@@ -1,7 +1,7 @@
 {
   "name": "@bead-ai/zeitlich",
   "version": "0.1.0",
-  "description": "An opinonated AI agent implementation for Temporal",
+  "description": "An opinionated AI agent implementation for Temporal",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
