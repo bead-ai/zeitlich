@@ -21,13 +21,9 @@ export function createTaskCreateHandler<
 >(
   stateManager: AgentStateManager<TCustom>,
   idGenerator: () => string
-): (
-  args: TaskCreateToolSchemaType,
-  toolCallId: string
-) => ToolHandlerResponse<WorkflowTask> {
+): (args: TaskCreateToolSchemaType) => ToolHandlerResponse<WorkflowTask> {
   return (
-    args: TaskCreateToolSchemaType,
-    _toolCallId: string
+    args: TaskCreateToolSchemaType
   ): ToolHandlerResponse<WorkflowTask> => {
     const task: WorkflowTask = {
       id: idGenerator(),

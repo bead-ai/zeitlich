@@ -17,13 +17,9 @@ import type { TaskGetToolSchemaType } from "./tool";
  */
 export function createTaskGetHandler<TCustom extends JsonSerializable<TCustom>>(
   stateManager: AgentStateManager<TCustom>
-): (
-  args: TaskGetToolSchemaType,
-  toolCallId: string
-) => ToolHandlerResponse<WorkflowTask | null> {
+): (args: TaskGetToolSchemaType) => ToolHandlerResponse<WorkflowTask | null> {
   return (
-    args: TaskGetToolSchemaType,
-    _toolCallId: string
+    args: TaskGetToolSchemaType
   ): ToolHandlerResponse<WorkflowTask | null> => {
     const task = stateManager.getTask(args.taskId) ?? null;
 

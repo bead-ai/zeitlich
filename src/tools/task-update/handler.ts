@@ -20,12 +20,10 @@ export function createTaskUpdateHandler<
 >(
   stateManager: AgentStateManager<TCustom>
 ): (
-  args: TaskUpdateToolSchemaType,
-  toolCallId: string
+  args: TaskUpdateToolSchemaType
 ) => ToolHandlerResponse<WorkflowTask | null> {
   return (
-    args: TaskUpdateToolSchemaType,
-    _toolCallId: string
+    args: TaskUpdateToolSchemaType
   ): ToolHandlerResponse<WorkflowTask | null> => {
     const task = stateManager.getTask(args.taskId);
 

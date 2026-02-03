@@ -4,6 +4,7 @@ import type {
 } from "../../lib/state-manager";
 import type { ToolHandlerResponse } from "../../lib/tool-router";
 import type { WorkflowTask } from "../../lib/types";
+import type { TaskListToolSchemaType } from "./tool";
 
 /**
  * Creates a TaskList handler that returns all tasks.
@@ -18,13 +19,9 @@ export function createTaskListHandler<
   TCustom extends JsonSerializable<TCustom>,
 >(
   stateManager: AgentStateManager<TCustom>
-): (
-  args: Record<string, never>,
-  toolCallId: string
-) => ToolHandlerResponse<WorkflowTask[]> {
+): (args: TaskListToolSchemaType) => ToolHandlerResponse<WorkflowTask[]> {
   return (
-    _args: Record<string, never>,
-    _toolCallId: string
+    _args: TaskListToolSchemaType
   ): ToolHandlerResponse<WorkflowTask[]> => {
     const taskList = stateManager.getTasks();
 
