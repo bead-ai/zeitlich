@@ -20,7 +20,7 @@ export interface TaskHandlerResult<TResult = unknown> {
  * @returns A tool handler function that can be used with the tool router
  *
  * @example
- * const taskHandler = createTaskHandler([
+ * const taskHandler = taskHandler([
  *   {
  *     name: "researcher",
  *     description: "Researches topics",
