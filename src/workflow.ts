@@ -94,6 +94,8 @@ export type {
   SessionEndHookContext,
   SubagentConfig,
   SubagentInput,
+  TaskStatus,
+  WorkflowTask,
 } from "./lib/types";
 export { isTerminalStatus } from "./lib/types";
 
@@ -128,6 +130,22 @@ export { writeTool } from "./tools/write/tool";
 export type { WriteToolSchemaType } from "./tools/write/tool";
 export { editTool } from "./tools/edit/tool";
 export type { EditToolSchemaType } from "./tools/edit/tool";
+
+// Workflow task tools (state-only, no activities needed)
+export { taskCreateTool } from "./tools/task-create/tool";
+export type { TaskCreateToolSchemaType } from "./tools/task-create/tool";
+export { createTaskCreateHandler } from "./tools/task-create/handler";
+
+export { taskGetTool } from "./tools/task-get/tool";
+export type { TaskGetToolSchemaType } from "./tools/task-get/tool";
+export { createTaskGetHandler } from "./tools/task-get/handler";
+
+export { taskListTool } from "./tools/task-list/tool";
+export { createTaskListHandler } from "./tools/task-list/handler";
+
+export { taskUpdateTool } from "./tools/task-update/tool";
+export type { TaskUpdateToolSchemaType } from "./tools/task-update/tool";
+export { createTaskUpdateHandler } from "./tools/task-update/handler";
 
 // Filesystem utilities (pure functions, no I/O)
 export {

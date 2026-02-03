@@ -127,6 +127,37 @@ export interface SubagentInput {
 }
 
 // ============================================================================
+// Workflow Tasks
+// ============================================================================
+
+/**
+ * Status of a workflow task
+ */
+export type TaskStatus = "pending" | "in_progress" | "completed";
+
+/**
+ * A task managed within a workflow for tracking work items
+ */
+export interface WorkflowTask {
+  /** Unique task identifier */
+  id: string;
+  /** Brief, actionable title in imperative form */
+  subject: string;
+  /** Detailed description of what needs to be done */
+  description: string;
+  /** Present continuous form shown in spinner when in_progress */
+  activeForm: string;
+  /** Current status of the task */
+  status: TaskStatus;
+  /** Arbitrary key-value pairs for tracking */
+  metadata: Record<string, string>;
+  /** IDs of tasks that must complete before this one can start */
+  blockedBy: string[];
+  /** IDs of tasks that are waiting for this one to complete */
+  blocks: string[];
+}
+
+// ============================================================================
 // Session Lifecycle Hooks
 // ============================================================================
 
