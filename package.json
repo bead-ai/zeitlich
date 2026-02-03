@@ -44,7 +44,9 @@
     "prepare": "husky",
     "release:pr": "release-please release-pr --repo-url=bead-ai/zeitlich --token=$GITHUB_TOKEN",
     "release:pr:dry": "release-please release-pr --repo-url=bead-ai/zeitlich --token=$GITHUB_TOKEN --dry-run",
-    "release:github": "release-please github-release --repo-url=bead-ai/zeitlich --token=$GITHUB_TOKEN"
+    "release:github": "release-please github-release --repo-url=bead-ai/zeitlich --token=$GITHUB_TOKEN",
+    "release:npm": "npm publish --access public",
+    "release:publish": "npm run release:github && npm run release:npm"
   },
   "keywords": [
     "ai",
