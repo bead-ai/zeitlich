@@ -52,8 +52,10 @@ export const createSession = async <
     /** Workflow-specific runAgent activity (with tools pre-bound) */
     runAgent: RunAgentActivity;
     promptManager: PromptManager;
-    toolRouter: ToolRouter<T, TResults>;
-    toolRegistry: ToolRegistry<T>;
+    /** Tool router for processing tool calls (optional if agent has no tools) */
+    toolRouter?: ToolRouter<T, TResults>;
+    /** Tool registry for parsing tool calls (optional if agent has no tools) */
+    toolRegistry?: ToolRegistry<T>;
     /** Session lifecycle hooks */
     hooks?: SessionLifecycleHooks;
   }
@@ -128,6 +130,13 @@ export const createSession = async <
           );
 
           if (stopReason === "end_turn") {
+            stateManager.complete();
+            exitReason = "completed";
+            return message;
+          }
+
+          // No tools configured - treat any non-end_turn as completed
+          if (!toolRouter || !toolRegistry) {
             stateManager.complete();
             exitReason = "completed";
             return message;
