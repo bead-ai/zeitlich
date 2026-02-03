@@ -9,18 +9,15 @@ import type { TaskUpdateToolSchemaType } from "./tool";
 /**
  * Creates a TaskUpdate handler that modifies task status and dependencies.
  *
- * @param tasks - Map storing workflow tasks
- * @param stateManager - State manager for version tracking
+ * @param stateManager - State manager containing tasks state
  * @returns A tool handler function
  *
  * @example
- * const tasks = new Map<string, WorkflowTask>();
- * const handler = createTaskUpdateHandler(tasks, stateManager);
+ * const handler = createTaskUpdateHandler(stateManager);
  */
 export function createTaskUpdateHandler<
   TCustom extends JsonSerializable<TCustom>,
 >(
-  tasks: Map<string, WorkflowTask>,
   stateManager: AgentStateManager<TCustom>
 ): (
   args: TaskUpdateToolSchemaType,
@@ -30,7 +27,7 @@ export function createTaskUpdateHandler<
     args: TaskUpdateToolSchemaType,
     _toolCallId: string
   ): ToolHandlerResponse<WorkflowTask | null> => {
-    const task = tasks.get(args.taskId);
+    const task = stateManager.getTask(args.taskId);
 
     if (!task) {
       return {
@@ -51,9 +48,10 @@ export function createTaskUpdateHandler<
           task.blockedBy.push(blockerId);
         }
         // Update the blocker task's blocks array
-        const blockerTask = tasks.get(blockerId);
+        const blockerTask = stateManager.getTask(blockerId);
         if (blockerTask && !blockerTask.blocks.includes(task.id)) {
           blockerTask.blocks.push(task.id);
+          stateManager.setTask(blockerTask);
         }
       }
     }
@@ -65,14 +63,15 @@ export function createTaskUpdateHandler<
           task.blocks.push(blockedId);
         }
         // Update the blocked task's blockedBy array
-        const blockedTask = tasks.get(blockedId);
+        const blockedTask = stateManager.getTask(blockedId);
         if (blockedTask && !blockedTask.blockedBy.includes(task.id)) {
           blockedTask.blockedBy.push(task.id);
+          stateManager.setTask(blockedTask);
         }
       }
     }
 
-    stateManager.incrementVersion();
+    stateManager.setTask(task);
 
     return {
       content: JSON.stringify(task, null, 2),

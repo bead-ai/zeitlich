@@ -1,6 +1,7 @@
 import {
   type AgentStatus,
   type BaseAgentState,
+  type WorkflowTask,
   isTerminalStatus,
 } from "./types";
 
@@ -101,6 +102,16 @@ export interface AgentStateManager<TCustom extends JsonSerializable<TCustom>> {
 
   /** Check if should return from waitForStateChange */
   shouldReturnFromWait(lastKnownVersion: number): boolean;
+
+  // Task management methods
+  /** Get all tasks */
+  getTasks(): WorkflowTask[];
+  /** Get a task by ID */
+  getTask(id: string): WorkflowTask | undefined;
+  /** Add or update a task */
+  setTask(task: WorkflowTask): void;
+  /** Delete a task by ID */
+  deleteTask(id: string): boolean;
 }
 
 /**
@@ -121,6 +132,9 @@ export function createAgentStateManager<
   let status: AgentStatus = "RUNNING";
   let version = 0;
   let turns = 0;
+
+  // Tasks state
+  const tasks = new Map<string, WorkflowTask>();
 
   // Custom state
   const customState = { ...(config?.initialState ?? ({} as TCustom)) };
@@ -203,6 +217,27 @@ export function createAgentStateManager<
 
     shouldReturnFromWait(lastKnownVersion: number): boolean {
       return version > lastKnownVersion || isTerminalStatus(status);
+    },
+
+    getTasks(): WorkflowTask[] {
+      return Array.from(tasks.values());
+    },
+
+    getTask(id: string): WorkflowTask | undefined {
+      return tasks.get(id);
+    },
+
+    setTask(task: WorkflowTask): void {
+      tasks.set(task.id, task);
+      version++;
+    },
+
+    deleteTask(id: string): boolean {
+      const deleted = tasks.delete(id);
+      if (deleted) {
+        version++;
+      }
+      return deleted;
     },
   };
 }

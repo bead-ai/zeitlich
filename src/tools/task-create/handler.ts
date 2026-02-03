@@ -9,19 +9,16 @@ import type { TaskCreateToolSchemaType } from "./tool";
 /**
  * Creates a TaskCreate handler that adds tasks to the workflow state.
  *
- * @param tasks - Map storing workflow tasks
- * @param stateManager - State manager for version tracking
+ * @param stateManager - State manager containing tasks state
  * @param idGenerator - Function to generate unique task IDs (e.g., uuid4 from Temporal)
  * @returns A tool handler function
  *
  * @example
- * const tasks = new Map<string, WorkflowTask>();
- * const handler = createTaskCreateHandler(tasks, stateManager, uuid4);
+ * const handler = createTaskCreateHandler(stateManager, uuid4);
  */
 export function createTaskCreateHandler<
   TCustom extends JsonSerializable<TCustom>,
 >(
-  tasks: Map<string, WorkflowTask>,
   stateManager: AgentStateManager<TCustom>,
   idGenerator: () => string
 ): (
@@ -43,8 +40,7 @@ export function createTaskCreateHandler<
       blocks: [],
     };
 
-    tasks.set(task.id, task);
-    stateManager.incrementVersion();
+    stateManager.setTask(task);
 
     return {
       content: JSON.stringify(task, null, 2),
