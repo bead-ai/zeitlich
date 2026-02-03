@@ -3,7 +3,7 @@ import type { MessageContent } from "@langchain/core/messages";
 /**
  * Configuration for creating a prompt manager
  */
-export interface PromptManagerConfig<TContext = unknown> {
+export interface PromptManagerConfig {
   /**
    * Base system prompt (e.g., Auditron identity).
    * Can be a static string or async function.
@@ -18,15 +18,13 @@ export interface PromptManagerConfig<TContext = unknown> {
    * Build context message content from agent-specific context.
    * Returns MessageContent array for the initial HumanMessage.
    */
-  buildContextMessage: (
-    context: TContext
-  ) => MessageContent | Promise<MessageContent>;
+  buildContextMessage: () => MessageContent | Promise<MessageContent>;
 }
 
 /**
  * Prompt manager interface
  */
-export interface PromptManager<TContext = unknown> {
+export interface PromptManager {
   /**
    * Get the full system prompt (base + instructions combined).
    */
@@ -34,16 +32,16 @@ export interface PromptManager<TContext = unknown> {
   /**
    * Build the initial context message content.
    */
-  buildContextMessage(context: TContext): Promise<MessageContent>;
+  buildContextMessage(): Promise<MessageContent>;
 }
 
 /**
  * Creates a prompt manager for handling system prompts and context messages.
  *
  */
-export function createPromptManager<TContext = unknown>(
-  config: PromptManagerConfig<TContext>
-): PromptManager<TContext> {
+export function createPromptManager(
+  config: PromptManagerConfig
+): PromptManager {
   const { baseSystemPrompt, instructionsPrompt, buildContextMessage } = config;
 
   async function resolvePrompt(
@@ -62,8 +60,8 @@ export function createPromptManager<TContext = unknown>(
       return [base, instructions].join("\n");
     },
 
-    async buildContextMessage(context: TContext): Promise<MessageContent> {
-      return buildContextMessage(context);
+    async buildContextMessage(): Promise<MessageContent> {
+      return buildContextMessage();
     },
   };
 }

@@ -21,10 +21,9 @@ export type {
 } from "./subagent-support";
 
 export interface ZeitlichSession {
-  runSession<T extends JsonSerializable<T>>(
-    prompt: string,
-    stateManager: AgentStateManager<T>
-  ): Promise<StoredMessage | null>;
+  runSession<T extends JsonSerializable<T>>(args: {
+    stateManager: AgentStateManager<T>;
+  }): Promise<StoredMessage | null>;
 }
 
 /**
@@ -89,10 +88,7 @@ export const createSession = async <
   };
 
   return {
-    runSession: async (
-      prompt: string,
-      stateManager
-    ): Promise<StoredMessage | null> => {
+    runSession: async ({ stateManager }): Promise<StoredMessage | null> => {
       if (hooks.onSessionStart) {
         await hooks.onSessionStart({
           threadId,
@@ -104,7 +100,7 @@ export const createSession = async <
       await initializeThread(threadId);
       await appendHumanMessage(
         threadId,
-        await promptManager.buildContextMessage(prompt)
+        await promptManager.buildContextMessage()
       );
 
       let exitReason: SessionExitReason = "completed";
