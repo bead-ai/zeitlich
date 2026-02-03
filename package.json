@@ -1,5 +1,5 @@
 {
-  "name": "@bead-ai/zeitlich",
+  "name": "zeitlich",
   "version": "0.1.0",
   "description": "An opinionated AI agent implementation for Temporal",
   "main": "./dist/index.js",
@@ -15,6 +15,16 @@
       "require": {
         "types": "./dist/index.d.ts",
         "default": "./dist/index.js"
+      }
+    },
+    "./workflow": {
+      "import": {
+        "types": "./dist/workflow.d.mts",
+        "default": "./dist/workflow.mjs"
+      },
+      "require": {
+        "types": "./dist/workflow.d.ts",
+        "default": "./dist/workflow.js"
       }
     }
   },
@@ -51,7 +61,10 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.0.0",
+    "@temporalio/envconfig": "^1.14.1",
+    "@temporalio/worker": "^1.14.1",
     "@types/node": "^20.11.0",
+    "@types/minimatch": "^5.1.2",
     "eslint": "^9.0.0",
     "husky": "^9.1.7",
     "ioredis": "^5.9.2",
@@ -67,5 +80,13 @@
   "bugs": {
     "url": "https://github.com/bead-ai/zeitlich/issues"
   },
-  "homepage": "https://github.com/bead-ai/zeitlich#readme"
+  "homepage": "https://github.com/bead-ai/zeitlich#readme",
+  "dependencies": {
+    "@langchain/core": "^1.1.18",
+    "@temporalio/common": "^1.14.1",
+    "@temporalio/plugin": "^1.14.1",
+    "@temporalio/workflow": "^1.14.1",
+    "minimatch": "^10.1.1",
+    "zod": "^4.3.6"
+  }
 }
