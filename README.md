@@ -489,6 +489,8 @@ For use in activities, worker setup, and Node.js code:
 
 Contributions are welcome! Please open an issue or submit a PR.
 
+For maintainers: see [RELEASING.md](./RELEASING.md) for the release process.
+
 ## License
 
 MIT © [Bead Technologies Inc.](https://usebead.ai)
