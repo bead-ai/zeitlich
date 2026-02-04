@@ -34,22 +34,44 @@ export interface ToolHandlerResponse<TResult> {
 }
 
 /**
- * A handler function for a specific tool.
- * Receives the parsed args and tool call ID, returns a response with content and result.
+ * Context passed to tool handlers for additional data beyond tool args.
+ * Use this to pass workflow state like file trees, user context, etc.
  */
-export type ToolHandler<TArgs, TResult> = (
+export interface ToolHandlerContext {
+  /** Additional context data - define your own shape */
+  [key: string]: unknown;
+}
+
+/**
+ * A handler function for a specific tool.
+ * Receives the parsed args and optional context, returns a response with content and result.
+ */
+export type ToolHandler<TArgs, TResult, TContext = ToolHandlerContext> = (
   args: TArgs,
-  toolCallId: string
+  context?: TContext
 ) => ToolHandlerResponse<TResult> | Promise<ToolHandlerResponse<TResult>>;
 
 /**
  * Activity-compatible tool handler that always returns a Promise.
  * Use this for tool handlers registered as Temporal activities.
+ *
+ * @example
+ * ```typescript
+ * // Filesystem handler with context
+ * const readHandler: ActivityToolHandler<
+ *   ReadToolSchemaType,
+ *   ReadResult,
+ *   { scopedNodes: FileNode[]; provider: FileSystemProvider }
+ * > = async (args, context) => {
+ *   return readHandler(args, context.scopedNodes, context.provider);
+ * };
+ * ```
  */
-export type ActivityToolHandler<TArgs, TResult> = (
-  args: TArgs,
-  toolCallId: string
-) => Promise<ToolHandlerResponse<TResult>>;
+export type ActivityToolHandler<
+  TArgs,
+  TResult,
+  TContext = ToolHandlerContext,
+> = (args: TArgs, context?: TContext) => Promise<ToolHandlerResponse<TResult>>;
 
 /**
  * Extract the args type for a specific tool name from a tool map.
@@ -122,11 +144,15 @@ export interface ToolRouterOptions<T extends ToolMap, TResult = unknown> {
 }
 
 /**
- * Context passed to processToolCalls for hook execution
+ * Context passed to processToolCalls for hook execution and handler invocation
  */
-export interface ProcessToolCallsContext {
+export interface ProcessToolCallsContext<
+  THandlerContext = ToolHandlerContext,
+> {
   /** Current turn number (for hooks) */
   turn?: number;
+  /** Context passed to each tool handler (scopedNodes, provider, etc.) */
+  handlerContext?: THandlerContext;
 }
 
 /**
@@ -232,7 +258,8 @@ export function createToolRouter<
 
   async function processToolCall(
     toolCall: ParsedToolCallUnion<T>,
-    turn: number
+    turn: number,
+    handlerContext?: ToolHandlerContext
   ): Promise<ToolCallResultUnion<TResults> | null> {
     const startTime = Date.now();
 
@@ -271,7 +298,7 @@ export function createToolRouter<
         // Cast is safe: either original args or modified args that must match schema
         const response = await handler(
           effectiveArgs as Parameters<typeof handler>[0],
-          toolCall.id
+          handlerContext
         );
         result = response.result;
         content = response.content;
@@ -336,10 +363,11 @@ export function createToolRouter<
       }
 
       const turn = context?.turn ?? 0;
+      const handlerContext = context?.handlerContext;
 
       if (parallel) {
         const results = await Promise.all(
-          toolCalls.map((tc) => processToolCall(tc, turn))
+          toolCalls.map((tc) => processToolCall(tc, turn, handlerContext))
         );
         // Filter out null results (skipped tool calls)
         return results.filter(
@@ -350,7 +378,7 @@ export function createToolRouter<
       // Sequential processing
       const results: ToolCallResultUnion<TResults>[] = [];
       for (const toolCall of toolCalls) {
-        const result = await processToolCall(toolCall, turn);
+        const result = await processToolCall(toolCall, turn, handlerContext);
         if (result !== null) {
           results.push(result);
         }
@@ -372,10 +400,7 @@ export function createToolRouter<
       const processOne = async (
         toolCall: ParsedToolCallUnion<T>
       ): Promise<ToolCallResult<TName, TResult>> => {
-        const response = await handler(
-          toolCall.args as ToolArgs<T, TName>,
-          toolCall.id
-        );
+        const response = await handler(toolCall.args as ToolArgs<T, TName>);
 
         // Automatically append tool result to thread
         await appendToolResult({

@@ -58,6 +58,7 @@ export type {
   ToolRouterHooks,
   ToolHandler,
   ActivityToolHandler,
+  ToolHandlerContext,
   ToolHandlerResponse,
   ToolHandlerMap,
   ToolCallResult,

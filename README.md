@@ -331,68 +331,75 @@ Built-in support for file operations with pluggable providers. File trees are dy
 import {
   buildFileTreePrompt,
   globTool,
-  grepTool,
   readTool,
   type FileNode,
+  type FileSystemProvider,
+  type ToolHandlerContext,
 } from "zeitlich/workflow";
 
 // In activities - use the providers and handlers
 import {
   CompositeFileSystemProvider,
   globHandler,
-  grepHandler,
   readHandler,
 } from "zeitlich";
 
-// Activities receive scopedNodes per-call for dynamic file trees
-// The provider fetches actual content from backends (DB, API, etc.)
+// Define your handler context type
+interface FileSystemContext extends ToolHandlerContext {
+  scopedNodes: FileNode[];
+  provider: FileSystemProvider;
+}
+
+// Activities receive context via handlerContext
 export const createActivities = (dbClient: DbClient) => ({
-  // Generate file tree from your data sources (implements GenerateFileTreeActivity)
+  // Generate file tree (implements GenerateFileTreeActivity)
   generateFileTree: async (config?: { userId: string }): Promise<FileNode[]> => {
-    // Fetch file metadata from database, API, etc.
     const files = await dbClient.getFilesForUser(config?.userId);
     return files.map((f) => ({
       path: f.path,
       type: "file" as const,
-      metadata: { dbId: f.id, backend: "db" },
+      metadata: { dbId: f.id },
     }));
   },
 
-  // File operations receive scopedNodes from workflow state
-  glob: async (args: GlobToolSchemaType, scopedNodes: FileNode[]) => {
-    const provider = CompositeFileSystemProvider.withScope(scopedNodes, {
-      backends: {
-        db: {
-          resolver: async (node) => {
-            const content = await dbClient.getFileContent(node.metadata?.dbId);
-            return { type: "text", content };
-          },
-        },
-      },
-      defaultBackend: "db",
-    });
-    return globHandler(args, scopedNodes, provider);
+  // Read file content from backend
+  readFileContent: async (node: FileNode) => {
+    const content = await dbClient.getFileContent(node.metadata?.dbId);
+    return { type: "text" as const, content };
   },
 
-  read: async (args: ReadToolSchemaType, scopedNodes: FileNode[]) => {
-    const provider = CompositeFileSystemProvider.withScope(scopedNodes, {
-      backends: {
-        db: {
-          resolver: async (node) => {
-            const content = await dbClient.getFileContent(node.metadata?.dbId);
-            return { type: "text", content };
-          },
-        },
-      },
-      defaultBackend: "db",
-    });
-    return readHandler(args, scopedNodes, provider);
+  // Handlers receive context from processToolCalls
+  glob: async (args: GlobToolSchemaType, context?: FileSystemContext) => {
+    if (!context) throw new Error("FileSystemContext required");
+    return globHandler(args, context.scopedNodes, context.provider);
+  },
+
+  read: async (args: ReadToolSchemaType, context?: FileSystemContext) => {
+    if (!context) throw new Error("FileSystemContext required");
+    return readHandler(args, context.scopedNodes, context.provider);
   },
 });
 
 // In workflow - file tree is generated at start, stored in state
 const fileTree = await activities.generateFileTree({ userId });
 stateManager.setFileTree(fileTree);
+
+// Create provider for this workflow
+const provider = CompositeFileSystemProvider.withScope(fileTree, {
+  backends: {
+    db: { resolver: (node) => activities.readFileContent(node) },
+  },
+  defaultBackend: "db",
+});
+
+// Pass handlerContext when processing tool calls
+await toolRouter.processToolCalls(toolCalls, {
+  turn: currentTurn,
+  handlerContext: {
+    scopedNodes: stateManager.getFileTree(),
+    provider,
+  },
+});
 
 // Build context for the agent prompt
 const fileTreeContext = buildFileTreePrompt(stateManager.getFileTree(), {
