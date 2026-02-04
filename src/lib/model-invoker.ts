@@ -19,7 +19,7 @@ import type {
 export interface InvokeModelConfig {
   threadId: string;
   agentName: string;
-  tools: ToolDefinition[];
+  tools?: ToolDefinition[];
 }
 
 /**

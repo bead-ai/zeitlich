@@ -52,7 +52,7 @@ Usage notes:
 export function createTaskTool<T extends SubagentConfig[]>(
   subagents: T
 ): {
-  name: typeof TASK_TOOL;
+  name: string;
   description: string;
   schema: z.ZodObject<{
     subagent: z.ZodEnum<Record<string, string>>;

@@ -107,11 +107,6 @@ export type {
 } from "./tools/task/tool";
 export { createTaskHandler } from "./tools/task/handler";
 export type { TaskHandlerResult } from "./tools/task/handler";
-export { withSubagentSupport, hasTaskTool } from "./lib/subagent-support";
-export type {
-  SubagentSupportConfig,
-  SubagentSupportResult,
-} from "./lib/subagent-support";
 
 // Activity type interfaces (types only, no runtime code)
 // These are safe to import in workflows for typing proxyActivities

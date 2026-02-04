@@ -129,12 +129,7 @@ export const createActivities = (redis: Redis) => {
 
   return {
     runAgent: (config, invocationConfig) =>
-      invokeModel(
-        redis,
-        { ...config, tools: Object.values(tools) },
-        model,
-        invocationConfig
-      ),
+      invokeModel(redis, config, model, invocationConfig),
 
     handleSearchResult: async ({ args }) => {
       // Your tool implementation
@@ -353,7 +348,9 @@ interface FileSystemContext extends ToolHandlerContext {
 // Activities receive context via handlerContext
 export const createActivities = (dbClient: DbClient) => ({
   // Generate file tree (implements GenerateFileTreeActivity)
-  generateFileTree: async (config?: { userId: string }): Promise<FileNode[]> => {
+  generateFileTree: async (config?: {
+    userId: string;
+  }): Promise<FileNode[]> => {
     const files = await dbClient.getFilesForUser(config?.userId);
     return files.map((f) => ({
       path: f.path,

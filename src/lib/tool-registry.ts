@@ -85,11 +85,6 @@ export interface ToolRegistry<T extends ToolMap> {
   parseToolCall(toolCall: RawToolCall): ParsedToolCallUnion<T>;
 
   /**
-   * Get the list of all tools in the registry.
-   */
-  getToolList(): T[keyof T][];
-
-  /**
    * Get a specific tool by its key in the registry.
    */
   getTool<K extends keyof T>(name: K): T[K];
@@ -103,6 +98,11 @@ export interface ToolRegistry<T extends ToolMap> {
    * Get all tool names in the registry.
    */
   getToolNames(): ToolNames<T>[];
+
+  /**
+   * Get all tools in the registry.
+   */
+  getToolList(): T[keyof T][];
 }
 
 /**
@@ -110,12 +110,9 @@ export interface ToolRegistry<T extends ToolMap> {
  *
  * @example
  * const registry = createToolRegistry({
- *   AssessAttribute: assessAttributeTool,
- *   AskUserQuestion: userInteractionTool,
+ *   AskUserQuestion: askUserQuestionTool,
  * });
  *
- * const toolCalls = message.tool_calls.map(tc => registry.parseToolCall(tc));
- * const tools = registry.getToolList();
  */
 export function createToolRegistry<T extends ToolMap>(
   tools: T
@@ -144,10 +141,6 @@ export function createToolRegistry<T extends ToolMap>(
       } as ParsedToolCallUnion<T>;
     },
 
-    getToolList(): T[keyof T][] {
-      return Object.values(tools) as T[keyof T][];
-    },
-
     getTool<K extends keyof T>(name: K): T[K] {
       return tools[name];
     },
@@ -158,6 +151,10 @@ export function createToolRegistry<T extends ToolMap>(
 
     getToolNames(): ToolNames<T>[] {
       return Array.from(toolMap.keys()) as ToolNames<T>[];
+    },
+
+    getToolList(): T[keyof T][] {
+      return Object.values(tools) as T[keyof T][];
     },
   };
 }

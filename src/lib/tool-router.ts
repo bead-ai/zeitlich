@@ -232,23 +232,10 @@ export type InferHandlerResults<H> = {
  *
  * @example
  * const router = createToolRouter(
- *   {
- *     registry: controlTestToolRegistry,
- *     threadId,
- *     appendToolResult,
- *     hooks: {
- *       onPreToolUse: (ctx) => { console.log('Before:', ctx.toolCall.name); },
- *       onPostToolUse: (ctx) => { console.log('After:', ctx.toolCall.name, ctx.durationMs); },
- *     },
- *   },
- *   {
- *     AskUserQuestion: async (args, toolCallId) => ({ content: '...', result: {...} }),
- *     // ... other handlers
- *   },
+ *   { registry, threadId, appendToolResult },
+ *   { AskUserQuestion: handleAskUserQuestion },
  * );
  *
- * const results = await router.processToolCalls(toolCalls, { turn: 1 });
- * // results[0].result is typed based on handler return types
  */
 export function createToolRouter<
   T extends ToolMap,
@@ -298,14 +285,12 @@ export function createToolRouter<
       }
     }
 
-    const handler = handlers[toolCall.name as keyof THandlers];
+    const handler = handlers[toolCall.name];
     let result: unknown;
     let content: ToolMessageContent;
 
     try {
       if (handler) {
-        // Use effective args (potentially modified by PreToolUse hook)
-        // Cast is safe: either original args or modified args that must match schema
         const response = await handler(
           effectiveArgs as Parameters<typeof handler>[0],
           (handlerContext ?? {}) as Parameters<typeof handler>[1]

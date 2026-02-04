@@ -1,6 +1,10 @@
 import type { FileNode } from "./filesystem/types";
 import type { ToolMessageContent } from "./thread-manager";
-import type { ParsedToolCallUnion, ToolMap } from "./tool-registry";
+import type {
+  ParsedToolCallUnion,
+  ToolDefinition,
+  ToolMap,
+} from "./tool-registry";
 
 import type { StoredMessage } from "@langchain/core/messages";
 import type { z } from "zod";
@@ -72,6 +76,7 @@ export interface RunAgentConfig {
   threadId: string;
   agentName: string;
   metadata?: Record<string, unknown>;
+  tools?: ToolDefinition[];
 }
 
 /**
