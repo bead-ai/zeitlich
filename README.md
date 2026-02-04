@@ -368,14 +368,12 @@ export const createActivities = (dbClient: DbClient) => ({
     return { type: "text" as const, content };
   },
 
-  // Handlers receive context from processToolCalls
-  glob: async (args: GlobToolSchemaType, context?: FileSystemContext) => {
-    if (!context) throw new Error("FileSystemContext required");
+  // Handlers receive context from processToolCalls (always defined, defaults to {})
+  glob: async (args: GlobToolSchemaType, context: FileSystemContext) => {
     return globHandler(args, context.scopedNodes, context.provider);
   },
 
-  read: async (args: ReadToolSchemaType, context?: FileSystemContext) => {
-    if (!context) throw new Error("FileSystemContext required");
+  read: async (args: ReadToolSchemaType, context: FileSystemContext) => {
     return readHandler(args, context.scopedNodes, context.provider);
   },
 });

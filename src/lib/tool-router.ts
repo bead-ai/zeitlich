@@ -44,16 +44,18 @@ export interface ToolHandlerContext {
 
 /**
  * A handler function for a specific tool.
- * Receives the parsed args and optional context, returns a response with content and result.
+ * Receives the parsed args and context, returns a response with content and result.
+ * Context always has a value (defaults to empty object if not provided).
  */
 export type ToolHandler<TArgs, TResult, TContext = ToolHandlerContext> = (
   args: TArgs,
-  context?: TContext
+  context: TContext
 ) => ToolHandlerResponse<TResult> | Promise<ToolHandlerResponse<TResult>>;
 
 /**
  * Activity-compatible tool handler that always returns a Promise.
  * Use this for tool handlers registered as Temporal activities.
+ * Context always has a value (defaults to empty object if not provided).
  *
  * @example
  * ```typescript
@@ -71,7 +73,7 @@ export type ActivityToolHandler<
   TArgs,
   TResult,
   TContext = ToolHandlerContext,
-> = (args: TArgs, context?: TContext) => Promise<ToolHandlerResponse<TResult>>;
+> = (args: TArgs, context: TContext) => Promise<ToolHandlerResponse<TResult>>;
 
 /**
  * Extract the args type for a specific tool name from a tool map.
@@ -146,9 +148,7 @@ export interface ToolRouterOptions<T extends ToolMap, TResult = unknown> {
 /**
  * Context passed to processToolCalls for hook execution and handler invocation
  */
-export interface ProcessToolCallsContext<
-  THandlerContext = ToolHandlerContext,
-> {
+export interface ProcessToolCallsContext<THandlerContext = ToolHandlerContext> {
   /** Current turn number (for hooks) */
   turn?: number;
   /** Context passed to each tool handler (scopedNodes, provider, etc.) */
@@ -176,10 +176,11 @@ export interface ToolRouter<
   /**
    * Process tool calls matching a specific name with a custom handler.
    */
-  processToolCallsByName<TName extends ToolNames<T>, TResult>(
+  processToolCallsByName<TName extends ToolNames<T>, TResult, TContext = ToolHandlerContext>(
     toolCalls: ParsedToolCallUnion<T>[],
     toolName: TName,
-    handler: ToolHandler<ToolArgs<T, TName>, TResult>
+    handler: ToolHandler<ToolArgs<T, TName>, TResult, TContext>,
+    context?: ProcessToolCallsContext<TContext>
   ): Promise<ToolCallResult<TName, TResult>[]>;
 
   /**
@@ -298,7 +299,7 @@ export function createToolRouter<
         // Cast is safe: either original args or modified args that must match schema
         const response = await handler(
           effectiveArgs as Parameters<typeof handler>[0],
-          handlerContext
+          (handlerContext ?? {}) as Parameters<typeof handler>[1]
         );
         result = response.result;
         content = response.content;
@@ -386,10 +387,11 @@ export function createToolRouter<
       return results;
     },
 
-    async processToolCallsByName<TName extends ToolNames<T>, TResult>(
+    async processToolCallsByName<TName extends ToolNames<T>, TResult, TContext = ToolHandlerContext>(
       toolCalls: ParsedToolCallUnion<T>[],
       toolName: TName,
-      handler: ToolHandler<ToolArgs<T, TName>, TResult>
+      handler: ToolHandler<ToolArgs<T, TName>, TResult, TContext>,
+      context?: ProcessToolCallsContext<TContext>
     ): Promise<ToolCallResult<TName, TResult>[]> {
       const matchingCalls = toolCalls.filter((tc) => tc.name === toolName);
 
@@ -397,10 +399,15 @@ export function createToolRouter<
         return [];
       }
 
+      const handlerContext = (context?.handlerContext ?? {}) as TContext;
+
       const processOne = async (
         toolCall: ParsedToolCallUnion<T>
       ): Promise<ToolCallResult<TName, TResult>> => {
-        const response = await handler(toolCall.args as ToolArgs<T, TName>);
+        const response = await handler(
+          toolCall.args as ToolArgs<T, TName>,
+          handlerContext
+        );
 
         // Automatically append tool result to thread
         await appendToolResult({
