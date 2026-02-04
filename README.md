@@ -338,43 +338,64 @@ import {
 
 // In activities - use the providers and handlers
 import {
-  InMemoryFileSystemProvider,
+  CompositeFileSystemProvider,
   globHandler,
   grepHandler,
   readHandler,
 } from "zeitlich";
 
 // Activities receive scopedNodes per-call for dynamic file trees
-export const createActivities = (fileContents: Record<string, string>) => ({
+// The provider fetches actual content from backends (DB, API, etc.)
+export const createActivities = (dbClient: DbClient) => ({
+  // Generate file tree from your data sources
+  generateFileTree: async (config: { userId: string }): Promise<FileNode[]> => {
+    // Fetch file metadata from database, API, etc.
+    const files = await dbClient.getFilesForUser(config.userId);
+    return files.map((f) => ({
+      path: f.path,
+      type: "file" as const,
+      metadata: { dbId: f.id, backend: "db" },
+    }));
+  },
+
+  // File operations receive scopedNodes from workflow state
   glob: async (args: GlobToolSchemaType, scopedNodes: FileNode[]) => {
-    // Provider is instantiated per-call with the current scope
-    const provider = InMemoryFileSystemProvider.withScopeFromTextFiles(
-      scopedNodes,
-      fileContents
-    );
+    const provider = CompositeFileSystemProvider.withScope(scopedNodes, {
+      backends: {
+        db: {
+          resolver: async (node) => {
+            const content = await dbClient.getFileContent(node.metadata?.dbId);
+            return { type: "text", content };
+          },
+        },
+      },
+      defaultBackend: "db",
+    });
     return globHandler(args, scopedNodes, provider);
   },
 
-  grep: async (args: GrepToolSchemaType, scopedNodes: FileNode[]) => {
-    const provider = InMemoryFileSystemProvider.withScopeFromTextFiles(
-      scopedNodes,
-      fileContents
-    );
-    return grepHandler(args, scopedNodes, provider);
-  },
-
   read: async (args: ReadToolSchemaType, scopedNodes: FileNode[]) => {
-    const provider = InMemoryFileSystemProvider.withScopeFromTextFiles(
-      scopedNodes,
-      fileContents
-    );
+    const provider = CompositeFileSystemProvider.withScope(scopedNodes, {
+      backends: {
+        db: {
+          resolver: async (node) => {
+            const content = await dbClient.getFileContent(node.metadata?.dbId);
+            return { type: "text", content };
+          },
+        },
+      },
+      defaultBackend: "db",
+    });
     return readHandler(args, scopedNodes, provider);
   },
 });
 
-// In workflow - file tree is stored in state and passed to activities
-const fileTree = stateManager.getFileTree();
-const fileTreeContext = buildFileTreePrompt(fileTree, {
+// In workflow - file tree is generated at start, stored in state
+const fileTree = await activities.generateFileTree({ userId });
+stateManager.setFileTree(fileTree);
+
+// Build context for the agent prompt
+const fileTreeContext = buildFileTreePrompt(stateManager.getFileTree(), {
   headerText: "Available Files",
 });
 ```
