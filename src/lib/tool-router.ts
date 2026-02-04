@@ -207,12 +207,12 @@ export interface ToolRouter<
 
 /**
  * Infer result types from a handler map.
- * Uses `any` for args due to function contravariance - handlers with specific
- * args types won't extend ToolHandler<unknown, R>.
+ * Uses `any` for args and context due to function contravariance - handlers with specific
+ * args/context types won't extend ToolHandler<unknown, R, unknown>.
  */
 export type InferHandlerResults<H> = {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  [K in keyof H & string]: H[K] extends ToolHandler<any, infer R>
+  [K in keyof H & string]: H[K] extends ToolHandler<any, infer R, any>
     ? Awaited<R>
     : never;
 };

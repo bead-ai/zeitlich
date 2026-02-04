@@ -1,4 +1,5 @@
 import type { ContentBlock } from "@langchain/core/messages";
+import type { JsonSerializable } from "../state-manager";
 
 /**
  * File node in the tree structure provided to the agent.
@@ -14,9 +15,9 @@ export interface FileNode {
   /** MIME type for multimodal content (e.g., "image/png", "application/pdf") */
   mimeType?: string;
   /** Provider-specific metadata (S3 key, database ID, etc.) */
-  metadata?: Record<string, unknown>;
+  metadata?: JsonSerializable<Record<string, unknown>>;
   /** Child nodes for directories */
-  children?: FileNode[];
+  children: FileNode[];
 }
 
 /**
