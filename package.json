@@ -29,7 +29,9 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "src",
+    "tsup.config.ts"
   ],
   "scripts": {
     "build": "tsup",
