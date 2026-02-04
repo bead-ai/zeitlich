@@ -34,8 +34,7 @@ export function createTaskHandler(subagents: SubagentConfig[]) {
     workflowInfo();
 
   return async (
-    args: GenericTaskToolSchemaType,
-    _toolCallId: string
+    args: GenericTaskToolSchemaType
   ): Promise<ToolHandlerResponse<TaskHandlerResult>> => {
     const config = subagents.find((s) => s.name === args.subagent);
 
