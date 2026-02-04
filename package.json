@@ -41,7 +41,7 @@
     "typecheck": "tsc --noEmit",
     "prepublishOnly": "npm run build",
     "clean": "rm -rf dist",
-    "prepare": "husky",
+    "prepare": "npm run build && husky",
     "release:pr": "release-please release-pr --repo-url=bead-ai/zeitlich --token=$GITHUB_TOKEN",
     "release:pr:dry": "release-please release-pr --repo-url=bead-ai/zeitlich --token=$GITHUB_TOKEN --dry-run",
     "release:github": "release-please github-release --repo-url=bead-ai/zeitlich --token=$GITHUB_TOKEN",
