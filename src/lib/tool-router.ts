@@ -84,13 +84,14 @@ export type ToolArgs<T extends ToolMap, TName extends ToolNames<T>> = z.infer<
 
 /**
  * A map of tool handlers keyed by tool name with typed results.
- * Each handler receives the properly typed args for that tool.
+ * Each handler receives the properly typed args and context for that tool.
  */
 export type ToolHandlerMap<
   T extends ToolMap,
   TResults extends Record<ToolNames<T>, unknown>,
+  TContext = ToolHandlerContext,
 > = {
-  [TName in ToolNames<T>]: ToolHandler<ToolArgs<T, TName>, TResults[TName]>;
+  [TName in ToolNames<T>]: ToolHandler<ToolArgs<T, TName>, TResults[TName], TContext>;
 };
 
 /**
