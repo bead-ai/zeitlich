@@ -8,6 +8,47 @@ import {
   type StoredMessage,
 } from "@langchain/core/messages";
 import type { RawToolCall } from "./lib/tool-registry";
+import type { FileNode } from "./lib/filesystem/types";
+
+/**
+ * Configuration for generating a file tree from various sources.
+ * This is a user-provided configuration - implement based on your data sources.
+ */
+export interface FileTreeGenerationConfig {
+  /** Data sources to generate the file tree from */
+  sources: Array<{
+    /** Type of data source */
+    type: "db" | "api" | "filesystem" | string;
+    /** Source-specific configuration */
+    config: Record<string, unknown>;
+  }>;
+}
+
+/**
+ * File tree generation activity interface.
+ * Implement this in your activities to generate dynamic file trees.
+ *
+ * @example
+ * ```typescript
+ * // In your activities file
+ * export const generateFileTree = async (
+ *   config: FileTreeGenerationConfig
+ * ): Promise<FileNode[]> => {
+ *   const nodes: FileNode[] = [];
+ *   for (const source of config.sources) {
+ *     if (source.type === 'db') {
+ *       nodes.push(...await fetchFromDatabase(source.config));
+ *     } else if (source.type === 'api') {
+ *       nodes.push(...await fetchFromApi(source.config));
+ *     }
+ *   }
+ *   return nodes;
+ * };
+ * ```
+ */
+export type GenerateFileTreeActivity = (
+  config: FileTreeGenerationConfig
+) => Promise<FileNode[]>;
 
 /**
  * Shared Zeitlich activities - thread management and message handling

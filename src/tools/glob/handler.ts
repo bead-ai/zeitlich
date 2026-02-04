@@ -1,43 +1,61 @@
 import type { FileSystemProvider, FileNode } from "../../lib/filesystem/types";
 import type { GlobToolSchemaType } from "./tool";
 
-export interface GlobHandlerConfig {
-  provider: FileSystemProvider;
-  scopedNodes: FileNode[];
+/**
+ * Result of a glob operation
+ */
+export interface GlobResult {
+  files: FileNode[];
 }
 
 /**
- * Create a glob handler that searches within the scoped file tree.
+ * Glob handler response
  */
-export function createGlobHandler(config: GlobHandlerConfig) {
-  return async (
-    args: GlobToolSchemaType
-  ): Promise<{ content: string; result: { files: FileNode[] } }> => {
-    const { pattern, root } = args;
+export interface GlobHandlerResponse {
+  content: string;
+  result: GlobResult;
+}
 
-    try {
-      const matches = await config.provider.glob(pattern, root);
+/**
+ * Glob handler that searches within the scoped file tree.
+ *
+ * @param args - Tool arguments (pattern, root)
+ * @param scopedNodes - The file tree defining the allowed scope
+ * @param provider - FileSystemProvider for I/O operations
+ */
+export async function globHandler(
+  args: GlobToolSchemaType,
+  scopedNodes: FileNode[],
+  provider: FileSystemProvider
+): Promise<GlobHandlerResponse> {
+  // scopedNodes is used by the provider for scope validation
+  // The provider should be instantiated with the scopedNodes
+  void scopedNodes;
 
-      if (matches.length === 0) {
-        return {
-          content: `No files found matching pattern: ${pattern}`,
-          result: { files: [] },
-        };
-      }
+  const { pattern, root } = args;
 
-      const paths = matches.map((node) => node.path);
-      const fileList = paths.map((p) => `  ${p}`).join("\n");
+  try {
+    const matches = await provider.glob(pattern, root);
 
+    if (matches.length === 0) {
       return {
-        content: `Found ${matches.length} file(s) matching "${pattern}":\n${fileList}`,
-        result: { files: matches },
-      };
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Unknown error";
-      return {
-        content: `Error searching for files: ${message}`,
+        content: `No files found matching pattern: ${pattern}`,
         result: { files: [] },
       };
     }
-  };
+
+    const paths = matches.map((node) => node.path);
+    const fileList = paths.map((p) => `  ${p}`).join("\n");
+
+    return {
+      content: `Found ${matches.length} file(s) matching "${pattern}":\n${fileList}`,
+      result: { files: matches },
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    return {
+      content: `Error searching for files: ${message}`,
+      result: { files: [] },
+    };
+  }
 }

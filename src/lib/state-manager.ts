@@ -4,6 +4,7 @@ import {
   type WorkflowTask,
   isTerminalStatus,
 } from "./types";
+import type { FileNode } from "./filesystem/types";
 
 /**
  * JSON primitive types that Temporal can serialize
@@ -112,6 +113,16 @@ export interface AgentStateManager<TCustom extends JsonSerializable<TCustom>> {
   setTask(task: WorkflowTask): void;
   /** Delete a task by ID */
   deleteTask(id: string): boolean;
+
+  // File tree management methods
+  /** Get the current file tree */
+  getFileTree(): FileNode[];
+  /** Set the entire file tree (replaces existing) */
+  setFileTree(nodes: FileNode[]): void;
+  /** Add a file node to the tree */
+  addFileNode(node: FileNode): void;
+  /** Remove a file node by path */
+  removeFileNode(path: string): boolean;
 }
 
 /**
@@ -135,6 +146,9 @@ export function createAgentStateManager<
 
   // Tasks state
   const tasks = new Map<string, WorkflowTask>();
+
+  // File tree state
+  let fileTree: FileNode[] = [];
 
   // Custom state
   const customState = { ...(config?.initialState ?? ({} as TCustom)) };
@@ -238,6 +252,30 @@ export function createAgentStateManager<
         version++;
       }
       return deleted;
+    },
+
+    getFileTree(): FileNode[] {
+      return fileTree;
+    },
+
+    setFileTree(nodes: FileNode[]): void {
+      fileTree = nodes;
+      version++;
+    },
+
+    addFileNode(node: FileNode): void {
+      fileTree = [...fileTree, node];
+      version++;
+    },
+
+    removeFileNode(path: string): boolean {
+      const initialLength = fileTree.length;
+      fileTree = fileTree.filter((n) => n.path !== path);
+      if (fileTree.length !== initialLength) {
+        version++;
+        return true;
+      }
+      return false;
     },
   };
 }

@@ -285,6 +285,34 @@ export class InMemoryFileSystemProvider extends BaseFileSystemProvider {
     }
     return new InMemoryFileSystemProvider(scopedNodes, fileMap);
   }
+
+  /**
+   * Create an InMemoryFileSystemProvider with a specific scope.
+   * Use this factory when instantiating providers per-call with dynamic file trees.
+   *
+   * @param scopedNodes - The file tree defining the allowed scope
+   * @param files - Map of file paths to content
+   */
+  static withScope(
+    scopedNodes: FileNode[],
+    files: Map<string, FileContent>
+  ): InMemoryFileSystemProvider {
+    return new InMemoryFileSystemProvider(scopedNodes, files);
+  }
+
+  /**
+   * Create an InMemoryFileSystemProvider with a specific scope from text files.
+   * Convenience factory combining withScope and fromTextFiles.
+   *
+   * @param scopedNodes - The file tree defining the allowed scope
+   * @param files - Object map of file paths to text content
+   */
+  static withScopeFromTextFiles(
+    scopedNodes: FileNode[],
+    files: Record<string, string>
+  ): InMemoryFileSystemProvider {
+    return InMemoryFileSystemProvider.fromTextFiles(scopedNodes, files);
+  }
 }
 
 /**
@@ -416,5 +444,23 @@ export class CompositeFileSystemProvider extends BaseFileSystemProvider {
    */
   hasBackend(name: string): boolean {
     return this.backends.has(name);
+  }
+
+  /**
+   * Create a CompositeFileSystemProvider with a specific scope.
+   * Use this factory when instantiating providers per-call with dynamic file trees.
+   *
+   * @param scopedNodes - The file tree defining the allowed scope
+   * @param config - Backend configuration including resolvers
+   */
+  static withScope(
+    scopedNodes: FileNode[],
+    config: {
+      backends: Record<string, BackendConfig>;
+      defaultBackend?: string;
+      defaultResolver?: FileResolver;
+    }
+  ): CompositeFileSystemProvider {
+    return new CompositeFileSystemProvider(scopedNodes, config);
   }
 }

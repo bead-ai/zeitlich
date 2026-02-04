@@ -85,7 +85,7 @@ Zeitlich provides two entry points to work with Temporal's workflow sandboxing:
 import { createSession, createToolRegistry, ... } from 'zeitlich/workflow';
 
 // In activity files and worker setup - full functionality
-import { ZeitlichPlugin, invokeModel, createGlobHandler, ... } from 'zeitlich';
+import { ZeitlichPlugin, invokeModel, globHandler, ... } from 'zeitlich';
 ```
 
 **Why?** Temporal workflows run in an isolated V8 sandbox that cannot import modules with Node.js APIs or external dependencies. The `/workflow` entry point contains only pure TypeScript code safe for workflow use.
@@ -324,7 +324,7 @@ const router = createToolRouter(
 
 ### Filesystem Utilities
 
-Built-in support for file operations with pluggable providers:
+Built-in support for file operations with pluggable providers. File trees are dynamic and stored in workflow state, enabling per-workflow scoping.
 
 ```typescript
 // In workflow - use the pure utilities and tool definitions
@@ -333,30 +333,47 @@ import {
   globTool,
   grepTool,
   readTool,
+  type FileNode,
 } from "zeitlich/workflow";
 
 // In activities - use the providers and handlers
 import {
   InMemoryFileSystemProvider,
-  createGlobHandler,
-  createGrepHandler,
-  createReadHandler,
+  globHandler,
+  grepHandler,
+  readHandler,
 } from "zeitlich";
 
-// Create an in-memory filesystem
-const provider = InMemoryFileSystemProvider.fromTextFiles(
-  fileTree,
-  fileContents
-);
+// Activities receive scopedNodes per-call for dynamic file trees
+export const createActivities = (fileContents: Record<string, string>) => ({
+  glob: async (args: GlobToolSchemaType, scopedNodes: FileNode[]) => {
+    // Provider is instantiated per-call with the current scope
+    const provider = InMemoryFileSystemProvider.withScopeFromTextFiles(
+      scopedNodes,
+      fileContents
+    );
+    return globHandler(args, scopedNodes, provider);
+  },
 
-// Create tool handlers
-const handlers = {
-  Glob: createGlobHandler({ provider, scopedNodes: fileTree }),
-  Grep: createGrepHandler({ provider, scopedNodes: fileTree }),
-  FileRead: createReadHandler({ provider, scopedNodes: fileTree }),
-};
+  grep: async (args: GrepToolSchemaType, scopedNodes: FileNode[]) => {
+    const provider = InMemoryFileSystemProvider.withScopeFromTextFiles(
+      scopedNodes,
+      fileContents
+    );
+    return grepHandler(args, scopedNodes, provider);
+  },
 
-// Generate context for the agent
+  read: async (args: ReadToolSchemaType, scopedNodes: FileNode[]) => {
+    const provider = InMemoryFileSystemProvider.withScopeFromTextFiles(
+      scopedNodes,
+      fileContents
+    );
+    return readHandler(args, scopedNodes, provider);
+  },
+});
+
+// In workflow - file tree is stored in state and passed to activities
+const fileTree = stateManager.getFileTree();
 const fileTreeContext = buildFileTreePrompt(fileTree, {
   headerText: "Available Files",
 });
@@ -388,12 +405,13 @@ import {
 } from "zeitlich/workflow";
 
 // Import handlers in activities
+// Handlers are direct functions that accept scopedNodes per-call
 import {
-  createReadHandler,
-  createWriteHandler,
-  createEditHandler,
-  createGlobHandler,
-  createGrepHandler,
+  readHandler,
+  writeHandler,
+  editHandler,
+  globHandler,
+  grepHandler,
 } from "zeitlich";
 ```
 
@@ -424,10 +442,10 @@ For use in activities, worker setup, and Node.js code:
 | `ZeitlichPlugin`              | Temporal worker plugin that registers shared activities                                                  |
 | `createSharedActivities`      | Creates thread management activities                                                                     |
 | `invokeModel`                 | Core LLM invocation utility (requires Redis + LangChain)                                                 |
-| `InMemoryFileSystemProvider`  | In-memory filesystem implementation                                                                      |
-| `CompositeFileSystemProvider` | Combines multiple filesystem providers                                                                   |
+| `InMemoryFileSystemProvider`  | In-memory filesystem implementation (use `withScope` factory for per-call instantiation)                 |
+| `CompositeFileSystemProvider` | Combines multiple filesystem providers (use `withScope` factory for per-call instantiation)              |
 | `BaseFileSystemProvider`      | Base class for custom providers                                                                          |
-| Tool handlers                 | `createGlobHandler`, `createGrepHandler`, `createReadHandler`, `createWriteHandler`, `createEditHandler` |
+| Tool handlers                 | `globHandler`, `grepHandler`, `readHandler`, `writeHandler`, `editHandler` (accept scopedNodes per-call) |
 
 ### Types
 

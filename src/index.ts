@@ -9,7 +9,7 @@
  * @example
  * ```typescript
  * // In your activities file
- * import { invokeModel, createGlobHandler } from '@bead-ai/zeitlich';
+ * import { invokeModel, globHandler } from '@bead-ai/zeitlich';
  *
  * // In your worker file
  * import { ZeitlichPlugin } from '@bead-ai/zeitlich';
@@ -26,24 +26,38 @@ export type { ZeitlichPluginOptions } from "./plugin";
 
 // Shared activities (requires Redis)
 export { createSharedActivities } from "./activities";
-export type { ZeitlichSharedActivities } from "./activities";
+export type {
+  ZeitlichSharedActivities,
+  FileTreeGenerationConfig,
+  GenerateFileTreeActivity,
+} from "./activities";
 
 // Model invocation (requires Redis, LangChain)
 export { invokeModel } from "./lib/model-invoker";
 export type { InvokeModelConfig } from "./lib/model-invoker";
 
 // Tool handlers (activity implementations)
+// These are direct functions that accept scopedNodes per-call for dynamic file trees
 export { handleAskUserQuestionToolResult } from "./tools/ask-user-question/handler";
-export { createGlobHandler } from "./tools/glob/handler";
-export type { GlobHandlerConfig } from "./tools/glob/handler";
-export { createGrepHandler } from "./tools/grep/handler";
-export type { GrepHandlerConfig } from "./tools/grep/handler";
-export { createReadHandler } from "./tools/read/handler";
-export type { ReadHandlerConfig } from "./tools/read/handler";
-export { createWriteHandler } from "./tools/write/handler";
-export type { WriteHandlerConfig, WriteResult } from "./tools/write/handler";
-export { createEditHandler } from "./tools/edit/handler";
-export type { EditHandlerConfig, EditResult } from "./tools/edit/handler";
+export { globHandler } from "./tools/glob/handler";
+export type { GlobResult, GlobHandlerResponse } from "./tools/glob/handler";
+export { grepHandler } from "./tools/grep/handler";
+export type { GrepResult, GrepHandlerResponse } from "./tools/grep/handler";
+export { readHandler } from "./tools/read/handler";
+export type { ReadResult, ReadHandlerResponse } from "./tools/read/handler";
+export { writeHandler } from "./tools/write/handler";
+export type {
+  WriteResult,
+  WriteHandlerResponse,
+  WriteHandlerOptions,
+  TreeUpdate,
+} from "./tools/write/handler";
+export { editHandler } from "./tools/edit/handler";
+export type {
+  EditResult,
+  EditHandlerResponse,
+  EditHandlerOptions,
+} from "./tools/edit/handler";
 
 // Filesystem providers (for activity implementations)
 export {

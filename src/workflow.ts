@@ -115,7 +115,11 @@ export type {
 
 // Activity type interfaces (types only, no runtime code)
 // These are safe to import in workflows for typing proxyActivities
-export type { ZeitlichSharedActivities } from "./activities";
+export type {
+  ZeitlichSharedActivities,
+  FileTreeGenerationConfig,
+  GenerateFileTreeActivity,
+} from "./activities";
 
 // Tool definitions (schemas only - no handlers)
 export { askUserQuestionTool } from "./tools/ask-user-question/tool";
