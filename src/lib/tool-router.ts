@@ -91,7 +91,11 @@ export type ToolHandlerMap<
   TResults extends Record<ToolNames<T>, unknown>,
   TContext = ToolHandlerContext,
 > = {
-  [TName in ToolNames<T>]: ToolHandler<ToolArgs<T, TName>, TResults[TName], TContext>;
+  [TName in ToolNames<T>]: ToolHandler<
+    ToolArgs<T, TName>,
+    TResults[TName],
+    TContext
+  >;
 };
 
 /**
@@ -177,7 +181,11 @@ export interface ToolRouter<
   /**
    * Process tool calls matching a specific name with a custom handler.
    */
-  processToolCallsByName<TName extends ToolNames<T>, TResult, TContext = ToolHandlerContext>(
+  processToolCallsByName<
+    TName extends ToolNames<T>,
+    TResult,
+    TContext = ToolHandlerContext,
+  >(
     toolCalls: ParsedToolCallUnion<T>[],
     toolName: TName,
     handler: ToolHandler<ToolArgs<T, TName>, TResult, TContext>,
@@ -388,7 +396,11 @@ export function createToolRouter<
       return results;
     },
 
-    async processToolCallsByName<TName extends ToolNames<T>, TResult, TContext = ToolHandlerContext>(
+    async processToolCallsByName<
+      TName extends ToolNames<T>,
+      TResult,
+      TContext = ToolHandlerContext,
+    >(
       toolCalls: ParsedToolCallUnion<T>[],
       toolName: TName,
       handler: ToolHandler<ToolArgs<T, TName>, TResult, TContext>,

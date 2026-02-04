@@ -28,7 +28,6 @@ export {
 export type {
   AgentState,
   AgentStateManager,
-  AgentStateManagerConfig,
   JsonSerializable,
   JsonValue,
   JsonPrimitive,

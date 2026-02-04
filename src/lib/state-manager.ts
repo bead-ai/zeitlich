@@ -41,16 +41,6 @@ export type JsonSerializable<T> = {
 };
 
 /**
- * Configuration for creating an agent state manager
- */
-export interface AgentStateManagerConfig<
-  TCustom extends JsonSerializable<TCustom>,
-> {
-  /** Initial values for custom state keys */
-  initialState: TCustom;
-}
-
-/**
  * Full state type combining base state with custom state
  */
 export type AgentState<TCustom extends JsonSerializable<TCustom>> =
@@ -128,9 +118,8 @@ export interface AgentStateManager<TCustom extends JsonSerializable<TCustom>> {
 /**
  * Creates an agent state manager for tracking workflow state.
  *
- * The manager owns all state internally:
- * - Default state: status, version (from BaseAgentState)
- * - Custom state: provided via initialState config
+ * @param initialState - Optional initial values for base and custom state
+ *   Base state defaults: status="RUNNING", version=0, turns=0, tasks=empty, fileTree=[]
  *
  * Note: Due to Temporal's workflow isolation, handlers must be set up
  * in the workflow file using defineQuery/defineUpdate and setHandler.
@@ -138,20 +127,28 @@ export interface AgentStateManager<TCustom extends JsonSerializable<TCustom>> {
  */
 export function createAgentStateManager<
   TCustom extends JsonSerializable<TCustom> = Record<string, never>,
->(config?: AgentStateManagerConfig<TCustom>): AgentStateManager<TCustom> {
+>(initialState?: Partial<BaseAgentState> & TCustom): AgentStateManager<TCustom> {
   // Default state (BaseAgentState fields)
-  let status: AgentStatus = "RUNNING";
-  let version = 0;
-  let turns = 0;
+  let status: AgentStatus = initialState?.status ?? "RUNNING";
+  let version = initialState?.version ?? 0;
+  let turns = initialState?.turns ?? 0;
 
   // Tasks state
-  const tasks = new Map<string, WorkflowTask>();
+  const tasks = new Map<string, WorkflowTask>(initialState?.tasks);
 
   // File tree state
-  let fileTree: FileNode[] = [];
+  let fileTree: FileNode[] = initialState?.fileTree ?? [];
 
-  // Custom state
-  const customState = { ...(config?.initialState ?? ({} as TCustom)) };
+  // Custom state - extract only custom fields (exclude base state keys)
+  const {
+    status: _,
+    version: __,
+    turns: ___,
+    tasks: ____,
+    fileTree: _____,
+    ...custom
+  } = initialState ?? {};
+  const customState = custom as TCustom;
 
   function buildState(): AgentState<TCustom> {
     return {
