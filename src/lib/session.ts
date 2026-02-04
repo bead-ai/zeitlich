@@ -6,19 +6,20 @@ import type {
   SessionStartHook,
   SessionEndHook,
   SessionExitReason,
+  SubagentConfig,
 } from "./types";
 import { type AgentStateManager, type JsonSerializable } from "./state-manager";
 import type { PromptManager } from "./prompt-manager";
-import type { RawToolCall, ToolMap, ToolRegistry } from "./tool-registry";
+import type {
+  ParsedToolCall,
+  ParsedToolCallUnion,
+  RawToolCall,
+  ToolMap,
+  ToolRegistry,
+} from "./tool-registry";
 import type { ToolRouter } from "./tool-router";
 import type { StoredMessage } from "@langchain/core/messages";
-
-// Re-export subagent support for easy access
-export { withSubagentSupport } from "./subagent-support";
-export type {
-  SubagentSupportConfig,
-  SubagentSupportResult,
-} from "./subagent-support";
+import { createTaskTool, type TaskToolSchemaType } from "../tools/task/tool";
 
 export interface ZeitlichSession {
   runSession<T extends JsonSerializable<T>>(args: {
@@ -46,15 +47,21 @@ export const createSession = async <
     promptManager,
     toolRouter,
     toolRegistry,
+    subagents,
     hooks = {},
   }: {
     /** Workflow-specific runAgent activity (with tools pre-bound) */
     runAgent: RunAgentActivity;
     promptManager: PromptManager;
     /** Tool router for processing tool calls (optional if agent has no tools) */
-    toolRouter?: ToolRouter<T, TResults>;
+    toolRouter?: ToolRouter<
+      T & { Task: TaskToolSchemaType<SubagentConfig[]> },
+      TResults
+    >;
     /** Tool registry for parsing tool calls (optional if agent has no tools) */
     toolRegistry?: ToolRegistry<T>;
+    /** Subagent configurations */
+    subagents?: SubagentConfig[];
     /** Session lifecycle hooks */
     hooks?: SessionLifecycleHooks;
   }
@@ -118,6 +125,10 @@ export const createSession = async <
             {
               threadId,
               agentName,
+              tools: [
+                ...(toolRegistry?.getToolList() ?? []),
+                ...(subagents?.length ? [createTaskTool(subagents)] : []),
+              ],
               metadata,
             },
             {
@@ -139,14 +150,39 @@ export const createSession = async <
           }
 
           const rawToolCalls: RawToolCall[] = await parseToolCalls(message);
-          const parsedToolCalls = rawToolCalls.map((tc: RawToolCall) =>
-            toolRegistry.parseToolCall(tc)
-          );
+          const parsedToolCalls = rawToolCalls
+            .filter((tc: RawToolCall) => tc.name !== "Task")
+            .map((tc: RawToolCall) => toolRegistry.parseToolCall(tc));
+          const taskToolCalls =
+            subagents && subagents.length > 0
+              ? rawToolCalls
+                  .filter((tc: RawToolCall) => tc.name === "Task")
+                  .map((tc: RawToolCall) => {
+                    // Parse and validate args using the tool's schema
+                    const parsedArgs = createTaskTool(subagents).schema.parse(
+                      tc.args
+                    );
+
+                    return {
+                      id: tc.id ?? "",
+                      name: tc.name,
+                      args: parsedArgs,
+                    } as ParsedToolCall<
+                      "Task",
+                      TaskToolSchemaType<SubagentConfig[]>
+                    >;
+                  })
+              : [];
 
           // Hooks can call stateManager.waitForInput() to pause the session
-          await toolRouter.processToolCalls(parsedToolCalls, {
-            turn: currentTurn,
-          });
+          await toolRouter.processToolCalls(
+            [...parsedToolCalls, ...taskToolCalls] as ParsedToolCallUnion<
+              T & { Task: TaskToolSchemaType<SubagentConfig[]> }
+            >[],
+            {
+              turn: currentTurn,
+            }
+          );
 
           if (stateManager.getStatus() === "WAITING_FOR_INPUT") {
             exitReason = "waiting_for_input";
