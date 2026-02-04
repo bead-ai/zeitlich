@@ -20,6 +20,7 @@ export interface WriteResult {
   bytesWritten: number;
   /** Tree update for new file creation - apply to workflow state */
   treeUpdate?: TreeUpdate;
+  children: FileNode[];
 }
 
 /**
@@ -71,6 +72,7 @@ export async function writeHandler(
         success: false,
         created: false,
         bytesWritten: 0,
+        children: [],
       },
     };
   }
@@ -87,6 +89,7 @@ export async function writeHandler(
           success: false,
           created: false,
           bytesWritten: 0,
+          children: [],
         },
       };
     }
@@ -104,6 +107,7 @@ export async function writeHandler(
           success: false,
           created: false,
           bytesWritten: 0,
+          children: [],
         },
       };
     }
@@ -120,6 +124,7 @@ export async function writeHandler(
       success: true,
       created,
       bytesWritten,
+      children: [],
     };
 
     // Include tree update for newly created files
@@ -129,6 +134,7 @@ export async function writeHandler(
         node: {
           path: file_path,
           type: "file",
+          children: [],
         },
       };
     }
@@ -146,6 +152,7 @@ export async function writeHandler(
         success: false,
         created: false,
         bytesWritten: 0,
+        children: [],
       },
     };
   }
