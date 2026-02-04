@@ -347,10 +347,10 @@ import {
 // Activities receive scopedNodes per-call for dynamic file trees
 // The provider fetches actual content from backends (DB, API, etc.)
 export const createActivities = (dbClient: DbClient) => ({
-  // Generate file tree from your data sources
-  generateFileTree: async (config: { userId: string }): Promise<FileNode[]> => {
+  // Generate file tree from your data sources (implements GenerateFileTreeActivity)
+  generateFileTree: async (config?: { userId: string }): Promise<FileNode[]> => {
     // Fetch file metadata from database, API, etc.
-    const files = await dbClient.getFilesForUser(config.userId);
+    const files = await dbClient.getFilesForUser(config?.userId);
     return files.map((f) => ({
       path: f.path,
       type: "file" as const,

@@ -117,7 +117,6 @@ export type {
 // These are safe to import in workflows for typing proxyActivities
 export type {
   ZeitlichSharedActivities,
-  FileTreeGenerationConfig,
   GenerateFileTreeActivity,
 } from "./activities";
 

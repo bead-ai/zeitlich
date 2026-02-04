@@ -28,7 +28,6 @@ export type { ZeitlichPluginOptions } from "./plugin";
 export { createSharedActivities } from "./activities";
 export type {
   ZeitlichSharedActivities,
-  FileTreeGenerationConfig,
   GenerateFileTreeActivity,
 } from "./activities";
 
