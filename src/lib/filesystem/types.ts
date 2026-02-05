@@ -144,6 +144,11 @@ export interface FileSystemProvider {
    * @param path Virtual path to check
    */
   exists(path: string): Promise<boolean>;
+
+  /**
+   * Get the scoped nodes for the provider
+   */
+  getScopedNodes(): FileNode[];
 }
 
 /**

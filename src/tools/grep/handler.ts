@@ -1,8 +1,4 @@
-import type {
-  FileSystemProvider,
-  FileNode,
-  GrepMatch,
-} from "../../lib/filesystem/types";
+import type { FileSystemProvider, GrepMatch } from "../../lib/filesystem/types";
 import type { GrepToolSchemaType } from "./tool";
 
 /**
@@ -49,18 +45,12 @@ function formatMatch(match: GrepMatch, showContext: boolean): string {
  * Grep handler that searches within the scoped file tree.
  *
  * @param args - Tool arguments (pattern, ignoreCase, maxMatches, etc.)
- * @param scopedNodes - The file tree defining the allowed scope
  * @param provider - FileSystemProvider for I/O operations
  */
 export async function grepHandler(
   args: GrepToolSchemaType,
-  scopedNodes: FileNode[],
   provider: FileSystemProvider
 ): Promise<GrepHandlerResponse> {
-  // scopedNodes is used by the provider for scope validation
-  // The provider should be instantiated with the scopedNodes
-  void scopedNodes;
-
   const {
     pattern,
     ignoreCase,

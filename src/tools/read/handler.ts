@@ -1,7 +1,6 @@
 import type { ContentBlock } from "@langchain/core/messages";
 import type {
   FileSystemProvider,
-  FileNode,
   FileContent,
 } from "../../lib/filesystem/types";
 import { fileContentToMessageContent } from "../../lib/filesystem/types";
@@ -55,18 +54,16 @@ function applyTextRange(
  * Read handler that reads files within the scoped file tree.
  *
  * @param args - Tool arguments (path, offset, limit)
- * @param scopedNodes - The file tree defining the allowed scope
  * @param provider - FileSystemProvider for I/O operations
  */
 export async function readHandler(
   args: ReadToolSchemaType,
-  scopedNodes: FileNode[],
   provider: FileSystemProvider
 ): Promise<ReadHandlerResponse> {
   const { path, offset, limit } = args;
 
   // Validate path is in scope
-  if (!isPathInScope(path, scopedNodes)) {
+  if (!isPathInScope(path, provider.getScopedNodes())) {
     return {
       content: [
         {

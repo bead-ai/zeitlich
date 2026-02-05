@@ -20,18 +20,12 @@ export interface GlobHandlerResponse {
  * Glob handler that searches within the scoped file tree.
  *
  * @param args - Tool arguments (pattern, root)
- * @param scopedNodes - The file tree defining the allowed scope
  * @param provider - FileSystemProvider for I/O operations
  */
 export async function globHandler(
   args: GlobToolSchemaType,
-  scopedNodes: FileNode[],
   provider: FileSystemProvider
 ): Promise<GlobHandlerResponse> {
-  // scopedNodes is used by the provider for scope validation
-  // The provider should be instantiated with the scopedNodes
-  void scopedNodes;
-
   const { pattern, root } = args;
 
   try {

@@ -235,6 +235,12 @@ export abstract class BaseFileSystemProvider implements FileSystemProvider {
   async exists(path: string): Promise<boolean> {
     return this.allowedPaths.has(path);
   }
+  /**
+   * Get the scoped nodes for the provider
+   */
+  getScopedNodes(): FileNode[] {
+    return this.scopedNodes;
+  }
 }
 
 /**

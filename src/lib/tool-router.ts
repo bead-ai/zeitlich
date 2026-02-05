@@ -54,7 +54,20 @@ export interface ToolWithHandler<
 /**
  * A map of tool keys to tool definitions with handlers.
  */
-export type ToolMap = Record<string, ToolWithHandler>;
+export type ToolMap = Record<
+  string,
+  {
+    name: string;
+    description: string;
+    schema: z.ZodType;
+    handler: (
+      args: unknown,
+      context: unknown
+    ) => ToolHandlerResponse<unknown> | Promise<ToolHandlerResponse<unknown>>;
+    strict?: boolean;
+    max_uses?: number;
+  }
+>;
 
 /**
  * Converts a ToolMap to MessageStructure-compatible tools type.
@@ -180,8 +193,11 @@ export type ToolArgs<T extends ToolMap, TName extends ToolNames<T>> = z.infer<
  * Extract the result type for a specific tool name from a tool map.
  */
 export type ToolResult<T extends ToolMap, TName extends ToolNames<T>> =
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  Extract<T[keyof T], { name: TName }>["handler"] extends ToolHandler<any, infer R, any>
+  Extract<T[keyof T], { name: TName }>["handler"] extends ToolHandler<
+    unknown,
+    infer R,
+    unknown
+  >
     ? Awaited<R>
     : never;
 
@@ -205,8 +221,11 @@ export interface ToolCallResult<
  * Infer result types from a tool map based on handler return types.
  */
 export type InferToolResults<T extends ToolMap> = {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  [K in keyof T as T[K]["name"]]: T[K]["handler"] extends ToolHandler<any, infer R, any>
+  [K in keyof T as T[K]["name"]]: T[K]["handler"] extends ToolHandler<
+    unknown,
+    infer R,
+    unknown
+  >
     ? Awaited<R>
     : never;
 };
