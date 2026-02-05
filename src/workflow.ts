@@ -49,8 +49,6 @@ export type {
   ParsedToolCallUnion,
   // Router types
   ToolRouter,
-  ToolRouterOptions,
-  ToolRouterHooks,
   // Handler types
   ToolHandler,
   ActivityToolHandler,
@@ -80,7 +78,6 @@ export type {
   InvocationConfig,
   ToolResultConfig,
   SessionExitReason,
-  SessionHooks,
   PreToolUseHook,
   PreToolUseHookContext,
   PreToolUseHookResult,

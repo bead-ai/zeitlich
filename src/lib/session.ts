@@ -2,20 +2,18 @@ import { proxyActivities } from "@temporalio/workflow";
 import type { ZeitlichSharedActivities } from "../activities";
 import type {
   ZeitlichAgentConfig,
-  RunAgentActivity,
   SessionStartHook,
   SessionEndHook,
   SessionExitReason,
   SubagentConfig,
 } from "./types";
 import { type AgentStateManager, type JsonSerializable } from "./state-manager";
-import type { PromptManager } from "./prompt-manager";
-import type {
-  ParsedToolCall,
-  ParsedToolCallUnion,
-  RawToolCall,
-  ToolMap,
-  ToolRouter,
+import {
+  createToolRouter,
+  type ParsedToolCall,
+  type ParsedToolCallUnion,
+  type RawToolCall,
+  type ToolMap,
 } from "./tool-router";
 import type { StoredMessage } from "@langchain/core/messages";
 import { createTaskTool, type TaskToolSchemaType } from "../tools/task/tool";
@@ -36,37 +34,41 @@ export interface SessionLifecycleHooks {
   onSessionEnd?: SessionEndHook;
 }
 
-export const createSession = async <T extends ToolMap>(
-  { threadId, agentName, maxTurns = 50, metadata = {} }: ZeitlichAgentConfig,
-  {
-    runAgent,
-    promptManager,
-    toolRouter,
-    subagents,
-    hooks = {},
-  }: {
-    /** Workflow-specific runAgent activity (with tools pre-bound) */
-    runAgent: RunAgentActivity;
-    promptManager: PromptManager;
-    /** Tool router for processing tool calls (optional if agent has no tools) */
-    toolRouter?: ToolRouter<T>;
-    /** Subagent configurations */
-    subagents?: SubagentConfig[];
-    /** Session lifecycle hooks */
-    hooks?: SessionLifecycleHooks;
-  }
-): Promise<ZeitlichSession> => {
-  const { initializeThread, appendHumanMessage, parseToolCalls } =
-    proxyActivities<ZeitlichSharedActivities>({
-      startToCloseTimeout: "30m",
-      retry: {
-        maximumAttempts: 6,
-        initialInterval: "5s",
-        maximumInterval: "15m",
-        backoffCoefficient: 4,
-      },
-      heartbeatTimeout: "5m",
-    });
+export const createSession = async <T extends ToolMap>({
+  threadId,
+  agentName,
+  maxTurns = 50,
+  metadata = {},
+  runAgent,
+  promptManager,
+  subagents,
+  tools = {} as T,
+  processToolsInParallel = true,
+  hooks = {},
+}: ZeitlichAgentConfig<T>): Promise<ZeitlichSession> => {
+  const {
+    initializeThread,
+    appendHumanMessage,
+    parseToolCalls,
+    appendToolResult,
+  } = proxyActivities<ZeitlichSharedActivities>({
+    startToCloseTimeout: "30m",
+    retry: {
+      maximumAttempts: 6,
+      initialInterval: "5s",
+      maximumInterval: "15m",
+      backoffCoefficient: 4,
+    },
+    heartbeatTimeout: "5m",
+  });
+
+  const toolRouter = createToolRouter({
+    tools,
+    appendToolResult,
+    threadId,
+    hooks,
+    parallel: processToolsInParallel,
+  });
 
   // Helper to call session end hook
   const callSessionEnd = async (

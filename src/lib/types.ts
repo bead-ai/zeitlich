@@ -1,6 +1,9 @@
+import type { PromptManager } from "./prompt-manager";
 import type { ToolMessageContent } from "./thread-manager";
 import type {
+  InferToolResults,
   ParsedToolCallUnion,
+  ToolCallResultUnion,
   ToolDefinition,
   ToolMap,
 } from "./tool-router";
@@ -60,11 +63,22 @@ export interface AgentResponse {
 /**
  * Configuration for a Zeitlich agent session
  */
-export interface ZeitlichAgentConfig {
+export interface ZeitlichAgentConfig<T extends ToolMap> {
   threadId: string;
   agentName: string;
   metadata?: Record<string, unknown>;
   maxTurns?: number;
+  /** Workflow-specific runAgent activity (with tools pre-bound) */
+  runAgent: RunAgentActivity;
+  promptManager: PromptManager;
+  /** Tool router for processing tool calls (optional if agent has no tools) */
+  tools?: T;
+  /** Subagent configurations */
+  subagents?: SubagentConfig[];
+  /** Session lifecycle hooks */
+  hooks?: Hooks<T, ToolCallResultUnion<InferToolResults<T>>>;
+  /** Whether to process tools in parallel */
+  processToolsInParallel?: boolean;
 }
 
 /**
@@ -305,7 +319,7 @@ export type SessionEndHook = (
 /**
  * Combined hooks interface for session lifecycle
  */
-export interface SessionHooks<T extends ToolMap, TResult = unknown> {
+export interface Hooks<T extends ToolMap, TResult = unknown> {
   /** Called before each tool execution - can block or modify */
   onPreToolUse?: PreToolUseHook<T>;
   /** Called after each successful tool execution */

@@ -1,14 +1,6 @@
-import type {
-  MessageStructure,
-  MessageToolDefinition,
-} from "@langchain/core/messages";
+import type { MessageToolDefinition } from "@langchain/core/messages";
 import type { ToolMessageContent } from "./thread-manager";
-import type {
-  ToolResultConfig,
-  PreToolUseHook,
-  PostToolUseHook,
-  PostToolUseFailureHook,
-} from "./types";
+import type { Hooks, ToolResultConfig } from "./types";
 
 import type { z } from "zod";
 import { proxyActivities } from "@temporalio/workflow";
@@ -82,14 +74,6 @@ export type ToolMapToMessageTools<T extends ToolMap> = {
     z.infer<T[K]["schema"]>
   >;
 };
-
-/**
- * Creates a MessageStructure type from a ToolMap.
- * This allows typed tool_calls on AIMessage when using parseToolCalls.
- */
-export type ToolMapToMessageStructure<T extends ToolMap> = MessageStructure<
-  ToolMapToMessageTools<T>
->;
 
 /**
  * Extract the tool names from a tool map (uses the tool's name property, not the key).
@@ -222,6 +206,22 @@ export interface ToolCallResult<
 }
 
 /**
+ * Options for creating a tool router.
+ */
+export interface ToolRouterOptions<T extends ToolMap> {
+  /** Map of tools with their handlers */
+  tools: T;
+  /** Thread ID for appending tool results */
+  threadId: string;
+  /** Function to append tool results to the thread (called automatically after each handler) */
+  appendToolResult: AppendToolResultFn;
+  /** Whether to process tools in parallel (default: true) */
+  parallel?: boolean;
+  /** Lifecycle hooks for tool execution */
+  hooks?: Hooks<T, ToolCallResultUnion<InferToolResults<T>>>;
+}
+
+/**
  * Infer result types from a tool map based on handler return types.
  */
 export type InferToolResults<T extends ToolMap> = {
@@ -242,36 +242,6 @@ export type InferToolResults<T extends ToolMap> = {
 export type ToolCallResultUnion<TResults extends Record<string, unknown>> = {
   [TName in keyof TResults & string]: ToolCallResult<TName, TResults[TName]>;
 }[keyof TResults & string];
-
-// ============================================================================
-// Router Configuration Types
-// ============================================================================
-
-/**
- * Tool-specific hooks for the router
- */
-export interface ToolRouterHooks<T extends ToolMap, TResult = unknown> {
-  /** Called before each tool execution - can block or modify */
-  onPreToolUse?: PreToolUseHook<T>;
-  /** Called after each successful tool execution */
-  onPostToolUse?: PostToolUseHook<T, TResult>;
-  /** Called when tool execution fails */
-  onPostToolUseFailure?: PostToolUseFailureHook<T>;
-}
-
-/**
- * Options for creating a tool router.
- */
-export interface ToolRouterOptions<T extends ToolMap> {
-  /** Map of tools with their handlers */
-  tools: T;
-  /** Thread ID for appending tool results */
-  threadId: string;
-  /** Whether to process tools in parallel (default: true) */
-  parallel?: boolean;
-  /** Lifecycle hooks for tool execution */
-  hooks?: ToolRouterHooks<T, ToolCallResultUnion<InferToolResults<T>>>;
-}
 
 /**
  * Context passed to processToolCalls for hook execution and handler invocation
