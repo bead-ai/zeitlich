@@ -9,9 +9,9 @@ type BashExecOut = {
 }
 
 export const handleBashTool: ActivityToolHandler<bashToolSchemaType, BashExecOut | null> = async (args: bashToolSchemaType) => {
-    const { bashOptions: customBashOptions, command } = args;
+    const { fs, command } = args;
 
-    const bashOptions = customBashOptions ?? {};
+    const bashOptions = fs ? { fs, } : {};
 
     const bash = new Bash(bashOptions);
 
