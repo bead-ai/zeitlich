@@ -26,10 +26,7 @@ export type { ZeitlichPluginOptions } from "./plugin";
 
 // Shared activities (requires Redis)
 export { createSharedActivities } from "./activities";
-export type {
-  ZeitlichSharedActivities,
-  GenerateFileTreeActivity,
-} from "./activities";
+export type { ZeitlichSharedActivities } from "./activities";
 
 // Model invocation (requires Redis, LangChain)
 export { invokeModel } from "./lib/model-invoker";
@@ -39,18 +36,7 @@ export type { InvokeModelConfig } from "./lib/model-invoker";
 // These are direct functions that accept scopedNodes per-call for dynamic file trees
 export { handleAskUserQuestionToolResult } from "./tools/ask-user-question/handler";
 export { globHandler } from "./tools/glob/handler";
-export type { GlobResult, GlobHandlerResponse } from "./tools/glob/handler";
-export { grepHandler } from "./tools/grep/handler";
-export type { GrepResult, GrepHandlerResponse } from "./tools/grep/handler";
-export { readHandler } from "./tools/read/handler";
-export type { ReadResult, ReadHandlerResponse } from "./tools/read/handler";
-export { writeHandler } from "./tools/write/handler";
-export type {
-  WriteResult,
-  WriteHandlerResponse,
-  WriteHandlerOptions,
-  TreeUpdate,
-} from "./tools/write/handler";
+
 export { editHandler } from "./tools/edit/handler";
 export type {
   EditResult,
@@ -58,9 +44,4 @@ export type {
   EditHandlerOptions,
 } from "./tools/edit/handler";
 
-// Filesystem providers (for activity implementations)
-export {
-  BaseFileSystemProvider,
-  InMemoryFileSystemProvider,
-  CompositeFileSystemProvider,
-} from "./lib/filesystem";
+export { toTree } from "./lib/fs";

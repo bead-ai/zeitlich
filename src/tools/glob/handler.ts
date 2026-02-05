@@ -1,11 +1,12 @@
-import type { FileSystemProvider, FileNode } from "../../lib/filesystem/types";
+import type { IFileSystem } from "just-bash";
+import { Bash } from "just-bash";
 import type { GlobToolSchemaType } from "./tool";
 
 /**
  * Result of a glob operation
  */
 export interface GlobResult {
-  files: FileNode[];
+  files: string[];
 }
 
 /**
@@ -23,33 +24,39 @@ export interface GlobHandlerResponse {
  * @param provider - FileSystemProvider for I/O operations
  */
 export async function globHandler(
-  args: GlobToolSchemaType,
-  provider: FileSystemProvider
+  _args: GlobToolSchemaType,
+  fs: IFileSystem
 ): Promise<GlobHandlerResponse> {
-  const { pattern, root } = args;
+  // const { pattern, root } = args;
+  const _bash = new Bash({ fs });
 
-  try {
-    const matches = await provider.glob(pattern, root);
+  return Promise.resolve({
+    content: "Hello, world!",
+    result: { files: [] },
+  });
 
-    if (matches.length === 0) {
-      return {
-        content: `No files found matching pattern: ${pattern}`,
-        result: { files: [] },
-      };
-    }
+  // try {
+  //   const matches = await bash.exec(`glob ${root} -name "${pattern}"`);
 
-    const paths = matches.map((node) => node.path);
-    const fileList = paths.map((p) => `  ${p}`).join("\n");
+  //   if (matches.length === 0) {
+  //     return {
+  //       content: `No files found matching pattern: ${pattern}`,
+  //       result: { files: [] },
+  //     };
+  //   }
 
-    return {
-      content: `Found ${matches.length} file(s) matching "${pattern}":\n${fileList}`,
-      result: { files: matches },
-    };
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Unknown error";
-    return {
-      content: `Error searching for files: ${message}`,
-      result: { files: [] },
-    };
-  }
+  //   const paths = matches.map((node) => node.path);
+  //   const fileList = paths.map((p) => `  ${p}`).join("\n");
+
+  //   return {
+  //     content: `Found ${matches.length} file(s) matching "${pattern}":\n${fileList}`,
+  //     result: { files: matches },
+  //   };
+  // } catch (error) {
+  //   const message = error instanceof Error ? error.message : "Unknown error";
+  //   return {
+  //     content: `Error searching for files: ${message}`,
+  //     result: { files: [] },
+  //   };
+  // }
 }

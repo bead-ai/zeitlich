@@ -8,34 +8,6 @@ import {
   type StoredMessage,
 } from "@langchain/core/messages";
 import type { RawToolCall } from "./lib/tool-router";
-import type { FileNode } from "./lib/filesystem/types";
-
-/**
- * File tree generation activity interface.
- * Implement this in your activities to generate dynamic file trees.
- *
- * The config parameter is optional and can be whatever your implementation needs
- * (user ID, project ID, filters, etc.).
- *
- * @example
- * ```typescript
- * // In your activities file
- * export const generateFileTree: GenerateFileTreeActivity<{ userId: string }> = async (
- *   config
- * ) => {
- *   const files = await db.getFilesForUser(config?.userId);
- *   return files.map((f) => ({
- *     path: f.path,
- *     type: "file" as const,
- *     metadata: { dbId: f.id },
- *   }));
- * };
- * ```
- */
-export type GenerateFileTreeActivity<
-  TConfig = Record<string, unknown>,
-> = (config?: TConfig) => Promise<FileNode[]>;
-
 /**
  * Shared Zeitlich activities - thread management and message handling
  * Note: runAgent is workflow-specific and should be created per-workflow

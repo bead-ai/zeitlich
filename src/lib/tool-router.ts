@@ -11,6 +11,8 @@ import type {
 } from "./types";
 
 import type { z } from "zod";
+import { proxyActivities } from "@temporalio/workflow";
+import type { ZeitlichSharedActivities } from "../activities";
 
 export type { ToolMessageContent };
 
@@ -60,10 +62,12 @@ export type ToolMap = Record<
     name: string;
     description: string;
     schema: z.ZodType;
+    /* eslint-disable @typescript-eslint/no-explicit-any */
     handler: (
-      args: unknown,
-      context: unknown
-    ) => ToolHandlerResponse<unknown> | Promise<ToolHandlerResponse<unknown>>;
+      args: any,
+      context: any
+    ) => ToolHandlerResponse<any> | Promise<ToolHandlerResponse<any>>;
+    /* eslint-enable @typescript-eslint/no-explicit-any */
     strict?: boolean;
     max_uses?: number;
   }
@@ -221,12 +225,14 @@ export interface ToolCallResult<
  * Infer result types from a tool map based on handler return types.
  */
 export type InferToolResults<T extends ToolMap> = {
+  /* eslint-disable @typescript-eslint/no-explicit-any */
   [K in keyof T as T[K]["name"]]: T[K]["handler"] extends ToolHandler<
-    unknown,
+    any,
     infer R,
-    unknown
+    any
   >
-    ? Awaited<R>
+    ? /* eslint-enable @typescript-eslint/no-explicit-any */
+      Awaited<R>
     : never;
 };
 
@@ -261,8 +267,6 @@ export interface ToolRouterOptions<T extends ToolMap> {
   tools: T;
   /** Thread ID for appending tool results */
   threadId: string;
-  /** Function to append tool results to the thread (called automatically after each handler) */
-  appendToolResult: AppendToolResultFn;
   /** Whether to process tools in parallel (default: true) */
   parallel?: boolean;
   /** Lifecycle hooks for tool execution */
@@ -374,7 +378,6 @@ export interface ToolRouter<T extends ToolMap> {
  * ```typescript
  * const router = createToolRouter({
  *   threadId,
- *   appendToolResult,
  *   tools: {
  *     Read: {
  *       name: "FileRead",
@@ -399,7 +402,17 @@ export interface ToolRouter<T extends ToolMap> {
 export function createToolRouter<T extends ToolMap>(
   options: ToolRouterOptions<T>
 ): ToolRouter<T> {
-  const { tools, parallel = true, threadId, appendToolResult, hooks } = options;
+  const { appendToolResult } = proxyActivities<ZeitlichSharedActivities>({
+    startToCloseTimeout: "2m",
+    retry: {
+      maximumAttempts: 3,
+      initialInterval: "5s",
+      maximumInterval: "15m",
+      backoffCoefficient: 4,
+    },
+  });
+
+  const { tools, parallel = true, threadId, hooks } = options;
 
   type TResults = InferToolResults<T>;
 

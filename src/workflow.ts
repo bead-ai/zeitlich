@@ -111,10 +111,7 @@ export type { TaskHandlerResult } from "./tools/task/handler";
 
 // Activity type interfaces (types only, no runtime code)
 // These are safe to import in workflows for typing proxyActivities
-export type {
-  ZeitlichSharedActivities,
-  GenerateFileTreeActivity,
-} from "./activities";
+export type { ZeitlichSharedActivities } from "./activities";
 
 // Tool definitions (schemas only - no handlers)
 export { askUserQuestionTool } from "./tools/ask-user-question/tool";
@@ -145,24 +142,3 @@ export { createTaskListHandler } from "./tools/task-list/handler";
 export { taskUpdateTool } from "./tools/task-update/tool";
 export type { TaskUpdateToolSchemaType } from "./tools/task-update/tool";
 export { createTaskUpdateHandler } from "./tools/task-update/handler";
-
-// Filesystem utilities (pure functions, no I/O)
-export {
-  buildFileTreePrompt,
-  flattenFileTree,
-  isPathInScope,
-  findNodeByPath,
-  fileContentToMessageContent,
-} from "./lib/filesystem";
-
-export type {
-  FileNode,
-  FileTreeRenderOptions,
-  FileSystemProvider,
-  FileSystemToolsConfig,
-  GrepOptions,
-  GrepMatch,
-  FileContent,
-  FileResolver,
-  BackendConfig,
-} from "./lib/filesystem";

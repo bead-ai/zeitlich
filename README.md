@@ -267,7 +267,6 @@ const router = createToolRouter(
   {
     registry: toolRegistry,
     threadId,
-    appendToolResult,
     hooks: {
       onPreToolUse: ({ toolCall }) => {
         console.log(`Executing ${toolCall.name}`);

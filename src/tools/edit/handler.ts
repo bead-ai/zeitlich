@@ -1,6 +1,5 @@
-import type { FileSystemProvider, FileNode } from "../../lib/filesystem/types";
-import { isPathInScope } from "../../lib/filesystem/tree-builder";
 import type { EditToolSchemaType } from "./tool";
+import type { IFileSystem } from "just-bash";
 
 /**
  * Result of an edit operation
@@ -45,18 +44,13 @@ function escapeRegExp(str: string): string {
  * Edit handler that edits files within the scoped file tree.
  *
  * @param args - Tool arguments (file_path, old_string, new_string, replace_all)
- * @param scopedNodes - The file tree defining the allowed scope
- * @param provider - FileSystemProvider for I/O operations
  * @param options - Additional options (readFiles, skipReadCheck)
  */
 export async function editHandler(
   args: EditToolSchemaType,
-  scopedNodes: FileNode[],
-  provider: FileSystemProvider,
-  options: EditHandlerOptions
+  fs: IFileSystem
 ): Promise<EditHandlerResponse> {
   const { file_path, old_string, new_string, replace_all = false } = args;
-  const { readFiles, skipReadCheck = false } = options;
 
   // Validate old_string !== new_string
   if (old_string === new_string) {
@@ -70,33 +64,9 @@ export async function editHandler(
     };
   }
 
-  // Validate path is in scope
-  if (!isPathInScope(file_path, scopedNodes)) {
-    return {
-      content: `Error: Path "${file_path}" is not within the available file system scope.`,
-      result: {
-        path: file_path,
-        success: false,
-        replacements: 0,
-      },
-    };
-  }
-
-  // Check read-before-write requirement
-  if (!skipReadCheck && !readFiles.has(file_path)) {
-    return {
-      content: `Error: You must read "${file_path}" before editing it. Use FileRead first.`,
-      result: {
-        path: file_path,
-        success: false,
-        replacements: 0,
-      },
-    };
-  }
-
   try {
     // Check if file exists
-    const exists = await provider.exists(file_path);
+    const exists = await fs.exists(file_path);
     if (!exists) {
       return {
         content: `Error: File "${file_path}" does not exist.`,
@@ -108,32 +78,8 @@ export async function editHandler(
       };
     }
 
-    // Check if provider supports write
-    if (!provider.write) {
-      return {
-        content: `Error: The file system provider does not support write operations.`,
-        result: {
-          path: file_path,
-          success: false,
-          replacements: 0,
-        },
-      };
-    }
-
     // Read current content
-    const fileContent = await provider.read(file_path);
-    if (fileContent.type !== "text") {
-      return {
-        content: `Error: FileEdit only works with text files. "${file_path}" is ${fileContent.type}.`,
-        result: {
-          path: file_path,
-          success: false,
-          replacements: 0,
-        },
-      };
-    }
-
-    const content = fileContent.content;
+    const content = await fs.readFile(file_path);
 
     // Check if old_string exists in the file
     if (!content.includes(old_string)) {
@@ -182,7 +128,7 @@ export async function editHandler(
     }
 
     // Write the modified content
-    await provider.write(file_path, newContent);
+    await fs.writeFile(file_path, newContent);
 
     const summary = replace_all
       ? `Replaced ${replacements} occurrence(s)`

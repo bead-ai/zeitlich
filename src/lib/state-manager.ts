@@ -4,7 +4,6 @@ import {
   type WorkflowTask,
   isTerminalStatus,
 } from "./types";
-import type { FileNode } from "./filesystem/types";
 
 /**
  * JSON primitive types that Temporal can serialize
@@ -103,16 +102,6 @@ export interface AgentStateManager<TCustom extends JsonSerializable<TCustom>> {
   setTask(task: WorkflowTask): void;
   /** Delete a task by ID */
   deleteTask(id: string): boolean;
-
-  // File tree management methods
-  /** Get the current file tree */
-  getFileTree(): FileNode[];
-  /** Set the entire file tree (replaces existing) */
-  setFileTree(nodes: FileNode[]): void;
-  /** Add a file node to the tree */
-  addFileNode(node: FileNode): void;
-  /** Remove a file node by path */
-  removeFileNode(path: string): boolean;
 }
 
 /**
@@ -127,7 +116,9 @@ export interface AgentStateManager<TCustom extends JsonSerializable<TCustom>> {
  */
 export function createAgentStateManager<
   TCustom extends JsonSerializable<TCustom> = Record<string, never>,
->(initialState?: Partial<BaseAgentState> & TCustom): AgentStateManager<TCustom> {
+>(
+  initialState?: Partial<BaseAgentState> & TCustom
+): AgentStateManager<TCustom> {
   // Default state (BaseAgentState fields)
   let status: AgentStatus = initialState?.status ?? "RUNNING";
   let version = initialState?.version ?? 0;
@@ -136,16 +127,12 @@ export function createAgentStateManager<
   // Tasks state
   const tasks = new Map<string, WorkflowTask>(initialState?.tasks);
 
-  // File tree state
-  let fileTree: FileNode[] = initialState?.fileTree ?? [];
-
   // Custom state - extract only custom fields (exclude base state keys)
   const {
     status: _,
     version: __,
     turns: ___,
     tasks: ____,
-    fileTree: _____,
     ...custom
   } = initialState ?? {};
   const customState = custom as TCustom;
@@ -249,30 +236,6 @@ export function createAgentStateManager<
         version++;
       }
       return deleted;
-    },
-
-    getFileTree(): FileNode[] {
-      return fileTree;
-    },
-
-    setFileTree(nodes: FileNode[]): void {
-      fileTree = nodes;
-      version++;
-    },
-
-    addFileNode(node: FileNode): void {
-      fileTree = [...fileTree, node];
-      version++;
-    },
-
-    removeFileNode(path: string): boolean {
-      const initialLength = fileTree.length;
-      fileTree = fileTree.filter((n) => n.path !== path);
-      if (fileTree.length !== initialLength) {
-        version++;
-        return true;
-      }
-      return false;
     },
   };
 }

@@ -1,4 +1,3 @@
-import type { FileNode } from "./filesystem/types";
 import type { ToolMessageContent } from "./thread-manager";
 import type {
   ParsedToolCallUnion,
@@ -26,7 +25,6 @@ export interface BaseAgentState {
   status: AgentStatus;
   version: number;
   turns: number;
-  fileTree: FileNode[];
   tasks: Map<string, WorkflowTask>;
 }
 
