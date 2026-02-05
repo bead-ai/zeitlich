@@ -2,7 +2,6 @@ import { dirname } from "path";
 import { fileURLToPath } from "url";
 import { describe, expect, it } from "vitest";
 import { handleBashTool } from "./handler";
-import type { BashOptions} from "just-bash";
 import { OverlayFs } from "just-bash";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -70,9 +69,8 @@ describe("bash with default options", () => {
 
 describe("bash with overlay filesystem", () => {
     it("sees files in the current directory", async () => {
-        const fs = new OverlayFs({ root: __dirname });
-        const bashOptions: BashOptions = { fs, cwd: fs.getMountPoint() };
-        const { result } = await handleBashTool({ command: "ls", bashOptions }, {});
+        const fs = new OverlayFs({ root: __dirname, mountPoint: "/home/user" });
+        const { result } = await handleBashTool({ command: "ls", fs }, {});
         expect(result?.stdout).toContain("bash.test.ts");
         expect(result?.stdout).toContain("handler.ts");
         expect(result?.stdout).toContain("tool.ts");
