@@ -1,7 +1,13 @@
+import { dirname } from "path";
+import { fileURLToPath } from "url";
 import { describe, expect, it } from "vitest";
 import { handleBashTool } from "./handler";
+import type { BashOptions} from "just-bash";
+import { OverlayFs } from "just-bash";
 
-describe("bash", () => {
+const __dirname = dirname(fileURLToPath(import.meta.url));
+
+describe("bash with default options", () => {
     it("executes echo and captures stdout", async () => {
         const { result } = await handleBashTool({ command: "echo 'hello world'" }, {});
         expect(result).not.toBeNull();
@@ -59,5 +65,16 @@ describe("bash", () => {
         expect(content).toContain("Exit code: 0");
         expect(content).toContain("stdout:");
         expect(content).toContain("test");
+    });
+});
+
+describe("bash with overlay filesystem", () => {
+    it("sees files in the current directory", async () => {
+        const fs = new OverlayFs({ root: __dirname });
+        const bashOptions: BashOptions = { fs, cwd: fs.getMountPoint() };
+        const { result } = await handleBashTool({ command: "ls", bashOptions }, {});
+        expect(result?.stdout).toContain("bash.test.ts");
+        expect(result?.stdout).toContain("handler.ts");
+        expect(result?.stdout).toContain("tool.ts");
     });
 });
