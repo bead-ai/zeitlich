@@ -24,6 +24,15 @@ export interface ZeitlichSession {
   }): Promise<StoredMessage | null>;
 }
 
+async function resolvePrompt(
+  prompt: string | (() => string | Promise<string>)
+): Promise<string> {
+  if (typeof prompt === "function") {
+    return prompt();
+  }
+  return prompt;
+}
+
 /**
  * Session-level hooks for lifecycle events
  */
@@ -40,10 +49,13 @@ export const createSession = async <T extends ToolMap>({
   maxTurns = 50,
   metadata = {},
   runAgent,
-  promptManager,
+  baseSystemPrompt,
+  instructionsPrompt,
+  buildContextMessage,
   subagents,
   tools = {} as T,
   processToolsInParallel = true,
+  buildInTools = {},
   hooks = {},
 }: ZeitlichAgentConfig<T>): Promise<ZeitlichSession> => {
   const {
@@ -68,6 +80,7 @@ export const createSession = async <T extends ToolMap>({
     appendToolResult,
     threadId,
     hooks,
+    buildInTools,
     parallel: processToolsInParallel,
   });
 
@@ -102,12 +115,12 @@ export const createSession = async <T extends ToolMap>({
       await initializeThread(threadId);
       await appendSystemMessage(
         threadId,
-        await promptManager.getSystemPrompt()
+        [
+          await resolvePrompt(baseSystemPrompt),
+          await resolvePrompt(instructionsPrompt),
+        ].join("\n")
       );
-      await appendHumanMessage(
-        threadId,
-        await promptManager.buildContextMessage()
-      );
+      await appendHumanMessage(threadId, await buildContextMessage());
 
       let exitReason: SessionExitReason = "completed";
 

@@ -1,6 +1,7 @@
-import type { PromptManager } from "./prompt-manager";
 import type { ToolMessageContent } from "./thread-manager";
 import type {
+  ActivityToolHandler,
+  BuildInToolDefinitions,
   InferToolResults,
   ParsedToolCallUnion,
   ToolCallResultUnion,
@@ -8,7 +9,7 @@ import type {
   ToolMap,
 } from "./tool-router";
 
-import type { StoredMessage } from "@langchain/core/messages";
+import type { MessageContent, StoredMessage } from "@langchain/core/messages";
 import type { z } from "zod";
 
 /**
@@ -71,7 +72,6 @@ export interface ZeitlichAgentConfig<T extends ToolMap> {
   maxTurns?: number;
   /** Workflow-specific runAgent activity (with tools pre-bound) */
   runAgent: RunAgentActivity;
-  promptManager: PromptManager;
   /** Tool router for processing tool calls (optional if agent has no tools) */
   tools?: T;
   /** Subagent configurations */
@@ -80,6 +80,33 @@ export interface ZeitlichAgentConfig<T extends ToolMap> {
   hooks?: Hooks<T, ToolCallResultUnion<InferToolResults<T>>>;
   /** Whether to process tools in parallel */
   processToolsInParallel?: boolean;
+  /**
+   * Base system prompt (e.g., Auditron identity).
+   * Can be a static string or async function.
+   */
+  baseSystemPrompt: string | (() => string | Promise<string>);
+  /**
+   * Agent-specific instructions prompt.
+   * Can be a static string or async function.
+   */
+  instructionsPrompt: string | (() => string | Promise<string>);
+  /**
+   * Build context message content from agent-specific context.
+   * Returns MessageContent array for the initial HumanMessage.
+   */
+  buildContextMessage: () => MessageContent | Promise<MessageContent>;
+  /**
+   * Build in tools
+   */
+  buildInTools?: Partial<
+    Record<
+      keyof BuildInToolDefinitions,
+      ActivityToolHandler<
+        BuildInToolDefinitions[keyof BuildInToolDefinitions]["schema"],
+        BuildInToolDefinitions[keyof BuildInToolDefinitions]["handler"]
+      >
+    >
+  >;
 }
 
 /**

@@ -32,10 +32,6 @@ export type {
   JsonPrimitive,
 } from "./lib/state-manager";
 
-// Prompt management
-export { createPromptManager } from "./lib/prompt-manager";
-export type { PromptManager, PromptManagerConfig } from "./lib/prompt-manager";
-
 // Tool router (includes registry functionality)
 export { createToolRouter, hasNoOtherToolCalls } from "./lib/tool-router";
 export type {

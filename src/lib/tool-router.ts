@@ -7,6 +7,10 @@ import { proxyActivities } from "@temporalio/workflow";
 import type { ZeitlichSharedActivities } from "../activities";
 import { createTaskTool } from "../tools/task/tool";
 import { createTaskHandler } from "../tools/task/handler";
+import type { handleBashTool } from "../tools/bash/handler";
+import type { createTaskCreateHandler } from "../tools/task-create/handler";
+import { bashTool } from "../tools/bash/tool";
+import { taskCreateTool } from "../tools/task-create/tool";
 
 export type { ToolMessageContent };
 
@@ -139,6 +143,23 @@ export interface ToolHandlerContext {
   [key: string]: unknown;
 }
 
+export interface BuildInToolDefinitions {
+  [bashTool.name]: typeof bashTool & {
+    handler: ReturnType<typeof handleBashTool>;
+  };
+  [taskCreateTool.name]: typeof taskCreateTool & {
+    handler: ReturnType<typeof createTaskCreateHandler>;
+  };
+}
+
+export const buildIntoolDefinitions: Record<
+  keyof BuildInToolDefinitions,
+  ToolDefinition
+> = {
+  [bashTool.name]: bashTool,
+  [taskCreateTool.name]: taskCreateTool,
+};
+
 /**
  * A handler function for a specific tool.
  * Receives the parsed args and context, returns a response with content and result.
@@ -223,6 +244,16 @@ export interface ToolRouterOptions<T extends ToolMap> {
   hooks?: Hooks<T, ToolCallResultUnion<InferToolResults<T>>>;
   /** Subagent configurations */
   subagents?: SubagentConfig[];
+  /** Build in tools */
+  buildInTools?: Partial<
+    Record<
+      keyof BuildInToolDefinitions,
+      ActivityToolHandler<
+        BuildInToolDefinitions[keyof BuildInToolDefinitions]["schema"],
+        BuildInToolDefinitions[keyof BuildInToolDefinitions]["handler"]
+      >
+    >
+  >;
 }
 
 /**
@@ -404,6 +435,15 @@ export function createToolRouter<T extends ToolMap>(
       ...createTaskTool(options.subagents),
       handler: createTaskHandler(options.subagents),
     });
+  }
+
+  if (options.buildInTools) {
+    for (const [key, value] of Object.entries(options.buildInTools)) {
+      toolMap.set(key, {
+        ...buildIntoolDefinitions[key as keyof BuildInToolDefinitions],
+        handler: value,
+      });
+    }
   }
 
   async function processToolCall(

@@ -144,13 +144,7 @@ export const createActivities = (redis: Redis) => {
 
 ```typescript
 import { proxyActivities, workflowInfo } from "@temporalio/workflow";
-import {
-  createAgentStateManager,
-  createSession,
-  createPromptManager,
-  createToolRegistry,
-  createToolRouter,
-} from "zeitlich/workflow";
+import { createAgentStateManager, createSession } from "zeitlich/workflow";
 import type { ZeitlichSharedActivities } from "zeitlich/workflow";
 import { tools } from "./tools";
 

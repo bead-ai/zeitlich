@@ -18,10 +18,13 @@ import type { TaskCreateToolSchemaType } from "./tool";
  */
 export function createTaskCreateHandler<
   TCustom extends JsonSerializable<TCustom>,
->(
-  stateManager: AgentStateManager<TCustom>,
-  idGenerator: () => string
-): (args: TaskCreateToolSchemaType) => ToolHandlerResponse<WorkflowTask> {
+>({
+  stateManager,
+  idGenerator,
+}: {
+  stateManager: AgentStateManager<TCustom>;
+  idGenerator: () => string;
+}): (args: TaskCreateToolSchemaType) => ToolHandlerResponse<WorkflowTask> {
   return (
     args: TaskCreateToolSchemaType
   ): ToolHandlerResponse<WorkflowTask> => {
