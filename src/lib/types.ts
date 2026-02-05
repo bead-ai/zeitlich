@@ -4,7 +4,7 @@ import type {
   ParsedToolCallUnion,
   ToolDefinition,
   ToolMap,
-} from "./tool-registry";
+} from "./tool-router";
 
 import type { StoredMessage } from "@langchain/core/messages";
 import type { z } from "zod";

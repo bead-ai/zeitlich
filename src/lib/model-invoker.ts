@@ -1,7 +1,7 @@
 import type Redis from "ioredis";
 import { createThreadManager } from "./thread-manager";
 import type { AgentResponse, InvocationConfig } from "./types";
-import type { ToolDefinition } from "./tool-registry";
+import type { ToolDefinition } from "./tool-router";
 import {
   mapStoredMessagesToChatMessages,
   SystemMessage,

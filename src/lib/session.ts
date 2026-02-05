@@ -15,9 +15,8 @@ import type {
   ParsedToolCallUnion,
   RawToolCall,
   ToolMap,
-  ToolRegistry,
-} from "./tool-registry";
-import type { ToolRouter } from "./tool-router";
+  ToolRouter,
+} from "./tool-router";
 import type { StoredMessage } from "@langchain/core/messages";
 import { createTaskTool, type TaskToolSchemaType } from "../tools/task/tool";
 
@@ -37,16 +36,12 @@ export interface SessionLifecycleHooks {
   onSessionEnd?: SessionEndHook;
 }
 
-export const createSession = async <
-  T extends ToolMap,
-  TResults extends Record<string, unknown>,
->(
+export const createSession = async <T extends ToolMap>(
   { threadId, agentName, maxTurns = 50, metadata = {} }: ZeitlichAgentConfig,
   {
     runAgent,
     promptManager,
     toolRouter,
-    toolRegistry,
     subagents,
     hooks = {},
   }: {
@@ -54,12 +49,7 @@ export const createSession = async <
     runAgent: RunAgentActivity;
     promptManager: PromptManager;
     /** Tool router for processing tool calls (optional if agent has no tools) */
-    toolRouter?: ToolRouter<
-      T & { Task: TaskToolSchemaType<SubagentConfig[]> },
-      TResults
-    >;
-    /** Tool registry for parsing tool calls (optional if agent has no tools) */
-    toolRegistry?: ToolRegistry<T>;
+    toolRouter?: ToolRouter<T>;
     /** Subagent configurations */
     subagents?: SubagentConfig[];
     /** Session lifecycle hooks */
@@ -126,7 +116,7 @@ export const createSession = async <
               threadId,
               agentName,
               tools: [
-                ...(toolRegistry?.getToolList() ?? []),
+                ...(toolRouter?.getToolDefinitions() ?? []),
                 ...(subagents?.length ? [createTaskTool(subagents)] : []),
               ],
               metadata,
@@ -143,7 +133,7 @@ export const createSession = async <
           }
 
           // No tools configured - treat any non-end_turn as completed
-          if (!toolRouter || !toolRegistry) {
+          if (!toolRouter) {
             stateManager.complete();
             exitReason = "completed";
             return message;
@@ -152,7 +142,7 @@ export const createSession = async <
           const rawToolCalls: RawToolCall[] = await parseToolCalls(message);
           const parsedToolCalls = rawToolCalls
             .filter((tc: RawToolCall) => tc.name !== "Task")
-            .map((tc: RawToolCall) => toolRegistry.parseToolCall(tc));
+            .map((tc: RawToolCall) => toolRouter.parseToolCall(tc));
           const taskToolCalls =
             subagents && subagents.length > 0
               ? rawToolCalls

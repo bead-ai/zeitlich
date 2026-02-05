@@ -7,7 +7,7 @@ import {
   type MessageContent,
   type StoredMessage,
 } from "@langchain/core/messages";
-import type { RawToolCall } from "./lib/tool-registry";
+import type { RawToolCall } from "./lib/tool-router";
 import type { FileNode } from "./lib/filesystem/types";
 
 /**

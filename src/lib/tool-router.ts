@@ -1,11 +1,8 @@
-import type { ToolMessageContent } from "./thread-manager";
 import type {
-  ParsedToolCall,
-  ParsedToolCallUnion,
-  ToolMap,
-  ToolNames,
-  ToolRegistry,
-} from "./tool-registry";
+  MessageStructure,
+  MessageToolDefinition,
+} from "@langchain/core/messages";
+import type { ToolMessageContent } from "./thread-manager";
 import type {
   ToolResultConfig,
   PreToolUseHook,
@@ -16,6 +13,103 @@ import type {
 import type { z } from "zod";
 
 export type { ToolMessageContent };
+
+// ============================================================================
+// Tool Definition Types (merged from tool-registry.ts)
+// ============================================================================
+
+/**
+ * A tool definition with a name, description, and Zod schema for arguments.
+ * Does not include a handler - use ToolWithHandler for tools with handlers.
+ */
+export interface ToolDefinition<
+  TName extends string = string,
+  TSchema extends z.ZodType = z.ZodType,
+> {
+  name: TName;
+  description: string;
+  schema: TSchema;
+  strict?: boolean;
+  max_uses?: number;
+}
+
+/**
+ * A tool definition with an integrated handler function.
+ * This is the primary type for defining tools in the router.
+ */
+export interface ToolWithHandler<
+  TName extends string = string,
+  TSchema extends z.ZodType = z.ZodType,
+  TResult = unknown,
+  TContext = ToolHandlerContext,
+> {
+  name: TName;
+  description: string;
+  schema: TSchema;
+  handler: ToolHandler<z.infer<TSchema>, TResult, TContext>;
+  strict?: boolean;
+  max_uses?: number;
+}
+
+/**
+ * A map of tool keys to tool definitions with handlers.
+ */
+export type ToolMap = Record<string, ToolWithHandler>;
+
+/**
+ * Converts a ToolMap to MessageStructure-compatible tools type.
+ * Maps each tool's name to a MessageToolDefinition with inferred input type from the schema.
+ */
+export type ToolMapToMessageTools<T extends ToolMap> = {
+  [K in keyof T as T[K]["name"]]: MessageToolDefinition<
+    z.infer<T[K]["schema"]>
+  >;
+};
+
+/**
+ * Creates a MessageStructure type from a ToolMap.
+ * This allows typed tool_calls on AIMessage when using parseToolCalls.
+ */
+export type ToolMapToMessageStructure<T extends ToolMap> = MessageStructure<
+  ToolMapToMessageTools<T>
+>;
+
+/**
+ * Extract the tool names from a tool map (uses the tool's name property, not the key).
+ */
+export type ToolNames<T extends ToolMap> = T[keyof T]["name"];
+
+/**
+ * A raw tool call as received from the LLM before parsing.
+ */
+export interface RawToolCall {
+  id?: string;
+  name: string;
+  args: unknown;
+}
+
+/**
+ * A parsed tool call with validated arguments for a specific tool.
+ */
+export interface ParsedToolCall<
+  TName extends string = string,
+  TArgs = unknown,
+> {
+  id: string;
+  name: TName;
+  args: TArgs;
+}
+
+/**
+ * Union type of all possible parsed tool calls from a tool map.
+ */
+export type ParsedToolCallUnion<T extends ToolMap> = {
+  [K in keyof T]: ParsedToolCall<T[K]["name"], z.infer<T[K]["schema"]>>;
+}[keyof T];
+
+// ============================================================================
+// Handler Types
+// ============================================================================
 
 /**
  * Function signature for appending tool results to a thread.
@@ -83,25 +177,17 @@ export type ToolArgs<T extends ToolMap, TName extends ToolNames<T>> = z.infer<
 >;
 
 /**
- * A map of tool handlers keyed by tool name with typed results.
- * Each handler receives the properly typed args and context for that tool.
+ * Extract the result type for a specific tool name from a tool map.
  */
-export type ToolHandlerMap<
-  T extends ToolMap,
-  TResults extends Record<ToolNames<T>, unknown>,
-  TContext = ToolHandlerContext,
-> = {
-  [TName in ToolNames<T>]: ToolHandler<
-    ToolArgs<T, TName>,
-    TResults[TName],
-    TContext
-  >;
-};
+export type ToolResult<T extends ToolMap, TName extends ToolNames<T>> =
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  Extract<T[keyof T], { name: TName }>["handler"] extends ToolHandler<any, infer R, any>
+    ? Awaited<R>
+    : never;
 
-/**
- * Extract the ToolMap type from a ToolRegistry instance type.
- */
-export type InferToolMap<T> = T extends ToolRegistry<infer U> ? U : never;
+// ============================================================================
+// Tool Call Result Types
+// ============================================================================
 
 /**
  * The result of processing a tool call.
@@ -116,11 +202,25 @@ export interface ToolCallResult<
 }
 
 /**
+ * Infer result types from a tool map based on handler return types.
+ */
+export type InferToolResults<T extends ToolMap> = {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  [K in keyof T as T[K]["name"]]: T[K]["handler"] extends ToolHandler<any, infer R, any>
+    ? Awaited<R>
+    : never;
+};
+
+/**
  * Union of all possible tool call results based on handler return types.
  */
 export type ToolCallResultUnion<TResults extends Record<string, unknown>> = {
   [TName in keyof TResults & string]: ToolCallResult<TName, TResults[TName]>;
 }[keyof TResults & string];
+
+// ============================================================================
+// Router Configuration Types
+// ============================================================================
 
 /**
  * Tool-specific hooks for the router
@@ -135,11 +235,11 @@ export interface ToolRouterHooks<T extends ToolMap, TResult = unknown> {
 }
 
 /**
- * Options for tool router.
+ * Options for creating a tool router.
  */
-export interface ToolRouterOptions<T extends ToolMap, TResult = unknown> {
-  /** Tool registry - used for type inference */
-  registry: ToolRegistry<T>;
+export interface ToolRouterOptions<T extends ToolMap> {
+  /** Map of tools with their handlers */
+  tools: T;
   /** Thread ID for appending tool results */
   threadId: string;
   /** Function to append tool results to the thread (called automatically after each handler) */
@@ -147,7 +247,7 @@ export interface ToolRouterOptions<T extends ToolMap, TResult = unknown> {
   /** Whether to process tools in parallel (default: true) */
   parallel?: boolean;
   /** Lifecycle hooks for tool execution */
-  hooks?: ToolRouterHooks<T, TResult>;
+  hooks?: ToolRouterHooks<T, ToolCallResultUnion<InferToolResults<T>>>;
 }
 
 /**
@@ -160,13 +260,39 @@ export interface ProcessToolCallsContext<THandlerContext = ToolHandlerContext> {
   handlerContext?: THandlerContext;
 }
 
+// ============================================================================
+// Router Interface
+// ============================================================================
+
 /**
  * The tool router interface with full type inference for both args and results.
  */
-export interface ToolRouter<
-  T extends ToolMap,
-  TResults extends Record<string, unknown>,
-> {
+export interface ToolRouter<T extends ToolMap> {
+  // --- Methods from registry ---
+
+  /**
+   * Parse and validate a raw tool call against the router's tools.
+   * Returns a typed tool call with validated arguments.
+   */
+  parseToolCall(toolCall: RawToolCall): ParsedToolCallUnion<T>;
+
+  /**
+   * Check if a tool with the given name exists in the router.
+   */
+  hasTool(name: string): boolean;
+
+  /**
+   * Get all tool names in the router.
+   */
+  getToolNames(): ToolNames<T>[];
+
+  /**
+   * Get all tool definitions (without handlers) for passing to LLM.
+   */
+  getToolDefinitions(): ToolDefinition[];
+
+  // --- Methods for processing tool calls ---
+
   /**
    * Process all tool calls using the registered handlers.
    * Returns typed results based on handler return types.
@@ -176,10 +302,11 @@ export interface ToolRouter<
   processToolCalls(
     toolCalls: ParsedToolCallUnion<T>[],
     context?: ProcessToolCallsContext
-  ): Promise<ToolCallResultUnion<TResults>[]>;
+  ): Promise<ToolCallResultUnion<InferToolResults<T>>[]>;
 
   /**
    * Process tool calls matching a specific name with a custom handler.
+   * Useful for overriding the default handler for specific cases.
    */
   processToolCallsByName<
     TName extends ToolNames<T>,
@@ -191,6 +318,8 @@ export interface ToolRouter<
     handler: ToolHandler<ToolArgs<T, TName>, TResult, TContext>,
     context?: ProcessToolCallsContext<TContext>
   ): Promise<ToolCallResult<TName, TResult>[]>;
+
+  // --- Utility methods ---
 
   /**
    * Filter tool calls by name.
@@ -208,50 +337,58 @@ export interface ToolRouter<
   /**
    * Filter results by tool name.
    */
-  getResultsByName<TName extends ToolNames<T> & keyof TResults>(
-    results: ToolCallResultUnion<TResults>[],
+  getResultsByName<TName extends ToolNames<T>>(
+    results: ToolCallResultUnion<InferToolResults<T>>[],
     name: TName
-  ): ToolCallResult<TName, TResults[TName]>[];
+  ): ToolCallResult<TName, ToolResult<T, TName>>[];
 }
 
-/**
- * Infer result types from a handler map.
- * Uses `any` for args and context due to function contravariance - handlers with specific
- * args/context types won't extend ToolHandler<unknown, R, unknown>.
- */
-export type InferHandlerResults<H> = {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  [K in keyof H & string]: H[K] extends ToolHandler<any, infer R, any>
-    ? Awaited<R>
-    : never;
-};
+// ============================================================================
+// Router Factory
+// ============================================================================
 
 /**
  * Creates a tool router for declarative tool call processing.
- * ToolMap type is inferred from options.registry, result types from handlers.
+ * Combines tool definitions with handlers in a single API.
  *
  * @example
- * const router = createToolRouter(
- *   { registry, threadId, appendToolResult },
- *   { AskUserQuestion: handleAskUserQuestion },
- * );
+ * ```typescript
+ * const router = createToolRouter({
+ *   threadId,
+ *   appendToolResult,
+ *   tools: {
+ *     Read: {
+ *       name: "FileRead",
+ *       description: "Read file contents",
+ *       schema: z.object({ path: z.string() }),
+ *       handler: async (args, ctx) => ({
+ *         content: `Read ${args.path}`,
+ *         result: { path: args.path, content: "..." },
+ *       }),
+ *     },
+ *   },
+ *   hooks: { onPreToolUse, onPostToolUse },
+ * });
  *
+ * // Parse raw tool calls from LLM
+ * const parsed = router.parseToolCall(rawToolCall);
+ *
+ * // Process tool calls
+ * const results = await router.processToolCalls([parsed]);
+ * ```
  */
-export function createToolRouter<
-  T extends ToolMap,
-  THandlers extends {
-    [TName in ToolNames<T>]: ToolHandler<ToolArgs<T, TName>, unknown>;
-  },
->(
-  options: ToolRouterOptions<
-    T,
-    ToolCallResultUnion<InferHandlerResults<THandlers>>
-  >,
-  handlers: THandlers
-): ToolRouter<T, InferHandlerResults<THandlers>> {
-  const { parallel = true, threadId, appendToolResult, hooks } = options;
+export function createToolRouter<T extends ToolMap>(
+  options: ToolRouterOptions<T>
+): ToolRouter<T> {
+  const { tools, parallel = true, threadId, appendToolResult, hooks } = options;
 
-  type TResults = InferHandlerResults<THandlers>;
+  type TResults = InferToolResults<T>;
+
+  // Build internal lookup map by tool name
+  const toolMap = new Map<string, T[keyof T]>();
+  for (const [_key, tool] of Object.entries(tools)) {
+    toolMap.set(tool.name, tool as T[keyof T]);
+  }
 
   async function processToolCall(
     toolCall: ParsedToolCallUnion<T>,
@@ -285,15 +422,15 @@ export function createToolRouter<
       }
     }
 
-    const handler = handlers[toolCall.name];
+    const tool = toolMap.get(toolCall.name);
     let result: unknown;
     let content: ToolMessageContent;
 
     try {
-      if (handler) {
-        const response = await handler(
-          effectiveArgs as Parameters<typeof handler>[0],
-          (handlerContext ?? {}) as Parameters<typeof handler>[1]
+      if (tool) {
+        const response = await tool.handler(
+          effectiveArgs as Parameters<typeof tool.handler>[0],
+          (handlerContext ?? {}) as Parameters<typeof tool.handler>[1]
         );
         result = response.result;
         content = response.content;
@@ -349,6 +486,45 @@ export function createToolRouter<
   }
 
   return {
+    // --- Methods from registry ---
+
+    parseToolCall(toolCall: RawToolCall): ParsedToolCallUnion<T> {
+      const tool = toolMap.get(toolCall.name);
+
+      if (!tool) {
+        throw new Error(`Tool ${toolCall.name} not found`);
+      }
+
+      // Parse and validate args using the tool's schema
+      const parsedArgs = tool.schema.parse(toolCall.args);
+
+      return {
+        id: toolCall.id ?? "",
+        name: toolCall.name,
+        args: parsedArgs,
+      } as ParsedToolCallUnion<T>;
+    },
+
+    hasTool(name: string): boolean {
+      return toolMap.has(name);
+    },
+
+    getToolNames(): ToolNames<T>[] {
+      return Array.from(toolMap.keys()) as ToolNames<T>[];
+    },
+
+    getToolDefinitions(): ToolDefinition[] {
+      return Object.values(tools).map((tool) => ({
+        name: tool.name,
+        description: tool.description,
+        schema: tool.schema,
+        strict: tool.strict,
+        max_uses: tool.max_uses,
+      }));
+    },
+
+    // --- Methods for processing tool calls ---
+
     async processToolCalls(
       toolCalls: ParsedToolCallUnion<T>[],
       context?: ProcessToolCallsContext
@@ -432,6 +608,8 @@ export function createToolRouter<
       return results;
     },
 
+    // --- Utility methods ---
+
     filterByName<TName extends ToolNames<T>>(
       toolCalls: ParsedToolCallUnion<T>[],
       name: TName
@@ -449,13 +627,14 @@ export function createToolRouter<
       return toolCalls.some((tc) => tc.name === name);
     },
 
-    getResultsByName<TName extends ToolNames<T> & keyof TResults>(
+    getResultsByName<TName extends ToolNames<T>>(
       results: ToolCallResultUnion<TResults>[],
       name: TName
-    ): ToolCallResult<TName, TResults[TName]>[] {
-      return results.filter(
-        (r): r is ToolCallResult<TName, TResults[TName]> => r.name === name
-      );
+    ): ToolCallResult<TName, ToolResult<T, TName>>[] {
+      return results.filter((r) => r.name === name) as ToolCallResult<
+        TName,
+        ToolResult<T, TName>
+      >[];
     },
   };
 }

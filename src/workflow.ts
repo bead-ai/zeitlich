@@ -10,7 +10,6 @@
  * import {
  *   createSession,
  *   createAgentStateManager,
- *   createToolRegistry,
  *   createToolRouter,
  * } from '@bead-ai/zeitlich/workflow';
  * ```
@@ -37,31 +36,33 @@ export type {
 export { createPromptManager } from "./lib/prompt-manager";
 export type { PromptManager, PromptManagerConfig } from "./lib/prompt-manager";
 
-// Tool registry
-export { createToolRegistry } from "./lib/tool-registry";
+// Tool router (includes registry functionality)
+export { createToolRouter, hasNoOtherToolCalls } from "./lib/tool-router";
 export type {
+  // Tool definition types
   ToolDefinition,
+  ToolWithHandler,
   ToolMap,
-  ToolRegistry,
+  ToolNames,
   RawToolCall,
   ParsedToolCall,
   ParsedToolCallUnion,
-  ToolNames,
-} from "./lib/tool-registry";
-
-// Tool router
-export { createToolRouter, hasNoOtherToolCalls } from "./lib/tool-router";
-export type {
+  // Router types
   ToolRouter,
   ToolRouterOptions,
   ToolRouterHooks,
+  // Handler types
   ToolHandler,
   ActivityToolHandler,
   ToolHandlerContext,
   ToolHandlerResponse,
-  ToolHandlerMap,
+  // Result types
+  ToolArgs,
+  ToolResult,
   ToolCallResult,
   ToolCallResultUnion,
+  InferToolResults,
+  // Other
   ToolMessageContent,
   AppendToolResultFn,
   ProcessToolCallsContext,
