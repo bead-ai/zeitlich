@@ -1,9 +1,11 @@
+import { defineQuery, setHandler } from "@temporalio/workflow";
 import {
   type AgentStatus,
   type BaseAgentState,
   type WorkflowTask,
   isTerminalStatus,
 } from "./types";
+import type { ToolDefinition } from "./tool-router";
 
 /**
  * JSON primitive types that Temporal can serialize
@@ -102,7 +104,12 @@ export interface AgentStateManager<TCustom extends JsonSerializable<TCustom>> {
   setTask(task: WorkflowTask): void;
   /** Delete a task by ID */
   deleteTask(id: string): boolean;
+
+  /** Set the tools */
+  setTools(newTools: ToolDefinition[]): void;
 }
+
+export const getStateQuery = defineQuery<BaseAgentState>("getState");
 
 /**
  * Creates an agent state manager for tracking workflow state.
@@ -123,6 +130,7 @@ export function createAgentStateManager<
   let status: AgentStatus = initialState?.status ?? "RUNNING";
   let version = initialState?.version ?? 0;
   let turns = initialState?.turns ?? 0;
+  let tools = initialState?.tools ?? [];
 
   // Tasks state
   const tasks = new Map<string, WorkflowTask>(initialState?.tasks);
@@ -133,6 +141,7 @@ export function createAgentStateManager<
     version: __,
     turns: ___,
     tasks: ____,
+    tools: _____,
     ...custom
   } = initialState ?? {};
   const customState = custom as TCustom;
@@ -142,9 +151,14 @@ export function createAgentStateManager<
       status,
       version,
       turns,
+      tools,
       ...customState,
     } as AgentState<TCustom>;
   }
+
+  setHandler(getStateQuery, () => {
+    return buildState();
+  });
 
   return {
     getStatus(): AgentStatus {
@@ -228,6 +242,10 @@ export function createAgentStateManager<
     setTask(task: WorkflowTask): void {
       tasks.set(task.id, task);
       version++;
+    },
+
+    setTools(newTools: ToolDefinition[]): void {
+      tools = newTools;
     },
 
     deleteTask(id: string): boolean {

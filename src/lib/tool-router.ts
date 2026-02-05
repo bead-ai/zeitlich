@@ -1,10 +1,12 @@
 import type { MessageToolDefinition } from "@langchain/core/messages";
 import type { ToolMessageContent } from "./thread-manager";
-import type { Hooks, ToolResultConfig } from "./types";
+import type { Hooks, SubagentConfig, ToolResultConfig } from "./types";
 
 import type { z } from "zod";
 import { proxyActivities } from "@temporalio/workflow";
 import type { ZeitlichSharedActivities } from "../activities";
+import { createTaskTool } from "../tools/task/tool";
+import { createTaskHandler } from "../tools/task/handler";
 
 export type { ToolMessageContent };
 
@@ -219,6 +221,8 @@ export interface ToolRouterOptions<T extends ToolMap> {
   parallel?: boolean;
   /** Lifecycle hooks for tool execution */
   hooks?: Hooks<T, ToolCallResultUnion<InferToolResults<T>>>;
+  /** Subagent configurations */
+  subagents?: SubagentConfig[];
 }
 
 /**
@@ -261,6 +265,8 @@ export interface ProcessToolCallsContext<THandlerContext = ToolHandlerContext> {
  * The tool router interface with full type inference for both args and results.
  */
 export interface ToolRouter<T extends ToolMap> {
+  /** Check if the router has any tools */
+  hasTools(): boolean;
   // --- Methods from registry ---
 
   /**
@@ -387,9 +393,17 @@ export function createToolRouter<T extends ToolMap>(
   type TResults = InferToolResults<T>;
 
   // Build internal lookup map by tool name
-  const toolMap = new Map<string, T[keyof T]>();
+  // Use ToolMap's value type to allow both user tools and the dynamic Task tool
+  const toolMap = new Map<string, ToolMap[string]>();
   for (const [_key, tool] of Object.entries(tools)) {
     toolMap.set(tool.name, tool as T[keyof T]);
+  }
+
+  if (options.subagents) {
+    toolMap.set("Task", {
+      ...createTaskTool(options.subagents),
+      handler: createTaskHandler(options.subagents),
+    });
   }
 
   async function processToolCall(
@@ -489,6 +503,10 @@ export function createToolRouter<T extends ToolMap>(
 
   return {
     // --- Methods from registry ---
+
+    hasTools(): boolean {
+      return toolMap.size > 0;
+    },
 
     parseToolCall(toolCall: RawToolCall): ParsedToolCallUnion<T> {
       const tool = toolMap.get(toolCall.name);

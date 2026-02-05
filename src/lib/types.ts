@@ -25,6 +25,7 @@ export type AgentStatus =
  * Base state that all agents must have
  */
 export interface BaseAgentState {
+  tools: ToolDefinition[];
   status: AgentStatus;
   version: number;
   turns: number;
@@ -88,24 +89,14 @@ export interface RunAgentConfig {
   threadId: string;
   agentName: string;
   metadata?: Record<string, unknown>;
-  tools?: ToolDefinition[];
 }
 
 /**
  * Type signature for workflow-specific runAgent activity
  */
 export type RunAgentActivity = (
-  config: RunAgentConfig,
-  invocationConfig: InvocationConfig
+  config: RunAgentConfig
 ) => Promise<AgentResponse>;
-
-/**
- * Per-invocation configuration passed to runAgent
- */
-export interface InvocationConfig {
-  systemPrompt: string;
-}
-
 /**
  * Configuration for appending a tool result
  */

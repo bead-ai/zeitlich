@@ -51,6 +51,7 @@ export const createSession = async <T extends ToolMap>({
     appendHumanMessage,
     parseToolCalls,
     appendToolResult,
+    appendSystemMessage,
   } = proxyActivities<ZeitlichSharedActivities>({
     startToCloseTimeout: "30m",
     retry: {
@@ -96,7 +97,13 @@ export const createSession = async <T extends ToolMap>({
         });
       }
 
+      stateManager.setTools(toolRouter.getToolDefinitions());
+
       await initializeThread(threadId);
+      await appendSystemMessage(
+        threadId,
+        await promptManager.getSystemPrompt()
+      );
       await appendHumanMessage(
         threadId,
         await promptManager.buildContextMessage()
@@ -113,20 +120,11 @@ export const createSession = async <T extends ToolMap>({
           stateManager.incrementTurns();
           const currentTurn = stateManager.getTurns();
 
-          const { message, stopReason } = await runAgent(
-            {
-              threadId,
-              agentName,
-              tools: [
-                ...(toolRouter?.getToolDefinitions() ?? []),
-                ...(subagents?.length ? [createTaskTool(subagents)] : []),
-              ],
-              metadata,
-            },
-            {
-              systemPrompt: await promptManager.getSystemPrompt(),
-            }
-          );
+          const { message, stopReason } = await runAgent({
+            threadId,
+            agentName,
+            metadata,
+          });
 
           if (stopReason === "end_turn") {
             stateManager.complete();
@@ -135,7 +133,7 @@ export const createSession = async <T extends ToolMap>({
           }
 
           // No tools configured - treat any non-end_turn as completed
-          if (!toolRouter) {
+          if (!toolRouter.hasTools()) {
             stateManager.complete();
             exitReason = "completed";
             return message;

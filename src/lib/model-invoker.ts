@@ -1,17 +1,16 @@
 import type Redis from "ioredis";
 import { createThreadManager } from "./thread-manager";
-import type { AgentResponse, InvocationConfig } from "./types";
-import type { ToolDefinition } from "./tool-router";
-import {
-  mapStoredMessagesToChatMessages,
-  SystemMessage,
-} from "@langchain/core/messages";
+import type { AgentResponse } from "./types";
+import { Context } from "@temporalio/activity";
+import type { WorkflowClient } from "@temporalio/client";
+import { mapStoredMessagesToChatMessages } from "@langchain/core/messages";
 import { v4 as uuidv4 } from "uuid";
 import type {
   BaseChatModel,
   BaseChatModelCallOptions,
   BindToolsInput,
 } from "@langchain/core/language_models/chat_models";
+import { getStateQuery } from "./state-manager";
 
 /**
  * Configuration for invoking the model
@@ -19,7 +18,6 @@ import type {
 export interface InvokeModelConfig {
   threadId: string;
   agentName: string;
-  tools?: ToolDefinition[];
 }
 
 /**
@@ -31,21 +29,30 @@ export interface InvokeModelConfig {
  * @param invocationConfig - Per-invocation configuration (system prompt, etc.)
  * @returns Agent response with message and metadata
  */
-export async function invokeModel(
-  redis: Redis,
-  { threadId, agentName, tools }: InvokeModelConfig,
-  model: BaseChatModel<BaseChatModelCallOptions & { tools?: BindToolsInput }>,
-  { systemPrompt }: InvocationConfig
-): Promise<AgentResponse> {
+export async function invokeModel({
+  redis,
+  model,
+  client,
+  config: { threadId, agentName },
+}: {
+  redis: Redis;
+  client: WorkflowClient;
+  config: InvokeModelConfig;
+  model: BaseChatModel<BaseChatModelCallOptions & { tools?: BindToolsInput }>;
+}): Promise<AgentResponse> {
   const thread = createThreadManager({ redis, threadId });
   const runId = uuidv4();
 
+  const info = Context.current().info; // Activity info
+  const parentWorkflowId = info.workflowExecution.workflowId;
+  const parentRunId = info.workflowExecution.runId;
+
+  const handle = client.getHandle(parentWorkflowId, parentRunId);
+  const { tools } = await handle.query(getStateQuery);
+
   const messages = await thread.load();
   const response = await model.invoke(
-    [
-      new SystemMessage(systemPrompt),
-      ...mapStoredMessagesToChatMessages(messages),
-    ],
+    [...mapStoredMessagesToChatMessages(messages)],
     {
       runName: agentName,
       runId,

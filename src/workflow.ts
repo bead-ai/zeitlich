@@ -75,7 +75,6 @@ export type {
   ZeitlichAgentConfig,
   RunAgentConfig,
   RunAgentActivity,
-  InvocationConfig,
   ToolResultConfig,
   SessionExitReason,
   PreToolUseHook,
@@ -103,7 +102,6 @@ export type {
   TaskToolSchemaType,
   GenericTaskToolSchemaType,
 } from "./tools/task/tool";
-export { createTaskHandler } from "./tools/task/handler";
 export type { TaskHandlerResult } from "./tools/task/handler";
 
 // Activity type interfaces (types only, no runtime code)

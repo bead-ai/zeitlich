@@ -13,6 +13,7 @@ import type { RawToolCall } from "./lib/tool-router";
  * Note: runAgent is workflow-specific and should be created per-workflow
  */
 export interface ZeitlichSharedActivities {
+  appendSystemMessage(threadId: string, content: string): Promise<void>;
   /**
    * Append a tool result to the thread.
    * Handles JSON serialization and optional cache points.
@@ -23,6 +24,11 @@ export interface ZeitlichSharedActivities {
    * Initialize an empty thread.
    */
   initializeThread(threadId: string): Promise<void>;
+
+  /**
+   * Append a system message to a thread.
+   */
+  appendSystemMessage(threadId: string, content: string): Promise<void>;
 
   /**
    * Append messages to a thread.
@@ -56,6 +62,14 @@ export interface ZeitlichSharedActivities {
  */
 export function createSharedActivities(redis: Redis): ZeitlichSharedActivities {
   return {
+    async appendSystemMessage(
+      threadId: string,
+      content: string
+    ): Promise<void> {
+      const thread = createThreadManager({ redis, threadId });
+      await thread.appendSystemMessage(content);
+    },
+
     async appendToolResult(config: ToolResultConfig): Promise<void> {
       const { threadId, toolCallId, content } = config;
       const thread = createThreadManager({ redis, threadId });

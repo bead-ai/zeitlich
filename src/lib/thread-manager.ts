@@ -7,6 +7,7 @@ import {
   type MessageContent,
   type MessageStructure,
   type StoredMessage,
+  SystemMessage,
   ToolMessage,
 } from "@langchain/core/messages";
 import { v4 as uuidv4 } from "uuid";
@@ -31,6 +32,8 @@ export interface ThreadManagerConfig {
 }
 
 export interface ThreadManager {
+  /** Append a system message to the thread */
+  appendSystemMessage(content: string): Promise<void>;
   /** Initialize an empty thread */
   initialize(): Promise<void>;
   /** Load all messages from the thread */
@@ -39,6 +42,9 @@ export interface ThreadManager {
   append(messages: StoredMessage[]): Promise<void>;
   /** Delete the thread */
   delete(): Promise<void>;
+
+  /** Create a SystemMessage (returns StoredMessage for storage) */
+  createSystemMessage(content: string): StoredMessage;
 
   /** Create a HumanMessage (returns StoredMessage for storage) */
   createHumanMessage(content: string | MessageContent): StoredMessage;
@@ -129,6 +135,17 @@ export function createThreadManager(
         content: content as MessageContent,
         tool_call_id: toolCallId,
       }).toDict();
+    },
+
+    createSystemMessage(content: string): StoredMessage {
+      return new SystemMessage({
+        content,
+      }).toDict();
+    },
+
+    async appendSystemMessage(content: string): Promise<void> {
+      const message = this.createSystemMessage(content);
+      await this.append([message]);
     },
 
     async appendHumanMessage(content: string | MessageContent): Promise<void> {
