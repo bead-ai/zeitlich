@@ -7,10 +7,10 @@ import { proxyActivities } from "@temporalio/workflow";
 import type { ZeitlichSharedActivities } from "../activities";
 import { createTaskTool } from "../tools/task/tool";
 import { createTaskHandler } from "../tools/task/handler";
-import type { handleBashTool } from "../tools/bash/handler";
 import type { createTaskCreateHandler } from "../tools/task-create/handler";
-import { bashTool } from "../tools/bash/tool";
+import { bashTool, createBashToolDescription } from "../tools/bash/tool";
 import { taskCreateTool } from "../tools/task-create/tool";
+import type { handleBashTool } from "../tools/bash/handler";
 
 export type { ToolMessageContent };
 
@@ -232,6 +232,8 @@ export interface ToolCallResult<
  * Options for creating a tool router.
  */
 export interface ToolRouterOptions<T extends ToolMap> {
+  /** File tree for the agent */
+  fileTree: string;
   /** Map of tools with their handlers */
   tools: T;
   /** Thread ID for appending tool results */
@@ -244,16 +246,10 @@ export interface ToolRouterOptions<T extends ToolMap> {
   hooks?: Hooks<T, ToolCallResultUnion<InferToolResults<T>>>;
   /** Subagent configurations */
   subagents?: SubagentConfig[];
-  /** Build in tools */
-  buildInTools?: Partial<
-    Record<
-      keyof BuildInToolDefinitions,
-      ActivityToolHandler<
-        BuildInToolDefinitions[keyof BuildInToolDefinitions]["schema"],
-        BuildInToolDefinitions[keyof BuildInToolDefinitions]["handler"]
-      >
-    >
-  >;
+  /** Build in tools - accepts raw handlers or proxied activities */
+  buildInTools?: {
+    [K in keyof BuildInToolDefinitions]?: BuildInToolDefinitions[K]["handler"];
+  };
 }
 
 /**
@@ -418,15 +414,12 @@ export function createToolRouter<T extends ToolMap>(
       backoffCoefficient: 4,
     },
   });
-
-  const { tools, parallel = true, threadId, hooks } = options;
-
   type TResults = InferToolResults<T>;
 
   // Build internal lookup map by tool name
   // Use ToolMap's value type to allow both user tools and the dynamic Task tool
   const toolMap = new Map<string, ToolMap[string]>();
-  for (const [_key, tool] of Object.entries(tools)) {
+  for (const [_key, tool] of Object.entries(options.tools)) {
     toolMap.set(tool.name, tool as T[keyof T]);
   }
 
@@ -439,10 +432,20 @@ export function createToolRouter<T extends ToolMap>(
 
   if (options.buildInTools) {
     for (const [key, value] of Object.entries(options.buildInTools)) {
-      toolMap.set(key, {
-        ...buildIntoolDefinitions[key as keyof BuildInToolDefinitions],
-        handler: value,
-      });
+      if (key === bashTool.name) {
+        toolMap.set(key, {
+          ...buildIntoolDefinitions[key as keyof BuildInToolDefinitions],
+          description: createBashToolDescription({
+            fileTree: options.fileTree,
+          }),
+          handler: value,
+        });
+      } else {
+        toolMap.set(key, {
+          ...buildIntoolDefinitions[key as keyof BuildInToolDefinitions],
+          handler: value,
+        });
+      }
     }
   }
 
@@ -455,16 +458,16 @@ export function createToolRouter<T extends ToolMap>(
 
     // PreToolUse hook - can skip or modify args
     let effectiveArgs: unknown = toolCall.args;
-    if (hooks?.onPreToolUse) {
-      const preResult = await hooks.onPreToolUse({
+    if (options.hooks?.onPreToolUse) {
+      const preResult = await options.hooks.onPreToolUse({
         toolCall,
-        threadId,
+        threadId: options.threadId,
         turn,
       });
       if (preResult?.skip) {
         // Skip this tool call - append a skip message and return null
         await appendToolResult({
-          threadId,
+          threadId: options.threadId,
           toolCallId: toolCall.id,
           content: JSON.stringify({
             skipped: true,
@@ -496,11 +499,11 @@ export function createToolRouter<T extends ToolMap>(
       }
     } catch (error) {
       // PostToolUseFailure hook - can recover from errors
-      if (hooks?.onPostToolUseFailure) {
-        const failureResult = await hooks.onPostToolUseFailure({
+      if (options.hooks?.onPostToolUseFailure) {
+        const failureResult = await options.hooks.onPostToolUseFailure({
           toolCall,
           error: error instanceof Error ? error : new Error(String(error)),
-          threadId,
+          threadId: options.threadId,
           turn,
         });
         if (failureResult?.fallbackContent !== undefined) {
@@ -518,7 +521,11 @@ export function createToolRouter<T extends ToolMap>(
     }
 
     // Automatically append tool result to thread
-    await appendToolResult({ threadId, toolCallId: toolCall.id, content });
+    await appendToolResult({
+      threadId: options.threadId,
+      toolCallId: toolCall.id,
+      content,
+    });
 
     const toolResult = {
       toolCallId: toolCall.id,
@@ -527,12 +534,12 @@ export function createToolRouter<T extends ToolMap>(
     } as ToolCallResultUnion<TResults>;
 
     // PostToolUse hook - called after successful execution
-    if (hooks?.onPostToolUse) {
+    if (options.hooks?.onPostToolUse) {
       const durationMs = Date.now() - startTime;
-      await hooks.onPostToolUse({
+      await options.hooks.onPostToolUse({
         toolCall,
         result: toolResult,
-        threadId,
+        threadId: options.threadId,
         turn,
         durationMs,
       });
@@ -574,8 +581,8 @@ export function createToolRouter<T extends ToolMap>(
     },
 
     getToolDefinitions(): ToolDefinition[] {
-      return Object.values(tools).map((tool) => ({
-        name: tool.name,
+      return Array.from(toolMap).map(([name, tool]) => ({
+        name,
         description: tool.description,
         schema: tool.schema,
         strict: tool.strict,
@@ -596,7 +603,7 @@ export function createToolRouter<T extends ToolMap>(
       const turn = context?.turn ?? 0;
       const handlerContext = context?.handlerContext;
 
-      if (parallel) {
+      if (options.parallel) {
         const results = await Promise.all(
           toolCalls.map((tc) => processToolCall(tc, turn, handlerContext))
         );
@@ -645,7 +652,7 @@ export function createToolRouter<T extends ToolMap>(
 
         // Automatically append tool result to thread
         await appendToolResult({
-          threadId,
+          threadId: options.threadId,
           toolCallId: toolCall.id,
           content: response.content,
         });
@@ -657,7 +664,7 @@ export function createToolRouter<T extends ToolMap>(
         };
       };
 
-      if (parallel) {
+      if (options.parallel) {
         return Promise.all(matchingCalls.map(processOne));
       }
 

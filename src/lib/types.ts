@@ -1,6 +1,5 @@
 import type { ToolMessageContent } from "./thread-manager";
 import type {
-  ActivityToolHandler,
   BuildInToolDefinitions,
   InferToolResults,
   ParsedToolCallUnion,
@@ -66,6 +65,7 @@ export interface AgentResponse {
  * Configuration for a Zeitlich agent session
  */
 export interface ZeitlichAgentConfig<T extends ToolMap> {
+  buildFileTree?: () => Promise<string>;
   threadId: string;
   agentName: string;
   metadata?: Record<string, unknown>;
@@ -96,17 +96,11 @@ export interface ZeitlichAgentConfig<T extends ToolMap> {
    */
   buildContextMessage: () => MessageContent | Promise<MessageContent>;
   /**
-   * Build in tools
+   * Build in tools - accepts raw handlers or proxied activities
    */
-  buildInTools?: Partial<
-    Record<
-      keyof BuildInToolDefinitions,
-      ActivityToolHandler<
-        BuildInToolDefinitions[keyof BuildInToolDefinitions]["schema"],
-        BuildInToolDefinitions[keyof BuildInToolDefinitions]["handler"]
-      >
-    >
-  >;
+  buildInTools?: {
+    [K in keyof BuildInToolDefinitions]?: BuildInToolDefinitions[K]["handler"];
+  };
 }
 
 /**

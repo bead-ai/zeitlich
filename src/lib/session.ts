@@ -52,6 +52,7 @@ export const createSession = async <T extends ToolMap>({
   baseSystemPrompt,
   instructionsPrompt,
   buildContextMessage,
+  buildFileTree = async (): Promise<string> => "",
   subagents,
   tools = {} as T,
   processToolsInParallel = true,
@@ -75,12 +76,16 @@ export const createSession = async <T extends ToolMap>({
     heartbeatTimeout: "5m",
   });
 
+  const fileTree = await buildFileTree();
+
   const toolRouter = createToolRouter({
     tools,
     appendToolResult,
     threadId,
     hooks,
     buildInTools,
+    fileTree,
+    subagents,
     parallel: processToolsInParallel,
   });
 

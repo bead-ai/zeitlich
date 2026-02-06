@@ -44,4 +44,6 @@ export type {
   EditHandlerOptions,
 } from "./tools/edit/handler";
 
+export { handleBashTool } from "./tools/bash/handler";
+
 export { toTree } from "./lib/fs";

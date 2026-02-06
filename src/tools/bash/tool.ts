@@ -1,7 +1,13 @@
 import z from "zod";
 
+export const createBashToolDescription = ({
+  fileTree,
+}: {
+  fileTree: string;
+}): string => `tool to execute bash commands, the file tree is: ${fileTree}`;
+
 export const bashTool = {
-  name: "bashTool" as const,
+  name: "Bash" as const,
   description: "tool to execute bash commands",
   schema: z.object({
     command: z

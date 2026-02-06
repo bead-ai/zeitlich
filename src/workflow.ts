@@ -133,3 +133,6 @@ export { createTaskListHandler } from "./tools/task-list/handler";
 export { taskUpdateTool } from "./tools/task-update/tool";
 export type { TaskUpdateToolSchemaType } from "./tools/task-update/tool";
 export { createTaskUpdateHandler } from "./tools/task-update/handler";
+
+export { bashTool } from "./tools/bash/tool";
+export type { bashToolSchemaType } from "./tools/bash/tool";
