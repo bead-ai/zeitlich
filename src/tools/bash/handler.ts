@@ -1,6 +1,6 @@
 import type { ActivityToolHandler } from "../../workflow";
 import type { bashToolSchemaType } from "./tool";
-import { Bash, type IFileSystem, type BashOptions } from "just-bash";
+import { Bash, type BashOptions } from "just-bash";
 
 type BashExecOut = {
   exitCode: number;
@@ -8,21 +8,24 @@ type BashExecOut = {
   stdout: string;
 };
 
-export const handleBashTool: (
-  fs: IFileSystem,
+/** BashOptions with `fs` required */
+type BashToolOptions = Required<Pick<BashOptions, "fs">> & Omit<BashOptions, "fs">;
 
+export const handleBashTool: (
+    bashOptions: BashToolOptions,
 ) => ActivityToolHandler<bashToolSchemaType, BashExecOut | null> =
-  (fs: IFileSystem) => async (args: bashToolSchemaType, _context) => {
+  (bashOptions: BashToolOptions) => async (args: bashToolSchemaType, _context) => {
     const { command } = args;
 
-    const bashOptions: BashOptions = {
-      ...(fs && { fs }),
+    const mergedOptions: BashOptions = {
+      ...bashOptions,
       executionLimits: {
-        maxStringLength: 52428800,
+        maxStringLength: 52428800, // 50MB default
+        ...bashOptions.executionLimits,
       },
     };
 
-    const bash = new Bash(bashOptions);
+    const bash = new Bash(mergedOptions);
 
     try {
       const { exitCode, stderr, stdout } = await bash.exec(command);
