@@ -10,7 +10,7 @@ describe("bash with default options", () => {
   const fs = new OverlayFs({ root: __dirname, mountPoint: "/home/user" });
 
   it("executes echo and captures stdout", async () => {
-    const { result } = await handleBashTool(fs)(
+    const { result } = await handleBashTool({fs})(
       { command: "echo 'hello world'" },
       {}
     );
@@ -20,17 +20,17 @@ describe("bash with default options", () => {
   });
 
   it("returns exit code 0 for successful commands", async () => {
-    const { result } = await handleBashTool(fs)({ command: "true" }, {});
+    const { result } = await handleBashTool({fs})({ command: "true" }, {});
     expect(result?.exitCode).toBe(0);
   });
 
   it("returns non-zero exit code for failed commands", async () => {
-    const { result } = await handleBashTool(fs)({ command: "false" }, {});
+    const { result } = await handleBashTool({fs})({ command: "false" }, {});
     expect(result?.exitCode).toBe(1);
   });
 
   it("captures stderr output", async () => {
-    const { result } = await handleBashTool(fs)(
+    const { result } = await handleBashTool({fs})(
       { command: "echo 'error message' >&2" },
       {}
     );
@@ -39,7 +39,7 @@ describe("bash with default options", () => {
   });
 
   it("supports piping between commands", async () => {
-    const { result } = await handleBashTool(fs)(
+    const { result } = await handleBashTool({fs})(
       { command: "echo 'hello world' | tr 'a-z' 'A-Z'" },
       {}
     );
@@ -47,7 +47,7 @@ describe("bash with default options", () => {
   });
 
   it("supports command chaining with &&", async () => {
-    const { result } = await handleBashTool(fs)(
+    const { result } = await handleBashTool({fs})(
       { command: "echo 'first' && echo 'second'" },
       {}
     );
@@ -56,7 +56,7 @@ describe("bash with default options", () => {
   });
 
   it("handles multi-line output", async () => {
-    const { result } = await handleBashTool(fs)(
+    const { result } = await handleBashTool({fs})(
       { command: "printf 'line1\\nline2\\nline3'" },
       {}
     );
@@ -67,7 +67,7 @@ describe("bash with default options", () => {
   });
 
   it("handles commands with arguments and flags", async () => {
-    const { result } = await handleBashTool(fs)(
+    const { result } = await handleBashTool({fs})(
       { command: "echo -n 'no newline'" },
       {}
     );
@@ -75,7 +75,7 @@ describe("bash with default options", () => {
   });
 
   it("supports command substitution", async () => {
-    const { result } = await handleBashTool(fs)(
+    const { result } = await handleBashTool({fs})(
       { command: "echo \"count: $(echo 'a b c' | wc -w | tr -d ' ')\"" },
       {}
     );
@@ -83,7 +83,7 @@ describe("bash with default options", () => {
   });
 
   it("returns content string with formatted output", async () => {
-    const { content } = await handleBashTool(fs)(
+    const { content } = await handleBashTool({fs})(
       { command: "echo 'test'" },
       {}
     );
@@ -96,7 +96,7 @@ describe("bash with default options", () => {
 describe("bash with overlay filesystem", () => {
   it("sees files in the current directory", async () => {
     const fs = new OverlayFs({ root: __dirname, mountPoint: "/home/user" });
-    const { result } = await handleBashTool(fs)({ command: "ls" }, {});
+    const { result } = await handleBashTool({fs})({ command: "ls" }, {});
     expect(result?.stdout).toContain("bash.test.ts");
     expect(result?.stdout).toContain("handler.ts");
     expect(result?.stdout).toContain("tool.ts");
