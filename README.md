@@ -48,8 +48,7 @@ const google = new ChatGoogleGenerativeAI({ model: "gemini-1.5-pro" });
 
 // Pass to invokeModel in your activity
 return {
-  runAgent: (config, invocationConfig) =>
-    invokeModel(redis, { ...config, tools }, anthropic, invocationConfig),
+  runAgent: (config) => invokeModel(redis, config, anthropic),
 };
 ```
 
@@ -82,10 +81,10 @@ Zeitlich provides two entry points to work with Temporal's workflow sandboxing:
 
 ```typescript
 // In workflow files - no external dependencies (Redis, LangChain, etc.)
-import { createSession, createToolRegistry, ... } from 'zeitlich/workflow';
+import { createSession, createAgentStateManager, askUserQuestionTool } from 'zeitlich/workflow';
 
 // In activity files and worker setup - full functionality
-import { ZeitlichPlugin, invokeModel, globHandler, ... } from 'zeitlich';
+import { ZeitlichPlugin, invokeModel, toTree } from 'zeitlich';
 ```
 
 **Why?** Temporal workflows run in an isolated V8 sandbox that cannot import modules with Node.js APIs or external dependencies. The `/workflow` entry point contains only pure TypeScript code safe for workflow use.
@@ -109,8 +108,6 @@ export const searchTool: ToolDefinition<"Search", typeof searchSchema> = {
     query: z.string().describe("The search query"),
   }),
 };
-
-export const tools = { Search: searchTool };
 ```
 
 ### 2. Create Activities
@@ -119,7 +116,6 @@ export const tools = { Search: searchTool };
 import type Redis from "ioredis";
 import { ChatAnthropic } from "@langchain/anthropic";
 import { invokeModel } from "zeitlich";
-import { tools } from "./tools";
 
 export const createActivities = (redis: Redis) => {
   const model = new ChatAnthropic({
@@ -128,16 +124,16 @@ export const createActivities = (redis: Redis) => {
   });
 
   return {
-    runAgent: (config, invocationConfig) =>
-      invokeModel(redis, config, model, invocationConfig),
+    runAgent: (config) => invokeModel(redis, config, model),
 
     handleSearchResult: async ({ args }) => {
-      // Your tool implementation
       const results = await performSearch(args.query);
       return { result: { results } };
     },
   };
 };
+
+export type MyActivities = ReturnType<typeof createActivities>;
 ```
 
 ### 3. Create the Workflow
@@ -145,42 +141,35 @@ export const createActivities = (redis: Redis) => {
 ```typescript
 import { proxyActivities, workflowInfo } from "@temporalio/workflow";
 import { createAgentStateManager, createSession } from "zeitlich/workflow";
-import type { ZeitlichSharedActivities } from "zeitlich/workflow";
-import { tools } from "./tools";
+import { searchTool } from "./tools";
+import type { MyActivities } from "./activities";
 
 const { runAgent, handleSearchResult } = proxyActivities<MyActivities>({
-  startToCloseTimeout: "30m",
-});
-
-const { appendToolResult } = proxyActivities<ZeitlichSharedActivities>({
   startToCloseTimeout: "30m",
 });
 
 export async function myAgentWorkflow({ prompt }: { prompt: string }) {
   const { runId } = workflowInfo();
 
-  const stateManager = createAgentStateManager({
-    initialState: { prompt },
-  });
+  const stateManager = createAgentStateManager({});
 
-  const toolRegistry = createToolRegistry(tools);
-
-  const toolRouter = createToolRouter(
-    { registry: toolRegistry, threadId: runId, appendToolResult },
-    { Search: handleSearchResult }
-  );
-
-  const promptManager = createPromptManager({
+  const session = await createSession({
+    threadId: runId,
+    agentName: "my-agent",
+    maxTurns: 20,
+    runAgent,
     baseSystemPrompt: "You are a helpful assistant.",
+    instructionsPrompt: "Help the user with their request.",
     buildContextMessage: () => [{ type: "text", text: prompt }],
+    tools: {
+      Search: {
+        ...searchTool,
+        handler: handleSearchResult,
+      },
+    },
   });
 
-  const session = await createSession(
-    { threadId: runId, agentName: "my-agent", maxTurns: 20 },
-    { runAgent, promptManager, toolRouter, toolRegistry }
-  );
-
-  await session.runSession(prompt, stateManager);
+  await session.runSession({ stateManager });
   return stateManager.getCurrentState();
 }
 ```
@@ -221,64 +210,72 @@ Manages workflow state with automatic versioning and status tracking:
 import { createAgentStateManager } from "zeitlich/workflow";
 
 const stateManager = createAgentStateManager({
-  initialState: { customField: "value" },
+  customField: "value",
 });
 
 // State operations
 stateManager.set("customField", "new value");
+stateManager.get("customField"); // Get current value
 stateManager.complete(); // Mark as COMPLETED
 stateManager.waitForInput(); // Mark as WAITING_FOR_INPUT
 stateManager.isRunning(); // Check if RUNNING
 stateManager.isTerminal(); // Check if COMPLETED/FAILED/CANCELLED
 ```
 
-### Tool Registry
+### Tools with Handlers
 
-Type-safe tool management with Zod validation:
-
-```typescript
-import { createToolRegistry } from "zeitlich/workflow";
-
-const registry = createToolRegistry({
-  Search: searchTool,
-  Calculate: calculateTool,
-});
-
-// Parse and validate tool calls from LLM
-const parsed = registry.parseToolCall(rawToolCall);
-// parsed.name is "Search" | "Calculate"
-// parsed.args is fully typed based on the tool's schema
-```
-
-### Tool Router
-
-Routes tool calls to handlers with lifecycle hooks:
+Define tools with their handlers inline in `createSession`:
 
 ```typescript
-import { createToolRouter } from "zeitlich/workflow";
+import { z } from "zod";
+import type { ToolDefinition } from "zeitlich/workflow";
 
-const router = createToolRouter(
-  {
-    registry: toolRegistry,
-    threadId,
-    hooks: {
-      onPreToolUse: ({ toolCall }) => {
-        console.log(`Executing ${toolCall.name}`);
-        return {}; // Can return { skip: true } or { modifiedArgs: {...} }
-      },
-      onPostToolUse: ({ toolCall, result, durationMs }) => {
-        console.log(`${toolCall.name} completed in ${durationMs}ms`);
-      },
-      onPostToolUseFailure: ({ toolCall, error }) => {
-        return { fallbackContent: "Tool failed, please try again" };
-      },
+// Define tool schema
+const searchTool: ToolDefinition<"Search", typeof searchSchema> = {
+  name: "Search",
+  description: "Search for information",
+  schema: z.object({ query: z.string() }),
+};
+
+// In workflow - combine tool definition with handler
+const session = await createSession({
+  // ... other config
+  tools: {
+    Search: {
+      ...searchTool,
+      handler: handleSearchResult, // Activity that implements the tool
     },
   },
-  {
-    Search: handleSearchResult,
-    Calculate: handleCalculateResult,
-  }
-);
+});
+```
+
+### Lifecycle Hooks
+
+Add hooks for tool execution and session lifecycle:
+
+```typescript
+const session = await createSession({
+  // ... other config
+  hooks: {
+    onPreToolUse: ({ toolCall }) => {
+      console.log(`Executing ${toolCall.name}`);
+      return {}; // Can return { skip: true } or { modifiedArgs: {...} }
+    },
+    onPostToolUse: ({ toolCall, result, durationMs }) => {
+      console.log(`${toolCall.name} completed in ${durationMs}ms`);
+      // Access stateManager here to update state based on results
+    },
+    onPostToolUseFailure: ({ toolCall, error }) => {
+      return { fallbackContent: "Tool failed, please try again" };
+    },
+    onSessionStart: ({ threadId, agentName }) => {
+      console.log(`Session started: ${agentName}`);
+    },
+    onSessionEnd: ({ exitReason, turns }) => {
+      console.log(`Session ended: ${exitReason} after ${turns} turns`);
+    },
+  },
+});
 ```
 
 ### Subagents
@@ -286,128 +283,71 @@ const router = createToolRouter(
 Spawn child agents as Temporal child workflows:
 
 ```typescript
-import { withSubagentSupport } from "zeitlich/workflow";
-import { z } from "zod";
-
-const { tools, taskHandler } = withSubagentSupport(baseTools, {
+const session = await createSession({
+  // ... other config
   subagents: [
     {
       name: "researcher",
       description: "Researches topics and returns findings",
       workflowType: "researcherWorkflow",
-      resultSchema: z.object({
-        findings: z.string(),
-        sources: z.array(z.string()),
-      }),
+    },
+    {
+      name: "code-reviewer",
+      description: "Reviews code for quality and best practices",
+      workflowType: "codeReviewerWorkflow",
     },
   ],
 });
-
-// Include taskHandler in your tool router
-const router = createToolRouter(
-  { registry, threadId, appendToolResult },
-  { ...handlers, Task: taskHandler }
-);
 ```
+
+The `Task` tool is automatically added when subagents are configured, allowing the agent to spawn child workflows.
 
 ### Filesystem Utilities
 
-Built-in support for file operations with pluggable providers. File trees are dynamic and stored in workflow state, enabling per-workflow scoping.
+Built-in support for file operations. Use `buildFileTree` to generate a file tree string that's included in the agent's context:
 
 ```typescript
-// In workflow - use the pure utilities and tool definitions
-import {
-  buildFileTreePrompt,
-  globTool,
-  readTool,
-  type FileNode,
-  type FileSystemProvider,
-  type ToolHandlerContext,
-} from "zeitlich/workflow";
-
-// In activities - use the providers and handlers
-import {
-  CompositeFileSystemProvider,
-  globHandler,
-  readHandler,
-} from "zeitlich";
-
-// Define your handler context type
-interface FileSystemContext extends ToolHandlerContext {
-  scopedNodes: FileNode[];
-  provider: FileSystemProvider;
-}
-
-// Activities receive context via handlerContext
-export const createActivities = (dbClient: DbClient) => ({
-  // Generate file tree (implements GenerateFileTreeActivity)
-  generateFileTree: async (config?: {
-    userId: string;
-  }): Promise<FileNode[]> => {
-    const files = await dbClient.getFilesForUser(config?.userId);
-    return files.map((f) => ({
-      path: f.path,
-      type: "file" as const,
-      metadata: { dbId: f.id },
-    }));
-  },
-
-  // Read file content from backend
-  readFileContent: async (node: FileNode) => {
-    const content = await dbClient.getFileContent(node.metadata?.dbId);
-    return { type: "text" as const, content };
-  },
-
-  // Handlers receive context from processToolCalls (always defined, defaults to {})
-  glob: async (args: GlobToolSchemaType, context: FileSystemContext) => {
-    return globHandler(args, context.scopedNodes, context.provider);
-  },
-
-  read: async (args: ReadToolSchemaType, context: FileSystemContext) => {
-    return readHandler(args, context.scopedNodes, context.provider);
+// In activities
+export const createActivities = () => ({
+  generateFileTree: async (): Promise<string> => {
+    // Return a formatted file tree string
+    return toTree("/path/to/workspace");
   },
 });
 
-// In workflow - file tree is generated at start, stored in state
-const fileTree = await activities.generateFileTree({ userId });
-stateManager.setFileTree(fileTree);
-
-// Create provider for this workflow
-const provider = CompositeFileSystemProvider.withScope(fileTree, {
-  backends: {
-    db: { resolver: (node) => activities.readFileContent(node) },
-  },
-  defaultBackend: "db",
+// In workflow
+const session = await createSession({
+  // ... other config
+  buildFileTree: generateFileTree, // Called at session start
 });
+```
 
-// Pass handlerContext when processing tool calls
-await toolRouter.processToolCalls(toolCalls, {
-  turn: currentTurn,
-  handlerContext: {
-    scopedNodes: stateManager.getFileTree(),
-    provider,
-  },
-});
+For more advanced file operations, use the built-in tool handlers:
 
-// Build context for the agent prompt
-const fileTreeContext = buildFileTreePrompt(stateManager.getFileTree(), {
-  headerText: "Available Files",
+```typescript
+import { globHandler, editHandler, toTree } from "zeitlich";
+
+export const createActivities = () => ({
+  generateFileTree: () => toTree("/workspace"),
+  handleGlob: (args) => globHandler(args),
+  handleEdit: (args) => editHandler(args, { basePath: "/workspace" }),
 });
 ```
 
 ### Built-in Tools
 
-Zeitlich provides ready-to-use tool definitions and handlers for common agent operations. More tools will be added in future releases.
+Zeitlich provides ready-to-use tool definitions and handlers for common agent operations.
 
-| Tool              | Description                                                               |
-| ----------------- | ------------------------------------------------------------------------- |
-| `FileRead`        | Read file contents with optional pagination (supports text, images, PDFs) |
-| `FileWrite`       | Create or overwrite files with new content                                |
-| `FileEdit`        | Edit specific sections of a file by find/replace                          |
-| `Glob`            | Search for files matching a glob pattern                                  |
-| `Grep`            | Search file contents with regex patterns                                  |
-| `AskUserQuestion` | Ask the user questions during execution with structured options           |
-| `Task`            | Launch subagents as child workflows (see [Subagents](#subagents))         |
+| Tool              | Description                                                     |
+| ----------------- | --------------------------------------------------------------- |
+| `Read`            | Read file contents with optional pagination                     |
+| `Write`           | Create or overwrite files with new content                      |
+| `Edit`            | Edit specific sections of a file by find/replace                |
+| `Glob`            | Search for files matching a glob pattern                        |
+| `Grep`            | Search file contents with regex patterns                        |
+| `Bash`            | Execute shell commands                                          |
+| `AskUserQuestion` | Ask the user questions during execution with structured options |
+| `Task`            | Launch subagents as child workflows (see [Subagents](#subagents)) |
 
 ```typescript
 // Import tool definitions in workflows
@@ -417,18 +357,34 @@ import {
   editTool,
   globTool,
   grepTool,
+  bashTool,
   askUserQuestionTool,
 } from "zeitlich/workflow";
 
 // Import handlers in activities
-// Handlers are direct functions that accept scopedNodes per-call
 import {
-  readHandler,
-  writeHandler,
   editHandler,
   globHandler,
-  grepHandler,
+  handleBashTool,
+  handleAskUserQuestionToolResult,
 } from "zeitlich";
+```
+
+Built-in tools can be added via `buildInTools` (for tools with special handling like Bash) or as regular tools:
+
+```typescript
+const session = await createSession({
+  // ... other config
+  tools: {
+    AskUserQuestion: {
+      ...askUserQuestionTool,
+      handler: handleAskUserQuestionToolResult,
+    },
+  },
+  buildInTools: {
+    Bash: handleBashToolResult,
+  },
+});
 ```
 
 ## API Reference
@@ -437,40 +393,38 @@ import {
 
 Safe for use in Temporal workflow files:
 
-| Export                    | Description                                                                        |
-| ------------------------- | ---------------------------------------------------------------------------------- |
-| `createSession`           | Creates an agent session for running the agentic loop                              |
-| `createAgentStateManager` | Creates a state manager for workflow state                                         |
-| `createPromptManager`     | Creates a prompt manager for system/context prompts                                |
-| `createToolRegistry`      | Creates a type-safe tool registry                                                  |
-| `createToolRouter`        | Creates a tool router with handlers and hooks                                      |
-| `withSubagentSupport`     | Adds Task tool for spawning subagents                                              |
-| `buildFileTreePrompt`     | Generates file tree context for prompts                                            |
-| Tool definitions          | `askUserQuestionTool`, `globTool`, `grepTool`, `readTool`, `writeTool`, `editTool` |
-| Types                     | All TypeScript types and interfaces                                                |
+| Export                    | Description                                                                                  |
+| ------------------------- | -------------------------------------------------------------------------------------------- |
+| `createSession`           | Creates an agent session with tools, prompts, subagents, and hooks                           |
+| `createAgentStateManager` | Creates a state manager for workflow state                                                   |
+| `createToolRouter`        | Creates a tool router (used internally by session, or for advanced use)                      |
+| `createTaskTool`          | Creates the Task tool for subagent support                                                   |
+| Tool definitions          | `askUserQuestionTool`, `globTool`, `grepTool`, `readTool`, `writeTool`, `editTool`, `bashTool` |
+| Task tools                | `taskCreateTool`, `taskGetTool`, `taskListTool`, `taskUpdateTool` for workflow task management |
+| Types                     | All TypeScript types and interfaces                                                          |
 
 ### Activity Entry Point (`zeitlich`)
 
 For use in activities, worker setup, and Node.js code:
 
-| Export                        | Description                                                                                              |
-| ----------------------------- | -------------------------------------------------------------------------------------------------------- |
-| `ZeitlichPlugin`              | Temporal worker plugin that registers shared activities                                                  |
-| `createSharedActivities`      | Creates thread management activities                                                                     |
-| `invokeModel`                 | Core LLM invocation utility (requires Redis + LangChain)                                                 |
-| `InMemoryFileSystemProvider`  | In-memory filesystem implementation (use `withScope` factory for per-call instantiation)                 |
-| `CompositeFileSystemProvider` | Combines multiple filesystem providers (use `withScope` factory for per-call instantiation)              |
-| `BaseFileSystemProvider`      | Base class for custom providers                                                                          |
-| Tool handlers                 | `globHandler`, `grepHandler`, `readHandler`, `writeHandler`, `editHandler` (accept scopedNodes per-call) |
+| Export                           | Description                                            |
+| -------------------------------- | ------------------------------------------------------ |
+| `ZeitlichPlugin`                 | Temporal worker plugin that registers shared activities |
+| `createSharedActivities`         | Creates thread management activities                   |
+| `invokeModel`                    | Core LLM invocation utility (requires Redis + LangChain) |
+| `toTree`                         | Generate file tree string from a directory path        |
+| Tool handlers                    | `globHandler`, `editHandler`, `handleBashTool`, `handleAskUserQuestionToolResult` |
 
 ### Types
 
-| Export           | Description                                                                  |
-| ---------------- | ---------------------------------------------------------------------------- |
-| `AgentStatus`    | `"RUNNING" \| "WAITING_FOR_INPUT" \| "COMPLETED" \| "FAILED" \| "CANCELLED"` |
-| `ToolDefinition` | Tool definition with name, description, and Zod schema                       |
-| `SubagentConfig` | Configuration for subagent workflows                                         |
-| `SessionHooks`   | Lifecycle hooks interface                                                    |
+| Export                  | Description                                                                  |
+| ----------------------- | ---------------------------------------------------------------------------- |
+| `AgentStatus`           | `"RUNNING" \| "WAITING_FOR_INPUT" \| "COMPLETED" \| "FAILED" \| "CANCELLED"` |
+| `ToolDefinition`        | Tool definition with name, description, and Zod schema                       |
+| `ToolWithHandler`       | Tool definition combined with its handler                                    |
+| `SubagentConfig`        | Configuration for subagent workflows                                         |
+| `SessionLifecycleHooks` | Lifecycle hooks interface                                                    |
+| `AgentState`            | Generic agent state type                                                     |
 
 ## Architecture
 
@@ -484,24 +438,19 @@ For use in activities, worker setup, and Node.js code:
 │                              │                                  │
 │  ┌──────────────────────────────────────────────────────────┐  │
 │  │                      Workflow                             │  │
-│  │  ┌────────────────┐  ┌─────────────┐  ┌──────────────┐   │  │
-│  │  │ State Manager  │  │   Session   │  │ Tool Router  │   │  │
-│  │  │ • Status       │  │ • Run loop  │  │ • Dispatch   │   │  │
-│  │  │ • Turns        │  │ • Max turns │  │ • Hooks      │   │  │
-│  │  │ • Custom state │  │ • Lifecycle │  │ • Handlers   │   │  │
-│  │  └────────────────┘  └─────────────┘  └──────────────┘   │  │
-│  │                              │                            │  │
-│  │  ┌────────────────┐  ┌─────────────┐  ┌──────────────┐   │  │
-│  │  │ Prompt Manager │  │Tool Registry│  │  Subagents   │   │  │
-│  │  │ • System prompt│  │ • Parsing   │  │ • Child WFs  │   │  │
-│  │  │ • Context      │  │ • Validation│  │ • Results    │   │  │
-│  │  └────────────────┘  └─────────────┘  └──────────────┘   │  │
+│  │  ┌────────────────┐  ┌───────────────────────────────┐   │  │
+│  │  │ State Manager  │  │           Session             │   │  │
+│  │  │ • Status       │  │  • Agent loop                 │   │  │
+│  │  │ • Turns        │  │  • Tool routing & hooks       │   │  │
+│  │  │ • Custom state │  │  • Prompts (system, context)  │   │  │
+│  │  └────────────────┘  │  • Subagent coordination      │   │  │
+│  │                      └───────────────────────────────────┘   │  │
 │  └──────────────────────────────────────────────────────────┘  │
 │                              │                                  │
 │  ┌──────────────────────────────────────────────────────────┐  │
 │  │                      Activities                           │  │
 │  │  • runAgent (LLM invocation)                              │  │
-│  │  • Tool handlers                                          │  │
+│  │  • Tool handlers (search, file ops, bash, etc.)           │  │
 │  └──────────────────────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────────────┘
                               │
