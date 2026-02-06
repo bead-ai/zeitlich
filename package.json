@@ -18,6 +18,12 @@
         "types": "./dist/workflow.d.ts",
         "default": "./dist/workflow.js"
       }
+    },
+    "./just-bash": {
+      "import": {
+        "types": "./dist/just-bash.d.ts",
+        "default": "./dist/just-bash.js"
+      }
     }
   },
   "files": [
