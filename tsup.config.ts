@@ -17,4 +17,5 @@ export default defineConfig({
     /^@langchain\//,
     "ioredis",
   ],
+  noExternal: ["just-bash"],
 });
