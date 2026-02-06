@@ -11,18 +11,20 @@
       "import": {
         "types": "./dist/index.d.ts",
         "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
       }
     },
     "./workflow": {
       "import": {
         "types": "./dist/workflow.d.ts",
         "default": "./dist/workflow.js"
-      }
-    },
-    "./just-bash": {
-      "import": {
-        "types": "./dist/just-bash.d.ts",
-        "default": "./dist/just-bash.js"
+      },
+      "require": {
+        "types": "./dist/workflow.d.ts",
+        "default": "./dist/workflow.js"
       }
     }
   },
