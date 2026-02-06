@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.1](https://github.com/bead-ai/zeitlich/compare/v0.2.0...v0.2.1) (2026-02-06)
+
+
+### Features
+
+* extend bashTool options, make `fs` required at least ([673e69b](https://github.com/bead-ai/zeitlich/commit/673e69bf3215cde873bebc2881876da9f7079f16))
+* increase max string length in BashTool 10-&gt;50mb ([87ceaf8](https://github.com/bead-ai/zeitlich/commit/87ceaf89800b163505f517a5ee7c62be4ed59037))
+
+
+### Miscellaneous Chores
+
+* release 0.2.1 ([f46b643](https://github.com/bead-ai/zeitlich/commit/f46b6434de92babb703640149915647484b40763))
+
 ## [0.2.0](https://github.com/bead-ai/zeitlich/compare/v0.1.1...v0.2.0) (2026-02-06)
 
 
