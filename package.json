@@ -1,6 +1,6 @@
 {
   "name": "zeitlich",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "[EXPERIMENTAL] An opinionated AI agent implementation for Temporal",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
