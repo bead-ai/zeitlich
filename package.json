@@ -2,7 +2,7 @@
   "name": "zeitlich",
   "version": "0.2.0",
   "description": "[EXPERIMENTAL] An opinionated AI agent implementation for Temporal",
-  "main": "./dist/index.cjs",
+  "main": "./dist/index.js",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "private": false,
@@ -11,20 +11,12 @@
       "import": {
         "types": "./dist/index.d.ts",
         "default": "./dist/index.js"
-      },
-      "require": {
-        "types": "./dist/index.d.cts",
-        "default": "./dist/index.cjs"
       }
     },
     "./workflow": {
       "import": {
         "types": "./dist/workflow.d.ts",
         "default": "./dist/workflow.js"
-      },
-      "require": {
-        "types": "./dist/workflow.d.cts",
-        "default": "./dist/workflow.cjs"
       }
     }
   },
