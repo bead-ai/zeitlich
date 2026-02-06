@@ -12,10 +12,5 @@ export default defineConfig({
   splitting: false,
   treeshake: true,
   outDir: "dist",
-  external: [
-    /^@temporalio\//,
-    /^@langchain\//,
-    "ioredis",
-  ],
-  noExternal: ["just-bash"],
+  external: [/^@temporalio\//, /^@langchain\//, "ioredis"],
 });
