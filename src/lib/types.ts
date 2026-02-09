@@ -4,7 +4,6 @@ import type {
   InferToolResults,
   ParsedToolCallUnion,
   ToolCallResultUnion,
-  ToolDefinition,
   ToolMap,
 } from "./tool-router";
 
@@ -25,7 +24,7 @@ export type AgentStatus =
  * Base state that all agents must have
  */
 export interface BaseAgentState {
-  tools: ToolDefinition[];
+  tools: SerializableToolDefinition[];
   status: AgentStatus;
   version: number;
   turns: number;
@@ -101,6 +100,19 @@ export interface ZeitlichAgentConfig<T extends ToolMap> {
   buildInTools?: {
     [K in keyof BuildInToolDefinitions]?: BuildInToolDefinitions[K]["handler"];
   };
+}
+
+/**
+ * A JSON-serializable tool definition for state storage.
+ * Uses a plain JSON Schema object instead of a live Zod instance,
+ * so it survives Temporal serialization without losing constraints (min, max, etc.).
+ */
+export interface SerializableToolDefinition {
+  name: string;
+  description: string;
+  schema: Record<string, unknown>;
+  strict?: boolean;
+  max_uses?: number;
 }
 
 /**

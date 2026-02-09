@@ -114,7 +114,6 @@ export const createSession = async <T extends ToolMap>({
           metadata,
         });
       }
-
       stateManager.setTools(toolRouter.getToolDefinitions());
 
       await initializeThread(threadId);
