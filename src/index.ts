@@ -47,3 +47,6 @@ export type {
 export { handleBashTool } from "./tools/bash/handler";
 
 export { toTree } from "./lib/fs";
+
+export { getStateQuery } from "./lib/state-manager";
+export { createThreadManager } from "./lib/thread-manager";
