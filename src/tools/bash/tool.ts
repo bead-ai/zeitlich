@@ -1,7 +1,7 @@
 import z from "zod";
 
 export const createBashToolDescription = ({
-  fileTree,
+  fileTree: _fileTree, // TODO: I'll bypass toTree but we'll need to think about it
 }: {
   fileTree: string;
 }): string => `Execute shell commands in a bash environment.
@@ -10,9 +10,7 @@ Use this tool to:
 - Run shell commands (ls, cat, grep, find, etc.)
 - Execute scripts and chain commands with pipes (|) or logical operators (&&, ||)
 - Inspect files and directories
-
-Current file tree:
-${fileTree}`;
+`;
 
 export const bashTool = {
   name: "Bash" as const,

@@ -1,6 +1,6 @@
 import type { ActivityToolHandler } from "../../workflow";
 import type { bashToolSchemaType } from "./tool";
-import { Bash, type BashOptions } from "just-bash";
+import { Sandbox } from "e2b";
 
 type BashExecOut = {
   exitCode: number;
@@ -8,27 +8,18 @@ type BashExecOut = {
   stdout: string;
 };
 
-/** BashOptions with `fs` required */
-type BashToolOptions = Required<Pick<BashOptions, "fs">> & Omit<BashOptions, "fs">;
-
 export const handleBashTool: (
-    bashOptions: BashToolOptions,
+    sandboxId: string,
+    E2B_API_KEY: string,
 ) => ActivityToolHandler<bashToolSchemaType, BashExecOut | null> =
-  (bashOptions: BashToolOptions) => async (args: bashToolSchemaType, _context) => {
+  (sandboxId: string) => async (args: bashToolSchemaType, _context) => {
     const { command } = args;
 
-    const mergedOptions: BashOptions = {
-      ...bashOptions,
-      executionLimits: {
-        maxStringLength: 52428800, // 50MB default
-        ...bashOptions.executionLimits,
-      },
-    };
-
-    const bash = new Bash(mergedOptions);
-
     try {
-      const { exitCode, stderr, stdout } = await bash.exec(command);
+      const sandbox = await Sandbox.connect(sandboxId);
+      
+      const commandResult = await sandbox.commands.run(command);
+      const { exitCode, stderr, stdout } = commandResult;
       const bashExecOut = { exitCode, stderr, stdout };
 
       return {

@@ -71,6 +71,7 @@
     "@temporalio/envconfig": "^1.14.1",
     "@temporalio/worker": "^1.14.1",
     "@types/node": "^20.11.0",
+    "dotenv": "^17.2.4",
     "eslint": "^9.0.0",
     "husky": "^9.1.7",
     "prettier": "^3.2.0",
@@ -89,6 +90,7 @@
   },
   "homepage": "https://github.com/bead-ai/zeitlich#readme",
   "dependencies": {
+    "@e2b/code-interpreter": "^2.3.3",
     "@langchain/core": "^1.1.18",
     "@temporalio/common": "^1.14.1",
     "@temporalio/plugin": "^1.14.1",
