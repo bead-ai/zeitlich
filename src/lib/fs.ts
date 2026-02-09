@@ -1,4 +1,4 @@
-import type { IFileSystem } from "just-bash";
+import type { Sandbox } from "e2b";
 
 const basename = (path: string, separator: string): string => {
   if (path[path.length - 1] === separator) path = path.slice(0, -1);
@@ -25,7 +25,7 @@ const printTree = async (
 };
 
 export const toTree = async (
-  fs: IFileSystem,
+  sandbox: Sandbox,
   opts: {
     dir?: string;
     separator?: "/" | "\\";
@@ -35,46 +35,53 @@ export const toTree = async (
   } = {}
 ): Promise<string> => {
   const separator = opts.separator || "/";
-  let dir = opts.dir || separator;
-  if (dir[dir.length - 1] !== separator) dir += separator;
+  // Convert ~ to /home/user for the sandbox path
+  const dir = opts.dir || "~";
+  const actualPath = dir === "~" ? "/home/user" : dir.replace(/^~/, "/home/user");
+  
   const tab = opts.tab || "";
   const depth = opts.depth ?? 10;
   const sort = opts.sort ?? true;
   let subtree = " (...)";
+  
   if (depth > 0) {
-    const list = (await fs.readdirWithFileTypes?.(dir)) || [];
+    const list = await sandbox.files.list(actualPath);
+    
     if (sort) {
       list.sort((a, b) => {
-        if (a.isDirectory && b.isDirectory) {
-          return a.name.toString().localeCompare(b.name.toString());
-        } else if (a.isDirectory) {
+        const aIsDir = a.type === "dir";
+        const bIsDir = b.type === "dir";
+        
+        if (aIsDir && bIsDir) {
+          return a.name.localeCompare(b.name);
+        } else if (aIsDir) {
           return -1;
-        } else if (b.isDirectory) {
+        } else if (bIsDir) {
           return 1;
         } else {
-          return a.name.toString().localeCompare(b.name.toString());
+          return a.name.localeCompare(b.name);
         }
       });
     }
+    
     subtree = await printTree(
       tab,
       list.map((entry) => async (tab): Promise<string | null> => {
-        if (entry.isDirectory) {
-          return toTree(fs, {
-            dir: dir + entry.name,
+        if (entry.type === "dir") {
+          return toTree(sandbox, {
+            dir: entry.path,
             depth: depth - 1,
             tab,
           });
-        } else if (entry.isSymbolicLink) {
-          return (
-            "" + entry.name + " → " + (await fs.readlink(dir + entry.name))
-          );
+        } else if (entry.symlinkTarget) {
+          return `${entry.name} → ${entry.symlinkTarget}`;
         } else {
-          return "" + entry.name;
+          return entry.name;
         }
       })
     );
   }
-  const base = basename(dir, separator) + separator;
+  
+  const base = basename(actualPath, separator) + separator;
   return base + subtree;
 };
