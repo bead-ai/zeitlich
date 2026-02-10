@@ -142,8 +142,8 @@ export type AppendToolResultFn = (config: ToolResultConfig) => Promise<void>;
 export interface ToolHandlerResponse<TResult> {
   /** Content sent back to the LLM as the tool call response */
   toolResponse: ToolMessageContent;
-  /** Optional data returned to the workflow and hooks for further processing */
-  data?: TResult;
+  /** Data returned to the workflow and hooks for further processing */
+  data: TResult | null;
 }
 
 /**
@@ -237,7 +237,7 @@ export interface ToolCallResult<
 > {
   toolCallId: string;
   name: TName;
-  data?: TResult;
+  data: TResult | null;
 }
 
 /**
@@ -560,8 +560,7 @@ export function createToolRouter<T extends ToolMap>(
       }
     } catch (error) {
       // --- PostToolUseFailure: per-tool then global ---
-      const err =
-        error instanceof Error ? error : new Error(String(error));
+      const err = error instanceof Error ? error : new Error(String(error));
       let recovered = false;
 
       if (toolHooks?.onPostToolUseFailure) {
@@ -754,7 +753,7 @@ export function createToolRouter<T extends ToolMap>(
         return {
           toolCallId: toolCall.id,
           name: toolCall.name as TName,
-          data: response.data,
+          data: response.data ?? null,
         };
       };
 
