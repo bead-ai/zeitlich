@@ -345,6 +345,34 @@ export type SessionEndHook = (
 ) => void | Promise<void>;
 
 /**
+ * Per-tool lifecycle hooks - defined directly on a tool definition.
+ * Runs in addition to global hooks (global pre → tool pre → execute → tool post → global post).
+ */
+export interface ToolHooks<TArgs = unknown, TResult = unknown> {
+  /** Called before this tool executes - can skip or modify args */
+  onPreToolUse?: (ctx: {
+    args: TArgs;
+    threadId: string;
+    turn: number;
+  }) => PreToolUseHookResult | Promise<PreToolUseHookResult>;
+  /** Called after this tool executes successfully */
+  onPostToolUse?: (ctx: {
+    args: TArgs;
+    result: TResult;
+    threadId: string;
+    turn: number;
+    durationMs: number;
+  }) => void | Promise<void>;
+  /** Called when this tool execution fails */
+  onPostToolUseFailure?: (ctx: {
+    args: TArgs;
+    error: Error;
+    threadId: string;
+    turn: number;
+  }) => PostToolUseFailureHookResult | Promise<PostToolUseFailureHookResult>;
+}
+
+/**
  * Combined hooks interface for session lifecycle
  */
 export interface Hooks<T extends ToolMap, TResult = unknown> {

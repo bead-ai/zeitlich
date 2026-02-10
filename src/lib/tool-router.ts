@@ -1,6 +1,6 @@
 import type { MessageToolDefinition } from "@langchain/core/messages";
 import type { ToolMessageContent } from "./thread-manager";
-import type { Hooks, SubagentConfig, ToolResultConfig } from "./types";
+import type { Hooks, SubagentConfig, ToolHooks, ToolResultConfig } from "./types";
 
 import type { z } from "zod";
 import { proxyActivities } from "@temporalio/workflow";
@@ -49,6 +49,8 @@ export interface ToolWithHandler<
   handler: ToolHandler<z.infer<TSchema>, TResult, TContext>;
   strict?: boolean;
   max_uses?: number;
+  /** Per-tool lifecycle hooks (run in addition to global hooks) */
+  hooks?: ToolHooks<z.infer<TSchema>, TResult>;
 }
 
 /**
@@ -68,6 +70,7 @@ export type ToolMap = Record<
     /* eslint-enable @typescript-eslint/no-explicit-any */
     strict?: boolean;
     max_uses?: number;
+    hooks?: ToolHooks;
   }
 >;
 
@@ -455,8 +458,10 @@ export function createToolRouter<T extends ToolMap>(
     handlerContext?: ToolHandlerContext
   ): Promise<ToolCallResultUnion<TResults> | null> {
     const startTime = Date.now();
+    const tool = toolMap.get(toolCall.name);
+    const toolHooks = tool?.hooks;
 
-    // PreToolUse hook - can skip or modify args
+    // --- PreToolUse: global then per-tool ---
     let effectiveArgs: unknown = toolCall.args;
     if (options.hooks?.onPreToolUse) {
       const preResult = await options.hooks.onPreToolUse({
@@ -465,7 +470,6 @@ export function createToolRouter<T extends ToolMap>(
         turn,
       });
       if (preResult?.skip) {
-        // Skip this tool call - append a skip message and return null
         await appendToolResult({
           threadId: options.threadId,
           toolCallId: toolCall.id,
@@ -480,10 +484,31 @@ export function createToolRouter<T extends ToolMap>(
         effectiveArgs = preResult.modifiedArgs;
       }
     }
+    if (toolHooks?.onPreToolUse) {
+      const preResult = await toolHooks.onPreToolUse({
+        args: effectiveArgs,
+        threadId: options.threadId,
+        turn,
+      });
+      if (preResult?.skip) {
+        await appendToolResult({
+          threadId: options.threadId,
+          toolCallId: toolCall.id,
+          content: JSON.stringify({
+            skipped: true,
+            reason: "Skipped by tool PreToolUse hook",
+          }),
+        });
+        return null;
+      }
+      if (preResult?.modifiedArgs !== undefined) {
+        effectiveArgs = preResult.modifiedArgs;
+      }
+    }
 
-    const tool = toolMap.get(toolCall.name);
+    // --- Execute handler ---
     let result: unknown;
-    let content: ToolMessageContent;
+    let content!: ToolMessageContent;
 
     try {
       if (tool) {
@@ -498,24 +523,48 @@ export function createToolRouter<T extends ToolMap>(
         content = JSON.stringify(result, null, 2);
       }
     } catch (error) {
-      // PostToolUseFailure hook - can recover from errors
-      if (options.hooks?.onPostToolUseFailure) {
-        const failureResult = await options.hooks.onPostToolUseFailure({
-          toolCall,
-          error: error instanceof Error ? error : new Error(String(error)),
+      // --- PostToolUseFailure: per-tool then global ---
+      const err =
+        error instanceof Error ? error : new Error(String(error));
+      let recovered = false;
+
+      if (toolHooks?.onPostToolUseFailure) {
+        const failureResult = await toolHooks.onPostToolUseFailure({
+          args: effectiveArgs,
+          error: err,
           threadId: options.threadId,
           turn,
         });
         if (failureResult?.fallbackContent !== undefined) {
           content = failureResult.fallbackContent;
           result = { error: String(error), recovered: true };
+          recovered = true;
         } else if (failureResult?.suppress) {
           content = JSON.stringify({ error: String(error), suppressed: true });
           result = { error: String(error), suppressed: true };
-        } else {
-          throw error;
+          recovered = true;
         }
-      } else {
+      }
+
+      if (!recovered && options.hooks?.onPostToolUseFailure) {
+        const failureResult = await options.hooks.onPostToolUseFailure({
+          toolCall,
+          error: err,
+          threadId: options.threadId,
+          turn,
+        });
+        if (failureResult?.fallbackContent !== undefined) {
+          content = failureResult.fallbackContent;
+          result = { error: String(error), recovered: true };
+          recovered = true;
+        } else if (failureResult?.suppress) {
+          content = JSON.stringify({ error: String(error), suppressed: true });
+          result = { error: String(error), suppressed: true };
+          recovered = true;
+        }
+      }
+
+      if (!recovered) {
         throw error;
       }
     }
@@ -533,9 +582,18 @@ export function createToolRouter<T extends ToolMap>(
       result,
     } as ToolCallResultUnion<TResults>;
 
-    // PostToolUse hook - called after successful execution
+    // --- PostToolUse: per-tool then global ---
+    const durationMs = Date.now() - startTime;
+    if (toolHooks?.onPostToolUse) {
+      await toolHooks.onPostToolUse({
+        args: effectiveArgs,
+        result: result,
+        threadId: options.threadId,
+        turn,
+        durationMs,
+      });
+    }
     if (options.hooks?.onPostToolUse) {
-      const durationMs = Date.now() - startTime;
       await options.hooks.onPostToolUse({
         toolCall,
         result: toolResult,

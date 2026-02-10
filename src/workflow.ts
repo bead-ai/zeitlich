@@ -81,6 +81,7 @@ export type {
   PostToolUseFailureHook,
   PostToolUseFailureHookContext,
   PostToolUseFailureHookResult,
+  ToolHooks,
   SessionStartHook,
   SessionStartHookContext,
   SessionEndHook,
