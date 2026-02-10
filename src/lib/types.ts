@@ -162,6 +162,36 @@ export interface SubagentConfig<TResult extends z.ZodType = z.ZodType> {
   resultSchema?: TResult;
   /** Optional static context passed to the subagent on every invocation */
   context?: Record<string, unknown>;
+  /** Per-subagent lifecycle hooks */
+  hooks?: SubagentHooks;
+}
+
+/**
+ * Per-subagent lifecycle hooks - defined on a SubagentConfig.
+ * Runs in addition to global hooks (global pre → subagent pre → execute → subagent post → global post).
+ */
+export interface SubagentHooks<TArgs = unknown, TResult = unknown> {
+  /** Called before this subagent executes - can skip or modify args */
+  onPreExecution?: (ctx: {
+    args: TArgs;
+    threadId: string;
+    turn: number;
+  }) => PreToolUseHookResult | Promise<PreToolUseHookResult>;
+  /** Called after this subagent executes successfully */
+  onPostExecution?: (ctx: {
+    args: TArgs;
+    result: TResult;
+    threadId: string;
+    turn: number;
+    durationMs: number;
+  }) => void | Promise<void>;
+  /** Called when this subagent execution fails */
+  onExecutionFailure?: (ctx: {
+    args: TArgs;
+    error: Error;
+    threadId: string;
+    turn: number;
+  }) => PostToolUseFailureHookResult | Promise<PostToolUseFailureHookResult>;
 }
 
 /**

@@ -1,6 +1,15 @@
 import type { MessageToolDefinition } from "@langchain/core/messages";
 import type { ToolMessageContent } from "./thread-manager";
-import type { Hooks, SubagentConfig, ToolHooks, ToolResultConfig } from "./types";
+import type {
+  Hooks,
+  PostToolUseFailureHookResult,
+  PreToolUseHookResult,
+  SubagentConfig,
+  SubagentHooks,
+  ToolHooks,
+  ToolResultConfig,
+} from "./types";
+import type { GenericTaskToolSchemaType } from "../tools/task/tool";
 
 import type { z } from "zod";
 import { proxyActivities } from "@temporalio/workflow";
@@ -427,9 +436,36 @@ export function createToolRouter<T extends ToolMap>(
   }
 
   if (options.subagents) {
+    // Build per-subagent hook dispatcher keyed by subagent name
+    const subagentHooksMap = new Map<string, SubagentHooks>();
+    for (const s of options.subagents) {
+      if (s.hooks) subagentHooksMap.set(s.name, s.hooks);
+    }
+
+    const resolveSubagentName = (args: unknown): string =>
+      (args as GenericTaskToolSchemaType).subagent;
+
     toolMap.set("Task", {
       ...createTaskTool(options.subagents),
       handler: createTaskHandler(options.subagents),
+      ...(subagentHooksMap.size > 0 && {
+        hooks: {
+          onPreToolUse: async (ctx): Promise<PreToolUseHookResult> => {
+            const hooks = subagentHooksMap.get(resolveSubagentName(ctx.args));
+            return hooks?.onPreExecution?.(ctx) ?? {};
+          },
+          onPostToolUse: async (ctx): Promise<void> => {
+            const hooks = subagentHooksMap.get(resolveSubagentName(ctx.args));
+            await hooks?.onPostExecution?.(ctx);
+          },
+          onPostToolUseFailure: async (
+            ctx
+          ): Promise<PostToolUseFailureHookResult> => {
+            const hooks = subagentHooksMap.get(resolveSubagentName(ctx.args));
+            return hooks?.onExecutionFailure?.(ctx) ?? {};
+          },
+        } satisfies ToolHooks,
+      }),
     });
   }
 

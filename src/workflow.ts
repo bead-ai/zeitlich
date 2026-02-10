@@ -87,6 +87,7 @@ export type {
   SessionEndHook,
   SessionEndHookContext,
   SubagentConfig,
+  SubagentHooks,
   SubagentInput,
   TaskStatus,
   WorkflowTask,
