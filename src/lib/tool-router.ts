@@ -16,10 +16,7 @@ import { proxyActivities } from "@temporalio/workflow";
 import type { ZeitlichSharedActivities } from "../activities";
 import { createTaskTool } from "../tools/task/tool";
 import { createTaskHandler } from "../tools/task/handler";
-import type { createTaskCreateHandler } from "../tools/task-create/handler";
 import { bashTool, createBashToolDescription } from "../tools/bash/tool";
-import { taskCreateTool } from "../tools/task-create/tool";
-import type { handleBashTool } from "../tools/bash/handler";
 
 export type { ToolMessageContent };
 
@@ -157,23 +154,6 @@ export interface ToolHandlerContext {
   [key: string]: unknown;
 }
 
-export interface BuildInToolDefinitions {
-  [bashTool.name]: typeof bashTool & {
-    handler: ReturnType<typeof handleBashTool>;
-  };
-  [taskCreateTool.name]: typeof taskCreateTool & {
-    handler: ReturnType<typeof createTaskCreateHandler>;
-  };
-}
-
-export const buildIntoolDefinitions: Record<
-  keyof BuildInToolDefinitions,
-  ToolDefinition
-> = {
-  [bashTool.name]: bashTool,
-  [taskCreateTool.name]: taskCreateTool,
-};
-
 /**
  * A handler function for a specific tool.
  * Receives the parsed args and context, returns a response with content and result.
@@ -260,10 +240,6 @@ export interface ToolRouterOptions<T extends ToolMap> {
   hooks?: Hooks<T, ToolCallResultUnion<InferToolResults<T>>>;
   /** Subagent configurations */
   subagents?: SubagentConfig[];
-  /** Build in tools - accepts raw handlers or proxied activities */
-  buildInTools?: {
-    [K in keyof BuildInToolDefinitions]?: BuildInToolDefinitions[K]["handler"];
-  };
 }
 
 /**
@@ -434,7 +410,15 @@ export function createToolRouter<T extends ToolMap>(
   // Use ToolMap's value type to allow both user tools and the dynamic Task tool
   const toolMap = new Map<string, ToolMap[string]>();
   for (const [_key, tool] of Object.entries(options.tools)) {
-    toolMap.set(tool.name, tool as T[keyof T]);
+    // Enhance Bash tool description with file tree when available
+    if (tool.name === bashTool.name && options.fileTree) {
+      toolMap.set(tool.name, {
+        ...tool,
+        description: createBashToolDescription({ fileTree: options.fileTree }),
+      } as T[keyof T]);
+    } else {
+      toolMap.set(tool.name, tool as T[keyof T]);
+    }
   }
 
   if (options.subagents) {
@@ -469,25 +453,6 @@ export function createToolRouter<T extends ToolMap>(
         } satisfies ToolHooks,
       }),
     });
-  }
-
-  if (options.buildInTools) {
-    for (const [key, value] of Object.entries(options.buildInTools)) {
-      if (key === bashTool.name) {
-        toolMap.set(key, {
-          ...buildIntoolDefinitions[key as keyof BuildInToolDefinitions],
-          description: createBashToolDescription({
-            fileTree: options.fileTree,
-          }),
-          handler: value,
-        });
-      } else {
-        toolMap.set(key, {
-          ...buildIntoolDefinitions[key as keyof BuildInToolDefinitions],
-          handler: value,
-        });
-      }
-    }
   }
 
   async function processToolCall(

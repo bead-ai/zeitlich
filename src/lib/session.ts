@@ -56,7 +56,6 @@ export const createSession = async <T extends ToolMap>({
   subagents,
   tools = {} as T,
   processToolsInParallel = true,
-  buildInTools = {},
   hooks = {},
 }: ZeitlichAgentConfig<T>): Promise<ZeitlichSession> => {
   const {
@@ -83,7 +82,6 @@ export const createSession = async <T extends ToolMap>({
     appendToolResult,
     threadId,
     hooks,
-    buildInTools,
     fileTree,
     subagents,
     parallel: processToolsInParallel,

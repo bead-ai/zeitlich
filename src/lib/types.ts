@@ -1,6 +1,5 @@
 import type { ToolMessageContent } from "./thread-manager";
 import type {
-  BuildInToolDefinitions,
   InferToolResults,
   ParsedToolCallUnion,
   ToolCallResultUnion,
@@ -95,12 +94,6 @@ export interface ZeitlichAgentConfig<T extends ToolMap> {
    * Returns MessageContent array for the initial HumanMessage.
    */
   buildContextMessage: () => MessageContent | Promise<MessageContent>;
-  /**
-   * Build in tools - accepts raw handlers or proxied activities
-   */
-  buildInTools?: {
-    [K in keyof BuildInToolDefinitions]?: BuildInToolDefinitions[K]["handler"];
-  };
 }
 
 /**

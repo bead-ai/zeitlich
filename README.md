@@ -373,7 +373,7 @@ import {
 } from "zeitlich";
 ```
 
-Built-in tools can be added via `buildInTools` (for tools with special handling like Bash) or as regular tools:
+All tools are passed via `tools`. The Bash tool's description is automatically enhanced with the file tree when provided:
 
 ```typescript
 const session = await createSession({
@@ -383,9 +383,10 @@ const session = await createSession({
       ...askUserQuestionTool,
       handler: handleAskUserQuestionToolResult,
     },
-  },
-  buildInTools: {
-    Bash: handleBashToolResult,
+    Bash: {
+      ...bashTool,
+      handler: handleBashTool(bashOptions),
+    },
   },
 });
 ```
