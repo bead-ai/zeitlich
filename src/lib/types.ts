@@ -388,7 +388,7 @@ export interface ToolHooks<TArgs = unknown, TResult = unknown> {
   /** Called after this tool executes successfully */
   onPostToolUse?: (ctx: {
     args: TArgs;
-    result: TResult;
+    result: TResult | null;
     threadId: string;
     turn: number;
     durationMs: number;

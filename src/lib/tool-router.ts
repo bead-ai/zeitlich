@@ -79,7 +79,9 @@ export type ToolMap = Record<
     /* eslint-enable @typescript-eslint/no-explicit-any */
     strict?: boolean;
     max_uses?: number;
-    hooks?: ToolHooks;
+    /* eslint-disable @typescript-eslint/no-explicit-any */
+    hooks?: ToolHooks<any, any>;
+    /* eslint-enable @typescript-eslint/no-explicit-any */
   }
 >;
 
@@ -797,6 +799,36 @@ export function createToolRouter<T extends ToolMap>(
       >[];
     },
   };
+}
+
+/**
+ * Identity function that creates a generic inference context for a tool definition.
+ * TypeScript infers TResult from the handler and flows it to hooks automatically.
+ *
+ * @example
+ * ```typescript
+ * tools: {
+ *   AskUser: defineTool({
+ *     ...askUserTool,
+ *     handler: handleAskUser,
+ *     hooks: {
+ *       onPostToolUse: ({ result }) => {
+ *         // result is correctly typed as the handler's return data type
+ *       },
+ *     },
+ *   }),
+ * }
+ * ```
+ */
+export function defineTool<
+  TName extends string,
+  TSchema extends z.ZodType,
+  TResult,
+  TContext = ToolHandlerContext,
+>(
+  tool: ToolWithHandler<TName, TSchema, TResult, TContext>
+): ToolWithHandler<TName, TSchema, TResult, TContext> {
+  return tool;
 }
 
 /**
