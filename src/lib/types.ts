@@ -8,6 +8,7 @@ import type {
 } from "./tool-router";
 
 import type { MessageContent, StoredMessage } from "@langchain/core/messages";
+import type { Workflow } from "@temporalio/workflow";
 import type { z } from "zod";
 
 /**
@@ -154,8 +155,8 @@ export interface SubagentConfig<TResult extends z.ZodType = z.ZodType> {
   name: string;
   /** Description shown to the parent agent explaining what this subagent does */
   description: string;
-  /** Temporal workflow type name (used with executeChild) */
-  workflowType: string;
+  /** Temporal workflow function or type name (used with executeChild) */
+  workflow: string | Workflow;
   /** Optional task queue - defaults to parent's queue if not specified */
   taskQueue?: string;
   /** Optional Zod schema to validate the child workflow's result. If omitted, result is passed through as-is. */

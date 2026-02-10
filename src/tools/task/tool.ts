@@ -44,7 +44,7 @@ Usage notes:
  *   {
  *     name: "researcher",
  *     description: "Researches topics and gathers information",
- *     workflowType: "researcherWorkflow",
+ *     workflow: "researcherWorkflow",
  *     resultSchema: z.object({ findings: z.string() }),
  *   },
  * ]);

@@ -24,7 +24,7 @@ export interface TaskHandlerResult<TResult = unknown> {
  *   {
  *     name: "researcher",
  *     description: "Researches topics",
- *     workflowType: "researcherWorkflow",
+ *     workflow: "researcherWorkflow",
  *     resultSchema: z.object({ findings: z.string() }),
  *   },
  * ]);
@@ -52,11 +52,16 @@ export function createTaskHandler(subagents: SubagentConfig[]) {
       ...(config.context && { context: config.context }),
     };
 
-    const childResult = await executeChild(config.workflowType, {
+    const childOpts = {
       workflowId: childWorkflowId,
       args: [input],
       taskQueue: config.taskQueue ?? parentTaskQueue,
-    });
+    };
+
+    const childResult =
+      typeof config.workflow === "string"
+        ? await executeChild(config.workflow, childOpts)
+        : await executeChild(config.workflow, childOpts);
 
     // Validate result if schema provided, otherwise pass through as-is
     const validated = config.resultSchema
