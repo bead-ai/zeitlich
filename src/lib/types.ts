@@ -2,6 +2,7 @@ import type { ToolMessageContent } from "./thread-manager";
 import type {
   InferToolResults,
   ParsedToolCallUnion,
+  RawToolCall,
   ToolCallResultUnion,
   ToolMap,
 } from "./tool-router";
@@ -50,8 +51,8 @@ export interface AgentFile {
 /**
  * Agent response from LLM invocation
  */
-export interface AgentResponse {
-  message: StoredMessage;
+export interface AgentResponse<M = StoredMessage> {
+  message: M;
   stopReason: string | null;
   usage?: {
     input_tokens?: number;
@@ -61,15 +62,38 @@ export interface AgentResponse {
 }
 
 /**
+ * Thread operations required by a session.
+ * Consumers provide these — typically by wrapping Temporal activities.
+ * Use `proxyDefaultThreadOps()` for the default StoredMessage implementation.
+ */
+export interface ThreadOps<M = StoredMessage> {
+  /** Initialize an empty thread */
+  initializeThread(threadId: string): Promise<void>;
+  /** Append a system message to the thread */
+  appendSystemMessage(threadId: string, content: string): Promise<void>;
+  /** Append a human message to the thread */
+  appendHumanMessage(
+    threadId: string,
+    content: string | MessageContent
+  ): Promise<void>;
+  /** Append a tool result to the thread */
+  appendToolResult(config: ToolResultConfig): Promise<void>;
+  /** Extract raw tool calls from a message */
+  parseToolCalls(message: M): Promise<RawToolCall[]>;
+}
+
+/**
  * Configuration for a Zeitlich agent session
  */
-export interface ZeitlichAgentConfig<T extends ToolMap> {
+export interface ZeitlichAgentConfig<T extends ToolMap, M = StoredMessage> {
   threadId: string;
   agentName: string;
   metadata?: Record<string, unknown>;
   maxTurns?: number;
   /** Workflow-specific runAgent activity (with tools pre-bound) */
-  runAgent: RunAgentActivity;
+  runAgent: RunAgentActivity<M>;
+  /** Thread operations (initialize, append messages, parse tool calls) */
+  threadOps: ThreadOps<M>;
   /** Tool router for processing tool calls (optional if agent has no tools) */
   tools?: T;
   /** Subagent configurations */
@@ -120,9 +144,9 @@ export interface RunAgentConfig {
 /**
  * Type signature for workflow-specific runAgent activity
  */
-export type RunAgentActivity = (
+export type RunAgentActivity<M = StoredMessage> = (
   config: RunAgentConfig
-) => Promise<AgentResponse>;
+) => Promise<AgentResponse<M>>;
 /**
  * Configuration for appending a tool result
  */

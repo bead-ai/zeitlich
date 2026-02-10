@@ -45,3 +45,8 @@ export { toTree } from "./lib/fs";
 
 export { getStateQuery } from "./lib/state-manager";
 export { createThreadManager } from "./lib/thread-manager";
+export type {
+  BaseThreadManager,
+  ThreadManager,
+  ThreadManagerConfig,
+} from "./lib/thread-manager";

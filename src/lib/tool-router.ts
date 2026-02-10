@@ -12,8 +12,6 @@ import type {
 import type { TaskArgs } from "../tools/task/tool";
 
 import type { z } from "zod";
-import { proxyActivities } from "@temporalio/workflow";
-import type { ZeitlichSharedActivities } from "../activities";
 import { createTaskTool } from "../tools/task/tool";
 import { createTaskHandler } from "../tools/task/handler";
 
@@ -399,15 +397,7 @@ export interface ToolRouter<T extends ToolMap> {
 export function createToolRouter<T extends ToolMap>(
   options: ToolRouterOptions<T>
 ): ToolRouter<T> {
-  const { appendToolResult } = proxyActivities<ZeitlichSharedActivities>({
-    startToCloseTimeout: "2m",
-    retry: {
-      maximumAttempts: 3,
-      initialInterval: "5s",
-      maximumInterval: "15m",
-      backoffCoefficient: 4,
-    },
-  });
+  const { appendToolResult } = options;
   type TResults = InferToolResults<T>;
 
   // Build internal lookup map by tool name

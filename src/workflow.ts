@@ -16,7 +16,7 @@
  */
 
 // Session
-export { createSession } from "./lib/session";
+export { createSession, proxyDefaultThreadOps } from "./lib/session";
 export type { ZeitlichSession, SessionLifecycleHooks } from "./lib/session";
 
 // State management
@@ -73,6 +73,7 @@ export type {
   BaseAgentState,
   AgentFile,
   AgentResponse,
+  ThreadOps,
   ZeitlichAgentConfig,
   RunAgentConfig,
   RunAgentActivity,

@@ -1,11 +1,13 @@
 import { proxyActivities } from "@temporalio/workflow";
 import type { ZeitlichSharedActivities } from "../activities";
 import type {
+  ThreadOps,
   ZeitlichAgentConfig,
   SessionStartHook,
   SessionEndHook,
   SessionExitReason,
 } from "./types";
+import type { StoredMessage } from "@langchain/core/messages";
 import { type AgentStateManager, type JsonSerializable } from "./state-manager";
 import {
   createToolRouter,
@@ -13,12 +15,11 @@ import {
   type RawToolCall,
   type ToolMap,
 } from "./tool-router";
-import type { StoredMessage } from "@langchain/core/messages";
 
-export interface ZeitlichSession {
+export interface ZeitlichSession<M = unknown> {
   runSession<T extends JsonSerializable<T>>(args: {
     stateManager: AgentStateManager<T>;
-  }): Promise<StoredMessage | null>;
+  }): Promise<M | null>;
 }
 
 async function resolvePrompt(
@@ -40,12 +41,13 @@ export interface SessionLifecycleHooks {
   onSessionEnd?: SessionEndHook;
 }
 
-export const createSession = async <T extends ToolMap>({
+export const createSession = async <T extends ToolMap, M = unknown>({
   threadId,
   agentName,
   maxTurns = 50,
   metadata = {},
   runAgent,
+  threadOps,
   baseSystemPrompt,
   instructionsPrompt,
   buildContextMessage,
@@ -53,27 +55,10 @@ export const createSession = async <T extends ToolMap>({
   tools = {} as T,
   processToolsInParallel = true,
   hooks = {},
-}: ZeitlichAgentConfig<T>): Promise<ZeitlichSession> => {
-  const {
-    initializeThread,
-    appendHumanMessage,
-    parseToolCalls,
-    appendToolResult,
-    appendSystemMessage,
-  } = proxyActivities<ZeitlichSharedActivities>({
-    startToCloseTimeout: "30m",
-    retry: {
-      maximumAttempts: 6,
-      initialInterval: "5s",
-      maximumInterval: "15m",
-      backoffCoefficient: 4,
-    },
-    heartbeatTimeout: "5m",
-  });
-
+}: ZeitlichAgentConfig<T, M>): Promise<ZeitlichSession<M>> => {
   const toolRouter = createToolRouter({
     tools,
-    appendToolResult,
+    appendToolResult: threadOps.appendToolResult,
     threadId,
     hooks,
     subagents,
@@ -97,7 +82,7 @@ export const createSession = async <T extends ToolMap>({
   };
 
   return {
-    runSession: async ({ stateManager }): Promise<StoredMessage | null> => {
+    runSession: async ({ stateManager }): Promise<M | null> => {
       if (hooks.onSessionStart) {
         await hooks.onSessionStart({
           threadId,
@@ -107,15 +92,15 @@ export const createSession = async <T extends ToolMap>({
       }
       stateManager.setTools(toolRouter.getToolDefinitions());
 
-      await initializeThread(threadId);
-      await appendSystemMessage(
+      await threadOps.initializeThread(threadId);
+      await threadOps.appendSystemMessage(
         threadId,
         [
           await resolvePrompt(baseSystemPrompt),
           await resolvePrompt(instructionsPrompt),
         ].join("\n")
       );
-      await appendHumanMessage(threadId, await buildContextMessage());
+      await threadOps.appendHumanMessage(threadId, await buildContextMessage());
 
       let exitReason: SessionExitReason = "completed";
 
@@ -147,7 +132,7 @@ export const createSession = async <T extends ToolMap>({
             return message;
           }
 
-          const rawToolCalls: RawToolCall[] = await parseToolCalls(message);
+          const rawToolCalls: RawToolCall[] = await threadOps.parseToolCalls(message);
 
           // Parse all tool calls uniformly through the router
           const parsedToolCalls: ParsedToolCallUnion<T>[] = [];
@@ -155,7 +140,7 @@ export const createSession = async <T extends ToolMap>({
             try {
               parsedToolCalls.push(toolRouter.parseToolCall(tc));
             } catch (error) {
-              await appendToolResult({
+              await threadOps.appendToolResult({
                 threadId,
                 toolCallId: tc.id ?? "",
                 content: JSON.stringify({
@@ -192,3 +177,40 @@ export const createSession = async <T extends ToolMap>({
     },
   };
 };
+
+/**
+ * Proxy the default ZeitlichSharedActivities as ThreadOps<StoredMessage>.
+ * Call this in workflow code for the standard LangChain/StoredMessage setup.
+ *
+ * @example
+ * ```typescript
+ * const session = await createSession({
+ *   threadOps: proxyDefaultThreadOps(),
+ *   // ...
+ * });
+ * ```
+ */
+export function proxyDefaultThreadOps(
+  options?: Parameters<typeof proxyActivities>[0]
+): ThreadOps<StoredMessage> {
+  const activities = proxyActivities<ZeitlichSharedActivities>(
+    options ?? {
+      startToCloseTimeout: "30m",
+      retry: {
+        maximumAttempts: 6,
+        initialInterval: "5s",
+        maximumInterval: "15m",
+        backoffCoefficient: 4,
+      },
+      heartbeatTimeout: "5m",
+    }
+  );
+
+  return {
+    initializeThread: activities.initializeThread,
+    appendSystemMessage: activities.appendSystemMessage,
+    appendHumanMessage: activities.appendHumanMessage,
+    appendToolResult: activities.appendToolResult,
+    parseToolCalls: activities.parseToolCalls,
+  };
+}
