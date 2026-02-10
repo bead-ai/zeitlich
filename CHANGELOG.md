@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.2](https://github.com/bead-ai/zeitlich/compare/v0.2.1...v0.2.2) (2026-02-10)
+
+
+### Miscellaneous Chores
+
+* improved interfaces and types ([#10](https://github.com/bead-ai/zeitlich/issues/10)) ([58dcfff](https://github.com/bead-ai/zeitlich/commit/58dcfffc0acfa0ddb008c3c63c5355e9b5251607))
+
 ## [0.2.1](https://github.com/bead-ai/zeitlich/compare/v0.2.0...v0.2.1) (2026-02-06)
 
 
