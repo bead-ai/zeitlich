@@ -140,10 +140,10 @@ export type AppendToolResultFn = (config: ToolResultConfig) => Promise<void>;
  * Contains the content for the tool message and the result to return from processToolCalls.
  */
 export interface ToolHandlerResponse<TResult> {
-  /** Content for the tool message added to the thread */
-  content: ToolMessageContent;
-  /** Result returned from processToolCalls */
-  result: TResult;
+  /** Content sent back to the LLM as the tool call response */
+  toolResponse: ToolMessageContent;
+  /** Optional data returned to the workflow and hooks for further processing */
+  data?: TResult;
 }
 
 /**
@@ -237,7 +237,7 @@ export interface ToolCallResult<
 > {
   toolCallId: string;
   name: TName;
-  result: TResult;
+  data?: TResult;
 }
 
 /**
@@ -552,8 +552,8 @@ export function createToolRouter<T extends ToolMap>(
           effectiveArgs as Parameters<typeof tool.handler>[0],
           (handlerContext ?? {}) as Parameters<typeof tool.handler>[1]
         );
-        result = response.result;
-        content = response.content;
+        result = response.data;
+        content = response.toolResponse;
       } else {
         result = { error: `Unknown tool: ${toolCall.name}` };
         content = JSON.stringify(result, null, 2);
@@ -615,7 +615,7 @@ export function createToolRouter<T extends ToolMap>(
     const toolResult = {
       toolCallId: toolCall.id,
       name: toolCall.name,
-      result,
+      data: result,
     } as ToolCallResultUnion<TResults>;
 
     // --- PostToolUse: per-tool then global ---
@@ -748,13 +748,13 @@ export function createToolRouter<T extends ToolMap>(
         await appendToolResult({
           threadId: options.threadId,
           toolCallId: toolCall.id,
-          content: response.content,
+          content: response.toolResponse,
         });
 
         return {
           toolCallId: toolCall.id,
           name: toolCall.name as TName,
-          result: response.result,
+          data: response.data,
         };
       };
 

@@ -13,8 +13,8 @@ export interface GlobResult {
  * Glob handler response
  */
 export interface GlobHandlerResponse {
-  content: string;
-  result: GlobResult;
+  toolResponse: string;
+  data: GlobResult;
 }
 
 /**
@@ -31,8 +31,8 @@ export async function globHandler(
   const _bash = new Bash({ fs });
 
   return Promise.resolve({
-    content: "Hello, world!",
-    result: { files: [] },
+    toolResponse: "Hello, world!",
+    data: { files: [] },
   });
 
   // try {

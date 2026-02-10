@@ -64,14 +64,14 @@ export function createTaskHandler(subagents: SubagentConfig[]) {
       : childResult;
 
     // Format content - stringify objects, pass strings through
-    const content =
+    const toolResponse =
       typeof validated === "string"
         ? validated
         : JSON.stringify(validated, null, 2);
 
     return {
-      content,
-      result: {
+      toolResponse,
+      data: {
         result: validated,
         childWorkflowId,
       },

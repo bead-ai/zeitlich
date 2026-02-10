@@ -39,8 +39,8 @@ export function createTaskCreateHandler<
     stateManager.setTask(task);
 
     return {
-      content: JSON.stringify(task, null, 2),
-      result: task,
+      toolResponse: JSON.stringify(task, null, 2),
+      data: task,
     };
   };
 }

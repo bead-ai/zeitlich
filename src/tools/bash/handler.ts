@@ -32,14 +32,14 @@ export const handleBashTool: (
       const bashExecOut = { exitCode, stderr, stdout };
 
       return {
-        content: `Exit code: ${exitCode}\n\nstdout:\n${stdout}\n\nstderr:\n${stderr}`,
-        result: bashExecOut,
+        toolResponse: `Exit code: ${exitCode}\n\nstdout:\n${stdout}\n\nstderr:\n${stderr}`,
+        data: bashExecOut,
       };
     } catch (error) {
       const err = error instanceof Error ? error : new Error("Unknown error");
       return {
-        content: `Error executing bash command: ${err.message}`,
-        result: null,
+        toolResponse: `Error executing bash command: ${err.message}`,
+        data: null,
       };
     }
   };

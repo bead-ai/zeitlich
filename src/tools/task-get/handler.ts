@@ -25,14 +25,14 @@ export function createTaskGetHandler<TCustom extends JsonSerializable<TCustom>>(
 
     if (!task) {
       return {
-        content: JSON.stringify({ error: `Task not found: ${args.taskId}` }),
-        result: null,
+        toolResponse: JSON.stringify({ error: `Task not found: ${args.taskId}` }),
+        data: null,
       };
     }
 
     return {
-      content: JSON.stringify(task, null, 2),
-      result: task,
+      toolResponse: JSON.stringify(task, null, 2),
+      data: task,
     };
   };
 }
