@@ -30,6 +30,7 @@ export interface BaseAgentState {
   version: number;
   turns: number;
   tasks: Map<string, WorkflowTask>;
+  systemPrompt: string;
 }
 
 /**
@@ -69,8 +70,6 @@ export interface AgentResponse<M = StoredMessage> {
 export interface ThreadOps<M = StoredMessage> {
   /** Initialize an empty thread */
   initializeThread(threadId: string): Promise<void>;
-  /** Append a system message to the thread */
-  appendSystemMessage(threadId: string, content: string): Promise<void>;
   /** Append a human message to the thread */
   appendHumanMessage(
     threadId: string,
@@ -102,16 +101,6 @@ export interface ZeitlichAgentConfig<T extends ToolMap, M = StoredMessage> {
   hooks?: Hooks<T, ToolCallResultUnion<InferToolResults<T>>>;
   /** Whether to process tools in parallel */
   processToolsInParallel?: boolean;
-  /**
-   * Base system prompt (e.g., Auditron identity).
-   * Can be a static string or async function.
-   */
-  baseSystemPrompt: string | (() => string | Promise<string>);
-  /**
-   * Agent-specific instructions prompt.
-   * Can be a static string or async function.
-   */
-  instructionsPrompt: string | (() => string | Promise<string>);
   /**
    * Build context message content from agent-specific context.
    * Returns MessageContent array for the initial HumanMessage.
@@ -153,6 +142,8 @@ export type RunAgentActivity<M = StoredMessage> = (
 export interface ToolResultConfig {
   threadId: string;
   toolCallId: string;
+  /** The name of the tool that produced this result */
+  toolName: string;
   /** Content for the tool message (string or complex content parts) */
   content: ToolMessageContent;
 }

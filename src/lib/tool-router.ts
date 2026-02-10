@@ -466,6 +466,7 @@ export function createToolRouter<T extends ToolMap>(
         await appendToolResult({
           threadId: options.threadId,
           toolCallId: toolCall.id,
+          toolName: toolCall.name,
           content: JSON.stringify({
             skipped: true,
             reason: "Skipped by PreToolUse hook",
@@ -487,6 +488,7 @@ export function createToolRouter<T extends ToolMap>(
         await appendToolResult({
           threadId: options.threadId,
           toolCallId: toolCall.id,
+          toolName: toolCall.name,
           content: JSON.stringify({
             skipped: true,
             reason: "Skipped by tool PreToolUse hook",
@@ -565,6 +567,7 @@ export function createToolRouter<T extends ToolMap>(
     await appendToolResult({
       threadId: options.threadId,
       toolCallId: toolCall.id,
+      toolName: toolCall.name,
       content,
     });
 
@@ -709,6 +712,7 @@ export function createToolRouter<T extends ToolMap>(
         await appendToolResult({
           threadId: options.threadId,
           toolCallId: toolCall.id,
+          toolName: toolCall.name,
           content: response.toolResponse,
         });
 

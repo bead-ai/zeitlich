@@ -7,7 +7,6 @@ import {
   type MessageContent,
   type MessageStructure,
   type StoredMessage,
-  SystemMessage,
   ToolMessage,
 } from "@langchain/core/messages";
 import { v4 as uuidv4 } from "uuid";
@@ -49,12 +48,6 @@ export interface BaseThreadManager<T> {
 
 /** Thread manager with StoredMessage convenience helpers */
 export interface ThreadManager extends BaseThreadManager<StoredMessage> {
-  /** Append a system message to the thread */
-  appendSystemMessage(content: string): Promise<void>;
-
-  /** Create a SystemMessage (returns StoredMessage for storage) */
-  createSystemMessage(content: string): StoredMessage;
-
   /** Create a HumanMessage (returns StoredMessage for storage) */
   createHumanMessage(content: string | MessageContent): StoredMessage;
 
@@ -86,9 +79,7 @@ export interface ThreadManager extends BaseThreadManager<StoredMessage> {
  * Without generic args, returns a full ThreadManager with StoredMessage helpers.
  * With a custom type T, returns a BaseThreadManager<T>.
  */
-export function createThreadManager(
-  config: ThreadManagerConfig
-): ThreadManager;
+export function createThreadManager(config: ThreadManagerConfig): ThreadManager;
 export function createThreadManager<T>(
   config: ThreadManagerConfig<T>
 ): BaseThreadManager<T>;
@@ -163,18 +154,7 @@ export function createThreadManager<T>(
       }).toDict();
     },
 
-    createSystemMessage(content: string): StoredMessage {
-      return new SystemMessage({ content }).toDict();
-    },
-
-    async appendSystemMessage(content: string): Promise<void> {
-      const message = helpers.createSystemMessage(content);
-      await (base as BaseThreadManager<StoredMessage>).append([message]);
-    },
-
-    async appendHumanMessage(
-      content: string | MessageContent
-    ): Promise<void> {
+    async appendHumanMessage(content: string | MessageContent): Promise<void> {
       const message = helpers.createHumanMessage(content);
       await (base as BaseThreadManager<StoredMessage>).append([message]);
     },
@@ -187,9 +167,7 @@ export function createThreadManager<T>(
       await (base as BaseThreadManager<StoredMessage>).append([message]);
     },
 
-    async appendAIMessage(
-      content: string | MessageContent
-    ): Promise<void> {
+    async appendAIMessage(content: string | MessageContent): Promise<void> {
       const message = helpers.createAIMessage(content as string);
       await (base as BaseThreadManager<StoredMessage>).append([message]);
     },

@@ -22,15 +22,6 @@ export interface ZeitlichSession<M = unknown> {
   }): Promise<M | null>;
 }
 
-async function resolvePrompt(
-  prompt: string | (() => string | Promise<string>)
-): Promise<string> {
-  if (typeof prompt === "function") {
-    return prompt();
-  }
-  return prompt;
-}
-
 /**
  * Session-level hooks for lifecycle events
  */
@@ -48,8 +39,6 @@ export const createSession = async <T extends ToolMap, M = unknown>({
   metadata = {},
   runAgent,
   threadOps,
-  baseSystemPrompt,
-  instructionsPrompt,
   buildContextMessage,
   subagents,
   tools = {} as T,
@@ -93,13 +82,6 @@ export const createSession = async <T extends ToolMap, M = unknown>({
       stateManager.setTools(toolRouter.getToolDefinitions());
 
       await threadOps.initializeThread(threadId);
-      await threadOps.appendSystemMessage(
-        threadId,
-        [
-          await resolvePrompt(baseSystemPrompt),
-          await resolvePrompt(instructionsPrompt),
-        ].join("\n")
-      );
       await threadOps.appendHumanMessage(threadId, await buildContextMessage());
 
       let exitReason: SessionExitReason = "completed";
@@ -132,7 +114,8 @@ export const createSession = async <T extends ToolMap, M = unknown>({
             return message;
           }
 
-          const rawToolCalls: RawToolCall[] = await threadOps.parseToolCalls(message);
+          const rawToolCalls: RawToolCall[] =
+            await threadOps.parseToolCalls(message);
 
           // Parse all tool calls uniformly through the router
           const parsedToolCalls: ParsedToolCallUnion<T>[] = [];
@@ -143,6 +126,7 @@ export const createSession = async <T extends ToolMap, M = unknown>({
               await threadOps.appendToolResult({
                 threadId,
                 toolCallId: tc.id ?? "",
+                toolName: tc.name,
                 content: JSON.stringify({
                   error: `Invalid tool call for "${tc.name}": ${error instanceof Error ? error.message : String(error)}`,
                 }),
@@ -208,7 +192,6 @@ export function proxyDefaultThreadOps(
 
   return {
     initializeThread: activities.initializeThread,
-    appendSystemMessage: activities.appendSystemMessage,
     appendHumanMessage: activities.appendHumanMessage,
     appendToolResult: activities.appendToolResult,
     parseToolCalls: activities.parseToolCalls,
