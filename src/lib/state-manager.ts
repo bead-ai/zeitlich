@@ -6,6 +6,7 @@ import {
   isTerminalStatus,
 } from "./types";
 import type { ToolDefinition } from "./tool-router";
+import { z } from "zod";
 
 /**
  * JSON primitive types that Temporal can serialize
@@ -105,7 +106,7 @@ export interface AgentStateManager<TCustom extends JsonSerializable<TCustom>> {
   /** Delete a task by ID */
   deleteTask(id: string): boolean;
 
-  /** Set the tools */
+  /** Set the tools (converts Zod schemas to JSON Schema for serialization) */
   setTools(newTools: ToolDefinition[]): void;
 }
 
@@ -245,7 +246,13 @@ export function createAgentStateManager<
     },
 
     setTools(newTools: ToolDefinition[]): void {
-      tools = newTools;
+      tools = newTools.map((tool) => ({
+        name: tool.name,
+        description: tool.description,
+        schema: z.toJSONSchema(tool.schema) as Record<string, unknown>,
+        strict: tool.strict,
+        max_uses: tool.max_uses,
+      }));
     },
 
     deleteTask(id: string): boolean {

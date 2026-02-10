@@ -292,12 +292,12 @@ const session = await createSession({
     {
       name: "researcher",
       description: "Researches topics and returns findings",
-      workflowType: "researcherWorkflow",
+      workflow: "researcherWorkflow",
     },
     {
       name: "code-reviewer",
       description: "Reviews code for quality and best practices",
-      workflowType: "codeReviewerWorkflow",
+      workflow: "codeReviewerWorkflow",
     },
   ],
 });

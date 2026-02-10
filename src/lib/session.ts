@@ -114,7 +114,6 @@ export const createSession = async <T extends ToolMap>({
           metadata,
         });
       }
-
       stateManager.setTools(toolRouter.getToolDefinitions());
 
       await initializeThread(threadId);
@@ -158,29 +157,56 @@ export const createSession = async <T extends ToolMap>({
           }
 
           const rawToolCalls: RawToolCall[] = await parseToolCalls(message);
-          const parsedToolCalls = rawToolCalls
-            .filter((tc: RawToolCall) => tc.name !== "Task")
-            .map((tc: RawToolCall) => toolRouter.parseToolCall(tc));
-          const taskToolCalls =
-            subagents && subagents.length > 0
-              ? rawToolCalls
-                  .filter((tc: RawToolCall) => tc.name === "Task")
-                  .map((tc: RawToolCall) => {
-                    // Parse and validate args using the tool's schema
-                    const parsedArgs = createTaskTool(subagents).schema.parse(
-                      tc.args
-                    );
 
-                    return {
-                      id: tc.id ?? "",
-                      name: tc.name,
-                      args: parsedArgs,
-                    } as ParsedToolCall<
-                      "Task",
-                      TaskToolSchemaType<SubagentConfig[]>
-                    >;
-                  })
-              : [];
+          // Parse tool calls, catching schema errors and returning them to the agent
+          const parsedToolCalls: ParsedToolCallUnion<T>[] = [];
+          for (const tc of rawToolCalls.filter(
+            (tc: RawToolCall) => tc.name !== "Task"
+          )) {
+            try {
+              parsedToolCalls.push(toolRouter.parseToolCall(tc));
+            } catch (error) {
+              await appendToolResult({
+                threadId,
+                toolCallId: tc.id ?? "",
+                content: JSON.stringify({
+                  error: `Invalid tool call for "${tc.name}": ${error instanceof Error ? error.message : String(error)}`,
+                }),
+              });
+            }
+          }
+
+          const taskToolCalls: ParsedToolCall<
+            "Task",
+            TaskToolSchemaType<SubagentConfig[]>
+          >[] = [];
+          if (subagents && subagents.length > 0) {
+            for (const tc of rawToolCalls.filter(
+              (tc: RawToolCall) => tc.name === "Task"
+            )) {
+              try {
+                const parsedArgs = createTaskTool(subagents).schema.parse(
+                  tc.args
+                );
+                taskToolCalls.push({
+                  id: tc.id ?? "",
+                  name: tc.name,
+                  args: parsedArgs,
+                } as ParsedToolCall<
+                  "Task",
+                  TaskToolSchemaType<SubagentConfig[]>
+                >);
+              } catch (error) {
+                await appendToolResult({
+                  threadId,
+                  toolCallId: tc.id ?? "",
+                  content: JSON.stringify({
+                    error: `Invalid tool call for "Task": ${error instanceof Error ? error.message : String(error)}`,
+                  }),
+                });
+              }
+            }
+          }
 
           // Hooks can call stateManager.waitForInput() to pause the session
           await toolRouter.processToolCalls(

@@ -5,6 +5,7 @@ import type {
 import type { ToolHandlerResponse } from "../../lib/tool-router";
 import type { WorkflowTask } from "../../lib/types";
 import type { TaskCreateToolSchemaType } from "./tool";
+import { uuid4 } from "@temporalio/workflow";
 
 /**
  * Creates a TaskCreate handler that adds tasks to the workflow state.
@@ -18,18 +19,14 @@ import type { TaskCreateToolSchemaType } from "./tool";
  */
 export function createTaskCreateHandler<
   TCustom extends JsonSerializable<TCustom>,
->({
-  stateManager,
-  idGenerator,
-}: {
-  stateManager: AgentStateManager<TCustom>;
-  idGenerator: () => string;
-}): (args: TaskCreateToolSchemaType) => ToolHandlerResponse<WorkflowTask> {
+>(
+  stateManager: AgentStateManager<TCustom>
+): (args: TaskCreateToolSchemaType) => ToolHandlerResponse<WorkflowTask> {
   return (
     args: TaskCreateToolSchemaType
   ): ToolHandlerResponse<WorkflowTask> => {
     const task: WorkflowTask = {
-      id: idGenerator(),
+      id: uuid4(),
       subject: args.subject,
       description: args.description,
       activeForm: args.activeForm,
@@ -42,8 +39,8 @@ export function createTaskCreateHandler<
     stateManager.setTask(task);
 
     return {
-      content: JSON.stringify(task, null, 2),
-      result: task,
+      toolResponse: JSON.stringify(task, null, 2),
+      data: task,
     };
   };
 }

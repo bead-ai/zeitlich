@@ -14,8 +14,8 @@ export interface EditResult {
  * Edit handler response
  */
 export interface EditHandlerResponse {
-  content: string;
-  result: EditResult;
+  toolResponse: string;
+  data: EditResult;
 }
 
 /**
@@ -55,8 +55,8 @@ export async function editHandler(
   // Validate old_string !== new_string
   if (old_string === new_string) {
     return {
-      content: `Error: old_string and new_string must be different.`,
-      result: {
+      toolResponse: `Error: old_string and new_string must be different.`,
+      data: {
         path: file_path,
         success: false,
         replacements: 0,
@@ -69,8 +69,8 @@ export async function editHandler(
     const exists = await fs.exists(file_path);
     if (!exists) {
       return {
-        content: `Error: File "${file_path}" does not exist.`,
-        result: {
+        toolResponse: `Error: File "${file_path}" does not exist.`,
+        data: {
           path: file_path,
           success: false,
           replacements: 0,
@@ -84,8 +84,8 @@ export async function editHandler(
     // Check if old_string exists in the file
     if (!content.includes(old_string)) {
       return {
-        content: `Error: Could not find the specified text in "${file_path}". Make sure old_string matches exactly (whitespace-sensitive).`,
-        result: {
+        toolResponse: `Error: Could not find the specified text in "${file_path}". Make sure old_string matches exactly (whitespace-sensitive).`,
+        data: {
           path: file_path,
           success: false,
           replacements: 0,
@@ -101,8 +101,8 @@ export async function editHandler(
     // Check uniqueness if not replace_all
     if (!replace_all && occurrences > 1) {
       return {
-        content: `Error: old_string appears ${occurrences} times in "${file_path}". Either provide more context to make it unique, or use replace_all: true.`,
-        result: {
+        toolResponse: `Error: old_string appears ${occurrences} times in "${file_path}". Either provide more context to make it unique, or use replace_all: true.`,
+        data: {
           path: file_path,
           success: false,
           replacements: 0,
@@ -135,8 +135,8 @@ export async function editHandler(
       : `Replaced 1 occurrence`;
 
     return {
-      content: `${summary} in ${file_path}`,
-      result: {
+      toolResponse: `${summary} in ${file_path}`,
+      data: {
         path: file_path,
         success: true,
         replacements,
@@ -145,8 +145,8 @@ export async function editHandler(
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
     return {
-      content: `Error editing file "${file_path}": ${message}`,
-      result: {
+      toolResponse: `Error editing file "${file_path}": ${message}`,
+      data: {
         path: file_path,
         success: false,
         replacements: 0,

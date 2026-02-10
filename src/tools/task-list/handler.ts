@@ -26,8 +26,8 @@ export function createTaskListHandler<
     const taskList = stateManager.getTasks();
 
     return {
-      content: JSON.stringify(taskList, null, 2),
-      result: taskList,
+      toolResponse: JSON.stringify(taskList, null, 2),
+      data: taskList,
     };
   };
 }

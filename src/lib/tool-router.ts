@@ -1,6 +1,15 @@
 import type { MessageToolDefinition } from "@langchain/core/messages";
 import type { ToolMessageContent } from "./thread-manager";
-import type { Hooks, SubagentConfig, ToolResultConfig } from "./types";
+import type {
+  Hooks,
+  PostToolUseFailureHookResult,
+  PreToolUseHookResult,
+  SubagentConfig,
+  SubagentHooks,
+  ToolHooks,
+  ToolResultConfig,
+} from "./types";
+import type { GenericTaskToolSchemaType } from "../tools/task/tool";
 
 import type { z } from "zod";
 import { proxyActivities } from "@temporalio/workflow";
@@ -49,6 +58,8 @@ export interface ToolWithHandler<
   handler: ToolHandler<z.infer<TSchema>, TResult, TContext>;
   strict?: boolean;
   max_uses?: number;
+  /** Per-tool lifecycle hooks (run in addition to global hooks) */
+  hooks?: ToolHooks<z.infer<TSchema>, TResult>;
 }
 
 /**
@@ -68,6 +79,9 @@ export type ToolMap = Record<
     /* eslint-enable @typescript-eslint/no-explicit-any */
     strict?: boolean;
     max_uses?: number;
+    /* eslint-disable @typescript-eslint/no-explicit-any */
+    hooks?: ToolHooks<any, any>;
+    /* eslint-enable @typescript-eslint/no-explicit-any */
   }
 >;
 
@@ -128,10 +142,10 @@ export type AppendToolResultFn = (config: ToolResultConfig) => Promise<void>;
  * Contains the content for the tool message and the result to return from processToolCalls.
  */
 export interface ToolHandlerResponse<TResult> {
-  /** Content for the tool message added to the thread */
-  content: ToolMessageContent;
-  /** Result returned from processToolCalls */
-  result: TResult;
+  /** Content sent back to the LLM as the tool call response */
+  toolResponse: ToolMessageContent;
+  /** Data returned to the workflow and hooks for further processing */
+  data: TResult | null;
 }
 
 /**
@@ -225,7 +239,7 @@ export interface ToolCallResult<
 > {
   toolCallId: string;
   name: TName;
-  result: TResult;
+  data: TResult | null;
 }
 
 /**
@@ -424,9 +438,36 @@ export function createToolRouter<T extends ToolMap>(
   }
 
   if (options.subagents) {
+    // Build per-subagent hook dispatcher keyed by subagent name
+    const subagentHooksMap = new Map<string, SubagentHooks>();
+    for (const s of options.subagents) {
+      if (s.hooks) subagentHooksMap.set(s.name, s.hooks);
+    }
+
+    const resolveSubagentName = (args: unknown): string =>
+      (args as GenericTaskToolSchemaType).subagent;
+
     toolMap.set("Task", {
       ...createTaskTool(options.subagents),
       handler: createTaskHandler(options.subagents),
+      ...(subagentHooksMap.size > 0 && {
+        hooks: {
+          onPreToolUse: async (ctx): Promise<PreToolUseHookResult> => {
+            const hooks = subagentHooksMap.get(resolveSubagentName(ctx.args));
+            return hooks?.onPreExecution?.(ctx) ?? {};
+          },
+          onPostToolUse: async (ctx): Promise<void> => {
+            const hooks = subagentHooksMap.get(resolveSubagentName(ctx.args));
+            await hooks?.onPostExecution?.(ctx);
+          },
+          onPostToolUseFailure: async (
+            ctx
+          ): Promise<PostToolUseFailureHookResult> => {
+            const hooks = subagentHooksMap.get(resolveSubagentName(ctx.args));
+            return hooks?.onExecutionFailure?.(ctx) ?? {};
+          },
+        } satisfies ToolHooks,
+      }),
     });
   }
 
@@ -455,8 +496,10 @@ export function createToolRouter<T extends ToolMap>(
     handlerContext?: ToolHandlerContext
   ): Promise<ToolCallResultUnion<TResults> | null> {
     const startTime = Date.now();
+    const tool = toolMap.get(toolCall.name);
+    const toolHooks = tool?.hooks;
 
-    // PreToolUse hook - can skip or modify args
+    // --- PreToolUse: global then per-tool ---
     let effectiveArgs: unknown = toolCall.args;
     if (options.hooks?.onPreToolUse) {
       const preResult = await options.hooks.onPreToolUse({
@@ -465,7 +508,6 @@ export function createToolRouter<T extends ToolMap>(
         turn,
       });
       if (preResult?.skip) {
-        // Skip this tool call - append a skip message and return null
         await appendToolResult({
           threadId: options.threadId,
           toolCallId: toolCall.id,
@@ -480,10 +522,31 @@ export function createToolRouter<T extends ToolMap>(
         effectiveArgs = preResult.modifiedArgs;
       }
     }
+    if (toolHooks?.onPreToolUse) {
+      const preResult = await toolHooks.onPreToolUse({
+        args: effectiveArgs,
+        threadId: options.threadId,
+        turn,
+      });
+      if (preResult?.skip) {
+        await appendToolResult({
+          threadId: options.threadId,
+          toolCallId: toolCall.id,
+          content: JSON.stringify({
+            skipped: true,
+            reason: "Skipped by tool PreToolUse hook",
+          }),
+        });
+        return null;
+      }
+      if (preResult?.modifiedArgs !== undefined) {
+        effectiveArgs = preResult.modifiedArgs;
+      }
+    }
 
-    const tool = toolMap.get(toolCall.name);
+    // --- Execute handler ---
     let result: unknown;
-    let content: ToolMessageContent;
+    let content!: ToolMessageContent;
 
     try {
       if (tool) {
@@ -491,31 +554,54 @@ export function createToolRouter<T extends ToolMap>(
           effectiveArgs as Parameters<typeof tool.handler>[0],
           (handlerContext ?? {}) as Parameters<typeof tool.handler>[1]
         );
-        result = response.result;
-        content = response.content;
+        result = response.data;
+        content = response.toolResponse;
       } else {
         result = { error: `Unknown tool: ${toolCall.name}` };
         content = JSON.stringify(result, null, 2);
       }
     } catch (error) {
-      // PostToolUseFailure hook - can recover from errors
-      if (options.hooks?.onPostToolUseFailure) {
-        const failureResult = await options.hooks.onPostToolUseFailure({
-          toolCall,
-          error: error instanceof Error ? error : new Error(String(error)),
+      // --- PostToolUseFailure: per-tool then global ---
+      const err = error instanceof Error ? error : new Error(String(error));
+      let recovered = false;
+
+      if (toolHooks?.onPostToolUseFailure) {
+        const failureResult = await toolHooks.onPostToolUseFailure({
+          args: effectiveArgs,
+          error: err,
           threadId: options.threadId,
           turn,
         });
         if (failureResult?.fallbackContent !== undefined) {
           content = failureResult.fallbackContent;
           result = { error: String(error), recovered: true };
+          recovered = true;
         } else if (failureResult?.suppress) {
           content = JSON.stringify({ error: String(error), suppressed: true });
           result = { error: String(error), suppressed: true };
-        } else {
-          throw error;
+          recovered = true;
         }
-      } else {
+      }
+
+      if (!recovered && options.hooks?.onPostToolUseFailure) {
+        const failureResult = await options.hooks.onPostToolUseFailure({
+          toolCall,
+          error: err,
+          threadId: options.threadId,
+          turn,
+        });
+        if (failureResult?.fallbackContent !== undefined) {
+          content = failureResult.fallbackContent;
+          result = { error: String(error), recovered: true };
+          recovered = true;
+        } else if (failureResult?.suppress) {
+          content = JSON.stringify({ error: String(error), suppressed: true });
+          result = { error: String(error), suppressed: true };
+          recovered = true;
+        }
+      }
+
+      if (!recovered) {
         throw error;
       }
     }
@@ -530,12 +616,21 @@ export function createToolRouter<T extends ToolMap>(
     const toolResult = {
       toolCallId: toolCall.id,
       name: toolCall.name,
-      result,
+      data: result,
     } as ToolCallResultUnion<TResults>;
 
-    // PostToolUse hook - called after successful execution
+    // --- PostToolUse: per-tool then global ---
+    const durationMs = Date.now() - startTime;
+    if (toolHooks?.onPostToolUse) {
+      await toolHooks.onPostToolUse({
+        args: effectiveArgs,
+        result: result,
+        threadId: options.threadId,
+        turn,
+        durationMs,
+      });
+    }
     if (options.hooks?.onPostToolUse) {
-      const durationMs = Date.now() - startTime;
       await options.hooks.onPostToolUse({
         toolCall,
         result: toolResult,
@@ -654,13 +749,13 @@ export function createToolRouter<T extends ToolMap>(
         await appendToolResult({
           threadId: options.threadId,
           toolCallId: toolCall.id,
-          content: response.content,
+          content: response.toolResponse,
         });
 
         return {
           toolCallId: toolCall.id,
           name: toolCall.name as TName,
-          result: response.result,
+          data: response.data ?? null,
         };
       };
 
@@ -704,6 +799,93 @@ export function createToolRouter<T extends ToolMap>(
       >[];
     },
   };
+}
+
+/**
+ * Identity function that creates a generic inference context for a tool definition.
+ * TypeScript infers TResult from the handler and flows it to hooks automatically.
+ *
+ * @example
+ * ```typescript
+ * tools: {
+ *   AskUser: defineTool({
+ *     ...askUserTool,
+ *     handler: handleAskUser,
+ *     hooks: {
+ *       onPostToolUse: ({ result }) => {
+ *         // result is correctly typed as the handler's return data type
+ *       },
+ *     },
+ *   }),
+ * }
+ * ```
+ */
+export function defineTool<
+  TName extends string,
+  TSchema extends z.ZodType,
+  TResult,
+  TContext = ToolHandlerContext,
+>(
+  tool: ToolWithHandler<TName, TSchema, TResult, TContext>
+): ToolWithHandler<TName, TSchema, TResult, TContext> {
+  return tool;
+}
+
+/**
+ * Identity function that provides full type inference for subagent configurations.
+ * Verifies the workflow function's input parameters match the configured context,
+ * and properly types the lifecycle hooks with Task tool args and inferred result type.
+ *
+ * @example
+ * ```ts
+ * // With typed context — workflow must accept { prompt, context }
+ * const researcher = defineSubagent({
+ *   name: "researcher",
+ *   description: "Researches topics",
+ *   workflow: researcherWorkflow, // (input: { prompt: string; context: { apiKey: string } }) => Promise<...>
+ *   context: { apiKey: "..." },
+ *   resultSchema: z.object({ findings: z.string() }),
+ *   hooks: {
+ *     onPostExecution: ({ result }) => {
+ *       // result is typed as { findings: string }
+ *     },
+ *   },
+ * });
+ *
+ * // Without context — workflow only needs { prompt }
+ * const writer = defineSubagent({
+ *   name: "writer",
+ *   description: "Writes content",
+ *   workflow: writerWorkflow, // (input: { prompt: string }) => Promise<...>
+ *   resultSchema: z.object({ content: z.string() }),
+ * });
+ * ```
+ */
+// With context — verifies workflow accepts { prompt, context: TContext }
+export function defineSubagent<
+  TResult extends z.ZodType = z.ZodType,
+  TContext extends Record<string, unknown> = Record<string, unknown>,
+>(
+  config: Omit<SubagentConfig<TResult>, "hooks" | "workflow" | "context"> & {
+    workflow:
+      | string
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      | ((input: { prompt: string; context: TContext }) => Promise<any>);
+    context: TContext;
+    hooks?: SubagentHooks<GenericTaskToolSchemaType, z.infer<TResult>>;
+  }
+): SubagentConfig<TResult>;
+// Without context — verifies workflow accepts { prompt }
+export function defineSubagent<TResult extends z.ZodType = z.ZodType>(
+  config: Omit<SubagentConfig<TResult>, "hooks" | "workflow"> & {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    workflow: string | ((input: { prompt: string }) => Promise<any>);
+    hooks?: SubagentHooks<GenericTaskToolSchemaType, z.infer<TResult>>;
+  }
+): SubagentConfig<TResult>;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function defineSubagent(config: any): SubagentConfig {
+  return config;
 }
 
 /**

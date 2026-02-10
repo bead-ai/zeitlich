@@ -21,5 +21,5 @@ export const handleAskUserQuestionToolResult: ActivityToolHandler<
       }).toDict()
   );
 
-  return { content: "Question submitted", result: { chatMessages: messages } };
+  return { toolResponse: "Question submitted", data: { chatMessages: messages } };
 };

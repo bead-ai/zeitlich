@@ -33,7 +33,7 @@ export type {
 } from "./lib/state-manager";
 
 // Tool router (includes registry functionality)
-export { createToolRouter, hasNoOtherToolCalls } from "./lib/tool-router";
+export { createToolRouter, hasNoOtherToolCalls, defineTool, defineSubagent } from "./lib/tool-router";
 export type {
   // Tool definition types
   ToolDefinition,
@@ -81,11 +81,13 @@ export type {
   PostToolUseFailureHook,
   PostToolUseFailureHookContext,
   PostToolUseFailureHookResult,
+  ToolHooks,
   SessionStartHook,
   SessionStartHookContext,
   SessionEndHook,
   SessionEndHookContext,
   SubagentConfig,
+  SubagentHooks,
   SubagentInput,
   TaskStatus,
   WorkflowTask,

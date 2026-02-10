@@ -4,11 +4,11 @@ import type {
   InferToolResults,
   ParsedToolCallUnion,
   ToolCallResultUnion,
-  ToolDefinition,
   ToolMap,
 } from "./tool-router";
 
 import type { MessageContent, StoredMessage } from "@langchain/core/messages";
+import type { Workflow } from "@temporalio/workflow";
 import type { z } from "zod";
 
 /**
@@ -25,7 +25,7 @@ export type AgentStatus =
  * Base state that all agents must have
  */
 export interface BaseAgentState {
-  tools: ToolDefinition[];
+  tools: SerializableToolDefinition[];
   status: AgentStatus;
   version: number;
   turns: number;
@@ -104,6 +104,19 @@ export interface ZeitlichAgentConfig<T extends ToolMap> {
 }
 
 /**
+ * A JSON-serializable tool definition for state storage.
+ * Uses a plain JSON Schema object instead of a live Zod instance,
+ * so it survives Temporal serialization without losing constraints (min, max, etc.).
+ */
+export interface SerializableToolDefinition {
+  name: string;
+  description: string;
+  schema: Record<string, unknown>;
+  strict?: boolean;
+  max_uses?: number;
+}
+
+/**
  * Configuration passed to runAgent activity
  */
 export interface RunAgentConfig {
@@ -142,12 +155,44 @@ export interface SubagentConfig<TResult extends z.ZodType = z.ZodType> {
   name: string;
   /** Description shown to the parent agent explaining what this subagent does */
   description: string;
-  /** Temporal workflow type name (used with executeChild) */
-  workflowType: string;
+  /** Temporal workflow function or type name (used with executeChild) */
+  workflow: string | Workflow;
   /** Optional task queue - defaults to parent's queue if not specified */
   taskQueue?: string;
   /** Optional Zod schema to validate the child workflow's result. If omitted, result is passed through as-is. */
   resultSchema?: TResult;
+  /** Optional static context passed to the subagent on every invocation */
+  context?: Record<string, unknown>;
+  /** Per-subagent lifecycle hooks */
+  hooks?: SubagentHooks;
+}
+
+/**
+ * Per-subagent lifecycle hooks - defined on a SubagentConfig.
+ * Runs in addition to global hooks (global pre → subagent pre → execute → subagent post → global post).
+ */
+export interface SubagentHooks<TArgs = unknown, TResult = unknown> {
+  /** Called before this subagent executes - can skip or modify args */
+  onPreExecution?: (ctx: {
+    args: TArgs;
+    threadId: string;
+    turn: number;
+  }) => PreToolUseHookResult | Promise<PreToolUseHookResult>;
+  /** Called after this subagent executes successfully */
+  onPostExecution?: (ctx: {
+    args: TArgs;
+    result: TResult;
+    threadId: string;
+    turn: number;
+    durationMs: number;
+  }) => void | Promise<void>;
+  /** Called when this subagent execution fails */
+  onExecutionFailure?: (ctx: {
+    args: TArgs;
+    error: Error;
+    threadId: string;
+    turn: number;
+  }) => PostToolUseFailureHookResult | Promise<PostToolUseFailureHookResult>;
 }
 
 /**
@@ -156,6 +201,8 @@ export interface SubagentConfig<TResult extends z.ZodType = z.ZodType> {
 export interface SubagentInput {
   /** The prompt/task from the parent agent */
   prompt: string;
+  /** Optional context parameters passed from the parent agent */
+  context?: Record<string, unknown>;
 }
 
 // ============================================================================
@@ -327,6 +374,34 @@ export interface SessionEndHookContext {
 export type SessionEndHook = (
   ctx: SessionEndHookContext
 ) => void | Promise<void>;
+
+/**
+ * Per-tool lifecycle hooks - defined directly on a tool definition.
+ * Runs in addition to global hooks (global pre → tool pre → execute → tool post → global post).
+ */
+export interface ToolHooks<TArgs = unknown, TResult = unknown> {
+  /** Called before this tool executes - can skip or modify args */
+  onPreToolUse?: (ctx: {
+    args: TArgs;
+    threadId: string;
+    turn: number;
+  }) => PreToolUseHookResult | Promise<PreToolUseHookResult>;
+  /** Called after this tool executes successfully */
+  onPostToolUse?: (ctx: {
+    args: TArgs;
+    result: TResult | null;
+    threadId: string;
+    turn: number;
+    durationMs: number;
+  }) => void | Promise<void>;
+  /** Called when this tool execution fails */
+  onPostToolUseFailure?: (ctx: {
+    args: TArgs;
+    error: Error;
+    threadId: string;
+    turn: number;
+  }) => PostToolUseFailureHookResult | Promise<PostToolUseFailureHookResult>;
+}
 
 /**
  * Combined hooks interface for session lifecycle
