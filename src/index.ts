@@ -28,6 +28,10 @@ export type { ZeitlichPluginOptions } from "./plugin";
 export { createSharedActivities } from "./activities";
 export type { ZeitlichSharedActivities } from "./activities";
 
+// Auto-append wrapper for large tool results (activity-side only)
+export { withAutoAppend } from "./lib/tool-router";
+export type { ThreadAppender } from "./lib/tool-router";
+
 // Model invocation (requires Redis, LangChain)
 export { invokeModel } from "./lib/model-invoker";
 export type { InvokeModelConfig } from "./lib/model-invoker";
