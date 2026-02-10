@@ -160,6 +160,8 @@ export interface SubagentConfig<TResult extends z.ZodType = z.ZodType> {
   taskQueue?: string;
   /** Optional Zod schema to validate the child workflow's result. If omitted, result is passed through as-is. */
   resultSchema?: TResult;
+  /** Optional static context passed to the subagent on every invocation */
+  context?: Record<string, unknown>;
 }
 
 /**
@@ -168,6 +170,8 @@ export interface SubagentConfig<TResult extends z.ZodType = z.ZodType> {
 export interface SubagentInput {
   /** The prompt/task from the parent agent */
   prompt: string;
+  /** Optional context parameters passed from the parent agent */
+  context?: Record<string, unknown>;
 }
 
 // ============================================================================

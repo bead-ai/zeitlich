@@ -47,9 +47,14 @@ export function createTaskHandler(subagents: SubagentConfig[]) {
     const childWorkflowId = `${parentWorkflowId}-${args.subagent}-${uuid4()}`;
 
     // Execute the child workflow
+    const input: SubagentInput = {
+      prompt: args.prompt,
+      ...(config.context && { context: config.context }),
+    };
+
     const childResult = await executeChild(config.workflowType, {
       workflowId: childWorkflowId,
-      args: [{ prompt: args.prompt } satisfies SubagentInput],
+      args: [input],
       taskQueue: config.taskQueue ?? parentTaskQueue,
     });
 
