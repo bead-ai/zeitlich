@@ -1,11 +1,12 @@
 import { z } from "zod";
+import type { ToolDefinition } from "../../lib/tool-router";
 
 export const writeTool = {
   name: "FileWrite" as const,
   description: `Create or overwrite a file with new content.
 
 Usage:
-- Provide the absolute virtual path to the file
+- Provide the absolute path to the file
 - The file will be created if it doesn't exist
 - If the file exists, it will be completely overwritten
 
@@ -15,12 +16,10 @@ IMPORTANT:
 - Path must be absolute (e.g., "/docs/readme.md", not "docs/readme.md")
 `,
   schema: z.object({
-    file_path: z
-      .string()
-      .describe("The absolute virtual path to the file to write"),
+    file_path: z.string().describe("The absolute path to the file to write"),
     content: z.string().describe("The content to write to the file"),
   }),
   strict: true,
-};
+} satisfies ToolDefinition;
 
-export type WriteToolSchemaType = z.infer<typeof writeTool.schema>;
+export type FileWriteArgs = z.infer<typeof writeTool.schema>;

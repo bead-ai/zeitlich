@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { ToolDefinition } from "../../lib/tool-router";
 
 export const editTool = {
   name: "FileEdit" as const,
@@ -34,6 +35,6 @@ IMPORTANT:
       ),
   }),
   strict: true,
-};
+} satisfies ToolDefinition;
 
-export type EditToolSchemaType = z.infer<typeof editTool.schema>;
+export type FileEditArgs = z.infer<typeof editTool.schema>;

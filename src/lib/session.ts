@@ -5,18 +5,15 @@ import type {
   SessionStartHook,
   SessionEndHook,
   SessionExitReason,
-  SubagentConfig,
 } from "./types";
 import { type AgentStateManager, type JsonSerializable } from "./state-manager";
 import {
   createToolRouter,
-  type ParsedToolCall,
   type ParsedToolCallUnion,
   type RawToolCall,
   type ToolMap,
 } from "./tool-router";
 import type { StoredMessage } from "@langchain/core/messages";
-import { createTaskTool, type TaskToolSchemaType } from "../tools/task/tool";
 
 export interface ZeitlichSession {
   runSession<T extends JsonSerializable<T>>(args: {
@@ -52,7 +49,6 @@ export const createSession = async <T extends ToolMap>({
   baseSystemPrompt,
   instructionsPrompt,
   buildContextMessage,
-  buildFileTree = async (): Promise<string> => "",
   subagents,
   tools = {} as T,
   processToolsInParallel = true,
@@ -75,14 +71,11 @@ export const createSession = async <T extends ToolMap>({
     heartbeatTimeout: "5m",
   });
 
-  const fileTree = await buildFileTree();
-
   const toolRouter = createToolRouter({
     tools,
     appendToolResult,
     threadId,
     hooks,
-    fileTree,
     subagents,
     parallel: processToolsInParallel,
   });
@@ -156,11 +149,9 @@ export const createSession = async <T extends ToolMap>({
 
           const rawToolCalls: RawToolCall[] = await parseToolCalls(message);
 
-          // Parse tool calls, catching schema errors and returning them to the agent
+          // Parse all tool calls uniformly through the router
           const parsedToolCalls: ParsedToolCallUnion<T>[] = [];
-          for (const tc of rawToolCalls.filter(
-            (tc: RawToolCall) => tc.name !== "Task"
-          )) {
+          for (const tc of rawToolCalls) {
             try {
               parsedToolCalls.push(toolRouter.parseToolCall(tc));
             } catch (error) {
@@ -174,47 +165,10 @@ export const createSession = async <T extends ToolMap>({
             }
           }
 
-          const taskToolCalls: ParsedToolCall<
-            "Task",
-            TaskToolSchemaType<SubagentConfig[]>
-          >[] = [];
-          if (subagents && subagents.length > 0) {
-            for (const tc of rawToolCalls.filter(
-              (tc: RawToolCall) => tc.name === "Task"
-            )) {
-              try {
-                const parsedArgs = createTaskTool(subagents).schema.parse(
-                  tc.args
-                );
-                taskToolCalls.push({
-                  id: tc.id ?? "",
-                  name: tc.name,
-                  args: parsedArgs,
-                } as ParsedToolCall<
-                  "Task",
-                  TaskToolSchemaType<SubagentConfig[]>
-                >);
-              } catch (error) {
-                await appendToolResult({
-                  threadId,
-                  toolCallId: tc.id ?? "",
-                  content: JSON.stringify({
-                    error: `Invalid tool call for "Task": ${error instanceof Error ? error.message : String(error)}`,
-                  }),
-                });
-              }
-            }
-          }
-
           // Hooks can call stateManager.waitForInput() to pause the session
-          await toolRouter.processToolCalls(
-            [...parsedToolCalls, ...taskToolCalls] as ParsedToolCallUnion<
-              T & { Task: TaskToolSchemaType<SubagentConfig[]> }
-            >[],
-            {
-              turn: currentTurn,
-            }
-          );
+          await toolRouter.processToolCalls(parsedToolCalls, {
+            turn: currentTurn,
+          });
 
           if (stateManager.getStatus() === "WAITING_FOR_INPUT") {
             exitReason = "waiting_for_input";

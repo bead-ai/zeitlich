@@ -64,7 +64,6 @@ export interface AgentResponse {
  * Configuration for a Zeitlich agent session
  */
 export interface ZeitlichAgentConfig<T extends ToolMap> {
-  buildFileTree?: () => Promise<string>;
   threadId: string;
   agentName: string;
   metadata?: Record<string, unknown>;
@@ -382,7 +381,7 @@ export interface ToolHooks<TArgs = unknown, TResult = unknown> {
   /** Called after this tool executes successfully */
   onPostToolUse?: (ctx: {
     args: TArgs;
-    result: TResult | null;
+    result: TResult;
     threadId: string;
     turn: number;
     durationMs: number;

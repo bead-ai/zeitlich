@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { ToolDefinition } from "../../lib/tool-router";
 
 export const globTool = {
   name: "Glob" as const,
@@ -22,6 +23,6 @@ Examples:
       .describe("Optional root directory to search from"),
   }),
   strict: true,
-};
+} satisfies ToolDefinition;
 
-export type GlobToolSchemaType = z.infer<typeof globTool.schema>;
+export type GlobArgs = z.infer<typeof globTool.schema>;

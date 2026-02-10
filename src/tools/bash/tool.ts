@@ -1,4 +1,5 @@
 import z from "zod";
+import type { ToolDefinition } from "../../lib/tool-router";
 
 export const createBashToolDescription = ({
   fileTree,
@@ -31,6 +32,6 @@ Use this tool to:
       ),
   }),
   strict: true,
-};
+} satisfies ToolDefinition;
 
-export type bashToolSchemaType = z.infer<typeof bashTool.schema>;
+export type BashArgs = z.infer<typeof bashTool.schema>;

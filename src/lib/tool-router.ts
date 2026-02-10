@@ -9,14 +9,14 @@ import type {
   ToolHooks,
   ToolResultConfig,
 } from "./types";
-import type { GenericTaskToolSchemaType } from "../tools/task/tool";
+import type { TaskArgs } from "../tools/task/tool";
 
 import type { z } from "zod";
 import { proxyActivities } from "@temporalio/workflow";
 import type { ZeitlichSharedActivities } from "../activities";
 import { createTaskTool } from "../tools/task/tool";
 import { createTaskHandler } from "../tools/task/handler";
-import { bashTool, createBashToolDescription } from "../tools/bash/tool";
+
 
 export type { ToolMessageContent };
 
@@ -55,12 +55,19 @@ export interface ToolWithHandler<
   handler: ToolHandler<z.infer<TSchema>, TResult, TContext>;
   strict?: boolean;
   max_uses?: number;
+  /** Whether this tool is available to the agent (default: true). Disabled tools are excluded from definitions and rejected at parse time. */
+  enabled?: boolean;
   /** Per-tool lifecycle hooks (run in addition to global hooks) */
   hooks?: ToolHooks<z.infer<TSchema>, TResult>;
 }
 
 /**
  * A map of tool keys to tool definitions with handlers.
+ *
+ * Handler uses `any` intentionally — this is a type-system boundary where heterogeneous
+ * tool types are stored together. Type safety for individual tools is enforced by
+ * `defineTool()` at the definition site and generic inference utilities like
+ * `InferToolResults<T>` at the consumption site.
  */
 export type ToolMap = Record<
   string,
@@ -68,17 +75,13 @@ export type ToolMap = Record<
     name: string;
     description: string;
     schema: z.ZodType;
-    /* eslint-disable @typescript-eslint/no-explicit-any */
-    handler: (
-      args: any,
-      context: any
-    ) => ToolHandlerResponse<any> | Promise<ToolHandlerResponse<any>>;
-    /* eslint-enable @typescript-eslint/no-explicit-any */
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    handler: ToolHandler<any, any, any>;
     strict?: boolean;
     max_uses?: number;
-    /* eslint-disable @typescript-eslint/no-explicit-any */
+    enabled?: boolean;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     hooks?: ToolHooks<any, any>;
-    /* eslint-enable @typescript-eslint/no-explicit-any */
   }
 >;
 
@@ -137,12 +140,15 @@ export type AppendToolResultFn = (config: ToolResultConfig) => Promise<void>;
 /**
  * The response from a tool handler.
  * Contains the content for the tool message and the result to return from processToolCalls.
+ *
+ * Tools that don't return additional data should use `data: null` (TResult defaults to null).
+ * Tools that may fail to produce data should type TResult as `SomeType | null`.
  */
-export interface ToolHandlerResponse<TResult> {
+export interface ToolHandlerResponse<TResult = null> {
   /** Content sent back to the LLM as the tool call response */
   toolResponse: ToolMessageContent;
   /** Data returned to the workflow and hooks for further processing */
-  data: TResult | null;
+  data: TResult;
 }
 
 /**
@@ -173,7 +179,7 @@ export type ToolHandler<TArgs, TResult, TContext = ToolHandlerContext> = (
  * ```typescript
  * // Filesystem handler with context
  * const readHandler: ActivityToolHandler<
- *   ReadToolSchemaType,
+ *   FileReadArgs,
  *   ReadResult,
  *   { scopedNodes: FileNode[]; provider: FileSystemProvider }
  * > = async (args, context) => {
@@ -219,15 +225,13 @@ export interface ToolCallResult<
 > {
   toolCallId: string;
   name: TName;
-  data: TResult | null;
+  data: TResult;
 }
 
 /**
  * Options for creating a tool router.
  */
 export interface ToolRouterOptions<T extends ToolMap> {
-  /** File tree for the agent */
-  fileTree: string;
   /** Map of tools with their handlers */
   tools: T;
   /** Thread ID for appending tool results */
@@ -410,16 +414,12 @@ export function createToolRouter<T extends ToolMap>(
   // Use ToolMap's value type to allow both user tools and the dynamic Task tool
   const toolMap = new Map<string, ToolMap[string]>();
   for (const [_key, tool] of Object.entries(options.tools)) {
-    // Enhance Bash tool description with file tree when available
-    if (tool.name === bashTool.name && options.fileTree) {
-      toolMap.set(tool.name, {
-        ...tool,
-        description: createBashToolDescription({ fileTree: options.fileTree }),
-      } as T[keyof T]);
-    } else {
-      toolMap.set(tool.name, tool as T[keyof T]);
-    }
+    toolMap.set(tool.name, tool as T[keyof T]);
   }
+
+  /** Check if a tool is enabled (defaults to true when not specified) */
+  const isEnabled = (tool: ToolMap[string]): boolean =>
+    tool.enabled !== false;
 
   if (options.subagents) {
     // Build per-subagent hook dispatcher keyed by subagent name
@@ -429,7 +429,7 @@ export function createToolRouter<T extends ToolMap>(
     }
 
     const resolveSubagentName = (args: unknown): string =>
-      (args as GenericTaskToolSchemaType).subagent;
+      (args as TaskArgs).subagent;
 
     toolMap.set("Task", {
       ...createTaskTool(options.subagents),
@@ -612,13 +612,13 @@ export function createToolRouter<T extends ToolMap>(
     // --- Methods from registry ---
 
     hasTools(): boolean {
-      return toolMap.size > 0;
+      return Array.from(toolMap.values()).some(isEnabled);
     },
 
     parseToolCall(toolCall: RawToolCall): ParsedToolCallUnion<T> {
       const tool = toolMap.get(toolCall.name);
 
-      if (!tool) {
+      if (!tool || !isEnabled(tool)) {
         throw new Error(`Tool ${toolCall.name} not found`);
       }
 
@@ -633,21 +633,26 @@ export function createToolRouter<T extends ToolMap>(
     },
 
     hasTool(name: string): boolean {
-      return toolMap.has(name);
+      const tool = toolMap.get(name);
+      return tool !== undefined && isEnabled(tool);
     },
 
     getToolNames(): ToolNames<T>[] {
-      return Array.from(toolMap.keys()) as ToolNames<T>[];
+      return Array.from(toolMap.entries())
+        .filter(([, tool]) => isEnabled(tool))
+        .map(([name]) => name) as ToolNames<T>[];
     },
 
     getToolDefinitions(): ToolDefinition[] {
-      return Array.from(toolMap).map(([name, tool]) => ({
-        name,
-        description: tool.description,
-        schema: tool.schema,
-        strict: tool.strict,
-        max_uses: tool.max_uses,
-      }));
+      return Array.from(toolMap)
+        .filter(([, tool]) => isEnabled(tool))
+        .map(([name, tool]) => ({
+          name,
+          description: tool.description,
+          schema: tool.schema,
+          strict: tool.strict,
+          max_uses: tool.max_uses,
+        }));
     },
 
     // --- Methods for processing tool calls ---
@@ -720,7 +725,7 @@ export function createToolRouter<T extends ToolMap>(
         return {
           toolCallId: toolCall.id,
           name: toolCall.name as TName,
-          data: response.data ?? null,
+          data: response.data,
         };
       };
 
@@ -837,7 +842,7 @@ export function defineSubagent<
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       | ((input: { prompt: string; context: TContext }) => Promise<any>);
     context: TContext;
-    hooks?: SubagentHooks<GenericTaskToolSchemaType, z.infer<TResult>>;
+    hooks?: SubagentHooks<TaskArgs, z.infer<TResult>>;
   }
 ): SubagentConfig<TResult>;
 // Without context — verifies workflow accepts { prompt }
@@ -845,7 +850,7 @@ export function defineSubagent<TResult extends z.ZodType = z.ZodType>(
   config: Omit<SubagentConfig<TResult>, "hooks" | "workflow"> & {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     workflow: string | ((input: { prompt: string }) => Promise<any>);
-    hooks?: SubagentHooks<GenericTaskToolSchemaType, z.infer<TResult>>;
+    hooks?: SubagentHooks<TaskArgs, z.infer<TResult>>;
   }
 ): SubagentConfig<TResult>;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

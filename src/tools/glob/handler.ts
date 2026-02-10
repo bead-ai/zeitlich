@@ -1,62 +1,31 @@
+import type { ActivityToolHandler } from "../../lib/tool-router";
+import type { GlobArgs } from "./tool";
 import type { IFileSystem } from "just-bash";
 import { Bash } from "just-bash";
-import type { GlobToolSchemaType } from "./tool";
 
 /**
  * Result of a glob operation
  */
-export interface GlobResult {
+interface GlobResult {
   files: string[];
 }
 
 /**
- * Glob handler response
- */
-export interface GlobHandlerResponse {
-  toolResponse: string;
-  data: GlobResult;
-}
-
-/**
- * Glob handler that searches within the scoped file tree.
+ * Creates a glob handler that searches within the scoped file tree.
  *
- * @param args - Tool arguments (pattern, root)
- * @param provider - FileSystemProvider for I/O operations
+ * @param fs - File system implementation for I/O operations
+ * @returns An ActivityToolHandler for glob tool calls
  */
-export async function globHandler(
-  _args: GlobToolSchemaType,
+export function createGlobHandler(
   fs: IFileSystem
-): Promise<GlobHandlerResponse> {
-  // const { pattern, root } = args;
-  const _bash = new Bash({ fs });
+): ActivityToolHandler<GlobArgs, GlobResult> {
+  return async (_args) => {
+    // const { pattern, root } = args;
+    const _bash = new Bash({ fs });
 
-  return Promise.resolve({
-    toolResponse: "Hello, world!",
-    data: { files: [] },
-  });
-
-  // try {
-  //   const matches = await bash.exec(`glob ${root} -name "${pattern}"`);
-
-  //   if (matches.length === 0) {
-  //     return {
-  //       content: `No files found matching pattern: ${pattern}`,
-  //       result: { files: [] },
-  //     };
-  //   }
-
-  //   const paths = matches.map((node) => node.path);
-  //   const fileList = paths.map((p) => `  ${p}`).join("\n");
-
-  //   return {
-  //     content: `Found ${matches.length} file(s) matching "${pattern}":\n${fileList}`,
-  //     result: { files: matches },
-  //   };
-  // } catch (error) {
-  //   const message = error instanceof Error ? error.message : "Unknown error";
-  //   return {
-  //     content: `Error searching for files: ${message}`,
-  //     result: { files: [] },
-  //   };
-  // }
+    return {
+      toolResponse: "Hello, world!",
+      data: { files: [] },
+    };
+  };
 }

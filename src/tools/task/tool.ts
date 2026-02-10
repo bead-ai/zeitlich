@@ -80,16 +80,9 @@ export function createTaskTool<T extends SubagentConfig[]>(
 }
 
 /**
- * Infer the schema type for a task tool created with specific subagents
+ * Task tool args type (when subagent names are not known at compile time)
  */
-export type TaskToolSchemaType<T extends SubagentConfig[]> = z.infer<
-  ReturnType<typeof createTaskTool<T>>["schema"]
->;
-
-/**
- * Generic task tool schema type (when subagent names are not known at compile time)
- */
-export type GenericTaskToolSchemaType = {
+export type TaskArgs = {
   subagent: string;
   description: string;
   prompt: string;

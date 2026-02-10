@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { ToolDefinition } from "../../lib/tool-router";
 
 export const grepTool = {
   name: "Grep" as const,
@@ -40,6 +41,6 @@ Examples:
       .describe("Number of context lines to show around matches"),
   }),
   strict: true,
-};
+} satisfies ToolDefinition;
 
-export type GrepToolSchemaType = z.infer<typeof grepTool.schema>;
+export type GrepArgs = z.infer<typeof grepTool.schema>;
