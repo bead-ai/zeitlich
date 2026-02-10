@@ -33,7 +33,7 @@ export type {
 } from "./lib/state-manager";
 
 // Tool router (includes registry functionality)
-export { createToolRouter, hasNoOtherToolCalls, defineTool } from "./lib/tool-router";
+export { createToolRouter, hasNoOtherToolCalls, defineTool, defineSubagent } from "./lib/tool-router";
 export type {
   // Tool definition types
   ToolDefinition,

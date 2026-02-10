@@ -832,6 +832,63 @@ export function defineTool<
 }
 
 /**
+ * Identity function that provides full type inference for subagent configurations.
+ * Verifies the workflow function's input parameters match the configured context,
+ * and properly types the lifecycle hooks with Task tool args and inferred result type.
+ *
+ * @example
+ * ```ts
+ * // With typed context — workflow must accept { prompt, context }
+ * const researcher = defineSubagent({
+ *   name: "researcher",
+ *   description: "Researches topics",
+ *   workflow: researcherWorkflow, // (input: { prompt: string; context: { apiKey: string } }) => Promise<...>
+ *   context: { apiKey: "..." },
+ *   resultSchema: z.object({ findings: z.string() }),
+ *   hooks: {
+ *     onPostExecution: ({ result }) => {
+ *       // result is typed as { findings: string }
+ *     },
+ *   },
+ * });
+ *
+ * // Without context — workflow only needs { prompt }
+ * const writer = defineSubagent({
+ *   name: "writer",
+ *   description: "Writes content",
+ *   workflow: writerWorkflow, // (input: { prompt: string }) => Promise<...>
+ *   resultSchema: z.object({ content: z.string() }),
+ * });
+ * ```
+ */
+// With context — verifies workflow accepts { prompt, context: TContext }
+export function defineSubagent<
+  TResult extends z.ZodType = z.ZodType,
+  TContext extends Record<string, unknown> = Record<string, unknown>,
+>(
+  config: Omit<SubagentConfig<TResult>, "hooks" | "workflow" | "context"> & {
+    workflow:
+      | string
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      | ((input: { prompt: string; context: TContext }) => Promise<any>);
+    context: TContext;
+    hooks?: SubagentHooks<GenericTaskToolSchemaType, z.infer<TResult>>;
+  }
+): SubagentConfig<TResult>;
+// Without context — verifies workflow accepts { prompt }
+export function defineSubagent<TResult extends z.ZodType = z.ZodType>(
+  config: Omit<SubagentConfig<TResult>, "hooks" | "workflow"> & {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    workflow: string | ((input: { prompt: string }) => Promise<any>);
+    hooks?: SubagentHooks<GenericTaskToolSchemaType, z.infer<TResult>>;
+  }
+): SubagentConfig<TResult>;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function defineSubagent(config: any): SubagentConfig {
+  return config;
+}
+
+/**
  * Utility to check if there were no tool calls besides a specific one
  */
 export function hasNoOtherToolCalls<T extends ToolMap>(
