@@ -15,7 +15,6 @@ import type { z } from "zod";
 import { createTaskTool } from "../tools/task/tool";
 import { createTaskHandler } from "../tools/task/handler";
 
-
 export type { ToolMessageContent };
 
 // ============================================================================
@@ -147,6 +146,13 @@ export interface ToolHandlerResponse<TResult = null> {
   toolResponse: ToolMessageContent;
   /** Data returned to the workflow and hooks for further processing */
   data: TResult;
+  /**
+   * When true, the tool result has already been appended to the thread
+   * by the handler itself (e.g. via `withAutoAppend`), so the router
+   * will skip the `appendToolResult` call. This avoids sending large
+   * payloads through Temporal's activity payload limit.
+   */
+  resultAppended?: boolean;
 }
 
 /**
@@ -408,8 +414,7 @@ export function createToolRouter<T extends ToolMap>(
   }
 
   /** Check if a tool is enabled (defaults to true when not specified) */
-  const isEnabled = (tool: ToolMap[string]): boolean =>
-    tool.enabled !== false;
+  const isEnabled = (tool: ToolMap[string]): boolean => tool.enabled !== false;
 
   if (options.subagents) {
     // Build per-subagent hook dispatcher keyed by subagent name
@@ -504,15 +509,22 @@ export function createToolRouter<T extends ToolMap>(
     // --- Execute handler ---
     let result: unknown;
     let content!: ToolMessageContent;
+    let resultAppended = false;
 
     try {
       if (tool) {
+        const enrichedContext = {
+          ...(handlerContext ?? {}),
+          threadId: options.threadId,
+          toolCallId: toolCall.id,
+        };
         const response = await tool.handler(
           effectiveArgs as Parameters<typeof tool.handler>[0],
-          (handlerContext ?? {}) as Parameters<typeof tool.handler>[1]
+          enrichedContext as Parameters<typeof tool.handler>[1]
         );
         result = response.data;
         content = response.toolResponse;
+        resultAppended = response.resultAppended === true;
       } else {
         result = { error: `Unknown tool: ${toolCall.name}` };
         content = JSON.stringify(result, null, 2);
@@ -563,13 +575,15 @@ export function createToolRouter<T extends ToolMap>(
       }
     }
 
-    // Automatically append tool result to thread
-    await appendToolResult({
-      threadId: options.threadId,
-      toolCallId: toolCall.id,
-      toolName: toolCall.name,
-      content,
-    });
+    // Automatically append tool result to thread (unless handler already did)
+    if (!resultAppended) {
+      await appendToolResult({
+        threadId: options.threadId,
+        toolCallId: toolCall.id,
+        toolName: toolCall.name,
+        content,
+      });
+    }
 
     const toolResult = {
       toolCallId: toolCall.id,
@@ -703,18 +717,25 @@ export function createToolRouter<T extends ToolMap>(
       const processOne = async (
         toolCall: ParsedToolCallUnion<T>
       ): Promise<ToolCallResult<TName, TResult>> => {
-        const response = await handler(
-          toolCall.args as ToolArgs<T, TName>,
-          handlerContext
-        );
-
-        // Automatically append tool result to thread
-        await appendToolResult({
+        const enrichedContext = {
+          ...(handlerContext ?? {}),
           threadId: options.threadId,
           toolCallId: toolCall.id,
-          toolName: toolCall.name,
-          content: response.toolResponse,
-        });
+        } as TContext;
+        const response = await handler(
+          toolCall.args as ToolArgs<T, TName>,
+          enrichedContext
+        );
+
+        // Automatically append tool result to thread (unless handler already did)
+        if (!response.resultAppended) {
+          await appendToolResult({
+            threadId: options.threadId,
+            toolCallId: toolCall.id,
+            toolName: toolCall.name,
+            content: response.toolResponse,
+          });
+        }
 
         return {
           toolCallId: toolCall.id,
@@ -762,6 +783,67 @@ export function createToolRouter<T extends ToolMap>(
         ToolResult<T, TName>
       >[];
     },
+  };
+}
+
+/**
+ * Minimal interface for appending tool messages to a thread.
+ * Satisfied by `ThreadManager` from `createThreadManager()`.
+ */
+export interface ThreadAppender {
+  appendToolMessage(
+    content: ToolMessageContent,
+    toolCallId: string
+  ): Promise<void>;
+}
+
+/**
+ * Wraps a tool handler to automatically append its result directly to the
+ * thread and sets `resultAppended: true` on the response.
+ *
+ * Use this for tools whose responses may exceed Temporal's activity payload
+ * limit. The wrapper appends to the thread inside the activity (where Redis
+ * is available), then replaces `toolResponse` with an empty string so the
+ * large payload never travels through the Temporal workflow boundary.
+ *
+ * @param getThread - Factory that returns a thread manager for the given threadId
+ * @param handler   - The original tool handler
+ * @returns A wrapped handler that auto-appends and flags the response
+ *
+ * @example
+ * ```typescript
+ * import { withAutoAppend } from '@bead-ai/zeitlich/workflow';
+ * import { createThreadManager } from '@bead-ai/zeitlich';
+ *
+ * const handler = withAutoAppend(
+ *   (threadId) => createThreadManager({ redis, threadId }),
+ *   async (args, ctx) => ({
+ *     toolResponse: JSON.stringify(largeResult), // appended directly to Redis
+ *     data: { summary: "..." },                  // small data for workflow
+ *   }),
+ * );
+ * ```
+ */
+export function withAutoAppend<
+  TArgs,
+  TResult,
+  TContext extends ToolHandlerContext = ToolHandlerContext,
+>(
+  getThread: (threadId: string) => ThreadAppender,
+  handler: ToolHandler<TArgs, TResult, TContext>
+): ToolHandler<TArgs, TResult, TContext> {
+  return async (args: TArgs, context: TContext) => {
+    const response = await handler(args, context);
+    const threadId = (context as Record<string, unknown>).threadId as string;
+    const toolCallId = (context as Record<string, unknown>)
+      .toolCallId as string;
+
+    // Append directly (inside the activity, bypassing Temporal payload)
+    const thread = getThread(threadId);
+    await thread.appendToolMessage(response.toolResponse, toolCallId);
+
+    // Return with empty toolResponse to keep the Temporal payload small
+    return { toolResponse: "", data: response.data, resultAppended: true };
   };
 }
 

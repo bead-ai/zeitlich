@@ -38,6 +38,7 @@ export {
   hasNoOtherToolCalls,
   defineTool,
   defineSubagent,
+  withAutoAppend,
 } from "./lib/tool-router";
 export type {
   // Tool definition types
@@ -64,6 +65,7 @@ export type {
   // Other
   ToolMessageContent,
   AppendToolResultFn,
+  ThreadAppender,
   ProcessToolCallsContext,
 } from "./lib/tool-router";
 
