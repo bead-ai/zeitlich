@@ -1,5 +1,5 @@
-import type { ActivityToolHandler } from "../../workflow";
-import type { bashToolSchemaType } from "./tool";
+import type { ActivityToolHandler } from "../../lib/tool-router";
+import type { BashArgs } from "./tool";
 import { Bash, type BashOptions } from "just-bash";
 
 type BashExecOut = {
@@ -11,10 +11,10 @@ type BashExecOut = {
 /** BashOptions with `fs` required */
 type BashToolOptions = Required<Pick<BashOptions, "fs">> & Omit<BashOptions, "fs">;
 
-export const handleBashTool: (
+export const createBashHandler: (
     bashOptions: BashToolOptions,
-) => ActivityToolHandler<bashToolSchemaType, BashExecOut | null> =
-  (bashOptions: BashToolOptions) => async (args: bashToolSchemaType, _context) => {
+) => ActivityToolHandler<BashArgs, BashExecOut | null> =
+  (bashOptions: BashToolOptions) => async (args: BashArgs, _context) => {
     const { command } = args;
 
     const mergedOptions: BashOptions = {

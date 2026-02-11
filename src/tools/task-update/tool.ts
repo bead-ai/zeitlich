@@ -1,4 +1,5 @@
 import z from "zod";
+import type { ToolDefinition } from "../../lib/tool-router";
 
 export const taskUpdateTool = {
   name: "TaskUpdate" as const,
@@ -15,6 +16,6 @@ export const taskUpdateTool = {
       .array(z.string())
       .describe("The IDs of the tasks that this task is blocking"),
   }),
-};
+} satisfies ToolDefinition;
 
-export type TaskUpdateToolSchemaType = z.infer<typeof taskUpdateTool.schema>;
+export type TaskUpdateArgs = z.infer<typeof taskUpdateTool.schema>;

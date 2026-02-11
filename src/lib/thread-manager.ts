@@ -7,7 +7,6 @@ import {
   type MessageContent,
   type MessageStructure,
   type StoredMessage,
-  SystemMessage,
   ToolMessage,
 } from "@langchain/core/messages";
 import { v4 as uuidv4 } from "uuid";
@@ -24,28 +23,31 @@ function getThreadKey(threadId: string, key: string): string {
  */
 export type ToolMessageContent = $InferMessageContent<MessageStructure, "tool">;
 
-export interface ThreadManagerConfig {
+export interface ThreadManagerConfig<T = StoredMessage> {
   redis: Redis;
   threadId: string;
   /** Thread key, defaults to 'messages' */
   key?: string;
+  /** Custom serializer, defaults to JSON.stringify */
+  serialize?: (message: T) => string;
+  /** Custom deserializer, defaults to JSON.parse */
+  deserialize?: (raw: string) => T;
 }
 
-export interface ThreadManager {
-  /** Append a system message to the thread */
-  appendSystemMessage(content: string): Promise<void>;
+/** Generic thread manager for any message type */
+export interface BaseThreadManager<T> {
   /** Initialize an empty thread */
   initialize(): Promise<void>;
   /** Load all messages from the thread */
-  load(): Promise<StoredMessage[]>;
+  load(): Promise<T[]>;
   /** Append messages to the thread */
-  append(messages: StoredMessage[]): Promise<void>;
+  append(messages: T[]): Promise<void>;
   /** Delete the thread */
   delete(): Promise<void>;
+}
 
-  /** Create a SystemMessage (returns StoredMessage for storage) */
-  createSystemMessage(content: string): StoredMessage;
-
+/** Thread manager with StoredMessage convenience helpers */
+export interface ThreadManager extends BaseThreadManager<StoredMessage> {
   /** Create a HumanMessage (returns StoredMessage for storage) */
   createHumanMessage(content: string | MessageContent): StoredMessage;
 
@@ -74,26 +76,38 @@ export interface ThreadManager {
 
 /**
  * Creates a thread manager for handling conversation state in Redis.
+ * Without generic args, returns a full ThreadManager with StoredMessage helpers.
+ * With a custom type T, returns a BaseThreadManager<T>.
  */
-export function createThreadManager(
-  config: ThreadManagerConfig
-): ThreadManager {
-  const { redis, threadId, key = "messages" } = config;
+export function createThreadManager(config: ThreadManagerConfig): ThreadManager;
+export function createThreadManager<T>(
+  config: ThreadManagerConfig<T>
+): BaseThreadManager<T>;
+export function createThreadManager<T>(
+  config: ThreadManagerConfig<T>
+): BaseThreadManager<T> {
+  const {
+    redis,
+    threadId,
+    key = "messages",
+    serialize = (m: T): string => JSON.stringify(m),
+    deserialize = (raw: string): T => JSON.parse(raw) as T,
+  } = config;
   const redisKey = getThreadKey(threadId, key);
 
-  return {
+  const base: BaseThreadManager<T> = {
     async initialize(): Promise<void> {
       await redis.del(redisKey);
     },
 
-    async load(): Promise<StoredMessage[]> {
+    async load(): Promise<T[]> {
       const data = await redis.lrange(redisKey, 0, -1);
-      return data.map((item) => JSON.parse(item) as StoredMessage);
+      return data.map(deserialize);
     },
 
-    async append(messages: StoredMessage[]): Promise<void> {
+    async append(messages: T[]): Promise<void> {
       if (messages.length > 0) {
-        await redis.rpush(redisKey, ...messages.map((m) => JSON.stringify(m)));
+        await redis.rpush(redisKey, ...messages.map(serialize));
         await redis.expire(redisKey, THREAD_TTL_SECONDS);
       }
     },
@@ -101,7 +115,11 @@ export function createThreadManager(
     async delete(): Promise<void> {
       await redis.del(redisKey);
     },
+  };
 
+  // If no custom serialize/deserialize were provided and T defaults to StoredMessage,
+  // the overload guarantees the caller gets ThreadManager with convenience helpers.
+  const helpers = {
     createHumanMessage(content: string | MessageContent): StoredMessage {
       return new HumanMessage({
         id: uuidv4(),
@@ -131,39 +149,29 @@ export function createThreadManager(
       toolCallId: string
     ): StoredMessage {
       return new ToolMessage({
-        // Cast needed due to langchain type compatibility
         content: content as MessageContent,
         tool_call_id: toolCallId,
       }).toDict();
     },
 
-    createSystemMessage(content: string): StoredMessage {
-      return new SystemMessage({
-        content,
-      }).toDict();
-    },
-
-    async appendSystemMessage(content: string): Promise<void> {
-      const message = this.createSystemMessage(content);
-      await this.append([message]);
-    },
-
     async appendHumanMessage(content: string | MessageContent): Promise<void> {
-      const message = this.createHumanMessage(content);
-      await this.append([message]);
+      const message = helpers.createHumanMessage(content);
+      await (base as BaseThreadManager<StoredMessage>).append([message]);
     },
 
     async appendToolMessage(
       content: ToolMessageContent,
       toolCallId: string
     ): Promise<void> {
-      const message = this.createToolMessage(content, toolCallId);
-      await this.append([message]);
+      const message = helpers.createToolMessage(content, toolCallId);
+      await (base as BaseThreadManager<StoredMessage>).append([message]);
     },
 
     async appendAIMessage(content: string | MessageContent): Promise<void> {
-      const message = this.createAIMessage(content);
-      await this.append([message]);
+      const message = helpers.createAIMessage(content as string);
+      await (base as BaseThreadManager<StoredMessage>).append([message]);
     },
   };
+
+  return Object.assign(base, helpers);
 }

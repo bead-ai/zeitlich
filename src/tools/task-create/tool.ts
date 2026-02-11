@@ -1,4 +1,5 @@
 import z from "zod";
+import type { ToolDefinition } from "../../lib/tool-router";
 
 export const taskCreateTool = {
   name: "TaskCreate" as const,
@@ -61,6 +62,6 @@ export const taskCreateTool = {
       .record(z.string(), z.string())
       .describe("Arbitrary key-value pairs for tracking"),
   }),
-};
+} satisfies ToolDefinition;
 
-export type TaskCreateToolSchemaType = z.infer<typeof taskCreateTool.schema>;
+export type TaskCreateArgs = z.infer<typeof taskCreateTool.schema>;

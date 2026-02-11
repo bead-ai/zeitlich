@@ -84,10 +84,14 @@ Zeitlich provides two entry points to work with Temporal's workflow sandboxing:
 
 ```typescript
 // In workflow files - no external dependencies (Redis, LangChain, etc.)
-import { createSession, createAgentStateManager, askUserQuestionTool } from 'zeitlich/workflow';
+import {
+  createSession,
+  createAgentStateManager,
+  askUserQuestionTool,
+} from "zeitlich/workflow";
 
 // In activity files and worker setup - full functionality
-import { ZeitlichPlugin, invokeModel, toTree } from 'zeitlich';
+import { ZeitlichPlugin, invokeModel, toTree } from "zeitlich";
 ```
 
 **Why?** Temporal workflows run in an isolated V8 sandbox that cannot import modules with Node.js APIs or external dependencies. The `/workflow` entry point contains only pure TypeScript code safe for workflow use.
@@ -161,8 +165,6 @@ export async function myAgentWorkflow({ prompt }: { prompt: string }) {
     agentName: "my-agent",
     maxTurns: 20,
     runAgent,
-    baseSystemPrompt: "You are a helpful assistant.",
-    instructionsPrompt: "Help the user with their request.",
     buildContextMessage: () => [{ type: "text", text: prompt }],
     tools: {
       Search: {
@@ -341,15 +343,15 @@ export const createActivities = () => ({
 
 Zeitlich provides ready-to-use tool definitions and handlers for common agent operations.
 
-| Tool              | Description                                                     |
-| ----------------- | --------------------------------------------------------------- |
-| `Read`            | Read file contents with optional pagination                     |
-| `Write`           | Create or overwrite files with new content                      |
-| `Edit`            | Edit specific sections of a file by find/replace                |
-| `Glob`            | Search for files matching a glob pattern                        |
-| `Grep`            | Search file contents with regex patterns                        |
-| `Bash`            | Execute shell commands                                          |
-| `AskUserQuestion` | Ask the user questions during execution with structured options |
+| Tool              | Description                                                       |
+| ----------------- | ----------------------------------------------------------------- |
+| `Read`            | Read file contents with optional pagination                       |
+| `Write`           | Create or overwrite files with new content                        |
+| `Edit`            | Edit specific sections of a file by find/replace                  |
+| `Glob`            | Search for files matching a glob pattern                          |
+| `Grep`            | Search file contents with regex patterns                          |
+| `Bash`            | Execute shell commands                                            |
+| `AskUserQuestion` | Ask the user questions during execution with structured options   |
 | `Task`            | Launch subagents as child workflows (see [Subagents](#subagents)) |
 
 ```typescript
@@ -373,7 +375,7 @@ import {
 } from "zeitlich";
 ```
 
-Built-in tools can be added via `buildInTools` (for tools with special handling like Bash) or as regular tools:
+All tools are passed via `tools`. The Bash tool's description is automatically enhanced with the file tree when provided:
 
 ```typescript
 const session = await createSession({
@@ -383,9 +385,10 @@ const session = await createSession({
       ...askUserQuestionTool,
       handler: handleAskUserQuestionToolResult,
     },
-  },
-  buildInTools: {
-    Bash: handleBashToolResult,
+    Bash: {
+      ...bashTool,
+      handler: handleBashTool(bashOptions),
+    },
   },
 });
 ```
@@ -396,27 +399,27 @@ const session = await createSession({
 
 Safe for use in Temporal workflow files:
 
-| Export                    | Description                                                                                  |
-| ------------------------- | -------------------------------------------------------------------------------------------- |
-| `createSession`           | Creates an agent session with tools, prompts, subagents, and hooks                           |
-| `createAgentStateManager` | Creates a state manager for workflow state                                                   |
-| `createToolRouter`        | Creates a tool router (used internally by session, or for advanced use)                      |
-| `createTaskTool`          | Creates the Task tool for subagent support                                                   |
+| Export                    | Description                                                                                    |
+| ------------------------- | ---------------------------------------------------------------------------------------------- |
+| `createSession`           | Creates an agent session with tools, prompts, subagents, and hooks                             |
+| `createAgentStateManager` | Creates a state manager for workflow state                                                     |
+| `createToolRouter`        | Creates a tool router (used internally by session, or for advanced use)                        |
+| `createTaskTool`          | Creates the Task tool for subagent support                                                     |
 | Tool definitions          | `askUserQuestionTool`, `globTool`, `grepTool`, `readTool`, `writeTool`, `editTool`, `bashTool` |
 | Task tools                | `taskCreateTool`, `taskGetTool`, `taskListTool`, `taskUpdateTool` for workflow task management |
-| Types                     | All TypeScript types and interfaces                                                          |
+| Types                     | All TypeScript types and interfaces                                                            |
 
 ### Activity Entry Point (`zeitlich`)
 
 For use in activities, worker setup, and Node.js code:
 
-| Export                           | Description                                            |
-| -------------------------------- | ------------------------------------------------------ |
-| `ZeitlichPlugin`                 | Temporal worker plugin that registers shared activities |
-| `createSharedActivities`         | Creates thread management activities                   |
-| `invokeModel`                    | Core LLM invocation utility (requires Redis + LangChain) |
-| `toTree`                         | Generate file tree string from a directory path        |
-| Tool handlers                    | `globHandler`, `editHandler`, `handleBashTool`, `handleAskUserQuestionToolResult` |
+| Export                   | Description                                                                       |
+| ------------------------ | --------------------------------------------------------------------------------- |
+| `ZeitlichPlugin`         | Temporal worker plugin that registers shared activities                           |
+| `createSharedActivities` | Creates thread management activities                                              |
+| `invokeModel`            | Core LLM invocation utility (requires Redis + LangChain)                          |
+| `toTree`                 | Generate file tree string from a directory path                                   |
+| Tool handlers            | `globHandler`, `editHandler`, `handleBashTool`, `handleAskUserQuestionToolResult` |
 
 ### Types
 

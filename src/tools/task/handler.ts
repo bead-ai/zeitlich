@@ -1,7 +1,7 @@
 import { executeChild, workflowInfo, uuid4 } from "@temporalio/workflow";
 import type { ToolHandlerResponse } from "../../lib/tool-router";
 import type { SubagentConfig, SubagentInput } from "../../lib/types";
-import type { GenericTaskToolSchemaType } from "./tool";
+import type { TaskArgs } from "./tool";
 
 /**
  * Result from a task handler execution
@@ -34,7 +34,7 @@ export function createTaskHandler(subagents: SubagentConfig[]) {
     workflowInfo();
 
   return async (
-    args: GenericTaskToolSchemaType
+    args: TaskArgs
   ): Promise<ToolHandlerResponse<TaskHandlerResult>> => {
     const config = subagents.find((s) => s.name === args.subagent);
 

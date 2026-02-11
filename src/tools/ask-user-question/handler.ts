@@ -1,14 +1,14 @@
 import { AIMessage, type StoredMessage } from "@langchain/core/messages";
 import type { ActivityToolHandler } from "../../lib/tool-router";
-import type { AskUserQuestionToolSchemaType } from "./tool";
+import type { AskUserQuestionArgs } from "./tool";
 
 /**
- * Handle user interaction tool result - creates AI messages for display.
+ * Creates handler for user interaction tool - creates AI messages for display.
  */
-export const handleAskUserQuestionToolResult: ActivityToolHandler<
-  AskUserQuestionToolSchemaType,
+export const createAskUserQuestionHandler = (): ActivityToolHandler<
+  AskUserQuestionArgs,
   { chatMessages: StoredMessage[] }
-> = async (args) => {
+> => async (args) => {
   const messages = args.questions.map(
     ({ question, header, options, multiSelect }) =>
       new AIMessage({

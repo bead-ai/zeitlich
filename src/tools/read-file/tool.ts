@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { ToolDefinition } from "../../lib/tool-router";
 
 export const readTool = {
   name: "FileRead" as const,
@@ -28,6 +29,6 @@ The tool returns the file content in an appropriate format:
       .describe("Maximum number of lines to read (for text files)"),
   }),
   strict: true,
-};
+} satisfies ToolDefinition;
 
-export type ReadToolSchemaType = z.infer<typeof readTool.schema>;
+export type FileReadArgs = z.infer<typeof readTool.schema>;

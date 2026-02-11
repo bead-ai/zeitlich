@@ -1,8 +1,8 @@
 import type { ToolMessageContent } from "./thread-manager";
 import type {
-  BuildInToolDefinitions,
   InferToolResults,
   ParsedToolCallUnion,
+  RawToolCall,
   ToolCallResultUnion,
   ToolMap,
 } from "./tool-router";
@@ -30,6 +30,7 @@ export interface BaseAgentState {
   version: number;
   turns: number;
   tasks: Map<string, WorkflowTask>;
+  systemPrompt: string;
 }
 
 /**
@@ -51,8 +52,8 @@ export interface AgentFile {
 /**
  * Agent response from LLM invocation
  */
-export interface AgentResponse {
-  message: StoredMessage;
+export interface AgentResponse<M = StoredMessage> {
+  message: M;
   stopReason: string | null;
   usage?: {
     input_tokens?: number;
@@ -62,16 +63,36 @@ export interface AgentResponse {
 }
 
 /**
+ * Thread operations required by a session.
+ * Consumers provide these — typically by wrapping Temporal activities.
+ * Use `proxyDefaultThreadOps()` for the default StoredMessage implementation.
+ */
+export interface ThreadOps<M = StoredMessage> {
+  /** Initialize an empty thread */
+  initializeThread(threadId: string): Promise<void>;
+  /** Append a human message to the thread */
+  appendHumanMessage(
+    threadId: string,
+    content: string | MessageContent
+  ): Promise<void>;
+  /** Append a tool result to the thread */
+  appendToolResult(config: ToolResultConfig): Promise<void>;
+  /** Extract raw tool calls from a message */
+  parseToolCalls(message: M): Promise<RawToolCall[]>;
+}
+
+/**
  * Configuration for a Zeitlich agent session
  */
-export interface ZeitlichAgentConfig<T extends ToolMap> {
-  buildFileTree?: () => Promise<string>;
+export interface ZeitlichAgentConfig<T extends ToolMap, M = StoredMessage> {
   threadId: string;
   agentName: string;
   metadata?: Record<string, unknown>;
   maxTurns?: number;
   /** Workflow-specific runAgent activity (with tools pre-bound) */
-  runAgent: RunAgentActivity;
+  runAgent: RunAgentActivity<M>;
+  /** Thread operations (initialize, append messages, parse tool calls) */
+  threadOps: ThreadOps<M>;
   /** Tool router for processing tool calls (optional if agent has no tools) */
   tools?: T;
   /** Subagent configurations */
@@ -81,26 +102,10 @@ export interface ZeitlichAgentConfig<T extends ToolMap> {
   /** Whether to process tools in parallel */
   processToolsInParallel?: boolean;
   /**
-   * Base system prompt (e.g., Auditron identity).
-   * Can be a static string or async function.
-   */
-  baseSystemPrompt: string | (() => string | Promise<string>);
-  /**
-   * Agent-specific instructions prompt.
-   * Can be a static string or async function.
-   */
-  instructionsPrompt: string | (() => string | Promise<string>);
-  /**
    * Build context message content from agent-specific context.
    * Returns MessageContent array for the initial HumanMessage.
    */
   buildContextMessage: () => MessageContent | Promise<MessageContent>;
-  /**
-   * Build in tools - accepts raw handlers or proxied activities
-   */
-  buildInTools?: {
-    [K in keyof BuildInToolDefinitions]?: BuildInToolDefinitions[K]["handler"];
-  };
 }
 
 /**
@@ -128,15 +133,17 @@ export interface RunAgentConfig {
 /**
  * Type signature for workflow-specific runAgent activity
  */
-export type RunAgentActivity = (
+export type RunAgentActivity<M = StoredMessage> = (
   config: RunAgentConfig
-) => Promise<AgentResponse>;
+) => Promise<AgentResponse<M>>;
 /**
  * Configuration for appending a tool result
  */
 export interface ToolResultConfig {
   threadId: string;
   toolCallId: string;
+  /** The name of the tool that produced this result */
+  toolName: string;
   /** Content for the tool message (string or complex content parts) */
   content: ToolMessageContent;
 }
@@ -389,7 +396,7 @@ export interface ToolHooks<TArgs = unknown, TResult = unknown> {
   /** Called after this tool executes successfully */
   onPostToolUse?: (ctx: {
     args: TArgs;
-    result: TResult | null;
+    result: TResult;
     threadId: string;
     turn: number;
     durationMs: number;

@@ -9,17 +9,11 @@ import type {
   ToolHooks,
   ToolResultConfig,
 } from "./types";
-import type { GenericTaskToolSchemaType } from "../tools/task/tool";
+import type { TaskArgs } from "../tools/task/tool";
 
 import type { z } from "zod";
-import { proxyActivities } from "@temporalio/workflow";
-import type { ZeitlichSharedActivities } from "../activities";
 import { createTaskTool } from "../tools/task/tool";
 import { createTaskHandler } from "../tools/task/handler";
-import type { createTaskCreateHandler } from "../tools/task-create/handler";
-import { bashTool, createBashToolDescription } from "../tools/bash/tool";
-import { taskCreateTool } from "../tools/task-create/tool";
-import type { handleBashTool } from "../tools/bash/handler";
 
 export type { ToolMessageContent };
 
@@ -58,12 +52,19 @@ export interface ToolWithHandler<
   handler: ToolHandler<z.infer<TSchema>, TResult, TContext>;
   strict?: boolean;
   max_uses?: number;
+  /** Whether this tool is available to the agent (default: true). Disabled tools are excluded from definitions and rejected at parse time. */
+  enabled?: boolean;
   /** Per-tool lifecycle hooks (run in addition to global hooks) */
   hooks?: ToolHooks<z.infer<TSchema>, TResult>;
 }
 
 /**
  * A map of tool keys to tool definitions with handlers.
+ *
+ * Handler uses `any` intentionally — this is a type-system boundary where heterogeneous
+ * tool types are stored together. Type safety for individual tools is enforced by
+ * `defineTool()` at the definition site and generic inference utilities like
+ * `InferToolResults<T>` at the consumption site.
  */
 export type ToolMap = Record<
   string,
@@ -71,17 +72,13 @@ export type ToolMap = Record<
     name: string;
     description: string;
     schema: z.ZodType;
-    /* eslint-disable @typescript-eslint/no-explicit-any */
-    handler: (
-      args: any,
-      context: any
-    ) => ToolHandlerResponse<any> | Promise<ToolHandlerResponse<any>>;
-    /* eslint-enable @typescript-eslint/no-explicit-any */
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    handler: ToolHandler<any, any, any>;
     strict?: boolean;
     max_uses?: number;
-    /* eslint-disable @typescript-eslint/no-explicit-any */
+    enabled?: boolean;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     hooks?: ToolHooks<any, any>;
-    /* eslint-enable @typescript-eslint/no-explicit-any */
   }
 >;
 
@@ -140,39 +137,30 @@ export type AppendToolResultFn = (config: ToolResultConfig) => Promise<void>;
 /**
  * The response from a tool handler.
  * Contains the content for the tool message and the result to return from processToolCalls.
+ *
+ * Tools that don't return additional data should use `data: null` (TResult defaults to null).
+ * Tools that may fail to produce data should type TResult as `SomeType | null`.
  */
-export interface ToolHandlerResponse<TResult> {
+export interface ToolHandlerResponse<TResult = null> {
   /** Content sent back to the LLM as the tool call response */
   toolResponse: ToolMessageContent;
   /** Data returned to the workflow and hooks for further processing */
-  data: TResult | null;
+  data: TResult;
+  /**
+   * When true, the tool result has already been appended to the thread
+   * by the handler itself (e.g. via `withAutoAppend`), so the router
+   * will skip the `appendToolResult` call. This avoids sending large
+   * payloads through Temporal's activity payload limit.
+   */
+  resultAppended?: boolean;
 }
 
 /**
  * Context passed to tool handlers for additional data beyond tool args.
  * Use this to pass workflow state like file trees, user context, etc.
+ * Generic so callers can type the context shape, e.g. ToolHandlerContext<ControlTestFsParams>.
  */
-export interface ToolHandlerContext {
-  /** Additional context data - define your own shape */
-  [key: string]: unknown;
-}
-
-export interface BuildInToolDefinitions {
-  [bashTool.name]: typeof bashTool & {
-    handler: ReturnType<typeof handleBashTool>;
-  };
-  [taskCreateTool.name]: typeof taskCreateTool & {
-    handler: ReturnType<typeof createTaskCreateHandler>;
-  };
-}
-
-export const buildIntoolDefinitions: Record<
-  keyof BuildInToolDefinitions,
-  ToolDefinition
-> = {
-  [bashTool.name]: bashTool,
-  [taskCreateTool.name]: taskCreateTool,
-};
+export type ToolHandlerContext<T = Record<string, unknown>> = T;
 
 /**
  * A handler function for a specific tool.
@@ -193,7 +181,7 @@ export type ToolHandler<TArgs, TResult, TContext = ToolHandlerContext> = (
  * ```typescript
  * // Filesystem handler with context
  * const readHandler: ActivityToolHandler<
- *   ReadToolSchemaType,
+ *   FileReadArgs,
  *   ReadResult,
  *   { scopedNodes: FileNode[]; provider: FileSystemProvider }
  * > = async (args, context) => {
@@ -239,15 +227,13 @@ export interface ToolCallResult<
 > {
   toolCallId: string;
   name: TName;
-  data: TResult | null;
+  data: TResult;
 }
 
 /**
  * Options for creating a tool router.
  */
 export interface ToolRouterOptions<T extends ToolMap> {
-  /** File tree for the agent */
-  fileTree: string;
   /** Map of tools with their handlers */
   tools: T;
   /** Thread ID for appending tool results */
@@ -260,10 +246,6 @@ export interface ToolRouterOptions<T extends ToolMap> {
   hooks?: Hooks<T, ToolCallResultUnion<InferToolResults<T>>>;
   /** Subagent configurations */
   subagents?: SubagentConfig[];
-  /** Build in tools - accepts raw handlers or proxied activities */
-  buildInTools?: {
-    [K in keyof BuildInToolDefinitions]?: BuildInToolDefinitions[K]["handler"];
-  };
 }
 
 /**
@@ -419,15 +401,7 @@ export interface ToolRouter<T extends ToolMap> {
 export function createToolRouter<T extends ToolMap>(
   options: ToolRouterOptions<T>
 ): ToolRouter<T> {
-  const { appendToolResult } = proxyActivities<ZeitlichSharedActivities>({
-    startToCloseTimeout: "2m",
-    retry: {
-      maximumAttempts: 3,
-      initialInterval: "5s",
-      maximumInterval: "15m",
-      backoffCoefficient: 4,
-    },
-  });
+  const { appendToolResult } = options;
   type TResults = InferToolResults<T>;
 
   // Build internal lookup map by tool name
@@ -437,6 +411,9 @@ export function createToolRouter<T extends ToolMap>(
     toolMap.set(tool.name, tool as T[keyof T]);
   }
 
+  /** Check if a tool is enabled (defaults to true when not specified) */
+  const isEnabled = (tool: ToolMap[string]): boolean => tool.enabled !== false;
+
   if (options.subagents) {
     // Build per-subagent hook dispatcher keyed by subagent name
     const subagentHooksMap = new Map<string, SubagentHooks>();
@@ -445,7 +422,7 @@ export function createToolRouter<T extends ToolMap>(
     }
 
     const resolveSubagentName = (args: unknown): string =>
-      (args as GenericTaskToolSchemaType).subagent;
+      (args as TaskArgs).subagent;
 
     toolMap.set("Task", {
       ...createTaskTool(options.subagents),
@@ -471,25 +448,6 @@ export function createToolRouter<T extends ToolMap>(
     });
   }
 
-  if (options.buildInTools) {
-    for (const [key, value] of Object.entries(options.buildInTools)) {
-      if (key === bashTool.name) {
-        toolMap.set(key, {
-          ...buildIntoolDefinitions[key as keyof BuildInToolDefinitions],
-          description: createBashToolDescription({
-            fileTree: options.fileTree,
-          }),
-          handler: value,
-        });
-      } else {
-        toolMap.set(key, {
-          ...buildIntoolDefinitions[key as keyof BuildInToolDefinitions],
-          handler: value,
-        });
-      }
-    }
-  }
-
   async function processToolCall(
     toolCall: ParsedToolCallUnion<T>,
     turn: number,
@@ -511,6 +469,7 @@ export function createToolRouter<T extends ToolMap>(
         await appendToolResult({
           threadId: options.threadId,
           toolCallId: toolCall.id,
+          toolName: toolCall.name,
           content: JSON.stringify({
             skipped: true,
             reason: "Skipped by PreToolUse hook",
@@ -532,6 +491,7 @@ export function createToolRouter<T extends ToolMap>(
         await appendToolResult({
           threadId: options.threadId,
           toolCallId: toolCall.id,
+          toolName: toolCall.name,
           content: JSON.stringify({
             skipped: true,
             reason: "Skipped by tool PreToolUse hook",
@@ -547,15 +507,23 @@ export function createToolRouter<T extends ToolMap>(
     // --- Execute handler ---
     let result: unknown;
     let content!: ToolMessageContent;
+    let resultAppended = false;
 
     try {
       if (tool) {
+        const enrichedContext = {
+          ...(handlerContext ?? {}),
+          threadId: options.threadId,
+          toolCallId: toolCall.id,
+          toolName: toolCall.name,
+        };
         const response = await tool.handler(
           effectiveArgs as Parameters<typeof tool.handler>[0],
-          (handlerContext ?? {}) as Parameters<typeof tool.handler>[1]
+          enrichedContext as Parameters<typeof tool.handler>[1]
         );
         result = response.data;
         content = response.toolResponse;
+        resultAppended = response.resultAppended === true;
       } else {
         result = { error: `Unknown tool: ${toolCall.name}` };
         content = JSON.stringify(result, null, 2);
@@ -606,12 +574,15 @@ export function createToolRouter<T extends ToolMap>(
       }
     }
 
-    // Automatically append tool result to thread
-    await appendToolResult({
-      threadId: options.threadId,
-      toolCallId: toolCall.id,
-      content,
-    });
+    // Automatically append tool result to thread (unless handler already did)
+    if (!resultAppended) {
+      await appendToolResult({
+        threadId: options.threadId,
+        toolCallId: toolCall.id,
+        toolName: toolCall.name,
+        content,
+      });
+    }
 
     const toolResult = {
       toolCallId: toolCall.id,
@@ -647,13 +618,13 @@ export function createToolRouter<T extends ToolMap>(
     // --- Methods from registry ---
 
     hasTools(): boolean {
-      return toolMap.size > 0;
+      return Array.from(toolMap.values()).some(isEnabled);
     },
 
     parseToolCall(toolCall: RawToolCall): ParsedToolCallUnion<T> {
       const tool = toolMap.get(toolCall.name);
 
-      if (!tool) {
+      if (!tool || !isEnabled(tool)) {
         throw new Error(`Tool ${toolCall.name} not found`);
       }
 
@@ -668,21 +639,26 @@ export function createToolRouter<T extends ToolMap>(
     },
 
     hasTool(name: string): boolean {
-      return toolMap.has(name);
+      const tool = toolMap.get(name);
+      return tool !== undefined && isEnabled(tool);
     },
 
     getToolNames(): ToolNames<T>[] {
-      return Array.from(toolMap.keys()) as ToolNames<T>[];
+      return Array.from(toolMap.entries())
+        .filter(([, tool]) => isEnabled(tool))
+        .map(([name]) => name) as ToolNames<T>[];
     },
 
     getToolDefinitions(): ToolDefinition[] {
-      return Array.from(toolMap).map(([name, tool]) => ({
-        name,
-        description: tool.description,
-        schema: tool.schema,
-        strict: tool.strict,
-        max_uses: tool.max_uses,
-      }));
+      return Array.from(toolMap)
+        .filter(([, tool]) => isEnabled(tool))
+        .map(([name, tool]) => ({
+          name,
+          description: tool.description,
+          schema: tool.schema,
+          strict: tool.strict,
+          max_uses: tool.max_uses,
+        }));
     },
 
     // --- Methods for processing tool calls ---
@@ -740,22 +716,31 @@ export function createToolRouter<T extends ToolMap>(
       const processOne = async (
         toolCall: ParsedToolCallUnion<T>
       ): Promise<ToolCallResult<TName, TResult>> => {
-        const response = await handler(
-          toolCall.args as ToolArgs<T, TName>,
-          handlerContext
-        );
-
-        // Automatically append tool result to thread
-        await appendToolResult({
+        const enrichedContext = {
+          ...(handlerContext ?? {}),
           threadId: options.threadId,
           toolCallId: toolCall.id,
-          content: response.toolResponse,
-        });
+          toolName: toolCall.name as TName,
+        } as TContext;
+        const response = await handler(
+          toolCall.args as ToolArgs<T, TName>,
+          enrichedContext
+        );
+
+        // Automatically append tool result to thread (unless handler already did)
+        if (!response.resultAppended) {
+          await appendToolResult({
+            threadId: options.threadId,
+            toolCallId: toolCall.id,
+            toolName: toolCall.name,
+            content: response.toolResponse,
+          });
+        }
 
         return {
           toolCallId: toolCall.id,
           name: toolCall.name as TName,
-          data: response.data ?? null,
+          data: response.data,
         };
       };
 
@@ -798,6 +783,61 @@ export function createToolRouter<T extends ToolMap>(
         ToolResult<T, TName>
       >[];
     },
+  };
+}
+
+/**
+ * Wraps a tool handler to automatically append its result directly to the
+ * thread and sets `resultAppended: true` on the response.
+ *
+ * Use this for tools whose responses may exceed Temporal's activity payload
+ * limit. The wrapper appends to the thread inside the activity (where Redis
+ * is available), then replaces `toolResponse` with an empty string so the
+ * large payload never travels through the Temporal workflow boundary.
+ *
+ * @param getThread - Factory that returns a thread manager for the given threadId
+ * @param handler   - The original tool handler
+ * @returns A wrapped handler that auto-appends and flags the response
+ *
+ * @example
+ * ```typescript
+ * import { withAutoAppend } from '@bead-ai/zeitlich/workflow';
+ * import { createThreadManager } from '@bead-ai/zeitlich';
+ *
+ * const handler = withAutoAppend(
+ *   (threadId) => createThreadManager({ redis, threadId }),
+ *   async (args, ctx) => ({
+ *     toolResponse: JSON.stringify(largeResult), // appended directly to Redis
+ *     data: { summary: "..." },                  // small data for workflow
+ *   }),
+ * );
+ * ```
+ */
+export function withAutoAppend<
+  TArgs,
+  TResult,
+  TContext extends ToolHandlerContext = ToolHandlerContext,
+>(
+  threadHandler: (config: ToolResultConfig) => Promise<void>,
+  handler: ActivityToolHandler<TArgs, TResult, TContext>
+): ActivityToolHandler<TArgs, TResult, TContext> {
+  return async (args: TArgs, context: TContext) => {
+    const response = await handler(args, context);
+    const threadId = (context as Record<string, unknown>).threadId as string;
+    const toolCallId = (context as Record<string, unknown>)
+      .toolCallId as string;
+    const toolName = (context as Record<string, unknown>).toolName as string;
+
+    // Append directly (inside the activity, bypassing Temporal payload)
+    await threadHandler({
+      threadId,
+      toolCallId,
+      toolName,
+      content: response.toolResponse,
+    });
+
+    // Return with empty toolResponse to keep the Temporal payload small
+    return { toolResponse: "", data: response.data, resultAppended: true };
   };
 }
 
@@ -872,7 +912,7 @@ export function defineSubagent<
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       | ((input: { prompt: string; context: TContext }) => Promise<any>);
     context: TContext;
-    hooks?: SubagentHooks<GenericTaskToolSchemaType, z.infer<TResult>>;
+    hooks?: SubagentHooks<TaskArgs, z.infer<TResult>>;
   }
 ): SubagentConfig<TResult>;
 // Without context — verifies workflow accepts { prompt }
@@ -880,7 +920,7 @@ export function defineSubagent<TResult extends z.ZodType = z.ZodType>(
   config: Omit<SubagentConfig<TResult>, "hooks" | "workflow"> & {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     workflow: string | ((input: { prompt: string }) => Promise<any>);
-    hooks?: SubagentHooks<GenericTaskToolSchemaType, z.infer<TResult>>;
+    hooks?: SubagentHooks<TaskArgs, z.infer<TResult>>;
   }
 ): SubagentConfig<TResult>;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

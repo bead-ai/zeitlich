@@ -1,4 +1,5 @@
 import z from "zod";
+import type { ToolDefinition } from "../../lib/tool-router";
 
 export const askUserQuestionTool = {
   name: "AskUserQuestion" as const,
@@ -39,8 +40,8 @@ Usage notes:
     ),
   }),
   strict: true,
-};
+} satisfies ToolDefinition;
 
-export type AskUserQuestionToolSchemaType = z.infer<
+export type AskUserQuestionArgs = z.infer<
   typeof askUserQuestionTool.schema
 >;

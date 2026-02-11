@@ -1,36 +1,25 @@
 import { proxyActivities } from "@temporalio/workflow";
 import type { ZeitlichSharedActivities } from "../activities";
 import type {
+  ThreadOps,
   ZeitlichAgentConfig,
   SessionStartHook,
   SessionEndHook,
   SessionExitReason,
-  SubagentConfig,
 } from "./types";
+import type { StoredMessage } from "@langchain/core/messages";
 import { type AgentStateManager, type JsonSerializable } from "./state-manager";
 import {
   createToolRouter,
-  type ParsedToolCall,
   type ParsedToolCallUnion,
   type RawToolCall,
   type ToolMap,
 } from "./tool-router";
-import type { StoredMessage } from "@langchain/core/messages";
-import { createTaskTool, type TaskToolSchemaType } from "../tools/task/tool";
 
-export interface ZeitlichSession {
+export interface ZeitlichSession<M = unknown> {
   runSession<T extends JsonSerializable<T>>(args: {
     stateManager: AgentStateManager<T>;
-  }): Promise<StoredMessage | null>;
-}
-
-async function resolvePrompt(
-  prompt: string | (() => string | Promise<string>)
-): Promise<string> {
-  if (typeof prompt === "function") {
-    return prompt();
-  }
-  return prompt;
+  }): Promise<M | null>;
 }
 
 /**
@@ -43,48 +32,24 @@ export interface SessionLifecycleHooks {
   onSessionEnd?: SessionEndHook;
 }
 
-export const createSession = async <T extends ToolMap>({
+export const createSession = async <T extends ToolMap, M = unknown>({
   threadId,
   agentName,
   maxTurns = 50,
   metadata = {},
   runAgent,
-  baseSystemPrompt,
-  instructionsPrompt,
+  threadOps,
   buildContextMessage,
-  buildFileTree = async (): Promise<string> => "",
   subagents,
   tools = {} as T,
   processToolsInParallel = true,
-  buildInTools = {},
   hooks = {},
-}: ZeitlichAgentConfig<T>): Promise<ZeitlichSession> => {
-  const {
-    initializeThread,
-    appendHumanMessage,
-    parseToolCalls,
-    appendToolResult,
-    appendSystemMessage,
-  } = proxyActivities<ZeitlichSharedActivities>({
-    startToCloseTimeout: "30m",
-    retry: {
-      maximumAttempts: 6,
-      initialInterval: "5s",
-      maximumInterval: "15m",
-      backoffCoefficient: 4,
-    },
-    heartbeatTimeout: "5m",
-  });
-
-  const fileTree = await buildFileTree();
-
+}: ZeitlichAgentConfig<T, M>): Promise<ZeitlichSession<M>> => {
   const toolRouter = createToolRouter({
     tools,
-    appendToolResult,
+    appendToolResult: threadOps.appendToolResult,
     threadId,
     hooks,
-    buildInTools,
-    fileTree,
     subagents,
     parallel: processToolsInParallel,
   });
@@ -106,7 +71,7 @@ export const createSession = async <T extends ToolMap>({
   };
 
   return {
-    runSession: async ({ stateManager }): Promise<StoredMessage | null> => {
+    runSession: async ({ stateManager }): Promise<M | null> => {
       if (hooks.onSessionStart) {
         await hooks.onSessionStart({
           threadId,
@@ -116,15 +81,8 @@ export const createSession = async <T extends ToolMap>({
       }
       stateManager.setTools(toolRouter.getToolDefinitions());
 
-      await initializeThread(threadId);
-      await appendSystemMessage(
-        threadId,
-        [
-          await resolvePrompt(baseSystemPrompt),
-          await resolvePrompt(instructionsPrompt),
-        ].join("\n")
-      );
-      await appendHumanMessage(threadId, await buildContextMessage());
+      await threadOps.initializeThread(threadId);
+      await threadOps.appendHumanMessage(threadId, await buildContextMessage());
 
       let exitReason: SessionExitReason = "completed";
 
@@ -156,19 +114,19 @@ export const createSession = async <T extends ToolMap>({
             return message;
           }
 
-          const rawToolCalls: RawToolCall[] = await parseToolCalls(message);
+          const rawToolCalls: RawToolCall[] =
+            await threadOps.parseToolCalls(message);
 
-          // Parse tool calls, catching schema errors and returning them to the agent
+          // Parse all tool calls uniformly through the router
           const parsedToolCalls: ParsedToolCallUnion<T>[] = [];
-          for (const tc of rawToolCalls.filter(
-            (tc: RawToolCall) => tc.name !== "Task"
-          )) {
+          for (const tc of rawToolCalls) {
             try {
               parsedToolCalls.push(toolRouter.parseToolCall(tc));
             } catch (error) {
-              await appendToolResult({
+              await threadOps.appendToolResult({
                 threadId,
                 toolCallId: tc.id ?? "",
+                toolName: tc.name,
                 content: JSON.stringify({
                   error: `Invalid tool call for "${tc.name}": ${error instanceof Error ? error.message : String(error)}`,
                 }),
@@ -176,47 +134,10 @@ export const createSession = async <T extends ToolMap>({
             }
           }
 
-          const taskToolCalls: ParsedToolCall<
-            "Task",
-            TaskToolSchemaType<SubagentConfig[]>
-          >[] = [];
-          if (subagents && subagents.length > 0) {
-            for (const tc of rawToolCalls.filter(
-              (tc: RawToolCall) => tc.name === "Task"
-            )) {
-              try {
-                const parsedArgs = createTaskTool(subagents).schema.parse(
-                  tc.args
-                );
-                taskToolCalls.push({
-                  id: tc.id ?? "",
-                  name: tc.name,
-                  args: parsedArgs,
-                } as ParsedToolCall<
-                  "Task",
-                  TaskToolSchemaType<SubagentConfig[]>
-                >);
-              } catch (error) {
-                await appendToolResult({
-                  threadId,
-                  toolCallId: tc.id ?? "",
-                  content: JSON.stringify({
-                    error: `Invalid tool call for "Task": ${error instanceof Error ? error.message : String(error)}`,
-                  }),
-                });
-              }
-            }
-          }
-
           // Hooks can call stateManager.waitForInput() to pause the session
-          await toolRouter.processToolCalls(
-            [...parsedToolCalls, ...taskToolCalls] as ParsedToolCallUnion<
-              T & { Task: TaskToolSchemaType<SubagentConfig[]> }
-            >[],
-            {
-              turn: currentTurn,
-            }
-          );
+          await toolRouter.processToolCalls(parsedToolCalls, {
+            turn: currentTurn,
+          });
 
           if (stateManager.getStatus() === "WAITING_FOR_INPUT") {
             exitReason = "waiting_for_input";
@@ -240,3 +161,39 @@ export const createSession = async <T extends ToolMap>({
     },
   };
 };
+
+/**
+ * Proxy the default ZeitlichSharedActivities as ThreadOps<StoredMessage>.
+ * Call this in workflow code for the standard LangChain/StoredMessage setup.
+ *
+ * @example
+ * ```typescript
+ * const session = await createSession({
+ *   threadOps: proxyDefaultThreadOps(),
+ *   // ...
+ * });
+ * ```
+ */
+export function proxyDefaultThreadOps(
+  options?: Parameters<typeof proxyActivities>[0]
+): ThreadOps<StoredMessage> {
+  const activities = proxyActivities<ZeitlichSharedActivities>(
+    options ?? {
+      startToCloseTimeout: "30m",
+      retry: {
+        maximumAttempts: 6,
+        initialInterval: "5s",
+        maximumInterval: "15m",
+        backoffCoefficient: 4,
+      },
+      heartbeatTimeout: "5m",
+    }
+  );
+
+  return {
+    initializeThread: activities.initializeThread,
+    appendHumanMessage: activities.appendHumanMessage,
+    appendToolResult: activities.appendToolResult,
+    parseToolCalls: activities.parseToolCalls,
+  };
+}
