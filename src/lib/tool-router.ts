@@ -819,8 +819,8 @@ export function withAutoAppend<
   TContext extends ToolHandlerContext = ToolHandlerContext,
 >(
   threadHandler: (config: ToolResultConfig) => Promise<void>,
-  handler: ToolHandler<TArgs, TResult, TContext>
-): ToolHandler<TArgs, TResult, TContext> {
+  handler: ActivityToolHandler<TArgs, TResult, TContext>
+): ActivityToolHandler<TArgs, TResult, TContext> {
   return async (args: TArgs, context: TContext) => {
     const response = await handler(args, context);
     const threadId = (context as Record<string, unknown>).threadId as string;
