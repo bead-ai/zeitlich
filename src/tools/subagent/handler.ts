@@ -5,16 +5,16 @@ import type {
   SubagentConfig,
   SubagentInput,
 } from "../../lib/types";
-import type { TaskArgs } from "./tool";
+import type { SubagentArgs } from "./tool";
 
 /**
- * Creates a Task tool handler that spawns child workflows for configured subagents.
+ * Creates a Subagent tool handler that spawns child workflows for configured subagents.
  *
  * @param subagents - Array of subagent configurations
  * @returns A tool handler function that can be used with the tool router
  *
  * @example
- * const taskHandler = taskHandler([
+ * const subagentHandler = subagentHandler([
  *   {
  *     name: "researcher",
  *     description: "Researches topics",
@@ -23,14 +23,14 @@ import type { TaskArgs } from "./tool";
  *   },
  * ]);
  */
-export function createTaskHandler<
+export function createSubagentHandler<
   const T extends readonly SubagentConfig[],
 >(subagents: [...T]) {
   const { workflowId: parentWorkflowId, taskQueue: parentTaskQueue } =
     workflowInfo();
 
   return async (
-    args: TaskArgs
+    args: SubagentArgs
   ): Promise<ToolHandlerResponse<InferSubagentResult<T[number]> | null>> => {
     const config = subagents.find((s) => s.name === args.subagent);
 

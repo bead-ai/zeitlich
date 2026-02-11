@@ -1,31 +1,31 @@
 import z from "zod";
 import type { SubagentConfig } from "../../lib/types";
 
-const TASK_TOOL = "Task" as const;
+const SUBAGENT_TOOL = "Subagent" as const;
 
 /**
  * Builds the tool description with available subagent information
  */
-function buildTaskDescription(subagents: SubagentConfig[]): string {
+function buildSubagentDescription(subagents: SubagentConfig[]): string {
   const subagentList = subagents
     .map((s) => `- **${s.name}**: ${s.description}`)
     .join("\n");
 
-  return `Launch a new agent to handle complex, multi-step tasks autonomously.
+  return `Launch a new agent to handle complex tasks autonomously.
 
-The ${TASK_TOOL} tool launches specialized agents (subprocesses) that autonomously handle complex tasks. Each agent type has specific capabilities and tools available to it.
+The ${SUBAGENT_TOOL} tool launches specialized agents (subprocesses) that autonomously handle complex tasks. Each agent type has specific capabilities and tools available to it.
 
 Available agent types:
 
 ${subagentList}
 
-When using the ${TASK_TOOL} tool, you must specify a subagent parameter to select which agent type to use.
+When using the ${SUBAGENT_TOOL} tool, you must specify a subagent parameter to select which agent type to use.
 
 Usage notes:
 
 - Always include a short description (3-5 words) summarizing what the agent will do
 - Launch multiple agents concurrently whenever possible, to maximize performance; to do that, use a single message with multiple tool uses
-- When the agent is done, it will return a single message back to you. The result returned by the agent is not visible to the user. To show the user the result, you should send a text message back to the user with a concise summary of the result.
+- When the agent is done, it will return a single message back to you.
 - Each invocation starts fresh - provide a detailed task description with all necessary context.
 - Provide clear, detailed prompts so the agent can work autonomously and return exactly the information you need.
 - The agent's outputs should generally be trusted
@@ -34,13 +34,13 @@ Usage notes:
 }
 
 /**
- * Creates a Task tool configured with the available subagents.
+ * Creates a Subagent tool configured with the available subagents.
  *
  * @param subagents - Array of subagent configurations (must have at least one)
  * @returns A tool definition with dynamic schema based on available subagents
  *
  * @example
- * const taskTool = createTaskTool([
+ * const subagentTool = createSubagentTool([
  *   {
  *     name: "researcher",
  *     description: "Researches topics and gathers information",
@@ -49,7 +49,7 @@ Usage notes:
  *   },
  * ]);
  */
-export function createTaskTool<T extends SubagentConfig[]>(
+export function createSubagentTool<T extends SubagentConfig[]>(
   subagents: T
 ): {
   name: string;
@@ -67,8 +67,8 @@ export function createTaskTool<T extends SubagentConfig[]>(
   const names = subagents.map((s) => s.name);
 
   return {
-    name: TASK_TOOL,
-    description: buildTaskDescription(subagents),
+    name: SUBAGENT_TOOL,
+    description: buildSubagentDescription(subagents),
     schema: z.object({
       subagent: z.enum(names).describe("The type of subagent to launch"),
       description: z
@@ -80,9 +80,9 @@ export function createTaskTool<T extends SubagentConfig[]>(
 }
 
 /**
- * Task tool args type (when subagent names are not known at compile time)
+ * Subagent tool args type (when subagent names are not known at compile time)
  */
-export type TaskArgs = {
+export type SubagentArgs = {
   subagent: string;
   description: string;
   prompt: string;

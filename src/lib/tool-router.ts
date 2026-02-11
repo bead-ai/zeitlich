@@ -9,11 +9,11 @@ import type {
   ToolHooks,
   ToolResultConfig,
 } from "./types";
-import type { TaskArgs } from "../tools/task/tool";
+import type { SubagentArgs } from "../tools/subagent/tool";
 
 import type { z } from "zod";
-import { createTaskTool } from "../tools/task/tool";
-import { createTaskHandler } from "../tools/task/handler";
+import { createSubagentTool } from "../tools/subagent/tool";
+import { createSubagentHandler } from "../tools/subagent/handler";
 
 export type { ToolMessageContent };
 
@@ -422,11 +422,11 @@ export function createToolRouter<T extends ToolMap>(
     }
 
     const resolveSubagentName = (args: unknown): string =>
-      (args as TaskArgs).subagent;
+      (args as SubagentArgs).subagent;
 
-    toolMap.set("Task", {
-      ...createTaskTool(options.subagents),
-      handler: createTaskHandler(options.subagents),
+    toolMap.set("Subagent", {
+      ...createSubagentTool(options.subagents),
+      handler: createSubagentHandler(options.subagents),
       ...(subagentHooksMap.size > 0 && {
         hooks: {
           onPreToolUse: async (ctx): Promise<PreToolUseHookResult> => {
@@ -912,7 +912,7 @@ export function defineSubagent<
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       | ((input: { prompt: string; context: TContext }) => Promise<any>);
     context: TContext;
-    hooks?: SubagentHooks<TaskArgs, z.infer<TResult>>;
+    hooks?: SubagentHooks<SubagentArgs, z.infer<TResult>>;
   }
 ): SubagentConfig<TResult>;
 // Without context — verifies workflow accepts { prompt }
@@ -920,7 +920,7 @@ export function defineSubagent<TResult extends z.ZodType = z.ZodType>(
   config: Omit<SubagentConfig<TResult>, "hooks" | "workflow"> & {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     workflow: string | ((input: { prompt: string }) => Promise<any>);
-    hooks?: SubagentHooks<TaskArgs, z.infer<TResult>>;
+    hooks?: SubagentHooks<SubagentArgs, z.infer<TResult>>;
   }
 ): SubagentConfig<TResult>;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

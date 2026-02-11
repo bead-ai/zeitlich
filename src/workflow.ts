@@ -101,8 +101,8 @@ export type {
 export { isTerminalStatus } from "./lib/types";
 
 // Subagent support
-export { createTaskTool } from "./tools/task/tool";
-export type { TaskArgs } from "./tools/task/tool";
+export { createSubagentTool } from "./tools/subagent/tool";
+export type { SubagentArgs } from "./tools/subagent/tool";
 
 // Activity type interfaces (types only, no runtime code)
 // These are safe to import in workflows for typing proxyActivities
