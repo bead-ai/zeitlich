@@ -54,7 +54,6 @@ export interface AgentFile {
  */
 export interface AgentResponse<M = StoredMessage> {
   message: M;
-  stopReason: string | null;
   usage?: {
     input_tokens?: number;
     output_tokens?: number;
@@ -151,6 +150,10 @@ export interface ToolResultConfig {
 // ============================================================================
 // Subagent Configuration
 // ============================================================================
+
+/** Infer the z.infer'd result type from a SubagentConfig, or null if no schema */
+export type InferSubagentResult<T extends SubagentConfig> =
+  T extends SubagentConfig<infer S> ? z.infer<S> : null;
 
 /**
  * Configuration for a subagent that can be spawned by the parent workflow.

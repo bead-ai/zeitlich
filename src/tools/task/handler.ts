@@ -1,17 +1,11 @@
 import { executeChild, workflowInfo, uuid4 } from "@temporalio/workflow";
 import type { ToolHandlerResponse } from "../../lib/tool-router";
-import type { SubagentConfig, SubagentInput } from "../../lib/types";
+import type {
+  InferSubagentResult,
+  SubagentConfig,
+  SubagentInput,
+} from "../../lib/types";
 import type { TaskArgs } from "./tool";
-
-/**
- * Result from a task handler execution
- */
-export interface TaskHandlerResult<TResult = unknown> {
-  /** The validated result from the child workflow */
-  result: TResult;
-  /** The child workflow ID (for reference/debugging) */
-  childWorkflowId: string;
-}
 
 /**
  * Creates a Task tool handler that spawns child workflows for configured subagents.
@@ -29,13 +23,15 @@ export interface TaskHandlerResult<TResult = unknown> {
  *   },
  * ]);
  */
-export function createTaskHandler(subagents: SubagentConfig[]) {
+export function createTaskHandler<
+  const T extends readonly SubagentConfig[],
+>(subagents: [...T]) {
   const { workflowId: parentWorkflowId, taskQueue: parentTaskQueue } =
     workflowInfo();
 
   return async (
     args: TaskArgs
-  ): Promise<ToolHandlerResponse<TaskHandlerResult>> => {
+  ): Promise<ToolHandlerResponse<InferSubagentResult<T[number]> | null>> => {
     const config = subagents.find((s) => s.name === args.subagent);
 
     if (!config) {
@@ -58,28 +54,19 @@ export function createTaskHandler(subagents: SubagentConfig[]) {
       taskQueue: config.taskQueue ?? parentTaskQueue,
     };
 
-    const childResult =
+    const { toolResponse, data } =
       typeof config.workflow === "string"
         ? await executeChild(config.workflow, childOpts)
         : await executeChild(config.workflow, childOpts);
 
     // Validate result if schema provided, otherwise pass through as-is
-    const validated = config.resultSchema
-      ? config.resultSchema.parse(childResult)
-      : childResult;
-
-    // Format content - stringify objects, pass strings through
-    const toolResponse =
-      typeof validated === "string"
-        ? validated
-        : JSON.stringify(validated, null, 2);
+    const validated = (
+      config.resultSchema ? config.resultSchema.parse(data) : null
+    ) as InferSubagentResult<T[number]> | null;
 
     return {
       toolResponse,
-      data: {
-        result: validated,
-        childWorkflowId,
-      },
+      data: validated,
     };
   };
 }

@@ -95,27 +95,21 @@ export const createSession = async <T extends ToolMap, M = unknown>({
           stateManager.incrementTurns();
           const currentTurn = stateManager.getTurns();
 
-          const { message, stopReason } = await runAgent({
+          const { message } = await runAgent({
             threadId,
             agentName,
             metadata,
           });
 
-          if (stopReason === "end_turn") {
-            stateManager.complete();
-            exitReason = "completed";
-            return message;
-          }
-
-          // No tools configured - treat any non-end_turn as completed
-          if (!toolRouter.hasTools()) {
-            stateManager.complete();
-            exitReason = "completed";
-            return message;
-          }
-
           const rawToolCalls: RawToolCall[] =
             await threadOps.parseToolCalls(message);
+
+          // No tools configured - treat any non-end_turn as completed
+          if (!toolRouter.hasTools() || rawToolCalls.length === 0) {
+            stateManager.complete();
+            exitReason = "completed";
+            return message;
+          }
 
           // Parse all tool calls uniformly through the router
           const parsedToolCalls: ParsedToolCallUnion<T>[] = [];

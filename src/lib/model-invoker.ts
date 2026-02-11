@@ -65,7 +65,6 @@ export async function invokeModel({
 
   return {
     message: response.toDict(),
-    stopReason: (response.response_metadata?.stop_reason as string) ?? null,
     usage: {
       input_tokens: response.usage_metadata?.input_tokens,
       output_tokens: response.usage_metadata?.output_tokens,
