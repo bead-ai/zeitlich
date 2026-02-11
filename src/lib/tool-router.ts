@@ -158,11 +158,9 @@ export interface ToolHandlerResponse<TResult = null> {
 /**
  * Context passed to tool handlers for additional data beyond tool args.
  * Use this to pass workflow state like file trees, user context, etc.
+ * Generic so callers can type the context shape, e.g. ToolHandlerContext<ControlTestFsParams>.
  */
-export interface ToolHandlerContext {
-  /** Additional context data - define your own shape */
-  [key: string]: unknown;
-}
+export type ToolHandlerContext<T = Record<string, unknown>> = T;
 
 /**
  * A handler function for a specific tool.
@@ -517,6 +515,7 @@ export function createToolRouter<T extends ToolMap>(
           ...(handlerContext ?? {}),
           threadId: options.threadId,
           toolCallId: toolCall.id,
+          toolName: toolCall.name,
         };
         const response = await tool.handler(
           effectiveArgs as Parameters<typeof tool.handler>[0],
@@ -721,6 +720,7 @@ export function createToolRouter<T extends ToolMap>(
           ...(handlerContext ?? {}),
           threadId: options.threadId,
           toolCallId: toolCall.id,
+          toolName: toolCall.name as TName,
         } as TContext;
         const response = await handler(
           toolCall.args as ToolArgs<T, TName>,
@@ -787,17 +787,6 @@ export function createToolRouter<T extends ToolMap>(
 }
 
 /**
- * Minimal interface for appending tool messages to a thread.
- * Satisfied by `ThreadManager` from `createThreadManager()`.
- */
-export interface ThreadAppender {
-  appendToolMessage(
-    content: ToolMessageContent,
-    toolCallId: string
-  ): Promise<void>;
-}
-
-/**
  * Wraps a tool handler to automatically append its result directly to the
  * thread and sets `resultAppended: true` on the response.
  *
@@ -829,7 +818,7 @@ export function withAutoAppend<
   TResult,
   TContext extends ToolHandlerContext = ToolHandlerContext,
 >(
-  getThread: (threadId: string) => ThreadAppender,
+  threadHandler: (config: ToolResultConfig) => Promise<void>,
   handler: ToolHandler<TArgs, TResult, TContext>
 ): ToolHandler<TArgs, TResult, TContext> {
   return async (args: TArgs, context: TContext) => {
@@ -837,10 +826,15 @@ export function withAutoAppend<
     const threadId = (context as Record<string, unknown>).threadId as string;
     const toolCallId = (context as Record<string, unknown>)
       .toolCallId as string;
+    const toolName = (context as Record<string, unknown>).toolName as string;
 
     // Append directly (inside the activity, bypassing Temporal payload)
-    const thread = getThread(threadId);
-    await thread.appendToolMessage(response.toolResponse, toolCallId);
+    await threadHandler({
+      threadId,
+      toolCallId,
+      toolName,
+      content: response.toolResponse,
+    });
 
     // Return with empty toolResponse to keep the Temporal payload small
     return { toolResponse: "", data: response.data, resultAppended: true };
