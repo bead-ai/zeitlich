@@ -54,6 +54,7 @@ export interface AgentFile {
  */
 export interface AgentResponse<M = StoredMessage> {
   message: M;
+  rawToolCalls: RawToolCall[];
   usage?: {
     input_tokens?: number;
     output_tokens?: number;
@@ -66,7 +67,7 @@ export interface AgentResponse<M = StoredMessage> {
  * Consumers provide these — typically by wrapping Temporal activities.
  * Use `proxyDefaultThreadOps()` for the default StoredMessage implementation.
  */
-export interface ThreadOps<M = StoredMessage> {
+export interface ThreadOps {
   /** Initialize an empty thread */
   initializeThread(threadId: string): Promise<void>;
   /** Append a human message to the thread */
@@ -76,8 +77,6 @@ export interface ThreadOps<M = StoredMessage> {
   ): Promise<void>;
   /** Append a tool result to the thread */
   appendToolResult(config: ToolResultConfig): Promise<void>;
-  /** Extract raw tool calls from a message */
-  parseToolCalls(message: M): Promise<RawToolCall[]>;
 }
 
 /**
@@ -91,7 +90,7 @@ export interface ZeitlichAgentConfig<T extends ToolMap, M = StoredMessage> {
   /** Workflow-specific runAgent activity (with tools pre-bound) */
   runAgent: RunAgentActivity<M>;
   /** Thread operations (initialize, append messages, parse tool calls) */
-  threadOps: ThreadOps<M>;
+  threadOps: ThreadOps;
   /** Tool router for processing tool calls (optional if agent has no tools) */
   tools?: T;
   /** Subagent configurations */

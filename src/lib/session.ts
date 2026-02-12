@@ -7,12 +7,10 @@ import type {
   SessionEndHook,
   SessionExitReason,
 } from "./types";
-import type { StoredMessage } from "@langchain/core/messages";
 import { type AgentStateManager, type JsonSerializable } from "./state-manager";
 import {
   createToolRouter,
   type ParsedToolCallUnion,
-  type RawToolCall,
   type ToolMap,
 } from "./tool-router";
 
@@ -95,14 +93,11 @@ export const createSession = async <T extends ToolMap, M = unknown>({
           stateManager.incrementTurns();
           const currentTurn = stateManager.getTurns();
 
-          const { message } = await runAgent({
+          const { message, rawToolCalls } = await runAgent({
             threadId,
             agentName,
             metadata,
           });
-
-          const rawToolCalls: RawToolCall[] =
-            await threadOps.parseToolCalls(message);
 
           // No tools configured - treat any non-end_turn as completed
           if (!toolRouter.hasTools() || rawToolCalls.length === 0) {
@@ -170,7 +165,7 @@ export const createSession = async <T extends ToolMap, M = unknown>({
  */
 export function proxyDefaultThreadOps(
   options?: Parameters<typeof proxyActivities>[0]
-): ThreadOps<StoredMessage> {
+): ThreadOps {
   const activities = proxyActivities<ZeitlichSharedActivities>(
     options ?? {
       startToCloseTimeout: "30m",
@@ -188,6 +183,5 @@ export function proxyDefaultThreadOps(
     initializeThread: activities.initializeThread,
     appendHumanMessage: activities.appendHumanMessage,
     appendToolResult: activities.appendToolResult,
-    parseToolCalls: activities.parseToolCalls,
   };
 }

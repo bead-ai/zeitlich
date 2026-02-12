@@ -63,8 +63,15 @@ export async function invokeModel({
 
   await thread.append([response.toDict()]);
 
+  const toolCalls = response.tool_calls ?? [];
+
   return {
     message: response.toDict(),
+    rawToolCalls: toolCalls.map((tc) => ({
+      id: tc.id,
+      name: tc.name,
+      args: tc.args,
+    })),
     usage: {
       input_tokens: response.usage_metadata?.input_tokens,
       output_tokens: response.usage_metadata?.output_tokens,
