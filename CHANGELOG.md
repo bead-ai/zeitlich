@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.4](https://github.com/bead-ai/zeitlich/compare/v0.2.3...v0.2.4) (2026-02-12)
+
+
+### Code Refactoring
+
+* enhance task handler type safety and structure ([a95cdce](https://github.com/bead-ai/zeitlich/commit/a95cdce52b0fc4d2757ff467d3ae9321ead1ee73))
+* move parseToolCalls into model call to avoid additional activity turn ([afe7b28](https://github.com/bead-ai/zeitlich/commit/afe7b2837ac7c2cd34d684568299921b71d320de))
+* rename task tool to subagent tool ([25a50a5](https://github.com/bead-ai/zeitlich/commit/25a50a548e550bd9ad6030b88c359ea308d60e48))
+
+
+### Miscellaneous Chores
+
+* release 0.2.4 ([f4369d8](https://github.com/bead-ai/zeitlich/commit/f4369d8a813d2b52bee1a753d5a1389c2f1fab2a))
+
 ## [0.2.3](https://github.com/bead-ai/zeitlich/compare/v0.2.2...v0.2.3) (2026-02-11)
 
 
