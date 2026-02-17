@@ -77,6 +77,8 @@ export interface ThreadOps {
   ): Promise<void>;
   /** Append a tool result to the thread */
   appendToolResult(config: ToolResultConfig): Promise<void>;
+  /** Append a system message to the thread */
+  appendSystemMessage(threadId: string, content: string): Promise<void>;
 }
 
 /**
@@ -85,12 +87,16 @@ export interface ThreadOps {
 export interface ZeitlichAgentConfig<T extends ToolMap, M = StoredMessage> {
   threadId: string;
   agentName: string;
+  /** Description, used for sub agents */
+  description?: string;
+  systemPrompt?: string;
   metadata?: Record<string, unknown>;
+  appendSystemPrompt?: boolean;
   maxTurns?: number;
   /** Workflow-specific runAgent activity (with tools pre-bound) */
   runAgent: RunAgentActivity<M>;
   /** Thread operations (initialize, append messages, parse tool calls) */
-  threadOps: ThreadOps;
+  threadOps?: ThreadOps;
   /** Tool router for processing tool calls (optional if agent has no tools) */
   tools?: T;
   /** Subagent configurations */
@@ -161,9 +167,11 @@ export type InferSubagentResult<T extends SubagentConfig> =
  */
 export interface SubagentConfig<TResult extends z.ZodType = z.ZodType> {
   /** Identifier used in Task tool's subagent parameter */
-  name: string;
+  agentName: string;
   /** Description shown to the parent agent explaining what this subagent does */
   description: string;
+  /** Whether this subagent is available (default: true). Disabled subagents are excluded from the Subagent tool. */
+  enabled?: boolean;
   /** Temporal workflow function or type name (used with executeChild) */
   workflow: string | Workflow;
   /** Optional task queue - defaults to parent's queue if not specified */

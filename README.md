@@ -52,7 +52,7 @@ const google = new ChatGoogleGenerativeAI({ model: "gemini-1.5-pro" });
 
 // Pass to invokeModel in your activity
 return {
-  runAgent: (config) => invokeModel(redis, config, anthropic),
+  runAgent: (config) => invokeModel({ config, model: anthropic, redis, client }),
 };
 ```
 
@@ -122,17 +122,25 @@ export const searchTool: ToolDefinition<"Search", typeof searchSchema> = {
 
 ```typescript
 import type Redis from "ioredis";
+import type { WorkflowClient } from "@temporalio/client";
 import { ChatAnthropic } from "@langchain/anthropic";
-import { invokeModel } from "zeitlich";
+import { invokeModel, type InvokeModelConfig } from "zeitlich";
 
-export const createActivities = (redis: Redis) => {
+export const createActivities = ({
+  redis,
+  client,
+}: {
+  redis: Redis;
+  client: WorkflowClient;
+}) => {
   const model = new ChatAnthropic({
     model: "claude-sonnet-4-20250514",
     maxTokens: 4096,
   });
 
   return {
-    runAgent: (config) => invokeModel(redis, config, model),
+    runAgent: (config: InvokeModelConfig) =>
+      invokeModel({ config, model, redis, client }),
 
     handleSearchResult: async ({ args }) => {
       const results = await performSearch(args.query);
@@ -148,12 +156,24 @@ export type MyActivities = ReturnType<typeof createActivities>;
 
 ```typescript
 import { proxyActivities, workflowInfo } from "@temporalio/workflow";
-import { createAgentStateManager, createSession } from "zeitlich/workflow";
+import {
+  createAgentStateManager,
+  createSession,
+  defineTool,
+  proxyDefaultThreadOps,
+} from "zeitlich/workflow";
 import { searchTool } from "./tools";
 import type { MyActivities } from "./activities";
 
 const { runAgent, handleSearchResult } = proxyActivities<MyActivities>({
   startToCloseTimeout: "30m",
+  retry: {
+    maximumAttempts: 6,
+    initialInterval: "5s",
+    maximumInterval: "15m",
+    backoffCoefficient: 4,
+  },
+  heartbeatTimeout: "5m",
 });
 
 export async function myAgentWorkflow({ prompt }: { prompt: string }) {
@@ -165,13 +185,15 @@ export async function myAgentWorkflow({ prompt }: { prompt: string }) {
     threadId: runId,
     agentName: "my-agent",
     maxTurns: 20,
+    systemPrompt: "You are a helpful assistant.",
     runAgent,
+    threadOps: proxyDefaultThreadOps(),
     buildContextMessage: () => [{ type: "text", text: prompt }],
     tools: {
-      Search: {
+      Search: defineTool({
         ...searchTool,
         handler: handleSearchResult,
-      },
+      }),
     },
   });
 
@@ -184,6 +206,7 @@ export async function myAgentWorkflow({ prompt }: { prompt: string }) {
 
 ```typescript
 import { Worker, NativeConnection } from "@temporalio/worker";
+import { Client } from "@temporalio/client";
 import { ZeitlichPlugin } from "zeitlich";
 import Redis from "ioredis";
 import { createActivities } from "./activities";
@@ -192,6 +215,7 @@ async function run() {
   const connection = await NativeConnection.connect({
     address: "localhost:7233",
   });
+  const client = new Client({ connection });
   const redis = new Redis({ host: "localhost", port: 6379 });
 
   const worker = await Worker.create({
@@ -199,7 +223,7 @@ async function run() {
     connection,
     taskQueue: "my-agent",
     workflowsPath: require.resolve("./workflows"),
-    activities: createActivities(redis),
+    activities: createActivities({ redis, client: client.workflow }),
   });
 
   await worker.run();
@@ -243,14 +267,14 @@ const searchTool: ToolDefinition<"Search", typeof searchSchema> = {
   schema: z.object({ query: z.string() }),
 };
 
-// In workflow - combine tool definition with handler
+// In workflow - combine tool definition with handler using defineTool()
 const session = await createSession({
   // ... other config
   tools: {
-    Search: {
+    Search: defineTool({
       ...searchTool,
       handler: handleSearchResult, // Activity that implements the tool
-    },
+    }),
   },
 });
 ```
@@ -289,20 +313,17 @@ const session = await createSession({
 Spawn child agents as Temporal child workflows:
 
 ```typescript
+// Define subagent workflows (each is a Temporal workflow that returns string | null)
+export const researcherSubagent = {
+  name: "researcher",
+  description: "Researches topics and returns findings",
+  workflow: researcherWorkflow,
+};
+
+// In the main agent workflow
 const session = await createSession({
   // ... other config
-  subagents: [
-    {
-      name: "researcher",
-      description: "Researches topics and returns findings",
-      workflow: "researcherWorkflow",
-    },
-    {
-      name: "code-reviewer",
-      description: "Reviews code for quality and best practices",
-      workflow: "codeReviewerWorkflow",
-    },
-  ],
+  subagents: [researcherSubagent, codeReviewerSubagent],
 });
 ```
 
@@ -328,16 +349,24 @@ const session = await createSession({
 });
 ```
 
-For more advanced file operations, use the built-in tool handlers:
+For more advanced file operations, use the built-in tool handler factories:
 
 ```typescript
-import { globHandler, editHandler, toTree } from "zeitlich";
+import { createGlobHandler, createEditHandler, toTree } from "zeitlich";
 
 export const createActivities = () => ({
   generateFileTree: () => toTree("/workspace"),
-  handleGlob: (args) => globHandler(args),
-  handleEdit: (args) => editHandler(args, { basePath: "/workspace" }),
+  globHandlerActivity: createGlobHandler("/workspace"),
+  editHandlerActivity: createEditHandler("/workspace"),
 });
+```
+
+`toTree` also accepts an in-memory filesystem object (e.g. from [`just-bash`](https://github.com/nicholasgasior/just-bash)):
+
+```typescript
+import { toTree } from "zeitlich";
+
+const fileTree = toTree(inMemoryFileSystem);
 ```
 
 ### Built-in Tools
@@ -367,12 +396,12 @@ import {
   askUserQuestionTool,
 } from "zeitlich/workflow";
 
-// Import handlers in activities
+// Import handler factories in activities
 import {
-  editHandler,
-  globHandler,
-  handleBashTool,
-  handleAskUserQuestionToolResult,
+  createEditHandler,
+  createGlobHandler,
+  createBashHandler,
+  createAskUserQuestionHandler,
 } from "zeitlich";
 ```
 
@@ -382,14 +411,14 @@ All tools are passed via `tools`. The Bash tool's description is automatically e
 const session = await createSession({
   // ... other config
   tools: {
-    AskUserQuestion: {
+    AskUserQuestion: defineTool({
       ...askUserQuestionTool,
-      handler: handleAskUserQuestionToolResult,
-    },
-    Bash: {
+      handler: askUserQuestionHandlerActivity,
+    }),
+    Bash: defineTool({
       ...bashTool,
-      handler: handleBashTool(bashOptions),
-    },
+      handler: bashHandlerActivity,
+    }),
   },
 });
 ```
@@ -420,7 +449,7 @@ For use in activities, worker setup, and Node.js code:
 | `createSharedActivities` | Creates thread management activities                                              |
 | `invokeModel`            | Core LLM invocation utility (requires Redis + LangChain)                          |
 | `toTree`                 | Generate file tree string from a directory path                                   |
-| Tool handlers            | `globHandler`, `editHandler`, `handleBashTool`, `handleAskUserQuestionToolResult` |
+| Tool handlers            | `createGlobHandler`, `createEditHandler`, `createBashHandler`, `createAskUserQuestionHandler` |
 
 ### Types
 

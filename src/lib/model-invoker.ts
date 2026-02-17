@@ -23,10 +23,11 @@ export interface InvokeModelConfig {
 /**
  * Core model invocation logic - shared utility for workflow-specific activities
  *
- * @param redis - Redis client for thread management
- * @param config - Model invocation configuration
- * @param model - Pre-instantiated LangChain chat model
- * @param invocationConfig - Per-invocation configuration (system prompt, etc.)
+ * @param options - Named options object
+ * @param options.redis - Redis client for thread management
+ * @param options.config - Model invocation configuration (threadId, agentName)
+ * @param options.model - Pre-instantiated LangChain chat model
+ * @param options.client - Temporal WorkflowClient for querying workflow state
  * @returns Agent response with message and metadata
  */
 export async function invokeModel({

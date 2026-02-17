@@ -8,7 +8,7 @@ const SUBAGENT_TOOL = "Subagent" as const;
  */
 function buildSubagentDescription(subagents: SubagentConfig[]): string {
   const subagentList = subagents
-    .map((s) => `- **${s.name}**: ${s.description}`)
+    .map((s) => `- **${s.agentName}**: ${s.description}`)
     .join("\n");
 
   return `Launch a new agent to handle complex tasks autonomously.
@@ -42,7 +42,7 @@ Usage notes:
  * @example
  * const subagentTool = createSubagentTool([
  *   {
- *     name: "researcher",
+ *     agentName: "researcher",
  *     description: "Researches topics and gathers information",
  *     workflow: "researcherWorkflow",
  *     resultSchema: z.object({ findings: z.string() }),
@@ -64,7 +64,7 @@ export function createSubagentTool<T extends SubagentConfig[]>(
     throw new Error("createTaskTool requires at least one subagent");
   }
 
-  const names = subagents.map((s) => s.name);
+  const names = subagents.map((s) => s.agentName);
 
   return {
     name: SUBAGENT_TOOL,

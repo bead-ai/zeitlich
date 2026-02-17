@@ -26,21 +26,20 @@ import type { SubagentArgs } from "./tool";
 export function createSubagentHandler<
   const T extends readonly SubagentConfig[],
 >(subagents: [...T]) {
-  const { workflowId: parentWorkflowId, taskQueue: parentTaskQueue } =
-    workflowInfo();
+  const { taskQueue: parentTaskQueue } = workflowInfo();
 
   return async (
     args: SubagentArgs
   ): Promise<ToolHandlerResponse<InferSubagentResult<T[number]> | null>> => {
-    const config = subagents.find((s) => s.name === args.subagent);
+    const config = subagents.find((s) => s.agentName === args.subagent);
 
     if (!config) {
       throw new Error(
-        `Unknown subagent: ${args.subagent}. Available: ${subagents.map((s) => s.name).join(", ")}`
+        `Unknown subagent: ${args.subagent}. Available: ${subagents.map((s) => s.agentName).join(", ")}`
       );
     }
 
-    const childWorkflowId = `${parentWorkflowId}-${args.subagent}-${uuid4()}`;
+    const childWorkflowId = `${args.subagent}-${uuid4()}`;
 
     // Execute the child workflow
     const input: SubagentInput = {

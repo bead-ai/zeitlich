@@ -42,10 +42,18 @@ export const createSession = async <T extends ToolMap, M = unknown>({
   tools = {} as T,
   processToolsInParallel = true,
   hooks = {},
+  appendSystemPrompt = true,
+  systemPrompt,
 }: ZeitlichAgentConfig<T, M>): Promise<ZeitlichSession<M>> => {
+  const {
+    appendToolResult,
+    appendHumanMessage,
+    initializeThread,
+    appendSystemMessage,
+  } = threadOps ?? proxyDefaultThreadOps();
   const toolRouter = createToolRouter({
     tools,
-    appendToolResult: threadOps.appendToolResult,
+    appendToolResult,
     threadId,
     hooks,
     subagents,
@@ -77,10 +85,14 @@ export const createSession = async <T extends ToolMap, M = unknown>({
           metadata,
         });
       }
+
       stateManager.setTools(toolRouter.getToolDefinitions());
 
-      await threadOps.initializeThread(threadId);
-      await threadOps.appendHumanMessage(threadId, await buildContextMessage());
+      await initializeThread(threadId);
+      if (appendSystemPrompt && systemPrompt && systemPrompt.trim() !== "") {
+        await appendSystemMessage(threadId, systemPrompt);
+      }
+      await appendHumanMessage(threadId, await buildContextMessage());
 
       let exitReason: SessionExitReason = "completed";
 
@@ -112,7 +124,7 @@ export const createSession = async <T extends ToolMap, M = unknown>({
             try {
               parsedToolCalls.push(toolRouter.parseToolCall(tc));
             } catch (error) {
-              await threadOps.appendToolResult({
+              await appendToolResult({
                 threadId,
                 toolCallId: tc.id ?? "",
                 toolName: tc.name,
@@ -183,5 +195,6 @@ export function proxyDefaultThreadOps(
     initializeThread: activities.initializeThread,
     appendHumanMessage: activities.appendHumanMessage,
     appendToolResult: activities.appendToolResult,
+    appendSystemMessage: activities.appendSystemMessage,
   };
 }
