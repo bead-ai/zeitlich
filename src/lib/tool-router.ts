@@ -837,7 +837,7 @@ export function withAutoAppend<
     });
 
     // Return with empty toolResponse to keep the Temporal payload small
-    return { toolResponse: "", data: response.data, resultAppended: true };
+    return { toolResponse: "Response appended via withAutoAppend", data: response.data, resultAppended: true };
   };
 }
 
