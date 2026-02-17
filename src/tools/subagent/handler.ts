@@ -26,8 +26,7 @@ import type { SubagentArgs } from "./tool";
 export function createSubagentHandler<
   const T extends readonly SubagentConfig[],
 >(subagents: [...T]) {
-  const { workflowId: parentWorkflowId, taskQueue: parentTaskQueue } =
-    workflowInfo();
+  const { taskQueue: parentTaskQueue } = workflowInfo();
 
   return async (
     args: SubagentArgs
@@ -40,7 +39,7 @@ export function createSubagentHandler<
       );
     }
 
-    const childWorkflowId = `${parentWorkflowId}-${args.subagent}-${uuid4()}`;
+    const childWorkflowId = `${args.subagent}-${uuid4()}`;
 
     // Execute the child workflow
     const input: SubagentInput = {
