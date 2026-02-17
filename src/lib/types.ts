@@ -85,12 +85,15 @@ export interface ThreadOps {
 export interface ZeitlichAgentConfig<T extends ToolMap, M = StoredMessage> {
   threadId: string;
   agentName: string;
+  /** Description, used for sub agents */
+  description?: string;
+  systemPrompt?: string;
   metadata?: Record<string, unknown>;
   maxTurns?: number;
   /** Workflow-specific runAgent activity (with tools pre-bound) */
   runAgent: RunAgentActivity<M>;
   /** Thread operations (initialize, append messages, parse tool calls) */
-  threadOps: ThreadOps;
+  threadOps?: ThreadOps;
   /** Tool router for processing tool calls (optional if agent has no tools) */
   tools?: T;
   /** Subagent configurations */

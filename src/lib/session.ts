@@ -43,9 +43,10 @@ export const createSession = async <T extends ToolMap, M = unknown>({
   processToolsInParallel = true,
   hooks = {},
 }: ZeitlichAgentConfig<T, M>): Promise<ZeitlichSession<M>> => {
+  const { appendToolResult, appendHumanMessage, initializeThread } = threadOps ?? proxyDefaultThreadOps();
   const toolRouter = createToolRouter({
     tools,
-    appendToolResult: threadOps.appendToolResult,
+    appendToolResult,
     threadId,
     hooks,
     subagents,
@@ -79,8 +80,8 @@ export const createSession = async <T extends ToolMap, M = unknown>({
       }
       stateManager.setTools(toolRouter.getToolDefinitions());
 
-      await threadOps.initializeThread(threadId);
-      await threadOps.appendHumanMessage(threadId, await buildContextMessage());
+      await initializeThread(threadId);
+      await appendHumanMessage(threadId, await buildContextMessage());
 
       let exitReason: SessionExitReason = "completed";
 
@@ -112,7 +113,7 @@ export const createSession = async <T extends ToolMap, M = unknown>({
             try {
               parsedToolCalls.push(toolRouter.parseToolCall(tc));
             } catch (error) {
-              await threadOps.appendToolResult({
+              await appendToolResult({
                 threadId,
                 toolCallId: tc.id ?? "",
                 toolName: tc.name,
