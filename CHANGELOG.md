@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.6](https://github.com/bead-ai/zeitlich/compare/v0.2.5...v0.2.6) (2026-02-17)
+
+
+### Bug Fixes
+
+* add missing appendSystemMessage method ([fc5bb99](https://github.com/bead-ai/zeitlich/commit/fc5bb998d071b81695eee06faf1cfc8f12801046))
+
+
+### Miscellaneous Chores
+
+* release 0.2.6 ([61bc60a](https://github.com/bead-ai/zeitlich/commit/61bc60a49b42609adc4f96c179531fe82e747f0f))
+
 ## [0.2.5](https://github.com/bead-ai/zeitlich/compare/v0.2.4...v0.2.5) (2026-02-17)
 
 
