@@ -37,6 +37,10 @@ export interface ZeitlichSharedActivities {
     content: string | MessageContent
   ): Promise<void>;
 
+  /**
+   * Append a system message to a thread.
+   */
+  appendSystemMessage(threadId: string, content: string): Promise<void>;
 }
 
 /**
@@ -76,5 +80,12 @@ export function createSharedActivities(redis: Redis): ZeitlichSharedActivities {
       await thread.appendHumanMessage(content);
     },
 
+    async appendSystemMessage(
+      threadId: string,
+      content: string
+    ): Promise<void> {
+      const thread = createThreadManager({ redis, threadId });
+      await thread.appendSystemMessage(content);
+    },
   };
 }

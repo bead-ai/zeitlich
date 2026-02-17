@@ -77,6 +77,8 @@ export interface ThreadOps {
   ): Promise<void>;
   /** Append a tool result to the thread */
   appendToolResult(config: ToolResultConfig): Promise<void>;
+  /** Append a system message to the thread */
+  appendSystemMessage(threadId: string, content: string): Promise<void>;
 }
 
 /**
@@ -89,6 +91,7 @@ export interface ZeitlichAgentConfig<T extends ToolMap, M = StoredMessage> {
   description?: string;
   systemPrompt?: string;
   metadata?: Record<string, unknown>;
+  appendSystemPrompt?: boolean;
   maxTurns?: number;
   /** Workflow-specific runAgent activity (with tools pre-bound) */
   runAgent: RunAgentActivity<M>;

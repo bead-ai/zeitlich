@@ -50,21 +50,20 @@ export interface BaseThreadManager<T> {
 export interface ThreadManager extends BaseThreadManager<StoredMessage> {
   /** Create a HumanMessage (returns StoredMessage for storage) */
   createHumanMessage(content: string | MessageContent): StoredMessage;
-
   /** Create an AIMessage with optional additional kwargs */
   createAIMessage(
     content: string | MessageContent,
     kwargs?: { header?: string; options?: string[]; multiSelect?: boolean }
   ): StoredMessage;
-
   /** Create a ToolMessage */
   createToolMessage(
     content: ToolMessageContent,
     toolCallId: string
   ): StoredMessage;
-
   /** Create and append a HumanMessage */
   appendHumanMessage(content: string | MessageContent): Promise<void>;
+  /** Create and append a SystemMessage */
+  appendSystemMessage(content: string): Promise<void>;
   /** Create and append a ToolMessage */
   appendToolMessage(
     content: ToolMessageContent,

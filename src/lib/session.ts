@@ -42,8 +42,15 @@ export const createSession = async <T extends ToolMap, M = unknown>({
   tools = {} as T,
   processToolsInParallel = true,
   hooks = {},
+  appendSystemPrompt = true,
+  systemPrompt,
 }: ZeitlichAgentConfig<T, M>): Promise<ZeitlichSession<M>> => {
-  const { appendToolResult, appendHumanMessage, initializeThread } = threadOps ?? proxyDefaultThreadOps();
+  const {
+    appendToolResult,
+    appendHumanMessage,
+    initializeThread,
+    appendSystemMessage,
+  } = threadOps ?? proxyDefaultThreadOps();
   const toolRouter = createToolRouter({
     tools,
     appendToolResult,
@@ -78,9 +85,13 @@ export const createSession = async <T extends ToolMap, M = unknown>({
           metadata,
         });
       }
+
       stateManager.setTools(toolRouter.getToolDefinitions());
 
       await initializeThread(threadId);
+      if (appendSystemPrompt && systemPrompt && systemPrompt.trim() !== "") {
+        await appendSystemMessage(threadId, systemPrompt);
+      }
       await appendHumanMessage(threadId, await buildContextMessage());
 
       let exitReason: SessionExitReason = "completed";
@@ -184,5 +195,6 @@ export function proxyDefaultThreadOps(
     initializeThread: activities.initializeThread,
     appendHumanMessage: activities.appendHumanMessage,
     appendToolResult: activities.appendToolResult,
+    appendSystemMessage: activities.appendSystemMessage,
   };
 }
