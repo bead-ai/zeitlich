@@ -415,18 +415,20 @@ export function createToolRouter<T extends ToolMap>(
   const isEnabled = (tool: ToolMap[string]): boolean => tool.enabled !== false;
 
   if (options.subagents) {
-    // Build per-subagent hook dispatcher keyed by subagent name
-    const subagentHooksMap = new Map<string, SubagentHooks>();
-    for (const s of options.subagents) {
-      if (s.hooks) subagentHooksMap.set(s.name, s.hooks);
-    }
+    const enabledSubagents = options.subagents.filter((s) => s.enabled !== false);
+    if (enabledSubagents.length > 0) {
+      // Build per-subagent hook dispatcher keyed by subagent name
+      const subagentHooksMap = new Map<string, SubagentHooks>();
+      for (const s of enabledSubagents) {
+        if (s.hooks) subagentHooksMap.set(s.name, s.hooks);
+      }
 
-    const resolveSubagentName = (args: unknown): string =>
-      (args as SubagentArgs).subagent;
+      const resolveSubagentName = (args: unknown): string =>
+        (args as SubagentArgs).subagent;
 
-    toolMap.set("Subagent", {
-      ...createSubagentTool(options.subagents),
-      handler: createSubagentHandler(options.subagents),
+      toolMap.set("Subagent", {
+        ...createSubagentTool(enabledSubagents),
+        handler: createSubagentHandler(enabledSubagents),
       ...(subagentHooksMap.size > 0 && {
         hooks: {
           onPreToolUse: async (ctx): Promise<PreToolUseHookResult> => {
@@ -443,9 +445,10 @@ export function createToolRouter<T extends ToolMap>(
             const hooks = subagentHooksMap.get(resolveSubagentName(ctx.args));
             return hooks?.onExecutionFailure?.(ctx) ?? {};
           },
-        } satisfies ToolHooks,
+        }         satisfies ToolHooks,
       }),
     });
+    }
   }
 
   async function processToolCall(
