@@ -164,7 +164,7 @@ export type InferSubagentResult<T extends SubagentConfig> =
  */
 export interface SubagentConfig<TResult extends z.ZodType = z.ZodType> {
   /** Identifier used in Task tool's subagent parameter */
-  name: string;
+  agentName: string;
   /** Description shown to the parent agent explaining what this subagent does */
   description: string;
   /** Whether this subagent is available (default: true). Disabled subagents are excluded from the Subagent tool. */

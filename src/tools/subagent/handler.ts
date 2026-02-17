@@ -31,11 +31,11 @@ export function createSubagentHandler<
   return async (
     args: SubagentArgs
   ): Promise<ToolHandlerResponse<InferSubagentResult<T[number]> | null>> => {
-    const config = subagents.find((s) => s.name === args.subagent);
+    const config = subagents.find((s) => s.agentName === args.subagent);
 
     if (!config) {
       throw new Error(
-        `Unknown subagent: ${args.subagent}. Available: ${subagents.map((s) => s.name).join(", ")}`
+        `Unknown subagent: ${args.subagent}. Available: ${subagents.map((s) => s.agentName).join(", ")}`
       );
     }
 

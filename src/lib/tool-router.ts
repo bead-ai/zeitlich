@@ -415,12 +415,14 @@ export function createToolRouter<T extends ToolMap>(
   const isEnabled = (tool: ToolMap[string]): boolean => tool.enabled !== false;
 
   if (options.subagents) {
-    const enabledSubagents = options.subagents.filter((s) => s.enabled !== false);
+    const enabledSubagents = options.subagents.filter(
+      (s) => s.enabled !== false
+    );
     if (enabledSubagents.length > 0) {
       // Build per-subagent hook dispatcher keyed by subagent name
       const subagentHooksMap = new Map<string, SubagentHooks>();
       for (const s of enabledSubagents) {
-        if (s.hooks) subagentHooksMap.set(s.name, s.hooks);
+        if (s.hooks) subagentHooksMap.set(s.agentName, s.hooks);
       }
 
       const resolveSubagentName = (args: unknown): string =>
@@ -429,25 +431,25 @@ export function createToolRouter<T extends ToolMap>(
       toolMap.set("Subagent", {
         ...createSubagentTool(enabledSubagents),
         handler: createSubagentHandler(enabledSubagents),
-      ...(subagentHooksMap.size > 0 && {
-        hooks: {
-          onPreToolUse: async (ctx): Promise<PreToolUseHookResult> => {
-            const hooks = subagentHooksMap.get(resolveSubagentName(ctx.args));
-            return hooks?.onPreExecution?.(ctx) ?? {};
-          },
-          onPostToolUse: async (ctx): Promise<void> => {
-            const hooks = subagentHooksMap.get(resolveSubagentName(ctx.args));
-            await hooks?.onPostExecution?.(ctx);
-          },
-          onPostToolUseFailure: async (
-            ctx
-          ): Promise<PostToolUseFailureHookResult> => {
-            const hooks = subagentHooksMap.get(resolveSubagentName(ctx.args));
-            return hooks?.onExecutionFailure?.(ctx) ?? {};
-          },
-        }         satisfies ToolHooks,
-      }),
-    });
+        ...(subagentHooksMap.size > 0 && {
+          hooks: {
+            onPreToolUse: async (ctx): Promise<PreToolUseHookResult> => {
+              const hooks = subagentHooksMap.get(resolveSubagentName(ctx.args));
+              return hooks?.onPreExecution?.(ctx) ?? {};
+            },
+            onPostToolUse: async (ctx): Promise<void> => {
+              const hooks = subagentHooksMap.get(resolveSubagentName(ctx.args));
+              await hooks?.onPostExecution?.(ctx);
+            },
+            onPostToolUseFailure: async (
+              ctx
+            ): Promise<PostToolUseFailureHookResult> => {
+              const hooks = subagentHooksMap.get(resolveSubagentName(ctx.args));
+              return hooks?.onExecutionFailure?.(ctx) ?? {};
+            },
+          } satisfies ToolHooks,
+        }),
+      });
     }
   }
 
@@ -840,7 +842,11 @@ export function withAutoAppend<
     });
 
     // Return with empty toolResponse to keep the Temporal payload small
-    return { toolResponse: "Response appended via withAutoAppend", data: response.data, resultAppended: true };
+    return {
+      toolResponse: "Response appended via withAutoAppend",
+      data: response.data,
+      resultAppended: true,
+    };
   };
 }
 
