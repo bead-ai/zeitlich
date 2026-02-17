@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.5](https://github.com/bead-ai/zeitlich/compare/v0.2.4...v0.2.5) (2026-02-17)
+
+
+### Documentation
+
+* Add DeepWiki badge to README ([b887efb](https://github.com/bead-ai/zeitlich/commit/b887efb1b48537c062434ca945b9943d0670b12e))
+* update docs to align with recent changes ([#15](https://github.com/bead-ai/zeitlich/issues/15)) ([2bd1e37](https://github.com/bead-ai/zeitlich/commit/2bd1e3782958440a515af844f42af01d05a83cea))
+
+
+### Miscellaneous Chores
+
+* release 0.2.5 ([c7ab91d](https://github.com/bead-ai/zeitlich/commit/c7ab91d8f1ffb8bd5c37e89472a6b9a5dc17e03d))
+
 ## [0.2.4](https://github.com/bead-ai/zeitlich/compare/v0.2.3...v0.2.4) (2026-02-12)
 
 
