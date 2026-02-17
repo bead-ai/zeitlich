@@ -7,6 +7,7 @@ import {
   type MessageContent,
   type MessageStructure,
   type StoredMessage,
+  SystemMessage,
   ToolMessage,
 } from "@langchain/core/messages";
 import { v4 as uuidv4 } from "uuid";
@@ -126,6 +127,13 @@ export function createThreadManager<T>(
       }).toDict();
     },
 
+    createSystemMessage(content: string): StoredMessage {
+      return new SystemMessage({
+        id: uuidv4(),
+        content: content as string,
+      }).toDict();
+    },
+
     createAIMessage(
       content: string,
       kwargs?: { header?: string; options?: string[]; multiSelect?: boolean }
@@ -168,6 +176,11 @@ export function createThreadManager<T>(
 
     async appendAIMessage(content: string | MessageContent): Promise<void> {
       const message = helpers.createAIMessage(content as string);
+      await (base as BaseThreadManager<StoredMessage>).append([message]);
+    },
+
+    async appendSystemMessage(content: string): Promise<void> {
+      const message = helpers.createSystemMessage(content);
       await (base as BaseThreadManager<StoredMessage>).append([message]);
     },
   };
