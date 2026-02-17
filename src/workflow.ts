@@ -1,7 +1,7 @@
 /**
  * Workflow-safe exports for use in Temporal workflow code.
  *
- * Import from '@bead-ai/zeitlich/workflow' in workflow files.
+ * Import from 'zeitlich/workflow' in workflow files.
  * These exports have no external dependencies (no Redis, no LangChain).
  *
  * @example
@@ -11,7 +11,7 @@
  *   createSession,
  *   createAgentStateManager,
  *   createToolRouter,
- * } from '@bead-ai/zeitlich/workflow';
+ * } from 'zeitlich/workflow';
  * ```
  */
 
