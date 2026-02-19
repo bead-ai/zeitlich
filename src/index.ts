@@ -37,7 +37,6 @@ export type { InvokeModelConfig } from "./lib/model-invoker";
 
 // Tool handlers (activity implementations)
 // All handlers follow the factory pattern: createXHandler(deps) => handler(args)
-export { createAskUserQuestionHandler } from "./tools/ask-user-question/handler";
 export { createGlobHandler } from "./tools/glob/handler";
 
 export { createEditHandler } from "./tools/edit/handler";
@@ -46,7 +45,6 @@ export { createBashHandler } from "./tools/bash/handler";
 
 export { toTree } from "./lib/fs";
 
-export { getStateQuery } from "./lib/state-manager";
 export { createThreadManager } from "./lib/thread-manager";
 export type {
   BaseThreadManager,

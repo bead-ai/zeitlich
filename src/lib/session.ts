@@ -1,11 +1,17 @@
-import { proxyActivities } from "@temporalio/workflow";
+import {
+  proxyActivities,
+  condition,
+  defineUpdate,
+  setHandler,
+} from "@temporalio/workflow";
 import type { ZeitlichSharedActivities } from "../activities";
 import type {
   ThreadOps,
-  ZeitlichAgentConfig,
+  AgentConfig,
   SessionStartHook,
   SessionEndHook,
   SessionExitReason,
+  SessionConfig,
 } from "./types";
 import { type AgentStateManager, type JsonSerializable } from "./state-manager";
 import {
@@ -13,6 +19,7 @@ import {
   type ParsedToolCallUnion,
   type ToolMap,
 } from "./tool-router";
+import type { MessageContent } from "@langchain/core/messages";
 
 export interface ZeitlichSession<M = unknown> {
   runSession<T extends JsonSerializable<T>>(args: {
@@ -44,13 +51,15 @@ export const createSession = async <T extends ToolMap, M = unknown>({
   hooks = {},
   appendSystemPrompt = true,
   systemPrompt,
-}: ZeitlichAgentConfig<T, M>): Promise<ZeitlichSession<M>> => {
+  waitForInputTimeout = "48h",
+}: SessionConfig<T, M> & AgentConfig): Promise<ZeitlichSession<M>> => {
   const {
     appendToolResult,
     appendHumanMessage,
     initializeThread,
     appendSystemMessage,
   } = threadOps ?? proxyDefaultThreadOps();
+
   const toolRouter = createToolRouter({
     tools,
     appendToolResult,
@@ -78,6 +87,26 @@ export const createSession = async <T extends ToolMap, M = unknown>({
 
   return {
     runSession: async ({ stateManager }): Promise<M | null> => {
+      setHandler(
+        defineUpdate<unknown, [MessageContent]>(`add${agentName}Message`),
+        async (message: MessageContent) => {
+          if (hooks.onPreHumanMessageAppend) {
+            await hooks.onPreHumanMessageAppend({
+              message,
+              threadId,
+            });
+          }
+          await appendHumanMessage(threadId, message);
+          if (hooks.onPostHumanMessageAppend) {
+            await hooks.onPostHumanMessageAppend({
+              message,
+              threadId,
+            });
+          }
+          stateManager.run();
+        }
+      );
+
       if (hooks.onSessionStart) {
         await hooks.onSessionStart({
           threadId,
@@ -141,8 +170,16 @@ export const createSession = async <T extends ToolMap, M = unknown>({
           });
 
           if (stateManager.getStatus() === "WAITING_FOR_INPUT") {
-            exitReason = "waiting_for_input";
-            break;
+            const conditionMet = await condition(
+              () => stateManager.getStatus() === "RUNNING",
+              waitForInputTimeout
+            );
+            if (!conditionMet) {
+              stateManager.cancel();
+              // Wait briefly to allow pending waitForStateChange handlers to complete
+              await condition(() => false, "2s");
+              break;
+            }
           }
         }
 

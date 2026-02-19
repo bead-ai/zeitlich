@@ -1,6 +1,6 @@
 import type Redis from "ioredis";
 import { createThreadManager } from "./thread-manager";
-import type { AgentResponse } from "./types";
+import type { AgentResponse, BaseAgentState } from "./types";
 import { Context } from "@temporalio/activity";
 import type { WorkflowClient } from "@temporalio/client";
 import { mapStoredMessagesToChatMessages } from "@langchain/core/messages";
@@ -10,7 +10,6 @@ import type {
   BaseChatModelCallOptions,
   BindToolsInput,
 } from "@langchain/core/language_models/chat_models";
-import { getStateQuery } from "./state-manager";
 
 /**
  * Configuration for invoking the model
@@ -49,7 +48,7 @@ export async function invokeModel({
   const parentRunId = info.workflowExecution.runId;
 
   const handle = client.getHandle(parentWorkflowId, parentRunId);
-  const { tools } = await handle.query(getStateQuery);
+  const { tools } = await handle.query<BaseAgentState>(`get${agentName}State`);
 
   const messages = await thread.load();
   const response = await model.invoke(

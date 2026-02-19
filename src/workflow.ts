@@ -74,7 +74,7 @@ export type {
   AgentFile,
   AgentResponse,
   ThreadOps,
-  ZeitlichAgentConfig,
+  AgentConfig,
   RunAgentConfig,
   RunAgentActivity,
   ToolResultConfig,
@@ -109,8 +109,6 @@ export type { SubagentArgs } from "./tools/subagent/tool";
 export type { ZeitlichSharedActivities } from "./activities";
 
 // Tool definitions (schemas only - no handlers)
-export { askUserQuestionTool } from "./tools/ask-user-question/tool";
-export type { AskUserQuestionArgs } from "./tools/ask-user-question/tool";
 export { globTool } from "./tools/glob/tool";
 export type { GlobArgs } from "./tools/glob/tool";
 export { grepTool } from "./tools/grep/tool";
@@ -141,3 +139,7 @@ export { createTaskUpdateHandler } from "./tools/task-update/handler";
 
 export { bashTool, createBashToolDescription } from "./tools/bash/tool";
 export type { BashArgs } from "./tools/bash/tool";
+
+export { askUserQuestionTool } from "./tools/ask-user-question/tool";
+export type { AskUserQuestionArgs } from "./tools/ask-user-question/tool";
+export { createAskUserQuestionHandler } from "./tools/ask-user-question/handler";

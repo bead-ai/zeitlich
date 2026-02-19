@@ -1,5 +1,11 @@
-import { defineQuery, setHandler } from "@temporalio/workflow";
 import {
+  condition,
+  defineQuery,
+  defineUpdate,
+  setHandler,
+} from "@temporalio/workflow";
+import {
+  type AgentConfig,
   type AgentStatus,
   type BaseAgentState,
   type WorkflowTask,
@@ -110,8 +116,6 @@ export interface AgentStateManager<TCustom extends JsonSerializable<TCustom>> {
   setTools(newTools: ToolDefinition[]): void;
 }
 
-export const getStateQuery = defineQuery<BaseAgentState>("getState");
-
 /**
  * Creates an agent state manager for tracking workflow state.
  *
@@ -124,9 +128,13 @@ export const getStateQuery = defineQuery<BaseAgentState>("getState");
  */
 export function createAgentStateManager<
   TCustom extends JsonSerializable<TCustom> = Record<string, never>,
->(
-  initialState?: Partial<BaseAgentState> & TCustom
-): AgentStateManager<TCustom> {
+>({
+  initialState,
+  agentConfig,
+}: {
+  initialState?: Partial<BaseAgentState> & TCustom;
+  agentConfig: AgentConfig;
+}): AgentStateManager<TCustom> {
   // Default state (BaseAgentState fields)
   let status: AgentStatus = initialState?.status ?? "RUNNING";
   let version = initialState?.version ?? 0;
@@ -157,9 +165,22 @@ export function createAgentStateManager<
     } as AgentState<TCustom>;
   }
 
-  setHandler(getStateQuery, () => {
+  setHandler(defineQuery(`get${agentConfig.agentName}State`), () => {
     return buildState();
   });
+
+  setHandler(
+    defineUpdate<AgentState<TCustom>, [number]>(
+      `waitFor${agentConfig.agentName}StateChange`
+    ),
+    async (lastKnownVersion: number) => {
+      await condition(
+        () => version > lastKnownVersion || isTerminalStatus(status),
+        "55s"
+      );
+      return buildState();
+    }
+  );
 
   return {
     getStatus(): AgentStatus {

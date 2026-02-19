@@ -8,6 +8,7 @@ import type {
 } from "./tool-router";
 
 import type { MessageContent, StoredMessage } from "@langchain/core/messages";
+import type { Duration } from "@temporalio/common";
 import type { Workflow } from "@temporalio/workflow";
 import type { z } from "zod";
 
@@ -82,16 +83,28 @@ export interface ThreadOps {
 }
 
 /**
- * Configuration for a Zeitlich agent session
+ * Configuration for a Zeitlich agent
  */
-export interface ZeitlichAgentConfig<T extends ToolMap, M = StoredMessage> {
-  threadId: string;
+export interface AgentConfig {
+  /** The name of the agent, should be unique within the workflows, ideally Pascal Case */
   agentName: string;
   /** Description, used for sub agents */
   description?: string;
+  /** The system prompt to append to the thread */
   systemPrompt?: string;
+}
+
+/**
+ * Configuration for a Zeitlich agent session
+ */
+export interface SessionConfig<T extends ToolMap, M = StoredMessage> {
+  /** The thread ID to use for the session */
+  threadId: string;
+  /** Metadata for the session */
   metadata?: Record<string, unknown>;
+  /** Whether to append the system prompt as message to the thread */
   appendSystemPrompt?: boolean;
+  /** How many turns to run the session for */
   maxTurns?: number;
   /** Workflow-specific runAgent activity (with tools pre-bound) */
   runAgent: RunAgentActivity<M>;
@@ -110,6 +123,8 @@ export interface ZeitlichAgentConfig<T extends ToolMap, M = StoredMessage> {
    * Returns MessageContent array for the initial HumanMessage.
    */
   buildContextMessage: () => MessageContent | Promise<MessageContent>;
+  /** How long to wait for input before cancelling the workflow */
+  waitForInputTimeout?: Duration;
 }
 
 /**
@@ -370,6 +385,40 @@ export type SessionStartHook = (
 ) => void | Promise<void>;
 
 /**
+ * Context for PreHumanMessageAppend hook - called before each human message is appended to the thread
+ */
+export interface PreHumanMessageAppendHookContext {
+  /** The message about to be appended */
+  message: MessageContent;
+  /** Thread identifier */
+  threadId: string;
+}
+
+/**
+ * PreHumanMessageAppend hook - called before each human message is appended to the thread
+ */
+export type PreHumanMessageAppendHook = (
+  ctx: PreHumanMessageAppendHookContext
+) => void | Promise<void>;
+
+/**
+ * PostHumanMessageAppend hook - called after each human message is appended to the thread
+ */
+export type PostHumanMessageAppendHook = (
+  ctx: PostHumanMessageAppendHookContext
+) => void | Promise<void>;
+
+/**
+ * Context for PostHumanMessageAppend hook - called after each human message is appended to the thread
+ */
+export interface PostHumanMessageAppendHookContext {
+  /** The message that was appended */
+  message: MessageContent;
+  /** Thread identifier */
+  threadId: string;
+}
+
+/**
  * Context for SessionEnd hook - called when session ends
  */
 export interface SessionEndHookContext {
@@ -424,6 +473,10 @@ export interface ToolHooks<TArgs = unknown, TResult = unknown> {
  * Combined hooks interface for session lifecycle
  */
 export interface Hooks<T extends ToolMap, TResult = unknown> {
+  /** Called before each human message is appended to the thread */
+  onPreHumanMessageAppend?: PreHumanMessageAppendHook;
+  /** Called after each human message is appended to the thread */
+  onPostHumanMessageAppend?: PostHumanMessageAppendHook;
   /** Called before each tool execution - can block or modify */
   onPreToolUse?: PreToolUseHook<T>;
   /** Called after each successful tool execution */
