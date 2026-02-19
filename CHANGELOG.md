@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.7](https://github.com/bead-ai/zeitlich/compare/v0.2.6...v0.2.7) (2026-02-19)
+
+
+### Features
+
+* add ability to request and add external input ([d00917e](https://github.com/bead-ai/zeitlich/commit/d00917ef70366385975e8efc3b31cbd5f6021522))
+
+
+### Miscellaneous Chores
+
+* release 0.2.7 ([576658b](https://github.com/bead-ai/zeitlich/commit/576658b1a204573edee08a20e9999b4fd784356d))
+
 ## [0.2.6](https://github.com/bead-ai/zeitlich/compare/v0.2.5...v0.2.6) (2026-02-17)
 
 
