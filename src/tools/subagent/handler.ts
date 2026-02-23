@@ -53,7 +53,7 @@ export function createSubagentHandler<
       taskQueue: config.taskQueue ?? parentTaskQueue,
     };
 
-    const { toolResponse, data } =
+    const { toolResponse, data, usage } =
       typeof config.workflow === "string"
         ? await executeChild(config.workflow, childOpts)
         : await executeChild(config.workflow, childOpts);
@@ -66,6 +66,7 @@ export function createSubagentHandler<
     return {
       toolResponse,
       data: validated,
+      ...(usage && { usage }),
     };
   };
 }

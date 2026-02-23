@@ -6,6 +6,7 @@ import type {
   PreToolUseHookResult,
   SubagentConfig,
   SubagentHooks,
+  TokenUsage,
   ToolHooks,
   ToolResultConfig,
 } from "./types";
@@ -154,13 +155,7 @@ export interface ToolHandlerResponse<TResult = null> {
    */
   resultAppended?: boolean;
   /** Token usage from the tool execution (e.g. child agent invocations) */
-  usage?: {
-    inputTokens?: number;
-    outputTokens?: number;
-    cachedWriteTokens?: number;
-    cachedReadTokens?: number;
-    reasonTokens?: number;
-  };
+  usage?: TokenUsage;
 }
 
 /**

@@ -54,19 +54,21 @@ export interface AgentFile {
   mimeType?: string;
 }
 
+export interface TokenUsage {
+  inputTokens?: number;
+  outputTokens?: number;
+  cachedWriteTokens?: number;
+  cachedReadTokens?: number;
+  reasonTokens?: number;
+}
+
 /**
  * Agent response from LLM invocation
  */
 export interface AgentResponse<M = StoredMessage> {
   message: M;
   rawToolCalls: RawToolCall[];
-  usage?: {
-    inputTokens?: number;
-    outputTokens?: number;
-    cachedWriteTokens?: number;
-    cachedReadTokens?: number;
-    reasonTokens?: number;
-  };
+  usage?: TokenUsage;
 }
 
 /**
