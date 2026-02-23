@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.8](https://github.com/bead-ai/zeitlich/compare/v0.2.7...v0.2.8) (2026-02-23)
+
+
+### Code Refactoring
+
+* enable dynamic tool choice ([54706df](https://github.com/bead-ai/zeitlich/commit/54706df3b055ad6a91773c45f9ecc34acc1ec443))
+* replace usage structure with TokenUsage interface for consistency ([ecced84](https://github.com/bead-ai/zeitlich/commit/ecced84c6c0125c8a77d1423c5a2327335a97ced))
+
+
+### Miscellaneous Chores
+
+* release 0.2.8 ([93d36a0](https://github.com/bead-ai/zeitlich/commit/93d36a02e5d0b22268862c77c12bed5a0bae2d16))
+
 ## [0.2.7](https://github.com/bead-ai/zeitlich/compare/v0.2.6...v0.2.7) (2026-02-19)
 
 
