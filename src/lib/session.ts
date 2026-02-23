@@ -186,9 +186,18 @@ export const createSession = async <T extends ToolMap, M = unknown>({
           }
 
           // Hooks can call stateManager.waitForInput() to pause the session
-          await toolRouter.processToolCalls(parsedToolCalls, {
-            turn: currentTurn,
-          });
+          const toolCallResults = await toolRouter.processToolCalls(
+            parsedToolCalls,
+            {
+              turn: currentTurn,
+            }
+          );
+
+          for (const result of toolCallResults) {
+            if (result.usage) {
+              stateManager.updateUsage(result.usage);
+            }
+          }
 
           if (stateManager.getStatus() === "WAITING_FOR_INPUT") {
             const conditionMet = await condition(

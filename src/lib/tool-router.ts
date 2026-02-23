@@ -231,6 +231,7 @@ export interface ToolCallResult<
   toolCallId: string;
   name: TName;
   data: TResult;
+  usage?: TokenUsage;
 }
 
 /**
