@@ -73,9 +73,13 @@ export async function invokeModel({
       args: tc.args,
     })),
     usage: {
-      input_tokens: response.usage_metadata?.input_tokens,
-      output_tokens: response.usage_metadata?.output_tokens,
-      total_tokens: response.usage_metadata?.total_tokens,
+      inputTokens: response.usage_metadata?.input_tokens,
+      outputTokens: response.usage_metadata?.output_tokens,
+      reasonTokens: response.usage_metadata?.output_token_details?.reasoning,
+      cachedWriteTokens:
+        response.usage_metadata?.input_token_details?.cache_creation,
+      cachedReadTokens:
+        response.usage_metadata?.input_token_details?.cache_read,
     },
   };
 }

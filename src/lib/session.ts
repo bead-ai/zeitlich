@@ -24,7 +24,11 @@ import type { MessageContent } from "@langchain/core/messages";
 export interface ZeitlichSession<M = unknown> {
   runSession<T extends JsonSerializable<T>>(args: {
     stateManager: AgentStateManager<T>;
-  }): Promise<M | null>;
+  }): Promise<{
+    finalMessage: M | null;
+    exitReason: SessionExitReason;
+    usage: ReturnType<AgentStateManager<T>["getTotalUsage"]>;
+  }>;
 }
 
 /**
@@ -40,6 +44,7 @@ export interface SessionLifecycleHooks {
 export const createSession = async <T extends ToolMap, M = unknown>({
   threadId,
   agentName,
+  description,
   maxTurns = 50,
   metadata = {},
   runAgent,
@@ -86,7 +91,13 @@ export const createSession = async <T extends ToolMap, M = unknown>({
   };
 
   return {
-    runSession: async ({ stateManager }): Promise<M | null> => {
+    runSession: async ({
+      stateManager,
+    }): Promise<{
+      finalMessage: M | null;
+      exitReason: SessionExitReason;
+      usage: ReturnType<typeof stateManager.getTotalUsage>;
+    }> => {
       setHandler(
         defineUpdate<unknown, [MessageContent]>(`add${agentName}Message`),
         async (message: MessageContent) => {
@@ -115,8 +126,6 @@ export const createSession = async <T extends ToolMap, M = unknown>({
         });
       }
 
-      stateManager.setTools(toolRouter.getToolDefinitions());
-
       await initializeThread(threadId);
       if (appendSystemPrompt && systemPrompt && systemPrompt.trim() !== "") {
         await appendSystemMessage(threadId, systemPrompt);
@@ -134,17 +143,29 @@ export const createSession = async <T extends ToolMap, M = unknown>({
           stateManager.incrementTurns();
           const currentTurn = stateManager.getTurns();
 
-          const { message, rawToolCalls } = await runAgent({
+          stateManager.setTools(toolRouter.getToolDefinitions());
+
+          const { message, rawToolCalls, usage } = await runAgent({
             threadId,
             agentName,
             metadata,
+            systemPrompt,
+            description,
           });
+
+          if (usage) {
+            stateManager.updateUsage(usage);
+          }
 
           // No tools configured - treat any non-end_turn as completed
           if (!toolRouter.hasTools() || rawToolCalls.length === 0) {
             stateManager.complete();
             exitReason = "completed";
-            return message;
+            return {
+              finalMessage: message,
+              exitReason,
+              usage: stateManager.getTotalUsage(),
+            };
           }
 
           // Parse all tool calls uniformly through the router
@@ -195,7 +216,11 @@ export const createSession = async <T extends ToolMap, M = unknown>({
         await callSessionEnd(exitReason, stateManager.getTurns());
       }
 
-      return null;
+      return {
+        finalMessage: null,
+        exitReason,
+        usage: stateManager.getTotalUsage(),
+      };
     },
   };
 };

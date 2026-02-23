@@ -53,7 +53,7 @@ export interface ToolWithHandler<
   strict?: boolean;
   max_uses?: number;
   /** Whether this tool is available to the agent (default: true). Disabled tools are excluded from definitions and rejected at parse time. */
-  enabled?: boolean;
+  enabled?: () => boolean;
   /** Per-tool lifecycle hooks (run in addition to global hooks) */
   hooks?: ToolHooks<z.infer<TSchema>, TResult>;
 }
@@ -76,7 +76,7 @@ export type ToolMap = Record<
     handler: ToolHandler<any, any, any>;
     strict?: boolean;
     max_uses?: number;
-    enabled?: boolean;
+    enabled?: () => boolean;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     hooks?: ToolHooks<any, any>;
   }
@@ -153,6 +153,14 @@ export interface ToolHandlerResponse<TResult = null> {
    * payloads through Temporal's activity payload limit.
    */
   resultAppended?: boolean;
+  /** Token usage from the tool execution (e.g. child agent invocations) */
+  usage?: {
+    inputTokens?: number;
+    outputTokens?: number;
+    cachedWriteTokens?: number;
+    cachedReadTokens?: number;
+    reasonTokens?: number;
+  };
 }
 
 /**
@@ -412,16 +420,14 @@ export function createToolRouter<T extends ToolMap>(
   }
 
   /** Check if a tool is enabled (defaults to true when not specified) */
-  const isEnabled = (tool: ToolMap[string]): boolean => tool.enabled !== false;
+  const isEnabled = (tool: ToolMap[string]): boolean =>
+    tool.enabled?.() ?? true;
 
   if (options.subagents) {
-    const enabledSubagents = options.subagents.filter(
-      (s) => s.enabled !== false
-    );
-    if (enabledSubagents.length > 0) {
+    if (options.subagents.length > 0) {
       // Build per-subagent hook dispatcher keyed by subagent name
       const subagentHooksMap = new Map<string, SubagentHooks>();
-      for (const s of enabledSubagents) {
+      for (const s of options.subagents) {
         if (s.hooks) subagentHooksMap.set(s.agentName, s.hooks);
       }
 
@@ -429,8 +435,8 @@ export function createToolRouter<T extends ToolMap>(
         (args as SubagentArgs).subagent;
 
       toolMap.set("Subagent", {
-        ...createSubagentTool(enabledSubagents),
-        handler: createSubagentHandler(enabledSubagents),
+        ...createSubagentTool(options.subagents),
+        handler: createSubagentHandler(options.subagents),
         ...(subagentHooksMap.size > 0 && {
           hooks: {
             onPreToolUse: async (ctx): Promise<PreToolUseHookResult> => {

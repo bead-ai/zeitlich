@@ -114,6 +114,25 @@ export interface AgentStateManager<TCustom extends JsonSerializable<TCustom>> {
 
   /** Set the tools (converts Zod schemas to JSON Schema for serialization) */
   setTools(newTools: ToolDefinition[]): void;
+
+  /** Update the usage */
+  updateUsage(usage: {
+    inputTokens?: number;
+    outputTokens?: number;
+    cachedWriteTokens?: number;
+    cachedReadTokens?: number;
+    reasonTokens?: number;
+  }): void;
+
+  /** Get the total usage */
+  getTotalUsage(): {
+    totalInputTokens: number;
+    totalOutputTokens: number;
+    totalCachedWriteTokens: number;
+    totalCachedReadTokens: number;
+    totalReasonTokens: number;
+    turns: number;
+  };
 }
 
 /**
@@ -140,6 +159,11 @@ export function createAgentStateManager<
   let version = initialState?.version ?? 0;
   let turns = initialState?.turns ?? 0;
   let tools = initialState?.tools ?? [];
+  let totalInputTokens = 0;
+  let totalOutputTokens = 0;
+  let totalCachedWriteTokens = 0;
+  let totalCachedReadTokens = 0;
+  let totalReasonTokens = 0;
 
   // Tasks state
   const tasks = new Map<string, WorkflowTask>(initialState?.tasks);
@@ -282,6 +306,38 @@ export function createAgentStateManager<
         version++;
       }
       return deleted;
+    },
+
+    updateUsage(usage: {
+      inputTokens?: number;
+      outputTokens?: number;
+      cachedWriteTokens?: number;
+      cachedReadTokens?: number;
+      reasonTokens?: number;
+    }): void {
+      totalInputTokens += usage.inputTokens ?? 0;
+      totalOutputTokens += usage.outputTokens ?? 0;
+      totalCachedWriteTokens += usage.cachedWriteTokens ?? 0;
+      totalCachedReadTokens += usage.cachedReadTokens ?? 0;
+      totalReasonTokens += usage.reasonTokens ?? 0;
+    },
+
+    getTotalUsage(): {
+      totalInputTokens: number;
+      totalOutputTokens: number;
+      totalCachedWriteTokens: number;
+      totalCachedReadTokens: number;
+      totalReasonTokens: number;
+      turns: number;
+    } {
+      return {
+        totalInputTokens,
+        totalOutputTokens,
+        totalCachedWriteTokens,
+        totalCachedReadTokens,
+        totalReasonTokens,
+        turns,
+      };
     },
   };
 }

@@ -32,6 +32,10 @@ export interface BaseAgentState {
   turns: number;
   tasks: Map<string, WorkflowTask>;
   systemPrompt: string;
+  totalInputTokens: number;
+  totalOutputTokens: number;
+  cachedWriteTokens: number;
+  cachedReadtTokens: number;
 }
 
 /**
@@ -57,9 +61,11 @@ export interface AgentResponse<M = StoredMessage> {
   message: M;
   rawToolCalls: RawToolCall[];
   usage?: {
-    input_tokens?: number;
-    output_tokens?: number;
-    total_tokens?: number;
+    inputTokens?: number;
+    outputTokens?: number;
+    cachedWriteTokens?: number;
+    cachedReadTokens?: number;
+    reasonTokens?: number;
   };
 }
 
@@ -143,9 +149,10 @@ export interface SerializableToolDefinition {
 /**
  * Configuration passed to runAgent activity
  */
-export interface RunAgentConfig {
+export interface RunAgentConfig extends AgentConfig {
+  /** The thread ID to use for the session */
   threadId: string;
-  agentName: string;
+  /** Metadata for the session */
   metadata?: Record<string, unknown>;
 }
 
@@ -155,6 +162,7 @@ export interface RunAgentConfig {
 export type RunAgentActivity<M = StoredMessage> = (
   config: RunAgentConfig
 ) => Promise<AgentResponse<M>>;
+
 /**
  * Configuration for appending a tool result
  */
@@ -186,7 +194,7 @@ export interface SubagentConfig<TResult extends z.ZodType = z.ZodType> {
   /** Description shown to the parent agent explaining what this subagent does */
   description: string;
   /** Whether this subagent is available (default: true). Disabled subagents are excluded from the Subagent tool. */
-  enabled?: boolean;
+  enabled?: () => boolean;
   /** Temporal workflow function or type name (used with executeChild) */
   workflow: string | Workflow;
   /** Optional task queue - defaults to parent's queue if not specified */
