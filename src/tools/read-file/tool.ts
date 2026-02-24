@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { ToolDefinition } from "../../lib/tool-router";
 
-export const readTool = {
+export const readFileTool = {
   name: "FileRead" as const,
   description: `Read file contents with optional pagination.
 
@@ -31,4 +31,4 @@ The tool returns the file content in an appropriate format:
   strict: true,
 } satisfies ToolDefinition;
 
-export type FileReadArgs = z.infer<typeof readTool.schema>;
+export type FileReadArgs = z.infer<typeof readFileTool.schema>;

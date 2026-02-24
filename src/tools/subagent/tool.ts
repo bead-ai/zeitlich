@@ -1,7 +1,7 @@
 import z from "zod";
 import type { SubagentConfig } from "../../lib/types";
 
-const SUBAGENT_TOOL = "Subagent" as const;
+export const SUBAGENT_TOOL_NAME = "Subagent" as const;
 
 /**
  * Builds the tool description with available subagent information
@@ -13,13 +13,13 @@ function buildSubagentDescription(subagents: SubagentConfig[]): string {
 
   return `Launch a new agent to handle complex tasks autonomously.
 
-The ${SUBAGENT_TOOL} tool launches specialized agents (subprocesses) that autonomously handle complex tasks. Each agent type has specific capabilities and tools available to it.
+The ${SUBAGENT_TOOL_NAME} tool launches specialized agents (subprocesses) that autonomously handle complex tasks. Each agent type has specific capabilities and tools available to it.
 
 Available agent types:
 
 ${subagentList}
 
-When using the ${SUBAGENT_TOOL} tool, you must specify a subagent parameter to select which agent type to use.
+When using the ${SUBAGENT_TOOL_NAME} tool, you must specify a subagent parameter to select which agent type to use.
 
 Usage notes:
 
@@ -67,7 +67,7 @@ export function createSubagentTool<T extends SubagentConfig[]>(
   const names = subagents.map((s) => s.agentName);
 
   return {
-    name: SUBAGENT_TOOL,
+    name: SUBAGENT_TOOL_NAME,
     description: buildSubagentDescription(subagents),
     schema: z.object({
       subagent: z.enum(names).describe("The type of subagent to launch"),

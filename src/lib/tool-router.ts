@@ -13,7 +13,7 @@ import type {
 import type { SubagentArgs } from "../tools/subagent/tool";
 
 import type { z } from "zod";
-import { createSubagentTool } from "../tools/subagent/tool";
+import { createSubagentTool, SUBAGENT_TOOL_NAME } from "../tools/subagent/tool";
 import { createSubagentHandler } from "../tools/subagent/handler";
 
 export type { ToolMessageContent };
@@ -416,7 +416,7 @@ export function createToolRouter<T extends ToolMap>(
   }
 
   /** Check if a tool is enabled (defaults to true when not specified) */
-  const isEnabled = (tool: ToolMap[string]): boolean =>
+  const isEnabled = (tool: ToolMap[string] | SubagentConfig): boolean =>
     tool.enabled?.() ?? true;
 
   if (options.subagents) {
@@ -430,7 +430,7 @@ export function createToolRouter<T extends ToolMap>(
       const resolveSubagentName = (args: unknown): string =>
         (args as SubagentArgs).subagent;
 
-      toolMap.set("Subagent", {
+      toolMap.set(SUBAGENT_TOOL_NAME, {
         ...createSubagentTool(options.subagents),
         handler: createSubagentHandler(options.subagents),
         ...(subagentHooksMap.size > 0 && {
@@ -657,15 +657,25 @@ export function createToolRouter<T extends ToolMap>(
     },
 
     getToolDefinitions(): ToolDefinition[] {
-      return Array.from(toolMap)
-        .filter(([, tool]) => isEnabled(tool))
-        .map(([name, tool]) => ({
-          name,
-          description: tool.description,
-          schema: tool.schema,
-          strict: tool.strict,
-          max_uses: tool.max_uses,
-        }));
+      const activeSubagents =
+        options.subagents?.filter((subagent) => isEnabled(subagent)) ?? [];
+
+      return [
+        ...Array.from(toolMap)
+          .filter(
+            ([, tool]) => isEnabled(tool) && tool.name !== SUBAGENT_TOOL_NAME
+          )
+          .map(([name, tool]) => ({
+            name,
+            description: tool.description,
+            schema: tool.schema,
+            strict: tool.strict,
+            max_uses: tool.max_uses,
+          })),
+        ...(activeSubagents.length > 0
+          ? [createSubagentTool(activeSubagents)]
+          : []),
+      ];
     },
 
     // --- Methods for processing tool calls ---
