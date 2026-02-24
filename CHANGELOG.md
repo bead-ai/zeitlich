@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.9](https://github.com/bead-ai/zeitlich/compare/v0.2.8...v0.2.9) (2026-02-24)
+
+
+### Bug Fixes
+
+* fix dynamic subagent enabled flag ([a80458c](https://github.com/bead-ai/zeitlich/commit/a80458c57fd4a73401aa7274ac6804d68bb69946))
+
+
+### Miscellaneous Chores
+
+* release 0.2.9 ([a18fd51](https://github.com/bead-ai/zeitlich/commit/a18fd51b8d3d57ec2dd916b345f831b4c26ae529))
+
 ## [0.2.8](https://github.com/bead-ai/zeitlich/compare/v0.2.7...v0.2.8) (2026-02-23)
 
 
