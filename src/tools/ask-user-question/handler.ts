@@ -1,11 +1,11 @@
-import type { ToolHandler } from "../../lib/tool-router";
+import type { ActivityToolHandler } from "../../lib/tool-router";
 import type { AskUserQuestionArgs } from "./tool";
 
 /**
  * Creates handler for user interaction tool - creates AI messages for display.
  */
 export const createAskUserQuestionHandler =
-  (): ToolHandler<
+  (): ActivityToolHandler<
     AskUserQuestionArgs,
     {
       questions: {
@@ -16,7 +16,7 @@ export const createAskUserQuestionHandler =
       }[];
     }
   > =>
-  (args) => {
+  async (args) => {
     return {
       toolResponse: "Question submitted",
       data: { questions: args.questions },
