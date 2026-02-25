@@ -3,7 +3,7 @@ import type { ToolDefinition } from "../../lib/tool-router";
 
 export const taskCreateTool = {
   name: "TaskCreate" as const,
-  description: `Use this tool to create a structured task list for the control test. This helps you track progress, organize complex tasks, and demonstrate thoroughness to the user.
+  description: `Use this tool to create a structured task list. This helps you track progress, organize complex tasks, and demonstrate thoroughness to the user.
   It also helps the user understand the progress of the task and overall progress of their requests.
   
   ## When to Use This Tool

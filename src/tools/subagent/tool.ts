@@ -8,29 +8,14 @@ export const SUBAGENT_TOOL_NAME = "Subagent" as const;
  */
 function buildSubagentDescription(subagents: SubagentConfig[]): string {
   const subagentList = subagents
-    .map((s) => `- **${s.agentName}**: ${s.description}`)
-    .join("\n");
+    .map((s) => `## ${s.agentName}\n${s.description}`)
+    .join("\n\n");
 
-  return `Launch a new agent to handle complex tasks autonomously.
+  return `The ${SUBAGENT_TOOL_NAME} tool launches specialized agents (subagents) that autonomously handle complex work. Each agent type has specific capabilities and tools available to it.
 
-The ${SUBAGENT_TOOL_NAME} tool launches specialized agents (subprocesses) that autonomously handle complex tasks. Each agent type has specific capabilities and tools available to it.
-
-Available agent types:
-
+# Available subagents:
 ${subagentList}
-
-When using the ${SUBAGENT_TOOL_NAME} tool, you must specify a subagent parameter to select which agent type to use.
-
-Usage notes:
-
-- Always include a short description (3-5 words) summarizing what the agent will do
-- Launch multiple agents concurrently whenever possible, to maximize performance; to do that, use a single message with multiple tool uses
-- When the agent is done, it will return a single message back to you.
-- Each invocation starts fresh - provide a detailed task description with all necessary context.
-- Provide clear, detailed prompts so the agent can work autonomously and return exactly the information you need.
-- The agent's outputs should generally be trusted
-- Clearly tell the agent what type of work you expect since it is not aware of the user's intent
-- If the agent description mentions that it should be used proactively, then you should try your best to use it without the user having to ask for it first. Use your judgement.`;
+`;
 }
 
 /**
