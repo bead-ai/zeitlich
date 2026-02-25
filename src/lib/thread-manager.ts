@@ -14,6 +14,27 @@ import { v4 as uuidv4 } from "uuid";
 
 const THREAD_TTL_SECONDS = 60 * 60 * 24 * 90; // 90 days
 
+/**
+ * Lua script for atomic idempotent append.
+ * Checks a dedup key; if it exists the message was already appended and we
+ * return 0. Otherwise appends all messages to the list, sets TTL on both
+ * the list and the dedup key, and returns 1.
+ *
+ * KEYS[1] = dedup key, KEYS[2] = list key
+ * ARGV[1] = TTL seconds, ARGV[2..N] = serialised messages
+ */
+const APPEND_IDEMPOTENT_SCRIPT = `
+if redis.call('EXISTS', KEYS[1]) == 1 then
+  return 0
+end
+for i = 2, #ARGV do
+  redis.call('RPUSH', KEYS[2], ARGV[i])
+end
+redis.call('EXPIRE', KEYS[2], tonumber(ARGV[1]))
+redis.call('SET', KEYS[1], '1', 'EX', tonumber(ARGV[1]))
+return 1
+`;
+
 function getThreadKey(threadId: string, key: string): string {
   return `thread:${threadId}:${key}`;
 }
@@ -33,6 +54,12 @@ export interface ThreadManagerConfig<T = StoredMessage> {
   serialize?: (message: T) => string;
   /** Custom deserializer, defaults to JSON.parse */
   deserialize?: (raw: string) => T;
+  /**
+   * Extract a unique id from a message for idempotent appends.
+   * When provided, `append` uses an atomic Lua script to skip duplicate writes.
+   * Defaults to `StoredMessage.data.id` for the standard ThreadManager.
+   */
+  idOf?: (message: T) => string;
 }
 
 /** Generic thread manager for any message type */
@@ -41,7 +68,11 @@ export interface BaseThreadManager<T> {
   initialize(): Promise<void>;
   /** Load all messages from the thread */
   load(): Promise<T[]>;
-  /** Append messages to the thread */
+  /**
+   * Append messages to the thread.
+   * When `idOf` is configured, appends are idempotent — retries with the
+   * same message ids are atomically skipped via a Redis Lua script.
+   */
   append(messages: T[]): Promise<void>;
   /** Delete the thread */
   delete(): Promise<void>;
@@ -51,6 +82,8 @@ export interface BaseThreadManager<T> {
 export interface ThreadManager extends BaseThreadManager<StoredMessage> {
   /** Create a HumanMessage (returns StoredMessage for storage) */
   createHumanMessage(content: string | MessageContent): StoredMessage;
+  /** Create a SystemMessage (returns StoredMessage for storage) */
+  createSystemMessage(content: string): StoredMessage;
   /** Create an AIMessage with optional additional kwargs */
   createAIMessage(
     content: string | MessageContent,
@@ -74,6 +107,11 @@ export interface ThreadManager extends BaseThreadManager<StoredMessage> {
   appendAIMessage(content: string | MessageContent): Promise<void>;
 }
 
+/** Default id extractor for StoredMessage */
+function storedMessageId(msg: StoredMessage): string {
+  return msg.data.id ?? "";
+}
+
 /**
  * Creates a thread manager for handling conversation state in Redis.
  * Without generic args, returns a full ThreadManager with StoredMessage helpers.
@@ -95,6 +133,13 @@ export function createThreadManager<T>(
   } = config;
   const redisKey = getThreadKey(threadId, key);
 
+  // Default idOf for StoredMessage when no custom serialization is used
+  const idOf =
+    config.idOf ??
+    (!config.serialize
+      ? (storedMessageId as unknown as (m: T) => string)
+      : undefined);
+
   const base: BaseThreadManager<T> = {
     async initialize(): Promise<void> {
       await redis.del(redisKey);
@@ -106,7 +151,20 @@ export function createThreadManager<T>(
     },
 
     async append(messages: T[]): Promise<void> {
-      if (messages.length > 0) {
+      if (messages.length === 0) return;
+
+      if (idOf) {
+        const dedupId = messages.map(idOf).join(":");
+        const dedupKey = getThreadKey(threadId, `dedup:${dedupId}`);
+        await redis.eval(
+          APPEND_IDEMPOTENT_SCRIPT,
+          2,
+          dedupKey,
+          redisKey,
+          String(THREAD_TTL_SECONDS),
+          ...messages.map(serialize)
+        );
+      } else {
         await redis.rpush(redisKey, ...messages.map(serialize));
         await redis.expire(redisKey, THREAD_TTL_SECONDS);
       }
@@ -156,6 +214,7 @@ export function createThreadManager<T>(
       toolCallId: string
     ): StoredMessage {
       return new ToolMessage({
+        id: uuidv4(),
         content: content as MessageContent,
         tool_call_id: toolCallId,
       }).toDict();
