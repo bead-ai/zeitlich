@@ -251,14 +251,13 @@ export function proxyDefaultThreadOps(
 ): ThreadOps {
   const activities = proxyActivities<ZeitlichSharedActivities>(
     options ?? {
-      startToCloseTimeout: "30m",
+      startToCloseTimeout: "10s",
       retry: {
         maximumAttempts: 6,
         initialInterval: "5s",
         maximumInterval: "15m",
         backoffCoefficient: 4,
       },
-      heartbeatTimeout: "5m",
     }
   );
 
