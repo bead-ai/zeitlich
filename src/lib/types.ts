@@ -196,7 +196,7 @@ export interface SubagentConfig<TResult extends z.ZodType = z.ZodType> {
   /** Description shown to the parent agent explaining what this subagent does */
   description: string;
   /** Whether this subagent is available (default: true). Disabled subagents are excluded from the Subagent tool. */
-  enabled?: () => boolean;
+  enabled?: boolean;
   /** Temporal workflow function or type name (used with executeChild) */
   workflow: string | Workflow;
   /** Optional task queue - defaults to parent's queue if not specified */

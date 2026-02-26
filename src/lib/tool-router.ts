@@ -77,7 +77,7 @@ export type ToolMap = Record<
     handler: ToolHandler<any, any, any>;
     strict?: boolean;
     max_uses?: number;
-    enabled?: () => boolean;
+    enabled?: boolean;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     hooks?: ToolHooks<any, any>;
   }
@@ -417,7 +417,7 @@ export function createToolRouter<T extends ToolMap>(
 
   /** Check if a tool is enabled (defaults to true when not specified) */
   const isEnabled = (tool: ToolMap[string] | SubagentConfig): boolean =>
-    tool.enabled?.() ?? true;
+    tool.enabled ?? true;
 
   if (options.subagents) {
     if (options.subagents.length > 0) {
