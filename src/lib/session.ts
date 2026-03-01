@@ -44,7 +44,6 @@ export interface SessionLifecycleHooks {
 export const createSession = async <T extends ToolMap, M = unknown>({
   threadId,
   agentName,
-  description,
   maxTurns = 50,
   metadata = {},
   runAgent,
@@ -55,7 +54,6 @@ export const createSession = async <T extends ToolMap, M = unknown>({
   processToolsInParallel = true,
   hooks = {},
   appendSystemPrompt = true,
-  systemPrompt,
   waitForInputTimeout = "48h",
 }: SessionConfig<T, M> & AgentConfig): Promise<ZeitlichSession<M>> => {
   const {
@@ -126,6 +124,8 @@ export const createSession = async <T extends ToolMap, M = unknown>({
         });
       }
 
+      const systemPrompt = stateManager.getSystemPrompt();
+
       await initializeThread(threadId);
       if (appendSystemPrompt && systemPrompt && systemPrompt.trim() !== "") {
         await appendSystemMessage(threadId, systemPrompt);
@@ -149,8 +149,6 @@ export const createSession = async <T extends ToolMap, M = unknown>({
             threadId,
             agentName,
             metadata,
-            systemPrompt,
-            description,
           });
 
           if (usage) {

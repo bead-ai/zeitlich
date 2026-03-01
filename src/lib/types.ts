@@ -31,7 +31,7 @@ export interface BaseAgentState {
   version: number;
   turns: number;
   tasks: Map<string, WorkflowTask>;
-  systemPrompt: string;
+  systemPrompt?: string;
   totalInputTokens: number;
   totalOutputTokens: number;
   cachedWriteTokens: number;
@@ -98,8 +98,6 @@ export interface AgentConfig {
   agentName: string;
   /** Description, used for sub agents */
   description?: string;
-  /** The system prompt to append to the thread */
-  systemPrompt?: string;
 }
 
 /**

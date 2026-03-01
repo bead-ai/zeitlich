@@ -90,6 +90,12 @@ export interface AgentStateManager<TCustom extends JsonSerializable<TCustom>> {
   /** Get current turns */
   getTurns(): number;
 
+  /** Get the system prompt */
+  getSystemPrompt(): string | undefined;
+
+  /** Set the system prompt */
+  setSystemPrompt(newSystemPrompt: string): void;
+
   /** Get a custom state value by key */
   get<K extends keyof TCustom>(key: K): TCustom[K];
 
@@ -164,6 +170,7 @@ export function createAgentStateManager<
   let totalCachedWriteTokens = 0;
   let totalCachedReadTokens = 0;
   let totalReasonTokens = 0;
+  let systemPrompt = initialState?.systemPrompt;
 
   // Tasks state
   const tasks = new Map<string, WorkflowTask>(initialState?.tasks);
@@ -213,6 +220,10 @@ export function createAgentStateManager<
 
     isRunning(): boolean {
       return status === "RUNNING";
+    },
+
+    getSystemPrompt(): string | undefined {
+      return systemPrompt;
     },
 
     isTerminal(): boolean {
@@ -298,6 +309,10 @@ export function createAgentStateManager<
         strict: tool.strict,
         max_uses: tool.max_uses,
       }));
+    },
+
+    setSystemPrompt(newSystemPrompt: string): void {
+      systemPrompt = newSystemPrompt;
     },
 
     deleteTask(id: string): boolean {
