@@ -3,13 +3,17 @@ import {
   defineQuery,
   defineUpdate,
   setHandler,
+  type QueryDefinition,
 } from "@temporalio/workflow";
+import type { UpdateDefinition } from "@temporalio/common/lib/interfaces";
 import {
   type AgentConfig,
   type AgentStatus,
   type BaseAgentState,
   type WorkflowTask,
   isTerminalStatus,
+  agentQueryName,
+  agentStateChangeUpdateName,
 } from "./types";
 import type { ToolDefinition } from "./tool-router";
 import { z } from "zod";
@@ -61,6 +65,11 @@ export type AgentState<TCustom extends JsonSerializable<TCustom>> =
  * the state and helpers needed for those handlers.
  */
 export interface AgentStateManager<TCustom extends JsonSerializable<TCustom>> {
+  /** Typed query definition registered for this agent's state */
+  readonly stateQuery: QueryDefinition<AgentState<TCustom>>;
+  /** Typed update definition registered for waiting on this agent's state change */
+  readonly stateChangeUpdate: UpdateDefinition<AgentState<TCustom>, [number]>;
+
   /** Get current status */
   getStatus(): AgentStatus;
   /** Check if agent is running */
@@ -196,24 +205,26 @@ export function createAgentStateManager<
     } as AgentState<TCustom>;
   }
 
-  setHandler(defineQuery(`get${agentConfig.agentName}State`), () => {
+  const stateQuery = defineQuery<AgentState<TCustom>>(
+    agentQueryName(agentConfig.agentName)
+  );
+  const stateChangeUpdate = defineUpdate<AgentState<TCustom>, [number]>(
+    agentStateChangeUpdateName(agentConfig.agentName)
+  );
+
+  setHandler(stateQuery, () => buildState());
+  setHandler(stateChangeUpdate, async (lastKnownVersion: number) => {
+    await condition(
+      () => version > lastKnownVersion || isTerminalStatus(status),
+      "55s"
+    );
     return buildState();
   });
 
-  setHandler(
-    defineUpdate<AgentState<TCustom>, [number]>(
-      `waitFor${agentConfig.agentName}StateChange`
-    ),
-    async (lastKnownVersion: number) => {
-      await condition(
-        () => version > lastKnownVersion || isTerminalStatus(status),
-        "55s"
-      );
-      return buildState();
-    }
-  );
-
   return {
+    stateQuery,
+    stateChangeUpdate,
+
     getStatus(): AgentStatus {
       return status;
     },
@@ -357,11 +368,3 @@ export function createAgentStateManager<
   };
 }
 
-/**
- * Handler names used across agents
- */
-export const AGENT_HANDLER_NAMES = {
-  getAgentState: "getAgentState",
-  waitForStateChange: "waitForStateChange",
-  addMessage: "addMessage",
-} as const;

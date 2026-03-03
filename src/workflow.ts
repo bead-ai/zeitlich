@@ -20,10 +20,7 @@ export { createSession, proxyDefaultThreadOps } from "./lib/session";
 export type { ZeitlichSession, SessionLifecycleHooks } from "./lib/session";
 
 // State management
-export {
-  createAgentStateManager,
-  AGENT_HANDLER_NAMES,
-} from "./lib/state-manager";
+export { createAgentStateManager } from "./lib/state-manager";
 export type {
   AgentState,
   AgentStateManager,
@@ -98,7 +95,11 @@ export type {
   TaskStatus,
   WorkflowTask,
 } from "./lib/types";
-export { isTerminalStatus } from "./lib/types";
+export {
+  isTerminalStatus,
+  agentQueryName,
+  agentStateChangeUpdateName,
+} from "./lib/types";
 
 // Subagent support
 export { createSubagentTool } from "./tools/subagent/tool";
