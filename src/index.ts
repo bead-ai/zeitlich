@@ -45,6 +45,9 @@ export { createBashHandler } from "./tools/bash/handler";
 
 export { toTree } from "./lib/fs";
 
+// Skills (activity-side: filesystem provider)
+export { FileSystemSkillProvider } from "./lib/skills/fs-provider";
+
 export { createThreadManager } from "./lib/thread-manager";
 export type {
   BaseThreadManager,

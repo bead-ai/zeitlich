@@ -6,6 +6,7 @@ import type {
   ToolCallResultUnion,
   ToolMap,
 } from "./tool-router";
+import type { Skill } from "./skills/types";
 
 import type { MessageContent, StoredMessage } from "@langchain/core/messages";
 import type { Duration } from "@temporalio/common";
@@ -120,6 +121,8 @@ export interface SessionConfig<T extends ToolMap, M = StoredMessage> {
   tools?: T;
   /** Subagent configurations */
   subagents?: SubagentConfig[];
+  /** Skills available to this agent (metadata + instructions, loaded activity-side) */
+  skills?: Skill[];
   /** Session lifecycle hooks */
   hooks?: Hooks<T, ToolCallResultUnion<InferToolResults<T>>>;
   /** Whether to process tools in parallel */

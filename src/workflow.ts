@@ -105,6 +105,13 @@ export {
 export { createSubagentTool } from "./tools/subagent/tool";
 export type { SubagentArgs } from "./tools/subagent/tool";
 
+// Skills (types + workflow-safe utilities)
+export type { Skill, SkillMetadata, SkillProvider } from "./lib/skills/types";
+export { parseSkillFile } from "./lib/skills/parse";
+export { createReadSkillTool } from "./tools/read-skill/tool";
+export { createReadSkillHandler } from "./tools/read-skill/handler";
+export type { ReadSkillArgs } from "./tools/read-skill/tool";
+
 // Activity type interfaces (types only, no runtime code)
 // These are safe to import in workflows for typing proxyActivities
 export type { ZeitlichSharedActivities } from "./activities";

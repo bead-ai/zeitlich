@@ -50,6 +50,7 @@ export const createSession = async <T extends ToolMap, M = unknown>({
   threadOps,
   buildContextMessage,
   subagents,
+  skills,
   tools = {} as T,
   processToolsInParallel = true,
   hooks = {},
@@ -69,6 +70,7 @@ export const createSession = async <T extends ToolMap, M = unknown>({
     threadId,
     hooks,
     subagents,
+    skills,
     parallel: processToolsInParallel,
   });
 

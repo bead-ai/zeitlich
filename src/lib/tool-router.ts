@@ -10,11 +10,17 @@ import type {
   ToolHooks,
   ToolResultConfig,
 } from "./types";
+import type { Skill } from "./skills/types";
 import type { SubagentArgs } from "../tools/subagent/tool";
 
 import type { z } from "zod";
 import { createSubagentTool, SUBAGENT_TOOL_NAME } from "../tools/subagent/tool";
 import { createSubagentHandler } from "../tools/subagent/handler";
+import {
+  createReadSkillTool,
+  READ_SKILL_TOOL_NAME,
+} from "../tools/read-skill/tool";
+import { createReadSkillHandler } from "../tools/read-skill/handler";
 
 export type { ToolMessageContent };
 
@@ -250,6 +256,8 @@ export interface ToolRouterOptions<T extends ToolMap> {
   hooks?: Hooks<T, ToolCallResultUnion<InferToolResults<T>>>;
   /** Subagent configurations */
   subagents?: SubagentConfig[];
+  /** Skills available to the agent (auto-adds ReadSkill tool when non-empty) */
+  skills?: Skill[];
 }
 
 /**
@@ -453,6 +461,13 @@ export function createToolRouter<T extends ToolMap>(
         }),
       });
     }
+  }
+
+  if (options.skills && options.skills.length > 0) {
+    toolMap.set(READ_SKILL_TOOL_NAME, {
+      ...createReadSkillTool(options.skills),
+      handler: createReadSkillHandler(options.skills),
+    });
   }
 
   async function processToolCall(
@@ -659,11 +674,15 @@ export function createToolRouter<T extends ToolMap>(
     getToolDefinitions(): ToolDefinition[] {
       const activeSubagents =
         options.subagents?.filter((subagent) => isEnabled(subagent)) ?? [];
+      const activeSkills = options.skills ?? [];
 
       return [
         ...Array.from(toolMap)
           .filter(
-            ([, tool]) => isEnabled(tool) && tool.name !== SUBAGENT_TOOL_NAME
+            ([, tool]) =>
+              isEnabled(tool) &&
+              tool.name !== SUBAGENT_TOOL_NAME &&
+              tool.name !== READ_SKILL_TOOL_NAME
           )
           .map(([name, tool]) => ({
             name,
@@ -674,6 +693,9 @@ export function createToolRouter<T extends ToolMap>(
           })),
         ...(activeSubagents.length > 0
           ? [createSubagentTool(activeSubagents)]
+          : []),
+        ...(activeSkills.length > 0
+          ? [createReadSkillTool(activeSkills)]
           : []),
       ];
     },
