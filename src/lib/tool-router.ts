@@ -21,6 +21,7 @@ import {
   READ_SKILL_TOOL_NAME,
 } from "../tools/read-skill/tool";
 import { createReadSkillHandler } from "../tools/read-skill/handler";
+import { ApplicationFailure } from "@temporalio/workflow";
 
 export type { ToolMessageContent };
 
@@ -592,7 +593,9 @@ export function createToolRouter<T extends ToolMap>(
       }
 
       if (!recovered) {
-        throw error;
+        throw ApplicationFailure.fromError(error, {
+          nonRetryable: true,
+        });
       }
     }
 

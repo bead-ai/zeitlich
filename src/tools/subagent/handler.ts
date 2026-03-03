@@ -6,6 +6,7 @@ import type {
   SubagentInput,
 } from "../../lib/types";
 import type { SubagentArgs } from "./tool";
+import type { z } from "zod";
 
 /**
  * Creates a Subagent tool handler that spawns child workflows for configured subagents.
@@ -49,7 +50,7 @@ export function createSubagentHandler<
 
     const childOpts = {
       workflowId: childWorkflowId,
-      args: [input],
+      args: [input] as const,
       taskQueue: config.taskQueue ?? parentTaskQueue,
     };
 
@@ -58,14 +59,30 @@ export function createSubagentHandler<
         ? await executeChild(config.workflow, childOpts)
         : await executeChild(config.workflow, childOpts);
 
+    if (!toolResponse) {
+      return {
+        toolResponse: "Subagent workflow returned no response",
+        data: null,
+        ...(usage && { usage }),
+      };
+    }
+
     // Validate result if schema provided, otherwise pass through as-is
     const validated = (
-      config.resultSchema ? config.resultSchema.parse(data) : null
-    ) as InferSubagentResult<T[number]> | null;
+      config.resultSchema ? config.resultSchema.safeParse(data) : null
+    ) as z.ZodSafeParseResult<InferSubagentResult<T[number]>> | null;
+
+    if (validated && !validated.success) {
+      return {
+        toolResponse: `Subagent workflow returned invalid data: ${validated.error.message}`,
+        data: null,
+        ...(usage && { usage }),
+      };
+    }
 
     return {
       toolResponse,
-      data: validated,
+      data: validated ? validated.data : data,
       ...(usage && { usage }),
     };
   };

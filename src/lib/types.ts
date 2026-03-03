@@ -4,13 +4,13 @@ import type {
   ParsedToolCallUnion,
   RawToolCall,
   ToolCallResultUnion,
+  ToolHandlerResponse,
   ToolMap,
 } from "./tool-router";
 import type { Skill } from "./skills/types";
 
 import type { MessageContent, StoredMessage } from "@langchain/core/messages";
 import type { Duration } from "@temporalio/common";
-import type { Workflow } from "@temporalio/workflow";
 import type { z } from "zod";
 
 /**
@@ -182,6 +182,10 @@ export interface ToolResultConfig {
 // Subagent Configuration
 // ============================================================================
 
+export type SubagentWorkflow<TResult extends z.ZodType = z.ZodType> = (
+  input: SubagentInput
+) => Promise<ToolHandlerResponse<TResult | null>>;
+
 /** Infer the z.infer'd result type from a SubagentConfig, or null if no schema */
 export type InferSubagentResult<T extends SubagentConfig> =
   T extends SubagentConfig<infer S> ? z.infer<S> : null;
@@ -199,7 +203,7 @@ export interface SubagentConfig<TResult extends z.ZodType = z.ZodType> {
   /** Whether this subagent is available (default: true). Disabled subagents are excluded from the Subagent tool. */
   enabled?: boolean;
   /** Temporal workflow function or type name (used with executeChild) */
-  workflow: string | Workflow;
+  workflow: string | SubagentWorkflow<TResult>;
   /** Optional task queue - defaults to parent's queue if not specified */
   taskQueue?: string;
   /** Optional Zod schema to validate the child workflow's result. If omitted, result is passed through as-is. */

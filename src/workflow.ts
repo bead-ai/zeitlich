@@ -104,6 +104,7 @@ export {
 // Subagent support
 export { createSubagentTool } from "./tools/subagent/tool";
 export type { SubagentArgs } from "./tools/subagent/tool";
+export type { SubagentWorkflow } from "./lib/types";
 
 // Skills (types + workflow-safe utilities)
 export type { Skill, SkillMetadata, SkillProvider } from "./lib/skills/types";

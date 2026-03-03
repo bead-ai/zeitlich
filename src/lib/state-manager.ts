@@ -7,7 +7,6 @@ import {
 } from "@temporalio/workflow";
 import type { UpdateDefinition } from "@temporalio/common/lib/interfaces";
 import {
-  type AgentConfig,
   type AgentStatus,
   type BaseAgentState,
   type WorkflowTask,
@@ -164,10 +163,10 @@ export function createAgentStateManager<
   TCustom extends JsonSerializable<TCustom> = Record<string, never>,
 >({
   initialState,
-  agentConfig,
+  agentName,
 }: {
   initialState?: Partial<BaseAgentState> & TCustom;
-  agentConfig: AgentConfig;
+  agentName: string;
 }): AgentStateManager<TCustom> {
   // Default state (BaseAgentState fields)
   let status: AgentStatus = initialState?.status ?? "RUNNING";
@@ -206,10 +205,10 @@ export function createAgentStateManager<
   }
 
   const stateQuery = defineQuery<AgentState<TCustom>>(
-    agentQueryName(agentConfig.agentName)
+    agentQueryName(agentName)
   );
   const stateChangeUpdate = defineUpdate<AgentState<TCustom>, [number]>(
-    agentStateChangeUpdateName(agentConfig.agentName)
+    agentStateChangeUpdateName(agentName)
   );
 
   setHandler(stateQuery, () => buildState());
@@ -367,4 +366,3 @@ export function createAgentStateManager<
     },
   };
 }
-

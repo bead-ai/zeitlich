@@ -3,6 +3,7 @@ import {
   condition,
   defineUpdate,
   setHandler,
+  ApplicationFailure,
 } from "@temporalio/workflow";
 import type { ZeitlichSharedActivities } from "../activities";
 import type {
@@ -129,7 +130,13 @@ export const createSession = async <T extends ToolMap, M = unknown>({
       const systemPrompt = stateManager.getSystemPrompt();
 
       await initializeThread(threadId);
-      if (appendSystemPrompt && systemPrompt && systemPrompt.trim() !== "") {
+      if (appendSystemPrompt) {
+        if (!systemPrompt || systemPrompt.trim() === "") {
+          throw ApplicationFailure.create({
+            message: "No system prompt in state",
+            nonRetryable: true,
+          });
+        }
         await appendSystemMessage(threadId, systemPrompt);
       }
       await appendHumanMessage(threadId, await buildContextMessage());
@@ -219,7 +226,7 @@ export const createSession = async <T extends ToolMap, M = unknown>({
         }
       } catch (error) {
         exitReason = "failed";
-        throw error;
+        throw ApplicationFailure.fromError(error);
       } finally {
         // SessionEnd hook - always called
         await callSessionEnd(exitReason, stateManager.getTurns());
