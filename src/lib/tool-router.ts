@@ -60,7 +60,7 @@ export interface ToolWithHandler<
   strict?: boolean;
   max_uses?: number;
   /** Whether this tool is available to the agent (default: true). Disabled tools are excluded from definitions and rejected at parse time. */
-  enabled?: () => boolean;
+  enabled?: boolean;
   /** Per-tool lifecycle hooks (run in addition to global hooks) */
   hooks?: ToolHooks<z.infer<TSchema>, TResult>;
 }
@@ -694,9 +694,7 @@ export function createToolRouter<T extends ToolMap>(
         ...(activeSubagents.length > 0
           ? [createSubagentTool(activeSubagents)]
           : []),
-        ...(activeSkills.length > 0
-          ? [createReadSkillTool(activeSkills)]
-          : []),
+        ...(activeSkills.length > 0 ? [createReadSkillTool(activeSkills)] : []),
       ];
     },
 
