@@ -18,14 +18,31 @@ export interface InvokeModelConfig {
 }
 
 /**
- * Core model invocation logic - shared utility for workflow-specific activities
+ * Core model invocation logic - shared utility for workflow-specific activities.
+ * Loads the conversation thread from Redis, queries the parent workflow for
+ * current tool definitions, invokes the LLM, and appends the response.
  *
- * @param options - Named options object
  * @param options.redis - Redis client for thread management
- * @param options.config - Model invocation configuration (threadId, agentName)
- * @param options.model - Pre-instantiated LangChain chat model
- * @param options.tools - Tool definitions to bind to the model
- * @returns Agent response with message and metadata
+ * @param options.config - `{ threadId, agentName }` identifying the conversation and agent
+ * @param options.model - Pre-instantiated LangChain chat model (e.g. `ChatAnthropic`, `ChatOpenAI`)
+ * @param options.client - Temporal WorkflowClient for querying workflow state (tools)
+ * @returns Agent response with message, raw tool calls, and token usage
+ *
+ * @example
+ * ```typescript
+ * import { invokeModel, type InvokeModelConfig } from 'zeitlich';
+ * import { ChatAnthropic } from '@langchain/anthropic';
+ *
+ * export const createActivities = ({ redis, client }) => ({
+ *   runAgentActivity: (config: InvokeModelConfig) => {
+ *     const model = new ChatAnthropic({
+ *       model: "claude-sonnet-4-6",
+ *       maxTokens: 4000,
+ *     });
+ *     return invokeModel({ config, model, redis, client });
+ *   },
+ * });
+ * ```
  */
 export async function invokeModel({
   redis,

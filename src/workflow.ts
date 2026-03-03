@@ -1,7 +1,7 @@
 /**
  * Workflow-safe exports for use in Temporal workflow code.
  *
- * Import from 'zeitlich/workflow' in workflow files.
+ * Import from `zeitlich/workflow` in workflow files.
  * These exports have no external dependencies (no Redis, no LangChain).
  *
  * @example
@@ -10,7 +10,10 @@
  * import {
  *   createSession,
  *   createAgentStateManager,
- *   createToolRouter,
+ *   askUserQuestionTool,
+ *   bashTool,
+ *   defineTool,
+ *   type SubagentWorkflow,
  * } from 'zeitlich/workflow';
  * ```
  */

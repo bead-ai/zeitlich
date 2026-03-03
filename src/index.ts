@@ -1,15 +1,21 @@
 /**
  * Activity-side exports for use in Temporal activity code and worker setup.
  *
- * Import from 'zeitlich' in activity files and worker setup.
+ * Import from `zeitlich` in activity files and worker setup.
  * These exports may have external dependencies (Redis, LangChain).
  *
- * For workflow code, use 'zeitlich/workflow' instead.
+ * For workflow code, use `zeitlich/workflow` instead.
  *
  * @example
  * ```typescript
  * // In your activities file
- * import { invokeModel, createGlobHandler } from 'zeitlich';
+ * import {
+ *   invokeModel,
+ *   createBashHandler,
+ *   createAskUserQuestionHandler,
+ *   toTree,
+ *   type InvokeModelConfig,
+ * } from 'zeitlich';
  *
  * // In your worker file
  * import { ZeitlichPlugin } from 'zeitlich';

@@ -2,7 +2,31 @@ import type { ActivityToolHandler } from "../../lib/tool-router";
 import type { AskUserQuestionArgs } from "./tool";
 
 /**
- * Creates handler for user interaction tool - creates AI messages for display.
+ * Creates a handler for the AskUserQuestion tool.
+ * Returns question data for display to the user via your UI layer.
+ *
+ * Typically paired with `stateManager.waitForInput()` in a `hooks.onPostToolUse`
+ * callback to pause the agent loop until the user responds.
+ *
+ * @example
+ * ```typescript
+ * import { createAskUserQuestionHandler } from 'zeitlich';
+ * import { askUserQuestionTool, defineTool } from 'zeitlich/workflow';
+ *
+ * // In activities
+ * const askUserQuestionHandlerActivity = createAskUserQuestionHandler();
+ *
+ * // In workflow
+ * tools: {
+ *   AskUserQuestion: defineTool({
+ *     ...askUserQuestionTool,
+ *     handler: askUserQuestionHandlerActivity,
+ *     hooks: {
+ *       onPostToolUse: () => { stateManager.waitForInput(); },
+ *     },
+ *   }),
+ * }
+ * ```
  */
 export const createAskUserQuestionHandler =
   (): ActivityToolHandler<

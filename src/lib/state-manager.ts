@@ -151,13 +151,31 @@ export interface AgentStateManager<TCustom extends JsonSerializable<TCustom>> {
 
 /**
  * Creates an agent state manager for tracking workflow state.
+ * Automatically registers Temporal query and update handlers for the agent.
  *
- * @param initialState - Optional initial values for base and custom state
- *   Base state defaults: status="RUNNING", version=0, turns=0, tasks=empty, fileTree=[]
+ * @param options.agentName - Unique agent name, used to derive query/update handler names
+ * @param options.initialState - Optional initial values for base and custom state.
+ *   Use `systemPrompt` here to set the agent's system prompt.
+ *   Base state defaults: status="RUNNING", version=0, turns=0, tasks=empty
  *
- * Note: Due to Temporal's workflow isolation, handlers must be set up
- * in the workflow file using defineQuery/defineUpdate and setHandler.
- * This manager provides the state and logic needed for those handlers.
+ * @example
+ * ```typescript
+ * const stateManager = createAgentStateManager({
+ *   initialState: {
+ *     systemPrompt: "You are a helpful assistant.",
+ *   },
+ *   agentName: "my-agent",
+ * });
+ *
+ * // With custom state fields
+ * const stateManager = createAgentStateManager({
+ *   initialState: {
+ *     systemPrompt: agentConfig.systemPrompt,
+ *     customField: "value",
+ *   },
+ *   agentName: agentConfig.agentName,
+ * });
+ * ```
  */
 export function createAgentStateManager<
   TCustom extends JsonSerializable<TCustom> = Record<string, never>,

@@ -24,6 +24,31 @@ const printTree = async (
   return str;
 };
 
+/**
+ * Generates a formatted file tree string from an `IFileSystem` instance.
+ * Useful for including filesystem context in agent prompts.
+ *
+ * @param fs - File system implementation (e.g. from `just-bash`)
+ * @param opts - Optional configuration for tree generation
+ * @param opts.dir - Root directory to start from (defaults to `/`)
+ * @param opts.separator - Path separator (`/` or `\\`, defaults to `/`)
+ * @param opts.depth - Maximum directory depth (defaults to 10)
+ * @param opts.sort - Sort entries alphabetically with directories first (defaults to true)
+ * @returns Formatted file tree string
+ *
+ * @example
+ * ```typescript
+ * import { toTree } from 'zeitlich';
+ *
+ * const fileTree = await toTree(inMemoryFileSystem);
+ * // Returns:
+ * // /
+ * // ├─ src/
+ * // │  ├─ index.ts
+ * // │  └─ utils.ts
+ * // └─ package.json
+ * ```
+ */
 export const toTree = async (
   fs: IFileSystem,
   opts: {

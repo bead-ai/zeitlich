@@ -11,6 +11,19 @@ type BashExecOut = {
 /** BashOptions with `fs` required */
 type BashToolOptions = Required<Pick<BashOptions, "fs">> & Omit<BashOptions, "fs">;
 
+/**
+ * Creates a Bash tool handler that executes shell commands in a sandboxed environment.
+ *
+ * @param bashOptions - Options including a required `fs` (file system implementation from `just-bash`)
+ * @returns Activity tool handler for Bash tool calls
+ *
+ * @example
+ * ```typescript
+ * import { createBashHandler } from 'zeitlich';
+ *
+ * const bashHandlerActivity = createBashHandler({ fs: inMemoryFileSystem });
+ * ```
+ */
 export const createBashHandler: (
     bashOptions: BashToolOptions,
 ) => ActivityToolHandler<BashArgs, BashExecOut | null> =

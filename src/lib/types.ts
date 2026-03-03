@@ -36,7 +36,7 @@ export interface BaseAgentState {
   totalInputTokens: number;
   totalOutputTokens: number;
   cachedWriteTokens: number;
-  cachedReadtTokens: number;
+  cachedReadTokens: number;
 }
 
 /**

@@ -42,6 +42,37 @@ export interface SessionLifecycleHooks {
   onSessionEnd?: SessionEndHook;
 }
 
+/**
+ * Creates an agent session that manages the agent loop: LLM invocation,
+ * tool routing, subagent coordination, and lifecycle hooks.
+ *
+ * @param config - Session and agent configuration (merged `SessionConfig` and `AgentConfig`)
+ * @returns A session object with `runSession()` to start the agent loop
+ *
+ * @example
+ * ```typescript
+ * import { createSession, createAgentStateManager, defineTool, bashTool } from 'zeitlich/workflow';
+ *
+ * const stateManager = createAgentStateManager({
+ *   initialState: { systemPrompt: "You are a helpful assistant." },
+ *   agentName: "my-agent",
+ * });
+ *
+ * const session = await createSession({
+ *   agentName: "my-agent",
+ *   maxTurns: 20,
+ *   threadId: runId,
+ *   runAgent: runAgentActivity,
+ *   buildContextMessage: () => [{ type: "text", text: prompt }],
+ *   subagents: [researcherSubagent],
+ *   tools: {
+ *     Bash: defineTool({ ...bashTool, handler: bashHandlerActivity }),
+ *   },
+ * });
+ *
+ * const { finalMessage, exitReason } = await session.runSession({ stateManager });
+ * ```
+ */
 export const createSession = async <T extends ToolMap, M = unknown>({
   threadId,
   agentName,
