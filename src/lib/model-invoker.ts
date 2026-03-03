@@ -1,8 +1,6 @@
 import type Redis from "ioredis";
 import { createThreadManager } from "./thread-manager";
-import { agentQueryName, type AgentResponse, type BaseAgentState } from "./types";
-import { Context } from "@temporalio/activity";
-import type { WorkflowClient } from "@temporalio/client";
+import { type AgentResponse, type SerializableToolDefinition } from "./types";
 import { mapStoredMessagesToChatMessages } from "@langchain/core/messages";
 import { v4 as uuidv4 } from "uuid";
 import type {
@@ -26,29 +24,22 @@ export interface InvokeModelConfig {
  * @param options.redis - Redis client for thread management
  * @param options.config - Model invocation configuration (threadId, agentName)
  * @param options.model - Pre-instantiated LangChain chat model
- * @param options.client - Temporal WorkflowClient for querying workflow state
+ * @param options.tools - Tool definitions to bind to the model
  * @returns Agent response with message and metadata
  */
 export async function invokeModel({
   redis,
   model,
-  client,
+  tools,
   config: { threadId, agentName },
 }: {
   redis: Redis;
-  client: WorkflowClient;
+  tools: SerializableToolDefinition[];
   config: InvokeModelConfig;
   model: BaseChatModel<BaseChatModelCallOptions & { tools?: BindToolsInput }>;
 }): Promise<AgentResponse> {
   const thread = createThreadManager({ redis, threadId });
   const runId = uuidv4();
-
-  const info = Context.current().info; // Activity info
-  const parentWorkflowId = info.workflowExecution.workflowId;
-  const parentRunId = info.workflowExecution.runId;
-
-  const handle = client.getHandle(parentWorkflowId, parentRunId);
-  const { tools } = await handle.query<BaseAgentState>(agentQueryName(agentName));
 
   const messages = await thread.load();
   const response = await model.invoke(
