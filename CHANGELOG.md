@@ -2,6 +2,27 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.11](https://github.com/bead-ai/zeitlich/compare/v0.2.9...v0.2.11) (2026-03-03)
+
+
+### Features
+
+* add agent query and update name helpers ([9fde6aa](https://github.com/bead-ai/zeitlich/commit/9fde6aa2e94a92b4a78a6df357b15206ca23953a))
+* add idempotent message appending with Redis Lua script ([fbdbff5](https://github.com/bead-ai/zeitlich/commit/fbdbff5dfcd83dd6c3208129a01741052041a4ef))
+* implement SKILL.md file parser ([db6067a](https://github.com/bead-ai/zeitlich/commit/db6067a8021d8f2dc6d9b7615e390d0404ac0b3d))
+
+
+### Bug Fixes
+
+* cleanup build in tool prompts ([134ed46](https://github.com/bead-ai/zeitlich/commit/134ed463aebf5acca780a0f4e18aad17484f3019))
+* return ActivityToolHandler from createAskUserQuestionHandler ([#20](https://github.com/bead-ai/zeitlich/issues/20)) ([a86732b](https://github.com/bead-ai/zeitlich/commit/a86732b8aa173cd29da3e7e92d3885d5723684e1))
+
+
+### Miscellaneous Chores
+
+* release 0.2.10 ([6923bd2](https://github.com/bead-ai/zeitlich/commit/6923bd29f37ccbb2080f1ea04110600d8dd853f3))
+* release 0.2.11 ([20acc6b](https://github.com/bead-ai/zeitlich/commit/20acc6b40c7796fe05427b5db5402ebc8e3ef3cb))
+
 ## [0.2.9](https://github.com/bead-ai/zeitlich/compare/v0.2.8...v0.2.9) (2026-02-24)
 
 
