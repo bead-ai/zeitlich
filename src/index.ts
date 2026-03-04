@@ -2,8 +2,8 @@
  * Activity-side exports for use in Temporal activity code and worker setup.
  *
  * Import from `zeitlich` in activity files and worker setup.
- * For LangChain-specific adapters (model invoker, thread manager, shared
- * activities), import from `zeitlich/langchain`.
+ * For LangChain-specific adapters (model invoker, thread manager, adapter),
+ * import from `zeitlich/adapters/langchain`.
  * For workflow code, use `zeitlich/workflow` instead.
  *
  * @example
@@ -16,26 +16,13 @@
  * } from 'zeitlich';
  *
  * // LangChain adapter
- * import {
- *   createLangChainModelInvoker,
- *   createLangChainSharedActivities,
- * } from 'zeitlich/langchain';
- *
- * // In your worker file
- * import { ZeitlichPlugin } from 'zeitlich';
+ * import { createLangChainAdapter } from 'zeitlich/adapters/langchain';
  * ```
  */
 
 // Re-export all workflow-safe exports for convenience
 // (Activities can use these too)
 export * from "./workflow";
-
-// Plugin (requires Redis)
-export { ZeitlichPlugin } from "./plugin";
-export type { ZeitlichPluginOptions } from "./plugin";
-
-// Shared activities interface (framework-agnostic)
-export type { ZeitlichSharedActivities } from "./activities";
 
 // Thread manager (generic, framework-agnostic)
 export { createThreadManager } from "./lib/thread-manager";

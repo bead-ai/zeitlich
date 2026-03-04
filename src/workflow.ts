@@ -136,10 +136,6 @@ export { createReadSkillTool } from "./tools/read-skill/tool";
 export { createReadSkillHandler } from "./tools/read-skill/handler";
 export type { ReadSkillArgs } from "./tools/read-skill/tool";
 
-// Activity type interfaces (types only, no runtime code)
-// These are safe to import in workflows for typing proxyActivities
-export type { ZeitlichSharedActivities } from "./activities";
-
 // Tool definitions (schemas only - no handlers)
 export { globTool } from "./tools/glob/tool";
 export type { GlobArgs } from "./tools/glob/tool";

@@ -1,18 +1,26 @@
 /**
  * LangChain adapter for Zeitlich.
  *
- * Provides LangChain-specific implementations of the framework-agnostic
- * thread manager, model invoker, and shared activities interfaces.
+ * Provides a unified adapter that bundles thread management and model
+ * invocation using LangChain's StoredMessage format.
  *
  * @example
  * ```typescript
  * import {
+ *   createLangChainAdapter,
  *   createLangChainThreadManager,
- *   createLangChainModelInvoker,
- *   createLangChainSharedActivities,
  * } from 'zeitlich/adapters/langchain';
+ *
+ * const adapter = createLangChainAdapter({ redis, model });
  * ```
  */
+
+// Adapter (primary API)
+export {
+  createLangChainAdapter,
+  type LangChainAdapter,
+  type LangChainAdapterConfig,
+} from "./activities";
 
 // Thread manager
 export {
@@ -22,12 +30,9 @@ export {
   type LangChainToolMessageContent,
 } from "./thread-manager";
 
-// Model invoker
+// Model invoker (for advanced use — prefer adapter.createModelInvoker)
 export {
   createLangChainModelInvoker,
   invokeLangChainModel,
   type LangChainModelInvokerConfig,
 } from "./model-invoker";
-
-// Shared activities
-export { createLangChainSharedActivities } from "./activities";

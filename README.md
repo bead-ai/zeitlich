@@ -45,15 +45,20 @@ The built-in LangChain adapter gives you:
 
 ```typescript
 import { ChatAnthropic } from "@langchain/anthropic";
-import { ChatOpenAI } from "@langchain/openai";
-import { createLangChainModelInvoker } from "zeitlich/adapters/langchain";
+import { createLangChainAdapter } from "zeitlich/adapters/langchain";
 import { createRunAgentActivity } from "zeitlich";
 
-const anthropic = new ChatAnthropic({ model: "claude-sonnet-4-20250514" });
-const invoker = createLangChainModelInvoker({ redis, model: anthropic });
+const adapter = createLangChainAdapter({
+  redis,
+  model: new ChatAnthropic({ model: "claude-sonnet-4-20250514" }),
+});
 
-// Queries the parent workflow for tool definitions automatically
-return { runAgent: createRunAgentActivity(client, invoker) };
+export function createActivities(client: WorkflowClient) {
+  return {
+    ...adapter.threadOps,
+    runAgent: createRunAgentActivity(client, adapter.invoker),
+  };
+}
 ```
 
 Install the LangChain package for your chosen provider:
@@ -98,25 +103,21 @@ import {
 
 // In activity files and worker setup — framework-agnostic core
 import {
-  ZeitlichPlugin,
+  createRunAgentActivity,
   createBashHandler,
   createAskUserQuestionHandler,
   toTree,
 } from "zeitlich";
 
-// LangChain adapter — LLM invocation, thread management, shared activities
-import {
-  createLangChainModelInvoker,
-  createLangChainSharedActivities,
-  createLangChainThreadManager,
-} from "zeitlich/adapters/langchain";
+// LangChain adapter — unified adapter for LLM invocation and thread management
+import { createLangChainAdapter } from "zeitlich/adapters/langchain";
 ```
 
 **Why three entry points?**
 
 - `zeitlich/workflow` — Pure TypeScript, safe for Temporal's V8 sandbox
 - `zeitlich` — Activity-side utilities (Redis, filesystem), framework-agnostic
-- `zeitlich/adapters/langchain` — LangChain-specific adapters (model invocation, thread management, shared activities)
+- `zeitlich/adapters/langchain` — LangChain-specific adapter (model invocation + thread management)
 
 ## Examples
 
@@ -226,7 +227,7 @@ import {
   createAskUserQuestionHandler,
   createRunAgentActivity,
 } from "zeitlich";
-import { createLangChainModelInvoker } from "zeitlich/adapters/langchain";
+import { createLangChainAdapter } from "zeitlich/adapters/langchain";
 
 export const createActivities = ({
   redis,
@@ -235,14 +236,17 @@ export const createActivities = ({
   redis: Redis;
   client: WorkflowClient;
 }) => {
-  const model = new ChatAnthropic({
-    model: "claude-sonnet-4-20250514",
-    maxTokens: 4096,
+  const adapter = createLangChainAdapter({
+    redis,
+    model: new ChatAnthropic({
+      model: "claude-sonnet-4-20250514",
+      maxTokens: 4096,
+    }),
   });
-  const invokeModel = createLangChainModelInvoker({ redis, model });
 
   return {
-    runAgentActivity: createRunAgentActivity(client, invokeModel),
+    ...adapter.threadOps,
+    runAgentActivity: createRunAgentActivity(client, adapter.invoker),
     searchHandlerActivity: async (args: { query: string }) => ({
       toolResponse: JSON.stringify(await performSearch(args.query)),
       data: null,
@@ -259,8 +263,6 @@ export type MyActivities = ReturnType<typeof createActivities>;
 
 ```typescript
 import { Worker, NativeConnection } from "@temporalio/worker";
-import { ZeitlichPlugin } from "zeitlich";
-import { createLangChainSharedActivities } from "zeitlich/adapters/langchain";
 import Redis from "ioredis";
 import { fileURLToPath } from "node:url";
 import { createActivities } from "./activities";
@@ -272,15 +274,10 @@ async function run() {
   const redis = new Redis({ host: "localhost", port: 6379 });
 
   const worker = await Worker.create({
-    plugins: [
-      new ZeitlichPlugin({
-        activities: createLangChainSharedActivities(redis),
-      }),
-    ],
     connection,
     taskQueue: "my-agent",
     workflowsPath: fileURLToPath(new URL("./workflows.ts", import.meta.url)),
-    activities: createActivities({ redis }),
+    activities: createActivities({ redis, client }),
   });
 
   await worker.run();
@@ -618,23 +615,23 @@ Safe for use in Temporal workflow files:
 
 Framework-agnostic utilities for activities, worker setup, and Node.js code:
 
-| Export                  | Description                                                                                   |
-| ----------------------- | --------------------------------------------------------------------------------------------- |
-| `ZeitlichPlugin`        | Temporal worker plugin that registers shared activities                                       |
-| `createThreadManager`   | Generic Redis-backed thread manager factory                                                   |
-| `toTree`                | Generate file tree string from an `IFileSystem` instance                                      |
-| Tool handlers           | `createGlobHandler`, `createEditHandler`, `createBashHandler`, `createAskUserQuestionHandler` |
+| Export                    | Description                                                                                   |
+| ------------------------- | --------------------------------------------------------------------------------------------- |
+| `createRunAgentActivity`  | Wraps a `ModelInvoker` into a `RunAgentActivity` with automatic tool loading                  |
+| `createThreadManager`     | Generic Redis-backed thread manager factory                                                   |
+| `toTree`                  | Generate file tree string from an `IFileSystem` instance                                      |
+| Tool handlers             | `createGlobHandler`, `createEditHandler`, `createBashHandler`, `createAskUserQuestionHandler` |
 
 ### LangChain Adapter Entry Point (`zeitlich/adapters/langchain`)
 
 LangChain-specific implementations:
 
-| Export                              | Description                                                          |
-| ----------------------------------- | -------------------------------------------------------------------- |
+| Export                              | Description                                                            |
+| ----------------------------------- | ---------------------------------------------------------------------- |
+| `createLangChainAdapter`            | Unified adapter returning `threadOps`, `invoker`, `createModelInvoker` |
 | `createLangChainModelInvoker`       | Factory that returns a `ModelInvoker` backed by a LangChain chat model |
-| `invokeLangChainModel`              | One-shot model invocation convenience function                       |
-| `createLangChainThreadManager`      | Thread manager with LangChain `StoredMessage` helpers                |
-| `createLangChainSharedActivities`   | Creates `ZeitlichSharedActivities` using LangChain messages          |
+| `invokeLangChainModel`              | One-shot model invocation convenience function                         |
+| `createLangChainThreadManager`      | Thread manager with LangChain `StoredMessage` helpers                  |
 
 ### Types
 
@@ -657,11 +654,6 @@ LangChain-specific implementations:
 ┌─────────────────────────────────────────────────────────────────┐
 │                        Temporal Worker                          │
 │  ┌──────────────────────────────────────────────────────────┐  │
-│  │                    ZeitlichPlugin                         │  │
-│  │  • Registers shared activities (adapter-provided)         │  │
-│  └──────────────────────────────────────────────────────────┘  │
-│                              │                                  │
-│  ┌──────────────────────────────────────────────────────────┐  │
 │  │              Workflow (zeitlich/workflow)                  │  │
 │  │  ┌────────────────┐  ┌───────────────────────────────┐   │  │
 │  │  │ State Manager  │  │           Session             │   │  │
@@ -669,7 +661,7 @@ LangChain-specific implementations:
 │  │  │ • Turns        │  │  • Tool routing & hooks       │   │  │
 │  │  │ • Custom state │  │  • Prompts (system, context)  │   │  │
 │  │  └────────────────┘  │  • Subagent coordination      │   │  │
-│  │                      └───────────────────────────────────┘   │  │
+│  │                      └───────────────────────────────┘   │  │
 │  └──────────────────────────────────────────────────────────┘  │
 │                              │                                  │
 │  ┌──────────────────────────────────────────────────────────┐  │
@@ -679,9 +671,8 @@ LangChain-specific implementations:
 │  └──────────────────────────────────────────────────────────┘  │
 │                              │                                  │
 │  ┌──────────────────────────────────────────────────────────┐  │
-│  │             LLM Adapter (zeitlich/adapters/langchain)              │  │
-│  │  • createLangChainModelInvoker (LLM invocation)           │  │
-│  │  • createLangChainSharedActivities (thread ops)           │  │
+│  │       LLM Adapter (zeitlich/adapters/langchain)           │  │
+│  │  • createLangChainAdapter (thread ops + model invoker)    │  │
 │  │  • createLangChainThreadManager (message helpers)         │  │
 │  └──────────────────────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────────────┘

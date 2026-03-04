@@ -5,7 +5,6 @@ import {
   setHandler,
   ApplicationFailure,
 } from "@temporalio/workflow";
-import type { ZeitlichSharedActivities } from "../activities";
 import type {
   ThreadOps,
   AgentConfig,
@@ -280,8 +279,9 @@ export const createSession = async <T extends ToolMap, M = unknown>({
 };
 
 /**
- * Proxy the default ZeitlichSharedActivities as ThreadOps.
- * Call this in workflow code to delegate thread operations to Temporal activities.
+ * Proxy the adapter's thread operations as Temporal activities.
+ * Call this in workflow code to delegate thread operations to the
+ * adapter-provided activities registered on the worker.
  *
  * @example
  * ```typescript
@@ -294,7 +294,7 @@ export const createSession = async <T extends ToolMap, M = unknown>({
 export function proxyDefaultThreadOps(
   options?: Parameters<typeof proxyActivities>[0]
 ): ThreadOps {
-  const activities = proxyActivities<ZeitlichSharedActivities>(
+  return proxyActivities<ThreadOps>(
     options ?? {
       startToCloseTimeout: "10s",
       retry: {
@@ -305,11 +305,4 @@ export function proxyDefaultThreadOps(
       },
     }
   );
-
-  return {
-    initializeThread: activities.initializeThread,
-    appendHumanMessage: activities.appendHumanMessage,
-    appendToolResult: activities.appendToolResult,
-    appendSystemMessage: activities.appendSystemMessage,
-  };
 }
