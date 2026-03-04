@@ -41,7 +41,11 @@ ${subagentList}
  */
 export function createSubagentTool<T extends SubagentConfig[]>(
   subagents: T
-) {
+): {
+  readonly name: typeof SUBAGENT_TOOL_NAME;
+  readonly description: string;
+  readonly schema: z.ZodObject<z.ZodRawShape>;
+} {
   if (subagents.length === 0) {
     throw new Error("createTaskTool requires at least one subagent");
   }
