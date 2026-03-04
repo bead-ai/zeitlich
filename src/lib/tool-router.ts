@@ -4,6 +4,7 @@ import type {
   PostToolUseFailureHookResult,
   PreToolUseHookResult,
   SubagentConfig,
+  SubagentHandlerResponse,
   SubagentHooks,
   TokenUsage,
   ToolHooks,
@@ -944,8 +945,9 @@ export function defineSubagent<
       | string
       | ((input: {
           prompt: string;
+          threadId?: string;
           context: TContext;
-        }) => Promise<ToolHandlerResponse<z.infer<TResult> | null>>);
+        }) => Promise<SubagentHandlerResponse<z.infer<TResult> | null>>);
     context: TContext;
     hooks?: SubagentHooks<SubagentArgs, z.infer<TResult>>;
   }
@@ -957,7 +959,8 @@ export function defineSubagent<TResult extends z.ZodType = z.ZodType>(
       | string
       | ((input: {
           prompt: string;
-        }) => Promise<ToolHandlerResponse<z.infer<TResult> | null>>);
+          threadId?: string;
+        }) => Promise<SubagentHandlerResponse<z.infer<TResult> | null>>);
     hooks?: SubagentHooks<SubagentArgs, z.infer<TResult>>;
   }
 ): SubagentConfig<TResult>;

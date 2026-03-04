@@ -26,6 +26,7 @@ export interface ZeitlichSession<M = unknown> {
   runSession<T extends JsonSerializable<T>>(args: {
     stateManager: AgentStateManager<T>;
   }): Promise<{
+    threadId: string;
     finalMessage: M | null;
     exitReason: SessionExitReason;
     usage: ReturnType<AgentStateManager<T>["getTotalUsage"]>;
@@ -129,6 +130,7 @@ export const createSession = async <T extends ToolMap, M = unknown>({
     runSession: async ({
       stateManager,
     }): Promise<{
+      threadId: string;
       finalMessage: M | null;
       exitReason: SessionExitReason;
       usage: ReturnType<typeof stateManager.getTotalUsage>;
@@ -206,6 +208,7 @@ export const createSession = async <T extends ToolMap, M = unknown>({
             stateManager.complete();
             exitReason = "completed";
             return {
+              threadId,
               finalMessage: message,
               exitReason,
               usage: stateManager.getTotalUsage(),
@@ -270,6 +273,7 @@ export const createSession = async <T extends ToolMap, M = unknown>({
       }
 
       return {
+        threadId,
         finalMessage: null,
         exitReason,
         usage: stateManager.getTotalUsage(),
