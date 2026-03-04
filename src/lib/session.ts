@@ -21,6 +21,7 @@ import {
   type ToolMap,
 } from "./tool-router";
 import type { MessageContent } from "@langchain/core/messages";
+import { getShortId } from "./thread-id";
 
 export interface ZeitlichSession<M = unknown> {
   runSession<T extends JsonSerializable<T>>(args: {
@@ -74,7 +75,7 @@ export interface SessionLifecycleHooks {
  * ```
  */
 export const createSession = async <T extends ToolMap, M = unknown>({
-  threadId,
+  threadId: providedThreadId,
   agentName,
   maxTurns = 50,
   metadata = {},
@@ -90,6 +91,8 @@ export const createSession = async <T extends ToolMap, M = unknown>({
   continueThread = false,
   waitForInputTimeout = "48h",
 }: SessionConfig<T, M> & AgentConfig): Promise<ZeitlichSession<M>> => {
+  const threadId = providedThreadId ?? getShortId();
+
   const {
     appendToolResult,
     appendHumanMessage,

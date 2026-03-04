@@ -105,8 +105,8 @@ export interface AgentConfig {
  * Configuration for a Zeitlich agent session
  */
 export interface SessionConfig<T extends ToolMap, M = StoredMessage> {
-  /** The thread ID to use for the session */
-  threadId: string;
+  /** The thread ID to use for the session (defaults to a short generated ID) */
+  threadId?: string;
   /** Metadata for the session */
   metadata?: Record<string, unknown>;
   /** Whether to append the system prompt as message to the thread */

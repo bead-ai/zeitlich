@@ -421,19 +421,17 @@ The `Subagent` tool is automatically added when subagents are configured, allowi
 By default, each session initializes a fresh thread. To continue an existing thread (e.g., resuming a conversation after a workflow completes), pass `continueThread: true` along with the previous `threadId`:
 
 ```typescript
-import { createSession, getShortId } from "zeitlich/workflow";
+import { createSession } from "zeitlich/workflow";
 
-// First run — generate a compact thread ID
-const threadId = getShortId(); // e.g. "AbX9kLmPqR2z"
-
+// First run — threadId defaults to getShortId() if omitted
 const session = await createSession({
-  threadId,
+  // threadId is optional, auto-generated if not provided
   // ... other config
 });
 
 // Later — new workflow picks up the same thread
 const resumedSession = await createSession({
-  threadId, // same ID from the first run
+  threadId: savedThreadId, // pass the ID from the first run
   continueThread: true, // skip thread init + system prompt
   // ... other config
 });
