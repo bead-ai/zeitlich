@@ -27,14 +27,14 @@
         "default": "./dist/workflow.js"
       }
     },
-    "./langchain": {
+    "./adapters/langchain": {
       "import": {
-        "types": "./dist/langchain/index.d.ts",
-        "default": "./dist/langchain/index.js"
+        "types": "./dist/adapters/langchain/index.d.ts",
+        "default": "./dist/adapters/langchain/index.js"
       },
       "require": {
-        "types": "./dist/langchain/index.d.ts",
-        "default": "./dist/langchain/index.js"
+        "types": "./dist/adapters/langchain/index.d.ts",
+        "default": "./dist/adapters/langchain/index.js"
       }
     }
   },

@@ -23,7 +23,7 @@ export interface ZeitlichPluginOptions {
  * ```typescript
  * import { Worker, NativeConnection } from '@temporalio/worker';
  * import { ZeitlichPlugin } from 'zeitlich';
- * import { createLangChainSharedActivities } from 'zeitlich/langchain';
+ * import { createLangChainSharedActivities } from 'zeitlich/adapters/langchain';
  * import Redis from 'ioredis';
  *
  * const redis = new Redis();

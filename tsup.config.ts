@@ -4,7 +4,7 @@ export default defineConfig({
   entry: {
     index: "src/index.ts",
     workflow: "src/workflow.ts",
-    "langchain/index": "src/langchain/index.ts",
+    "adapters/langchain/index": "src/adapters/langchain/index.ts",
   },
   format: ["esm", "cjs"],
   dts: true,

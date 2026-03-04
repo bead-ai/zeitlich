@@ -35,7 +35,7 @@ Temporal solves these problems for workflows. Zeitlich brings these guarantees t
 
 Zeitlich's core is framework-agnostic — it defines generic interfaces (`ModelInvoker`, `ThreadOps`, `MessageContent`) that work with any LLM SDK. Concrete implementations are provided via adapter packages.
 
-### LangChain Adapter (`zeitlich/langchain`)
+### LangChain Adapter (`zeitlich/adapters/langchain`)
 
 The built-in LangChain adapter gives you:
 
@@ -46,7 +46,7 @@ The built-in LangChain adapter gives you:
 ```typescript
 import { ChatAnthropic } from "@langchain/anthropic";
 import { ChatOpenAI } from "@langchain/openai";
-import { createLangChainModelInvoker } from "zeitlich/langchain";
+import { createLangChainModelInvoker } from "zeitlich/adapters/langchain";
 
 const anthropic = new ChatAnthropic({ model: "claude-sonnet-4-20250514" });
 const invoker = createLangChainModelInvoker({ redis, model: anthropic });
@@ -74,7 +74,7 @@ npm install zeitlich ioredis
 **Peer dependencies:**
 
 - `ioredis` >= 5.0.0
-- `@langchain/core` >= 1.0.0 (optional — only needed when using `zeitlich/langchain`)
+- `@langchain/core` >= 1.0.0 (optional — only needed when using `zeitlich/adapters/langchain`)
 
 **Required infrastructure:**
 
@@ -110,14 +110,14 @@ import {
   createLangChainModelInvoker,
   createLangChainSharedActivities,
   createLangChainThreadManager,
-} from "zeitlich/langchain";
+} from "zeitlich/adapters/langchain";
 ```
 
 **Why three entry points?**
 
 - `zeitlich/workflow` — Pure TypeScript, safe for Temporal's V8 sandbox
 - `zeitlich` — Activity-side utilities (Redis, filesystem), framework-agnostic
-- `zeitlich/langchain` — LangChain-specific adapters (model invocation, thread management, shared activities)
+- `zeitlich/adapters/langchain` — LangChain-specific adapters (model invocation, thread management, shared activities)
 
 ## Examples
 
@@ -222,7 +222,7 @@ Activities are factory functions that receive infrastructure dependencies (`redi
 import type Redis from "ioredis";
 import { ChatAnthropic } from "@langchain/anthropic";
 import { createBashHandler, createAskUserQuestionHandler } from "zeitlich";
-import { createLangChainModelInvoker } from "zeitlich/langchain";
+import { createLangChainModelInvoker } from "zeitlich/adapters/langchain";
 import type { ModelInvokerConfig } from "zeitlich/workflow";
 
 export const createActivities = ({ redis }: { redis: Redis }) => {
@@ -251,7 +251,7 @@ export type MyActivities = ReturnType<typeof createActivities>;
 ```typescript
 import { Worker, NativeConnection } from "@temporalio/worker";
 import { ZeitlichPlugin } from "zeitlich";
-import { createLangChainSharedActivities } from "zeitlich/langchain";
+import { createLangChainSharedActivities } from "zeitlich/adapters/langchain";
 import Redis from "ioredis";
 import { fileURLToPath } from "node:url";
 import { createActivities } from "./activities";
@@ -616,7 +616,7 @@ Framework-agnostic utilities for activities, worker setup, and Node.js code:
 | `toTree`                | Generate file tree string from an `IFileSystem` instance                                      |
 | Tool handlers           | `createGlobHandler`, `createEditHandler`, `createBashHandler`, `createAskUserQuestionHandler` |
 
-### LangChain Adapter Entry Point (`zeitlich/langchain`)
+### LangChain Adapter Entry Point (`zeitlich/adapters/langchain`)
 
 LangChain-specific implementations:
 
@@ -670,7 +670,7 @@ LangChain-specific implementations:
 │  └──────────────────────────────────────────────────────────┘  │
 │                              │                                  │
 │  ┌──────────────────────────────────────────────────────────┐  │
-│  │             LLM Adapter (zeitlich/langchain)              │  │
+│  │             LLM Adapter (zeitlich/adapters/langchain)              │  │
 │  │  • createLangChainModelInvoker (LLM invocation)           │  │
 │  │  • createLangChainSharedActivities (thread ops)           │  │
 │  │  • createLangChainThreadManager (message helpers)         │  │
