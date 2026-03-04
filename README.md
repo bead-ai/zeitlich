@@ -236,7 +236,7 @@ export const createActivities = ({
   redis: Redis;
   client: WorkflowClient;
 }) => {
-  const adapter = createLangChainAdapter({
+  const { threadOps, invoker } = createLangChainAdapter({
     redis,
     model: new ChatAnthropic({
       model: "claude-sonnet-4-20250514",
@@ -245,8 +245,8 @@ export const createActivities = ({
   });
 
   return {
-    ...adapter.threadOps,
-    runAgentActivity: createRunAgentActivity(client, adapter.invoker),
+    ...threadOps,
+    runAgentActivity: createRunAgentActivity(client, invoker),
     searchHandlerActivity: async (args: { query: string }) => ({
       toolResponse: JSON.stringify(await performSearch(args.query)),
       data: null,
