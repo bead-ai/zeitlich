@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.13](https://github.com/bead-ai/zeitlich/compare/v0.2.12...v0.2.13) (2026-03-04)
+
+
+### Code Refactoring
+
+* update ToolMessageContent type to use MessageContent for improved flexibility ([3dd7af6](https://github.com/bead-ai/zeitlich/commit/3dd7af64a7ee7ad8e4ab6f682155a61413fa9fca))
+
+
+### Miscellaneous Chores
+
+* release 0.2.13 ([b415fe1](https://github.com/bead-ai/zeitlich/commit/b415fe1657b6e7fc7407a95a67d52e9c39a7e388))
+
 ## [0.2.12](https://github.com/bead-ai/zeitlich/compare/v0.2.11...v0.2.12) (2026-03-04)
 
 
