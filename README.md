@@ -416,6 +416,70 @@ const session = await createSession({
 
 The `Subagent` tool is automatically added when subagents are configured, allowing the LLM to spawn child workflows.
 
+### Thread Continuation
+
+By default, each session initializes a fresh thread. To continue an existing thread (e.g., resuming a conversation after a workflow completes), pass `continueThread: true` along with the previous `threadId`:
+
+```typescript
+import { createSession, getShortId } from "zeitlich/workflow";
+
+// First run — generate a compact thread ID
+const threadId = getShortId(); // e.g. "AbX9kLmPqR2z"
+
+const session = await createSession({
+  threadId,
+  // ... other config
+});
+
+// Later — new workflow picks up the same thread
+const resumedSession = await createSession({
+  threadId, // same ID from the first run
+  continueThread: true, // skip thread init + system prompt
+  // ... other config
+});
+```
+
+`getShortId()` produces compact, workflow-deterministic IDs (~12 base-62 chars) that are more token-efficient than UUIDs.
+
+#### Subagent Thread Continuation
+
+Subagents can opt in to thread continuation via `allowThreadContinuation`. When enabled, the parent agent can pass a `threadId` to resume a previous subagent conversation:
+
+```typescript
+import { getShortId, type SubagentWorkflow } from "zeitlich/workflow";
+
+// Subagent workflow that supports continuation
+export const researcherWorkflow: SubagentWorkflow = async ({
+  prompt,
+  threadId,
+}) => {
+  const effectiveThreadId = threadId ?? getShortId();
+
+  const session = await createSession({
+    threadId: effectiveThreadId,
+    continueThread: !!threadId,
+    // ... other config
+  });
+
+  const { finalMessage } = await session.runSession({ stateManager });
+  return {
+    toolResponse: finalMessage ? extractText(finalMessage) : "No response",
+    data: null,
+    threadId: effectiveThreadId,
+  };
+};
+
+// Register with allowThreadContinuation
+export const researcherSubagent = {
+  agentName: "Researcher",
+  description: "Researches topics and gathers information",
+  workflow: researcherWorkflow,
+  allowThreadContinuation: true,
+};
+```
+
+The subagent returns its `threadId` in the response, which the handler surfaces to the parent LLM as `[Thread ID: ...]`. The parent can then pass that ID back in a subsequent `Subagent` tool call to continue the conversation.
+
 ### Filesystem Utilities
 
 Built-in support for file operations with in-memory or custom filesystem providers (e.g. from [`just-bash`](https://github.com/nicholasgasior/just-bash)).
@@ -531,6 +595,7 @@ Safe for use in Temporal workflow files:
 | `createToolRouter`        | Creates a tool router (used internally by session, or for advanced use)                                |
 | `defineTool`              | Identity function for type-safe tool definition with handler and hooks                                 |
 | `defineSubagent`          | Identity function for type-safe subagent configuration                                                 |
+| `getShortId`              | Generate a compact, workflow-deterministic identifier (base-62, 12 chars)                              |
 | `createSubagentTool`      | Creates the Subagent tool for spawning child workflows                                                 |
 | Tool definitions          | `askUserQuestionTool`, `globTool`, `grepTool`, `readFileTool`, `writeFileTool`, `editTool`, `bashTool` |
 | Task tools                | `taskCreateTool`, `taskGetTool`, `taskListTool`, `taskUpdateTool` for workflow task management         |

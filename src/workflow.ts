@@ -20,6 +20,9 @@
 
 // Session
 export { createSession, proxyDefaultThreadOps } from "./lib/session";
+
+// Thread utilities
+export { getShortId } from "./lib/thread-id";
 export type { ZeitlichSession, SessionLifecycleHooks } from "./lib/session";
 
 // State management

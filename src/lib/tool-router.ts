@@ -163,6 +163,8 @@ export interface ToolHandlerResponse<TResult = null> {
   resultAppended?: boolean;
   /** Token usage from the tool execution (e.g. child agent invocations) */
   usage?: TokenUsage;
+  /** Thread ID used by the handler (surfaced to the LLM for subagent thread continuation) */
+  threadId?: string;
 }
 
 /**

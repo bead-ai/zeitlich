@@ -132,6 +132,8 @@ export interface SessionConfig<T extends ToolMap, M = StoredMessage> {
    * Returns MessageContent array for the initial HumanMessage.
    */
   buildContextMessage: () => MessageContent | Promise<MessageContent>;
+  /** When true, skip thread initialization and system prompt — append only the new human message to the existing thread. */
+  continueThread?: boolean;
   /** How long to wait for input before cancelling the workflow */
   waitForInputTimeout?: Duration;
 }
@@ -210,6 +212,8 @@ export interface SubagentConfig<TResult extends z.ZodType = z.ZodType> {
   resultSchema?: TResult;
   /** Optional static context passed to the subagent on every invocation */
   context?: Record<string, unknown>;
+  /** Allow the parent agent to pass a threadId for this subagent to continue (default: false) */
+  allowThreadContinuation?: boolean;
   /** Per-subagent lifecycle hooks */
   hooks?: SubagentHooks;
 }
@@ -250,6 +254,8 @@ export interface SubagentInput {
   prompt: string;
   /** Optional context parameters passed from the parent agent */
   context?: Record<string, unknown>;
+  /** When set, the subagent should continue this thread instead of starting a new one */
+  threadId?: string;
 }
 
 // ============================================================================

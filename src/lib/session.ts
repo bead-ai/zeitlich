@@ -87,6 +87,7 @@ export const createSession = async <T extends ToolMap, M = unknown>({
   processToolsInParallel = true,
   hooks = {},
   appendSystemPrompt = true,
+  continueThread = false,
   waitForInputTimeout = "48h",
 }: SessionConfig<T, M> & AgentConfig): Promise<ZeitlichSession<M>> => {
   const {
@@ -160,15 +161,17 @@ export const createSession = async <T extends ToolMap, M = unknown>({
 
       const systemPrompt = stateManager.getSystemPrompt();
 
-      await initializeThread(threadId);
-      if (appendSystemPrompt) {
-        if (!systemPrompt || systemPrompt.trim() === "") {
-          throw ApplicationFailure.create({
-            message: "No system prompt in state",
-            nonRetryable: true,
-          });
+      if (!continueThread) {
+        await initializeThread(threadId);
+        if (appendSystemPrompt) {
+          if (!systemPrompt || systemPrompt.trim() === "") {
+            throw ApplicationFailure.create({
+              message: "No system prompt in state",
+              nonRetryable: true,
+            });
+          }
+          await appendSystemMessage(threadId, systemPrompt);
         }
-        await appendSystemMessage(threadId, systemPrompt);
       }
       await appendHumanMessage(threadId, await buildContextMessage());
 

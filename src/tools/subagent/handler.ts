@@ -1,5 +1,6 @@
-import { executeChild, workflowInfo, uuid4 } from "@temporalio/workflow";
-import type { ToolHandlerResponse } from "../../lib/tool-router";
+import { executeChild, workflowInfo } from "@temporalio/workflow";
+import { getShortId } from "../../lib/thread-id";
+import type { ToolHandlerResponse, ToolMessageContent } from "../../lib/tool-router";
 import type {
   InferSubagentResult,
   SubagentConfig,
@@ -40,12 +41,13 @@ export function createSubagentHandler<
       );
     }
 
-    const childWorkflowId = `${args.subagent}-${uuid4()}`;
+    const childWorkflowId = `${args.subagent}-${getShortId()}`;
 
-    // Execute the child workflow
     const input: SubagentInput = {
       prompt: args.prompt,
       ...(config.context && { context: config.context }),
+      ...(args.threadId &&
+        config.allowThreadContinuation && { threadId: args.threadId }),
     };
 
     const childOpts = {
@@ -54,7 +56,7 @@ export function createSubagentHandler<
       taskQueue: config.taskQueue ?? parentTaskQueue,
     };
 
-    const { toolResponse, data, usage } =
+    const { toolResponse, data, usage, threadId: childThreadId } =
       typeof config.workflow === "string"
         ? await executeChild(config.workflow, childOpts)
         : await executeChild(config.workflow, childOpts);
@@ -80,8 +82,16 @@ export function createSubagentHandler<
       };
     }
 
+    let finalToolResponse: ToolMessageContent = toolResponse;
+    if (config.allowThreadContinuation && childThreadId) {
+      finalToolResponse =
+        typeof toolResponse === "string"
+          ? `${toolResponse}\n\n[Thread ID: ${childThreadId}]`
+          : toolResponse;
+    }
+
     return {
-      toolResponse,
+      toolResponse: finalToolResponse,
       data: validated ? validated.data : data,
       ...(usage && { usage }),
     };
