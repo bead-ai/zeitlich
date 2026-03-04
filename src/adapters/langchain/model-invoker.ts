@@ -54,7 +54,7 @@ export function createLangChainModelInvoker({
       {
         runName: agentName,
         runId,
-        metadata: { thread_id: threadId, ...metadata },
+        metadata: { thread_id: `${agentName}-${threadId}`, ...metadata },
         tools: state.tools,
       }
     );
