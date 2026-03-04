@@ -28,7 +28,7 @@ export interface LangChainModelInvokerConfig {
  *
  * @example
  * ```typescript
- * import { createLangChainModelInvoker } from 'zeitlich/langchain';
+ * import { createLangChainModelInvoker } from 'zeitlich/adapters/langchain';
  * import { createRunAgentActivity } from 'zeitlich';
  * import { ChatAnthropic } from '@langchain/anthropic';
  *
