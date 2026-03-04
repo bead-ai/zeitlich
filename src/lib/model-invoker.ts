@@ -1,14 +1,11 @@
-import type { AgentResponse, SerializableToolDefinition } from "./types";
+import type { AgentResponse, RunAgentConfig } from "./types";
 
 /**
  * Configuration passed to a ModelInvoker.
+ * Tools are NOT passed here — implementations should load them
+ * via `queryParentWorkflowState` using `agentQueryName(config.agentName)`.
  */
-export interface ModelInvokerConfig {
-  threadId: string;
-  agentName: string;
-  tools: SerializableToolDefinition[];
-  metadata?: Record<string, unknown>;
-}
+export type ModelInvokerConfig = RunAgentConfig;
 
 /**
  * Generic model invocation contract.
@@ -19,5 +16,5 @@ export interface ModelInvokerConfig {
  * implementations of this type.
  */
 export type ModelInvoker<M = unknown> = (
-  config: ModelInvokerConfig,
+  config: ModelInvokerConfig
 ) => Promise<AgentResponse<M>>;

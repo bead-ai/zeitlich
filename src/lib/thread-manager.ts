@@ -1,17 +1,5 @@
 import type Redis from "ioredis";
 
-import {
-  type $InferMessageContent,
-  AIMessage,
-  HumanMessage,
-  type MessageContent,
-  type MessageStructure,
-  type StoredMessage,
-  SystemMessage,
-  ToolMessage,
-} from "@langchain/core/messages";
-import { v4 as uuidv4 } from "uuid";
-
 const THREAD_TTL_SECONDS = 60 * 60 * 24 * 90; // 90 days
 
 /**
@@ -39,13 +27,7 @@ function getThreadKey(threadId: string, key: string): string {
   return `thread:${threadId}:${key}`;
 }
 
-/**
- * Content for a tool message response.
- * Can be a simple string or complex content parts (text, images, cache points, etc.)
- */
-export type ToolMessageContent = $InferMessageContent<MessageStructure, "tool">;
-
-export interface ThreadManagerConfig<T = StoredMessage> {
+export interface ThreadManagerConfig<T> {
   redis: Redis;
   threadId: string;
   /** Thread key, defaults to 'messages' */
@@ -57,7 +39,6 @@ export interface ThreadManagerConfig<T = StoredMessage> {
   /**
    * Extract a unique id from a message for idempotent appends.
    * When provided, `append` uses an atomic Lua script to skip duplicate writes.
-   * Defaults to `StoredMessage.data.id` for the standard ThreadManager.
    */
   idOf?: (message: T) => string;
 }
@@ -78,51 +59,12 @@ export interface BaseThreadManager<T> {
   delete(): Promise<void>;
 }
 
-/** Thread manager with StoredMessage convenience helpers */
-export interface ThreadManager extends BaseThreadManager<StoredMessage> {
-  /** Create a HumanMessage (returns StoredMessage for storage) */
-  createHumanMessage(content: string | MessageContent): StoredMessage;
-  /** Create a SystemMessage (returns StoredMessage for storage) */
-  createSystemMessage(content: string): StoredMessage;
-  /** Create an AIMessage with optional additional kwargs */
-  createAIMessage(
-    content: string | MessageContent,
-    kwargs?: { header?: string; options?: string[]; multiSelect?: boolean }
-  ): StoredMessage;
-  /** Create a ToolMessage */
-  createToolMessage(
-    content: ToolMessageContent,
-    toolCallId: string
-  ): StoredMessage;
-  /** Create and append a HumanMessage */
-  appendHumanMessage(content: string | MessageContent): Promise<void>;
-  /** Create and append a SystemMessage */
-  appendSystemMessage(content: string): Promise<void>;
-  /** Create and append a ToolMessage */
-  appendToolMessage(
-    content: ToolMessageContent,
-    toolCallId: string
-  ): Promise<void>;
-  /** Create and append an AIMessage */
-  appendAIMessage(content: string | MessageContent): Promise<void>;
-}
-
-/** Default id extractor for StoredMessage */
-function storedMessageId(msg: StoredMessage): string {
-  return msg.data.id ?? "";
-}
-
 /**
- * Creates a thread manager for handling conversation state in Redis.
- * Without generic args, returns a full ThreadManager with StoredMessage helpers.
- * With a custom type T, returns a BaseThreadManager<T>.
+ * Creates a generic thread manager for handling conversation state in Redis.
+ * Framework-agnostic — works with any serializable message type.
  */
-export function createThreadManager(config: ThreadManagerConfig): ThreadManager;
 export function createThreadManager<T>(
-  config: ThreadManagerConfig<T>
-): BaseThreadManager<T>;
-export function createThreadManager<T>(
-  config: ThreadManagerConfig<T>
+  config: ThreadManagerConfig<T>,
 ): BaseThreadManager<T> {
   const {
     redis,
@@ -130,16 +72,9 @@ export function createThreadManager<T>(
     key = "messages",
     serialize = (m: T): string => JSON.stringify(m),
     deserialize = (raw: string): T => JSON.parse(raw) as T,
+    idOf,
   } = config;
   const redisKey = getThreadKey(threadId, key);
-
-  // Default idOf for StoredMessage when no custom serialization is used
-  const idOf =
-    config.idOf ??
-    (!config.serialize
-      ? (storedMessageId as unknown as (m: T) => string)
-      : undefined);
-
   const metaKey = getThreadKey(threadId, `${key}:meta`);
 
   async function assertThreadExists(): Promise<void> {
@@ -149,7 +84,7 @@ export function createThreadManager<T>(
     }
   }
 
-  const base: BaseThreadManager<T> = {
+  return {
     async initialize(): Promise<void> {
       await redis.del(redisKey);
       await redis.set(metaKey, "1", "EX", THREAD_TTL_SECONDS);
@@ -174,7 +109,7 @@ export function createThreadManager<T>(
           dedupKey,
           redisKey,
           String(THREAD_TTL_SECONDS),
-          ...messages.map(serialize)
+          ...messages.map(serialize),
         );
       } else {
         await redis.rpush(redisKey, ...messages.map(serialize));
@@ -186,77 +121,4 @@ export function createThreadManager<T>(
       await redis.del(redisKey, metaKey);
     },
   };
-
-  // If no custom serialize/deserialize were provided and T defaults to StoredMessage,
-  // the overload guarantees the caller gets ThreadManager with convenience helpers.
-  const helpers = {
-    createHumanMessage(content: string | MessageContent): StoredMessage {
-      return new HumanMessage({
-        id: uuidv4(),
-        content: content as string,
-      }).toDict();
-    },
-
-    createSystemMessage(content: string): StoredMessage {
-      return new SystemMessage({
-        id: uuidv4(),
-        content: content as string,
-      }).toDict();
-    },
-
-    createAIMessage(
-      content: string,
-      kwargs?: { header?: string; options?: string[]; multiSelect?: boolean }
-    ): StoredMessage {
-      return new AIMessage({
-        id: uuidv4(),
-        content,
-        additional_kwargs: kwargs
-          ? {
-              header: kwargs.header,
-              options: kwargs.options,
-              multiSelect: kwargs.multiSelect,
-            }
-          : undefined,
-      }).toDict();
-    },
-
-    createToolMessage(
-      content: ToolMessageContent,
-      toolCallId: string
-    ): StoredMessage {
-      return new ToolMessage({
-        id: uuidv4(),
-        content: content as MessageContent,
-        tool_call_id: toolCallId,
-      }).toDict();
-    },
-
-    async appendHumanMessage(content: string | MessageContent): Promise<void> {
-      const message = helpers.createHumanMessage(content);
-      await (base as BaseThreadManager<StoredMessage>).append([message]);
-    },
-
-    async appendToolMessage(
-      content: ToolMessageContent,
-      toolCallId: string
-    ): Promise<void> {
-      const message = helpers.createToolMessage(content, toolCallId);
-      await (base as BaseThreadManager<StoredMessage>).append([message]);
-    },
-
-    async appendAIMessage(content: string | MessageContent): Promise<void> {
-      const message = helpers.createAIMessage(content as string);
-      await (base as BaseThreadManager<StoredMessage>).append([message]);
-    },
-
-    async appendSystemMessage(content: string): Promise<void> {
-      const message = helpers.createSystemMessage(content);
-      // System messages should always be the first message in the thread
-      await (base as BaseThreadManager<StoredMessage>).initialize();
-      await (base as BaseThreadManager<StoredMessage>).append([message]);
-    },
-  };
-
-  return Object.assign(base, helpers);
 }

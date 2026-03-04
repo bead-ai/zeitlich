@@ -49,12 +49,10 @@ import { ChatOpenAI } from "@langchain/openai";
 import { createLangChainModelInvoker } from "zeitlich/adapters/langchain";
 
 const anthropic = new ChatAnthropic({ model: "claude-sonnet-4-20250514" });
-const invoker = createLangChainModelInvoker({ redis, model: anthropic });
+const invoker = createLangChainModelInvoker({ redis, model: anthropic, client });
 
-// Use as runAgent activity
-return {
-  runAgent: (config) => invoker({ ...config, tools: config.tools ?? [] }),
-};
+// Use directly as runAgent activity — tools are loaded via workflow query
+return { runAgent: invoker };
 ```
 
 Install the LangChain package for your chosen provider:
@@ -220,20 +218,26 @@ Activities are factory functions that receive infrastructure dependencies (`redi
 
 ```typescript
 import type Redis from "ioredis";
+import type { WorkflowClient } from "@temporalio/client";
 import { ChatAnthropic } from "@langchain/anthropic";
 import { createBashHandler, createAskUserQuestionHandler } from "zeitlich";
 import { createLangChainModelInvoker } from "zeitlich/adapters/langchain";
-import type { ModelInvokerConfig } from "zeitlich/workflow";
 
-export const createActivities = ({ redis }: { redis: Redis }) => {
+export const createActivities = ({
+  redis,
+  client,
+}: {
+  redis: Redis;
+  client: WorkflowClient;
+}) => {
   const model = new ChatAnthropic({
     model: "claude-sonnet-4-20250514",
     maxTokens: 4096,
   });
-  const invokeModel = createLangChainModelInvoker({ redis, model });
+  const invokeModel = createLangChainModelInvoker({ redis, model, client });
 
   return {
-    runAgentActivity: (config: ModelInvokerConfig) => invokeModel(config),
+    runAgentActivity: invokeModel,
     searchHandlerActivity: async (args: { query: string }) => ({
       toolResponse: JSON.stringify(await performSearch(args.query)),
       data: null,

@@ -1,4 +1,3 @@
-import type { ToolMessageContent } from "./thread-manager";
 import type {
   InferToolResults,
   ParsedToolCallUnion,
@@ -9,9 +8,21 @@ import type {
 } from "./tool-router";
 import type { Skill } from "./skills/types";
 
-import type { MessageContent, StoredMessage } from "@langchain/core/messages";
 import type { Duration } from "@temporalio/common";
 import type { z } from "zod";
+
+// ============================================================================
+// Framework-agnostic message types
+// ============================================================================
+
+/** A single content part within a structured message (text, image, etc.) */
+export type ContentPart = { type: string; [key: string]: unknown };
+
+/** Message content — plain string or an array of structured content parts */
+export type MessageContent = string | ContentPart[];
+
+/** Content returned by a tool handler */
+export type ToolMessageContent = string;
 
 /**
  * Agent execution status
@@ -66,7 +77,7 @@ export interface TokenUsage {
 /**
  * Agent response from LLM invocation
  */
-export interface AgentResponse<M = StoredMessage> {
+export interface AgentResponse<M = unknown> {
   message: M;
   rawToolCalls: RawToolCall[];
   usage?: TokenUsage;
@@ -75,7 +86,6 @@ export interface AgentResponse<M = StoredMessage> {
 /**
  * Thread operations required by a session.
  * Consumers provide these — typically by wrapping Temporal activities.
- * Use `proxyDefaultThreadOps()` for the default StoredMessage implementation.
  */
 export interface ThreadOps {
   /** Initialize an empty thread */
@@ -104,7 +114,7 @@ export interface AgentConfig {
 /**
  * Configuration for a Zeitlich agent session
  */
-export interface SessionConfig<T extends ToolMap, M = StoredMessage> {
+export interface SessionConfig<T extends ToolMap, M = unknown> {
   /** The thread ID to use for the session (defaults to a short generated ID) */
   threadId?: string;
   /** Metadata for the session */
@@ -164,7 +174,7 @@ export interface RunAgentConfig extends AgentConfig {
 /**
  * Type signature for workflow-specific runAgent activity
  */
-export type RunAgentActivity<M = StoredMessage> = (
+export type RunAgentActivity<M = unknown> = (
   config: RunAgentConfig
 ) => Promise<AgentResponse<M>>;
 

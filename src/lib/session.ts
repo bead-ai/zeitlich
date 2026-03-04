@@ -20,7 +20,7 @@ import {
   type ParsedToolCallUnion,
   type ToolMap,
 } from "./tool-router";
-import type { MessageContent } from "@langchain/core/messages";
+import type { MessageContent } from "./types";
 import { getShortId } from "./thread-id";
 
 export interface ZeitlichSession<M = unknown> {
@@ -280,8 +280,8 @@ export const createSession = async <T extends ToolMap, M = unknown>({
 };
 
 /**
- * Proxy the default ZeitlichSharedActivities as ThreadOps<StoredMessage>.
- * Call this in workflow code for the standard LangChain/StoredMessage setup.
+ * Proxy the default ZeitlichSharedActivities as ThreadOps.
+ * Call this in workflow code to delegate thread operations to Temporal activities.
  *
  * @example
  * ```typescript
