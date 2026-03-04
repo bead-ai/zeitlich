@@ -45,6 +45,6 @@ export function createRunAgentActivity<M>(
       client,
       agentQueryName(config.agentName)
     );
-    return invoker({ ...config, tools: state.tools ?? [] });
+    return invoker({ ...config, state });
   };
 }

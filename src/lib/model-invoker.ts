@@ -1,16 +1,14 @@
-import type { AgentResponse, SerializableToolDefinition } from "./types";
+import type { AgentResponse, BaseAgentState } from "./types";
 
 /**
  * Configuration passed to a ModelInvoker.
- * Includes `tools` so the invoker can bind them to the LLM call.
- *
- * Use `withToolLoading` to bridge `ModelInvoker` → `RunAgentActivity`,
- * which automatically loads tools from the parent workflow state.
+ * Includes the full agent state so adapters can read tools, system prompt,
+ * token usage, or any custom state fields for model configuration.
  */
 export interface ModelInvokerConfig {
   threadId: string;
   agentName: string;
-  tools: SerializableToolDefinition[];
+  state: BaseAgentState;
   metadata?: Record<string, unknown>;
 }
 

@@ -1,8 +1,5 @@
 import type Redis from "ioredis";
-import type {
-  AgentResponse,
-  SerializableToolDefinition,
-} from "../../lib/types";
+import type { AgentResponse } from "../../lib/types";
 import type { ModelInvokerConfig } from "../../lib/model-invoker";
 import { mapStoredMessagesToChatMessages } from "@langchain/core/messages";
 import type { StoredMessage } from "@langchain/core/messages";
@@ -46,7 +43,7 @@ export function createLangChainModelInvoker({
   return async function invokeLangChainModel(
     config: ModelInvokerConfig
   ): Promise<AgentResponse<StoredMessage>> {
-    const { threadId, agentName, tools, metadata } = config;
+    const { threadId, agentName, state, metadata } = config;
 
     const thread = createLangChainThreadManager({ redis, threadId });
     const runId = uuidv4();
@@ -58,7 +55,7 @@ export function createLangChainModelInvoker({
         runName: agentName,
         runId,
         metadata: { thread_id: threadId, ...metadata },
-        tools: tools as unknown as BindToolsInput,
+        tools: state.tools,
       }
     );
 
@@ -94,14 +91,12 @@ export function createLangChainModelInvoker({
 export async function invokeLangChainModel({
   redis,
   model,
-  tools,
-  config: { threadId, agentName },
+  config,
 }: {
   redis: Redis;
-  tools: SerializableToolDefinition[];
-  config: { threadId: string; agentName: string };
+  config: ModelInvokerConfig;
   model: BaseChatModel<BaseChatModelCallOptions & { tools?: BindToolsInput }>;
 }): Promise<AgentResponse<StoredMessage>> {
   const invoker = createLangChainModelInvoker({ redis, model });
-  return invoker({ threadId, agentName, tools });
+  return invoker(config);
 }
