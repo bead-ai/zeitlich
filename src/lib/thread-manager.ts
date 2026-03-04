@@ -252,6 +252,8 @@ export function createThreadManager<T>(
 
     async appendSystemMessage(content: string): Promise<void> {
       const message = helpers.createSystemMessage(content);
+      // System messages should always be the first message in the thread
+      await (base as BaseThreadManager<StoredMessage>).initialize();
       await (base as BaseThreadManager<StoredMessage>).append([message]);
     },
   };

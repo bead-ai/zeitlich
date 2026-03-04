@@ -165,7 +165,6 @@ export const createSession = async <T extends ToolMap, M = unknown>({
       const systemPrompt = stateManager.getSystemPrompt();
 
       if (!continueThread) {
-        await initializeThread(threadId);
         if (appendSystemPrompt) {
           if (!systemPrompt || systemPrompt.trim() === "") {
             throw ApplicationFailure.create({
@@ -174,6 +173,8 @@ export const createSession = async <T extends ToolMap, M = unknown>({
             });
           }
           await appendSystemMessage(threadId, systemPrompt);
+        } else {
+          await initializeThread(threadId);
         }
       }
       await appendHumanMessage(threadId, await buildContextMessage());
