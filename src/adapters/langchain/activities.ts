@@ -67,7 +67,7 @@ export interface LangChainAdapter {
  * ```
  */
 export function createLangChainAdapter(
-  config: LangChainAdapterConfig,
+  config: LangChainAdapterConfig
 ): LangChainAdapter {
   const { redis } = config;
 
@@ -79,7 +79,7 @@ export function createLangChainAdapter(
 
     async appendHumanMessage(
       threadId: string,
-      content: string | MessageContent,
+      content: string | MessageContent
     ): Promise<void> {
       const thread = createLangChainThreadManager({ redis, threadId });
       await thread.appendHumanMessage(content);
@@ -87,7 +87,7 @@ export function createLangChainAdapter(
 
     async appendSystemMessage(
       threadId: string,
-      content: string,
+      content: string
     ): Promise<void> {
       const thread = createLangChainThreadManager({ redis, threadId });
       await thread.appendSystemMessage(content);
@@ -105,12 +105,12 @@ export function createLangChainAdapter(
 
   const invoker: ModelInvoker<StoredMessage> = config.model
     ? makeInvoker(config.model)
-    : (() => {
+    : ((() => {
         throw new Error(
           "No default model provided to createLangChainAdapter. " +
-            "Either pass `model` in the config or use `createModelInvoker(model)` instead.",
+            "Either pass `model` in the config or use `createModelInvoker(model)` instead."
         );
-      }) as unknown as ModelInvoker<StoredMessage>;
+      }) as unknown as ModelInvoker<StoredMessage>);
 
   return {
     threadOps,

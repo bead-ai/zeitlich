@@ -942,7 +942,10 @@ export function defineSubagent<
   config: Omit<SubagentConfig<TResult>, "hooks" | "workflow" | "context"> & {
     workflow:
       | string
-      | ((input: { prompt: string; context: TContext }) => Promise<ToolHandlerResponse<TResult | null>>);
+      | ((input: {
+          prompt: string;
+          context: TContext;
+        }) => Promise<ToolHandlerResponse<z.infer<TResult> | null>>);
     context: TContext;
     hooks?: SubagentHooks<SubagentArgs, z.infer<TResult>>;
   }
@@ -950,7 +953,11 @@ export function defineSubagent<
 // Without context — verifies workflow accepts { prompt }
 export function defineSubagent<TResult extends z.ZodType = z.ZodType>(
   config: Omit<SubagentConfig<TResult>, "hooks" | "workflow"> & {
-    workflow: string | ((input: { prompt: string }) => Promise<ToolHandlerResponse<TResult | null>>);
+    workflow:
+      | string
+      | ((input: {
+          prompt: string;
+        }) => Promise<ToolHandlerResponse<z.infer<TResult> | null>>);
     hooks?: SubagentHooks<SubagentArgs, z.infer<TResult>>;
   }
 ): SubagentConfig<TResult>;

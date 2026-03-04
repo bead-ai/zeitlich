@@ -196,7 +196,7 @@ export interface ToolResultConfig {
 
 export type SubagentWorkflow<TResult extends z.ZodType = z.ZodType> = (
   input: SubagentInput
-) => Promise<ToolHandlerResponse<TResult | null>>;
+) => Promise<ToolHandlerResponse<z.infer<TResult> | null>>;
 
 /** Infer the z.infer'd result type from a SubagentConfig, or null if no schema */
 export type InferSubagentResult<T extends SubagentConfig> =
