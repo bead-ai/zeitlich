@@ -2,6 +2,47 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.12](https://github.com/bead-ai/zeitlich/compare/v0.2.11...v0.2.12) (2026-03-04)
+
+
+### Features
+
+* add provider specific adapters ([2c2ca6d](https://github.com/bead-ai/zeitlich/commit/2c2ca6dbdd0e798b3b61aad43252c833cb11dbcb))
+* add workflow state query helper and update invokeModel parameters ([5ea8275](https://github.com/bead-ai/zeitlich/commit/5ea8275a8626d6336f225e8eaf528aa2b1003209))
+* enhance thread management with existence checks ([5047721](https://github.com/bead-ai/zeitlich/commit/50477219eff028a52379e9f0c700149aa27f398b))
+* implement thread continuation support in subagent workflows ([0dbef0b](https://github.com/bead-ai/zeitlich/commit/0dbef0bb6b59b45d0cf2600ed3be79079e49c64c))
+* make threadId optional in session configuration ([048f545](https://github.com/bead-ai/zeitlich/commit/048f5454776215cbe40dfb068af6094ff8946c85))
+
+
+### Bug Fixes
+
+* improve type safety in workflow function ([d3656f0](https://github.com/bead-ai/zeitlich/commit/d3656f017079290430e2e01e9e267335b1081493))
+* only one activity call needed to start a thread ([6fa83de](https://github.com/bead-ai/zeitlich/commit/6fa83dea31223720644e037ba4df83177479095d))
+* update workflow type to return specific ToolHandlerResponse ([4295fd3](https://github.com/bead-ai/zeitlich/commit/4295fd3b2e3c49a7815c03346dbcf98866e2394f))
+
+
+### Code Refactoring
+
+* destructure LangChain adapter for improved readability and maintainability ([3bd32e9](https://github.com/bead-ai/zeitlich/commit/3bd32e92ef3478e4c73c2a4f019f83a6aabe0590))
+* enhance createSubagentTool return type for clarity ([1f59dbf](https://github.com/bead-ai/zeitlich/commit/1f59dbfbe7ad8d914dc1eead612b6faab6d746d7))
+* integrate createRunAgentActivity for improved tool management ([9ae6ed0](https://github.com/bead-ai/zeitlich/commit/9ae6ed0d21f1a0f4e73c248b807a325957ca57cb))
+* rename langchain paths to adapters for consistency ([0301fea](https://github.com/bead-ai/zeitlich/commit/0301fea986cc8766e91652006cbb233f6b35f53e))
+* streamline model invocation and enhance framework-agnostic interfaces ([10d750a](https://github.com/bead-ai/zeitlich/commit/10d750a6eb6cbb9565c350701ba4eaabc5c09b42))
+* unify LangChain adapter for streamlined model invocation and thread management ([dcebbc6](https://github.com/bead-ai/zeitlich/commit/dcebbc650f81a3b2a75c9e51436ab9205d179b55))
+* update ModelInvoker to utilize full agent state for improved tool management ([357bb79](https://github.com/bead-ai/zeitlich/commit/357bb795bc5c16260b625ee19eb5f535e7ed81af))
+
+
+### Documentation
+
+* align docs with latest changes ([e1efe2b](https://github.com/bead-ai/zeitlich/commit/e1efe2b3ffce2802936c3f08aba758464ea81303))
+* update import paths for LangChain model invoker ([be5c6b0](https://github.com/bead-ai/zeitlich/commit/be5c6b0a3dde3fda79f38bdbe0cac2cb920ad154))
+* update reaqdme order ([655fbaa](https://github.com/bead-ai/zeitlich/commit/655fbaaeb7a671abd5d30d340673ea05345b2493))
+
+
+### Miscellaneous Chores
+
+* release 0.2.12 ([a5c5c0a](https://github.com/bead-ai/zeitlich/commit/a5c5c0add81daaddd3e1412ff1fbec17836152ab))
+
 ## [0.2.11](https://github.com/bead-ai/zeitlich/compare/v0.2.9...v0.2.11) (2026-03-03)
 
 
