@@ -1,6 +1,5 @@
-import type { MessageToolDefinition } from "@langchain/core/messages";
-import type { ToolMessageContent } from "./thread-manager";
 import type {
+  ToolMessageContent,
   Hooks,
   PostToolUseFailureHookResult,
   PreToolUseHookResult,
@@ -22,8 +21,6 @@ import {
 } from "../tools/read-skill/tool";
 import { createReadSkillHandler } from "../tools/read-skill/handler";
 import { ApplicationFailure } from "@temporalio/workflow";
-
-export type { ToolMessageContent };
 
 // ============================================================================
 // Tool Definition Types (merged from tool-registry.ts)
@@ -89,16 +86,6 @@ export type ToolMap = Record<
     hooks?: ToolHooks<any, any>;
   }
 >;
-
-/**
- * Converts a ToolMap to MessageStructure-compatible tools type.
- * Maps each tool's name to a MessageToolDefinition with inferred input type from the schema.
- */
-export type ToolMapToMessageTools<T extends ToolMap> = {
-  [K in keyof T as T[K]["name"]]: MessageToolDefinition<
-    z.infer<T[K]["schema"]>
-  >;
-};
 
 /**
  * Extract the tool names from a tool map (uses the tool's name property, not the key).

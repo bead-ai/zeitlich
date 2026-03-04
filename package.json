@@ -26,6 +26,16 @@
         "types": "./dist/workflow.d.ts",
         "default": "./dist/workflow.js"
       }
+    },
+    "./langchain": {
+      "import": {
+        "types": "./dist/langchain/index.d.ts",
+        "default": "./dist/langchain/index.js"
+      },
+      "require": {
+        "types": "./dist/langchain/index.d.ts",
+        "default": "./dist/langchain/index.js"
+      }
     }
   },
   "files": [
@@ -82,7 +92,13 @@
     "vitest": "^4.0.18"
   },
   "peerDependencies": {
+    "@langchain/core": ">=1.0.0",
     "ioredis": ">=5.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@langchain/core": {
+      "optional": true
+    }
   },
   "type": "module",
   "bugs": {
@@ -90,7 +106,6 @@
   },
   "homepage": "https://github.com/bead-ai/zeitlich#readme",
   "dependencies": {
-    "@langchain/core": "^1.1.29",
     "@temporalio/common": "^1.15.0",
     "@temporalio/plugin": "^1.15.0",
     "@temporalio/workflow": "^1.15.0",

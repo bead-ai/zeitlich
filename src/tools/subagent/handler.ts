@@ -1,6 +1,7 @@
 import { executeChild, workflowInfo } from "@temporalio/workflow";
 import { getShortId } from "../../lib/thread-id";
-import type { ToolHandlerResponse, ToolMessageContent } from "../../lib/tool-router";
+import type { ToolHandlerResponse } from "../../lib/tool-router";
+import type { ToolMessageContent } from "../../lib/types";
 import type {
   InferSubagentResult,
   SubagentConfig,

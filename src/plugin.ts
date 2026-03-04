@@ -1,6 +1,5 @@
 import { SimplePlugin } from "@temporalio/plugin";
-import { createSharedActivities } from "./activities";
-import type Redis from "ioredis";
+import type { ZeitlichSharedActivities } from "./activities";
 
 /**
  * Options for the Zeitlich plugin
@@ -8,7 +7,8 @@ import type Redis from "ioredis";
  * @experimental The Zeitlich plugin is an experimental feature; APIs may change without notice.
  */
 export interface ZeitlichPluginOptions {
-  redis: Redis;
+  /** Shared activities instance (e.g. from `createLangChainSharedActivities(redis)`) */
+  activities: ZeitlichSharedActivities;
 }
 
 /**
@@ -23,11 +23,12 @@ export interface ZeitlichPluginOptions {
  * ```typescript
  * import { Worker, NativeConnection } from '@temporalio/worker';
  * import { ZeitlichPlugin } from 'zeitlich';
+ * import { createLangChainSharedActivities } from 'zeitlich/langchain';
  * import Redis from 'ioredis';
  *
  * const redis = new Redis();
  * const worker = await Worker.create({
- *   plugins: [new ZeitlichPlugin({ redis })],
+ *   plugins: [new ZeitlichPlugin({ activities: createLangChainSharedActivities(redis) })],
  *   connection,
  *   taskQueue: "my-agent",
  *   workflowsPath: fileURLToPath(new URL("./workflows.ts", import.meta.url)),
@@ -39,7 +40,7 @@ export class ZeitlichPlugin extends SimplePlugin {
   constructor(options: ZeitlichPluginOptions) {
     super({
       name: "ZeitlichPlugin",
-      activities: createSharedActivities(options.redis),
+      activities: options.activities,
     });
   }
 }

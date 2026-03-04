@@ -65,23 +65,30 @@ export type {
   ToolCallResultUnion,
   InferToolResults,
   // Other
-  ToolMessageContent,
   AppendToolResultFn,
   ProcessToolCallsContext,
 } from "./lib/tool-router";
 
 // Types
 export type {
+  // Message types (framework-agnostic)
+  ContentPart,
+  MessageContent,
+  ToolMessageContent,
+  TokenUsage,
+  // Agent types
   AgentStatus,
   BaseAgentState,
   AgentFile,
   AgentResponse,
   ThreadOps,
   AgentConfig,
+  SessionConfig,
   RunAgentConfig,
   RunAgentActivity,
   ToolResultConfig,
   SessionExitReason,
+  // Hook types
   PreToolUseHook,
   PreToolUseHookContext,
   PreToolUseHookResult,
@@ -90,14 +97,21 @@ export type {
   PostToolUseFailureHook,
   PostToolUseFailureHookContext,
   PostToolUseFailureHookResult,
+  PreHumanMessageAppendHook,
+  PreHumanMessageAppendHookContext,
+  PostHumanMessageAppendHook,
+  PostHumanMessageAppendHookContext,
+  Hooks,
   ToolHooks,
   SessionStartHook,
   SessionStartHookContext,
   SessionEndHook,
   SessionEndHookContext,
+  // Subagent types
   SubagentConfig,
   SubagentHooks,
   SubagentInput,
+  // Task types
   TaskStatus,
   WorkflowTask,
 } from "./lib/types";
@@ -106,6 +120,9 @@ export {
   agentQueryName,
   agentStateChangeUpdateName,
 } from "./lib/types";
+
+// Model invoker contract
+export type { ModelInvoker, ModelInvokerConfig } from "./lib/model-invoker";
 
 // Subagent support
 export { createSubagentTool } from "./tools/subagent/tool";
