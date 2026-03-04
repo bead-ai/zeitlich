@@ -1,8 +1,9 @@
 import type Redis from "ioredis";
-import type { AgentResponse, BaseAgentState } from "../../lib/types";
-import { agentQueryName } from "../../lib/types";
+import type {
+  AgentResponse,
+  SerializableToolDefinition,
+} from "../../lib/types";
 import type { ModelInvokerConfig } from "../../lib/model-invoker";
-import { queryParentWorkflowState } from "../../lib/workflow-helpers";
 import { mapStoredMessagesToChatMessages } from "@langchain/core/messages";
 import type { StoredMessage } from "@langchain/core/messages";
 import { v4 as uuidv4 } from "uuid";
@@ -11,13 +12,11 @@ import type {
   BaseChatModelCallOptions,
   BindToolsInput,
 } from "@langchain/core/language_models/chat_models";
-import type { WorkflowClient } from "@temporalio/client";
 import { createLangChainThreadManager } from "./thread-manager";
 
 export interface LangChainModelInvokerConfig {
   redis: Redis;
   model: BaseChatModel<BaseChatModelCallOptions & { tools?: BindToolsInput }>;
-  client: WorkflowClient;
 }
 
 /**
@@ -30,30 +29,24 @@ export interface LangChainModelInvokerConfig {
  * @example
  * ```typescript
  * import { createLangChainModelInvoker } from 'zeitlich/langchain';
+ * import { createRunAgentActivity } from 'zeitlich';
  * import { ChatAnthropic } from '@langchain/anthropic';
  *
  * const model = new ChatAnthropic({ model: "claude-sonnet-4-6" });
- * const invoker = createLangChainModelInvoker({ redis, model, client });
+ * const invoker = createLangChainModelInvoker({ redis, model });
  *
- * // Use directly as runAgent activity — tools are loaded via workflow query:
- * return { runAgent: invoker };
+ * // Wrap with createRunAgentActivity to use as runAgent activity:
+ * return { runAgent: createRunAgentActivity(client, invoker) };
  * ```
  */
 export function createLangChainModelInvoker({
   redis,
   model,
-  client,
 }: LangChainModelInvokerConfig) {
   return async function invokeLangChainModel(
     config: ModelInvokerConfig
   ): Promise<AgentResponse<StoredMessage>> {
-    const { threadId, agentName, metadata } = config;
-
-    const state = await queryParentWorkflowState<BaseAgentState>(
-      client,
-      agentQueryName(agentName)
-    );
-    const tools = state.tools ?? [];
+    const { threadId, agentName, tools, metadata } = config;
 
     const thread = createLangChainThreadManager({ redis, threadId });
     const runId = uuidv4();
@@ -97,20 +90,18 @@ export function createLangChainModelInvoker({
  * Standalone function for one-shot LangChain model invocation.
  * Convenience wrapper around createLangChainModelInvoker for cases where
  * you don't need to reuse the invoker.
- *
- * Tools are loaded automatically from the parent workflow state via query.
  */
 export async function invokeLangChainModel({
   redis,
   model,
-  client,
+  tools,
   config: { threadId, agentName },
 }: {
   redis: Redis;
-  client: WorkflowClient;
+  tools: SerializableToolDefinition[];
   config: { threadId: string; agentName: string };
   model: BaseChatModel<BaseChatModelCallOptions & { tools?: BindToolsInput }>;
 }): Promise<AgentResponse<StoredMessage>> {
-  const invoker = createLangChainModelInvoker({ redis, model, client });
-  return invoker({ threadId, agentName });
+  const invoker = createLangChainModelInvoker({ redis, model });
+  return invoker({ threadId, agentName, tools });
 }

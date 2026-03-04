@@ -51,7 +51,10 @@ export type { ModelInvoker, ModelInvokerConfig } from "./lib/model-invoker";
 export { withAutoAppend } from "./lib/tool-router";
 
 // Workflow state helpers (requires Temporal client)
-export { queryParentWorkflowState } from "./lib/workflow-helpers";
+export {
+  queryParentWorkflowState,
+  createRunAgentActivity,
+} from "./lib/workflow-helpers";
 
 // Tool handlers (activity implementations)
 // All handlers follow the factory pattern: createXHandler(deps) => handler(args)
