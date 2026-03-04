@@ -953,8 +953,7 @@ export function defineSubagent<
   config: Omit<SubagentConfig<TResult>, "hooks" | "workflow" | "context"> & {
     workflow:
       | string
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      | ((input: { prompt: string; context: TContext }) => Promise<any>);
+      | ((input: { prompt: string; context: TContext }) => Promise<ToolHandlerResponse<TResult | null>>);
     context: TContext;
     hooks?: SubagentHooks<SubagentArgs, z.infer<TResult>>;
   }
@@ -962,8 +961,7 @@ export function defineSubagent<
 // Without context — verifies workflow accepts { prompt }
 export function defineSubagent<TResult extends z.ZodType = z.ZodType>(
   config: Omit<SubagentConfig<TResult>, "hooks" | "workflow"> & {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    workflow: string | ((input: { prompt: string }) => Promise<any>);
+    workflow: string | ((input: { prompt: string }) => Promise<ToolHandlerResponse<TResult | null>>);
     hooks?: SubagentHooks<SubagentArgs, z.infer<TResult>>;
   }
 ): SubagentConfig<TResult>;
