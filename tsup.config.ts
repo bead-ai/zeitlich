@@ -5,6 +5,7 @@ export default defineConfig({
     index: "src/index.ts",
     workflow: "src/workflow.ts",
     "adapters/langchain/index": "src/adapters/langchain/index.ts",
+    "adapters/google-genai/index": "src/adapters/google-genai/index.ts",
   },
   format: ["esm", "cjs"],
   dts: true,
@@ -16,6 +17,7 @@ export default defineConfig({
   external: [
     /^@temporalio\//,
     /^@langchain\//,
+    /^@google\//,
     "ioredis",
     "@mongodb-js/zstd",
     "node-liblzma",

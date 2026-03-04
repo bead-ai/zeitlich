@@ -36,6 +36,16 @@
         "types": "./dist/adapters/langchain/index.d.ts",
         "default": "./dist/adapters/langchain/index.js"
       }
+    },
+    "./adapters/google-genai": {
+      "import": {
+        "types": "./dist/adapters/google-genai/index.d.ts",
+        "default": "./dist/adapters/google-genai/index.js"
+      },
+      "require": {
+        "types": "./dist/adapters/google-genai/index.d.ts",
+        "default": "./dist/adapters/google-genai/index.js"
+      }
     }
   },
   "files": [
@@ -92,10 +102,14 @@
     "vitest": "^4.0.18"
   },
   "peerDependencies": {
+    "@google/genai": "^1.43.0",
     "@langchain/core": ">=1.0.0",
     "ioredis": ">=5.0.0"
   },
   "peerDependenciesMeta": {
+    "@google/genai": {
+      "optional": true
+    },
     "@langchain/core": {
       "optional": true
     }
