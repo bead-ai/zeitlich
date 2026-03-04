@@ -140,18 +140,30 @@ export function createThreadManager<T>(
       ? (storedMessageId as unknown as (m: T) => string)
       : undefined);
 
+  const metaKey = getThreadKey(threadId, `${key}:meta`);
+
+  async function assertThreadExists(): Promise<void> {
+    const exists = await redis.exists(metaKey);
+    if (!exists) {
+      throw new Error(`Thread "${threadId}" (key: ${key}) does not exist`);
+    }
+  }
+
   const base: BaseThreadManager<T> = {
     async initialize(): Promise<void> {
       await redis.del(redisKey);
+      await redis.set(metaKey, "1", "EX", THREAD_TTL_SECONDS);
     },
 
     async load(): Promise<T[]> {
+      await assertThreadExists();
       const data = await redis.lrange(redisKey, 0, -1);
       return data.map(deserialize);
     },
 
     async append(messages: T[]): Promise<void> {
       if (messages.length === 0) return;
+      await assertThreadExists();
 
       if (idOf) {
         const dedupId = messages.map(idOf).join(":");
@@ -171,7 +183,7 @@ export function createThreadManager<T>(
     },
 
     async delete(): Promise<void> {
-      await redis.del(redisKey);
+      await redis.del(redisKey, metaKey);
     },
   };
 
