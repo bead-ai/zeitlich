@@ -52,7 +52,8 @@ const google = new ChatGoogleGenerativeAI({ model: "gemini-1.5-pro" });
 
 // Pass to invokeModel in your activity
 return {
-  runAgent: (config) => invokeModel({ config, model: anthropic, redis, client }),
+  runAgent: (config) =>
+    invokeModel({ config, model: anthropic, redis, client }),
 };
 ```
 
@@ -128,47 +129,7 @@ export const searchTool: ToolDefinition<"Search", typeof searchSchema> = {
 };
 ```
 
-### 2. Create Activities
-
-Activities are factory functions that receive infrastructure dependencies (`redis`, `client`). Each returns an object of activity functions registered with the Temporal worker.
-
-```typescript
-import type Redis from "ioredis";
-import type { WorkflowClient } from "@temporalio/client";
-import { ChatAnthropic } from "@langchain/anthropic";
-import {
-  invokeModel,
-  createBashHandler,
-  createAskUserQuestionHandler,
-  type InvokeModelConfig,
-} from "zeitlich";
-
-export const createActivities = ({
-  redis,
-  client,
-}: {
-  redis: Redis;
-  client: WorkflowClient;
-}) => ({
-  runAgentActivity: (config: InvokeModelConfig) => {
-    const model = new ChatAnthropic({
-      model: "claude-sonnet-4-20250514",
-      maxTokens: 4096,
-    });
-    return invokeModel({ config, model, redis, client });
-  },
-  searchHandlerActivity: async (args: { query: string }) => ({
-    toolResponse: JSON.stringify(await performSearch(args.query)),
-    data: null,
-  }),
-  bashHandlerActivity: createBashHandler({ fs: inMemoryFileSystem }),
-  askUserQuestionHandlerActivity: createAskUserQuestionHandler(),
-});
-
-export type MyActivities = ReturnType<typeof createActivities>;
-```
-
-### 3. Create the Workflow
+### 2. Create the Workflow
 
 The system prompt is set via `createAgentStateManager`'s `initialState`, and agent config fields (`agentName`, `maxTurns`, etc.) are spread into `createSession`.
 
@@ -240,6 +201,46 @@ export async function myAgentWorkflow({ prompt }: { prompt: string }) {
   const result = await session.runSession({ stateManager });
   return result;
 }
+```
+
+### 3. Create Activities
+
+Activities are factory functions that receive infrastructure dependencies (`redis`, `client`). Each returns an object of activity functions registered with the Temporal worker.
+
+```typescript
+import type Redis from "ioredis";
+import type { WorkflowClient } from "@temporalio/client";
+import { ChatAnthropic } from "@langchain/anthropic";
+import {
+  invokeModel,
+  createBashHandler,
+  createAskUserQuestionHandler,
+  type InvokeModelConfig,
+} from "zeitlich";
+
+export const createActivities = ({
+  redis,
+  client,
+}: {
+  redis: Redis;
+  client: WorkflowClient;
+}) => ({
+  runAgentActivity: (config: InvokeModelConfig) => {
+    const model = new ChatAnthropic({
+      model: "claude-sonnet-4-20250514",
+      maxTokens: 4096,
+    });
+    return invokeModel({ config, model, redis, client });
+  },
+  searchHandlerActivity: async (args: { query: string }) => ({
+    toolResponse: JSON.stringify(await performSearch(args.query)),
+    data: null,
+  }),
+  bashHandlerActivity: createBashHandler({ fs: inMemoryFileSystem }),
+  askUserQuestionHandlerActivity: createAskUserQuestionHandler(),
+});
+
+export type MyActivities = ReturnType<typeof createActivities>;
 ```
 
 ### 4. Set Up the Worker
@@ -449,7 +450,11 @@ const session = await createSession({
 For file operations, use the built-in tool handler factories. All handlers accept an `IFileSystem`:
 
 ```typescript
-import { createGlobHandler, createEditHandler, createBashHandler } from "zeitlich";
+import {
+  createGlobHandler,
+  createEditHandler,
+  createBashHandler,
+} from "zeitlich";
 
 export const createActivities = ({ redis, client }) => ({
   generateFileTreeActivity: async () => toTree(inMemoryFileSystem),
@@ -519,8 +524,8 @@ const session = await createSession({
 
 Safe for use in Temporal workflow files:
 
-| Export                    | Description                                                                                    |
-| ------------------------- | ---------------------------------------------------------------------------------------------- |
+| Export                    | Description                                                                                            |
+| ------------------------- | ------------------------------------------------------------------------------------------------------ |
 | `createSession`           | Creates an agent session with tools, prompts, subagents, and hooks                                     |
 | `createAgentStateManager` | Creates a state manager for workflow state with query/update handlers                                  |
 | `createToolRouter`        | Creates a tool router (used internally by session, or for advanced use)                                |
@@ -535,12 +540,12 @@ Safe for use in Temporal workflow files:
 
 For use in activities, worker setup, and Node.js code:
 
-| Export                   | Description                                                                       |
-| ------------------------ | --------------------------------------------------------------------------------- |
-| `ZeitlichPlugin`         | Temporal worker plugin that registers shared activities                           |
-| `createSharedActivities` | Creates thread management activities                                              |
-| `invokeModel`            | Core LLM invocation utility (requires Redis + LangChain)                          |
-| `toTree`                 | Generate file tree string from an `IFileSystem` instance                          |
+| Export                   | Description                                                                                   |
+| ------------------------ | --------------------------------------------------------------------------------------------- |
+| `ZeitlichPlugin`         | Temporal worker plugin that registers shared activities                                       |
+| `createSharedActivities` | Creates thread management activities                                                          |
+| `invokeModel`            | Core LLM invocation utility (requires Redis + LangChain)                                      |
+| `toTree`                 | Generate file tree string from an `IFileSystem` instance                                      |
 | Tool handlers            | `createGlobHandler`, `createEditHandler`, `createBashHandler`, `createAskUserQuestionHandler` |
 
 ### Types
