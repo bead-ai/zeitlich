@@ -22,7 +22,7 @@ export type ContentPart = { type: string; [key: string]: unknown };
 export type MessageContent = string | ContentPart[];
 
 /** Content returned by a tool handler */
-export type ToolMessageContent = string;
+export type ToolMessageContent = MessageContent;
 
 /**
  * Agent execution status
