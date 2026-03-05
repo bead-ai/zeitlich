@@ -132,16 +132,20 @@ export interface SandboxOps {
 // Errors
 // ============================================================================
 
-export class SandboxNotSupportedError extends Error {
+import { ApplicationFailure } from "@temporalio/common";
+
+export class SandboxNotSupportedError extends ApplicationFailure {
   constructor(operation: string) {
-    super(`Sandbox does not support: ${operation}`);
-    this.name = "SandboxNotSupportedError";
+    super(
+      `Sandbox does not support: ${operation}`,
+      "SandboxNotSupportedError",
+      true,
+    );
   }
 }
 
-export class SandboxNotFoundError extends Error {
+export class SandboxNotFoundError extends ApplicationFailure {
   constructor(sandboxId: string) {
-    super(`Sandbox not found: ${sandboxId}`);
-    this.name = "SandboxNotFoundError";
+    super(`Sandbox not found: ${sandboxId}`, "SandboxNotFoundError", true);
   }
 }
