@@ -6,7 +6,7 @@ import {
   ApplicationFailure,
 } from "@temporalio/workflow";
 import type { SessionExitReason, MessageContent } from "../types";
-import type { ThreadOps, SessionConfig } from "./types";
+import type { ThreadOps, SessionConfig, ZeitlichSession } from "./types";
 import type { SandboxOps } from "../sandbox/types";
 import { type AgentStateManager, type JsonSerializable } from "../state/types";
 import { createToolRouter } from "../tool-router/router";
@@ -64,7 +64,7 @@ export const createSession = async <T extends ToolMap, M = unknown>({
   waitForInputTimeout = "48h",
   sandbox: sandboxOps,
   sandboxId: inheritedSandboxId,
-}: SessionConfig<T, M>) => {
+}: SessionConfig<T, M>): Promise<ZeitlichSession<M>> => {
   const threadId = providedThreadId ?? getShortId();
 
   const {
@@ -109,15 +109,15 @@ export const createSession = async <T extends ToolMap, M = unknown>({
   };
 
   return {
-    runSession: async ({
+    runSession: async <TState extends JsonSerializable<TState>>({
       stateManager,
     }: {
-      stateManager: AgentStateManager<JsonSerializable<Record<string, never>>>;
+      stateManager: AgentStateManager<TState>;
     }): Promise<{
       threadId: string;
       finalMessage: M | null;
       exitReason: SessionExitReason;
-      usage: ReturnType<typeof stateManager.getTotalUsage>;
+      usage: ReturnType<AgentStateManager<TState>["getTotalUsage"]>;
     }> => {
       setHandler(
         defineUpdate<unknown, [MessageContent]>(`add${agentName}Message`),
