@@ -1,8 +1,8 @@
 import { Context } from "@temporalio/activity";
 import type { WorkflowClient } from "@temporalio/client";
-import type { ModelInvoker } from "./model-invoker";
-import type { AgentResponse, BaseAgentState, RunAgentConfig } from "./types";
-import { agentQueryName } from "./types";
+import type { ModelInvoker, AgentResponse } from "./types";
+import type { BaseAgentState, RunAgentConfig } from "../types";
+import { agentQueryName } from "../types";
 
 /**
  * Query the parent workflow's state from within an activity.

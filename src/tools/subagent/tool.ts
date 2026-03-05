@@ -1,5 +1,5 @@
 import z from "zod";
-import type { SubagentConfig } from "../../lib/types";
+import type { SubagentConfig } from "../../lib/subagent/types";
 
 export const SUBAGENT_TOOL_NAME = "Subagent" as const;
 

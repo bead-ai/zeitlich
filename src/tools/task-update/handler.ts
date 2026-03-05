@@ -1,7 +1,7 @@
 import type {
   AgentStateManager,
   JsonSerializable,
-} from "../../lib/state-manager";
+} from "../../lib/state";
 import type { ToolHandler } from "../../lib/tool-router";
 import type { WorkflowTask } from "../../lib/types";
 import type { TaskUpdateArgs } from "./tool";

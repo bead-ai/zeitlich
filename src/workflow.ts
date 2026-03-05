@@ -20,20 +20,20 @@
 
 // Session
 export { createSession, proxyDefaultThreadOps, proxySandboxOps } from "./lib/session";
+export type { ZeitlichSession, SessionLifecycleHooks, ThreadOps, SessionConfig } from "./lib/session";
 
 // Thread utilities
-export { getShortId } from "./lib/thread-id";
-export type { ZeitlichSession, SessionLifecycleHooks } from "./lib/session";
+export { getShortId } from "./lib/thread";
 
 // State management
-export { createAgentStateManager } from "./lib/state-manager";
+export { createAgentStateManager } from "./lib/state";
 export type {
   AgentState,
   AgentStateManager,
   JsonSerializable,
   JsonValue,
   JsonPrimitive,
-} from "./lib/state-manager";
+} from "./lib/state";
 
 // Tool router (includes registry functionality)
 export {
@@ -64,30 +64,6 @@ export type {
   ToolCallResult,
   ToolCallResultUnion,
   InferToolResults,
-  // Other
-  AppendToolResultFn,
-  ProcessToolCallsContext,
-} from "./lib/tool-router";
-
-// Types
-export type {
-  // Message types (framework-agnostic)
-  ContentPart,
-  MessageContent,
-  ToolMessageContent,
-  TokenUsage,
-  // Agent types
-  AgentStatus,
-  BaseAgentState,
-  AgentFile,
-  AgentResponse,
-  ThreadOps,
-  AgentConfig,
-  SessionConfig,
-  RunAgentConfig,
-  RunAgentActivity,
-  ToolResultConfig,
-  SessionExitReason,
   // Hook types
   PreToolUseHook,
   PreToolUseHookContext,
@@ -107,10 +83,27 @@ export type {
   SessionStartHookContext,
   SessionEndHook,
   SessionEndHookContext,
-  // Subagent types
-  SubagentConfig,
-  SubagentHooks,
-  SubagentInput,
+  // Other
+  AppendToolResultFn,
+  ProcessToolCallsContext,
+} from "./lib/tool-router";
+
+// Core types
+export type {
+  // Message types (framework-agnostic)
+  ContentPart,
+  MessageContent,
+  ToolMessageContent,
+  TokenUsage,
+  // Agent types
+  AgentStatus,
+  BaseAgentState,
+  AgentFile,
+  AgentConfig,
+  RunAgentConfig,
+  ToolResultConfig,
+  SessionExitReason,
+  SerializableToolDefinition,
   // Task types
   TaskStatus,
   WorkflowTask,
@@ -121,8 +114,17 @@ export {
   agentStateChangeUpdateName,
 } from "./lib/types";
 
-// Model invoker contract
-export type { ModelInvoker, ModelInvokerConfig } from "./lib/model-invoker";
+// Model types
+export type { AgentResponse, RunAgentActivity, ModelInvoker, ModelInvokerConfig } from "./lib/model";
+
+// Subagent types
+export type {
+  SubagentConfig,
+  SubagentHooks,
+  SubagentInput,
+  SubagentHandlerResponse,
+  SubagentWorkflow,
+} from "./lib/subagent/types";
 
 // Sandbox types (workflow-safe — no activity-side code)
 export type {
@@ -146,7 +148,6 @@ export {
 // Subagent support
 export { createSubagentTool } from "./tools/subagent/tool";
 export type { SubagentArgs } from "./tools/subagent/tool";
-export type { SubagentHandlerResponse, SubagentWorkflow } from "./lib/types";
 
 // Skills (types + workflow-safe utilities)
 export type { Skill, SkillMetadata, SkillProvider } from "./lib/skills/types";

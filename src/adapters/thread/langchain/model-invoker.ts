@@ -1,6 +1,6 @@
 import type Redis from "ioredis";
-import type { AgentResponse } from "../../../lib/types";
-import type { ModelInvokerConfig } from "../../../lib/model-invoker";
+import type { AgentResponse } from "../../../lib/model";
+import type { ModelInvokerConfig } from "../../../lib/model";
 import { mapStoredMessagesToChatMessages } from "@langchain/core/messages";
 import type { StoredMessage } from "@langchain/core/messages";
 import { v4 as uuidv4 } from "uuid";

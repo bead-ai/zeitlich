@@ -1,0 +1,92 @@
+import type { z } from "zod";
+import type {
+  ToolHandlerResponse,
+  PreToolUseHookResult,
+  PostToolUseFailureHookResult,
+} from "../tool-router/types";
+
+/** ToolHandlerResponse with threadId required (subagents must always surface their thread) */
+export type SubagentHandlerResponse<TResult = null> = ToolHandlerResponse<TResult> &
+  { threadId: string };
+
+export type SubagentWorkflow<TResult extends z.ZodType = z.ZodType> = (
+  input: SubagentInput
+) => Promise<SubagentHandlerResponse<z.infer<TResult> | null>>;
+
+/** Infer the z.infer'd result type from a SubagentConfig, or null if no schema */
+export type InferSubagentResult<T extends SubagentConfig> =
+  T extends SubagentConfig<infer S> ? z.infer<S> : null;
+
+/**
+ * Configuration for a subagent that can be spawned by the parent workflow.
+ *
+ * @template TResult - Zod schema type for validating the child workflow's result
+ */
+export interface SubagentConfig<TResult extends z.ZodType = z.ZodType> {
+  /** Identifier used in Task tool's subagent parameter */
+  agentName: string;
+  /** Description shown to the parent agent explaining what this subagent does */
+  description: string;
+  /** Whether this subagent is available (default: true). Disabled subagents are excluded from the Subagent tool. */
+  enabled?: boolean;
+  /** Temporal workflow function or type name (used with executeChild) */
+  workflow: string | SubagentWorkflow<TResult>;
+  /** Optional task queue - defaults to parent's queue if not specified */
+  taskQueue?: string;
+  /** Optional Zod schema to validate the child workflow's result. If omitted, result is passed through as-is. */
+  resultSchema?: TResult;
+  /** Optional static context passed to the subagent on every invocation */
+  context?: Record<string, unknown>;
+  /** Allow the parent agent to pass a threadId for this subagent to continue (default: false) */
+  allowThreadContinuation?: boolean;
+  /** Per-subagent lifecycle hooks */
+  hooks?: SubagentHooks;
+  /**
+   * Sandbox strategy for this subagent.
+   * - `'inherit'` (default): reuse the parent's sandbox (shared filesystem/exec).
+   * - `'own'`: the child creates and owns its own sandbox.
+   */
+  sandbox?: "inherit" | "own";
+}
+
+/**
+ * Per-subagent lifecycle hooks - defined on a SubagentConfig.
+ * Runs in addition to global hooks (global pre → subagent pre → execute → subagent post → global post).
+ */
+export interface SubagentHooks<TArgs = unknown, TResult = unknown> {
+  /** Called before this subagent executes - can skip or modify args */
+  onPreExecution?: (ctx: {
+    args: TArgs;
+    threadId: string;
+    turn: number;
+  }) => PreToolUseHookResult | Promise<PreToolUseHookResult>;
+  /** Called after this subagent executes successfully */
+  onPostExecution?: (ctx: {
+    args: TArgs;
+    result: TResult;
+    threadId: string;
+    turn: number;
+    durationMs: number;
+  }) => void | Promise<void>;
+  /** Called when this subagent execution fails */
+  onExecutionFailure?: (ctx: {
+    args: TArgs;
+    error: Error;
+    threadId: string;
+    turn: number;
+  }) => PostToolUseFailureHookResult | Promise<PostToolUseFailureHookResult>;
+}
+
+/**
+ * Input passed to child workflows when spawned as subagents
+ */
+export interface SubagentInput {
+  /** The prompt/task from the parent agent */
+  prompt: string;
+  /** Optional context parameters passed from the parent agent */
+  context?: Record<string, unknown>;
+  /** When set, the subagent should continue this thread instead of starting a new one */
+  threadId?: string;
+  /** Sandbox ID inherited from the parent agent (when SubagentConfig.sandbox is 'inherit') */
+  sandboxId?: string;
+}

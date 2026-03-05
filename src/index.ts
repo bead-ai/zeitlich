@@ -29,14 +29,14 @@
 export * from "./workflow";
 
 // Thread manager (generic, framework-agnostic)
-export { createThreadManager } from "./lib/thread-manager";
+export { createThreadManager } from "./lib/thread";
 export type {
   BaseThreadManager,
   ThreadManagerConfig,
-} from "./lib/thread-manager";
+} from "./lib/thread";
 
 // Model invoker contract (framework-agnostic)
-export type { ModelInvoker, ModelInvokerConfig } from "./lib/model-invoker";
+export type { ModelInvoker, ModelInvokerConfig } from "./lib/model";
 
 // Auto-append wrapper for large tool results (activity-side only)
 export { withAutoAppend } from "./lib/tool-router";
@@ -45,7 +45,7 @@ export { withAutoAppend } from "./lib/tool-router";
 export {
   queryParentWorkflowState,
   createRunAgentActivity,
-} from "./lib/workflow-helpers";
+} from "./lib/model";
 
 // Sandbox (activity-side: manager)
 export { SandboxManager } from "./lib/sandbox/manager";
@@ -62,5 +62,4 @@ export { createReadFileHandler } from "./tools/read-file/handler";
 
 export { createWriteFileHandler } from "./tools/write-file/handler";
 
-export { toTree } from "./lib/fs";
-
+export { toTree } from "./lib/utils";

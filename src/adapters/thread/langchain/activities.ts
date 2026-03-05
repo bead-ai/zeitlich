@@ -1,7 +1,8 @@
 import type Redis from "ioredis";
-import type { ThreadOps, ToolResultConfig } from "../../../lib/types";
+import type { ToolResultConfig } from "../../../lib/types";
 import type { MessageContent } from "@langchain/core/messages";
-import type { ModelInvoker } from "../../../lib/model-invoker";
+import type { ThreadOps } from "../../../lib/session/types";
+import type { ModelInvoker } from "../../../lib/model";
 import type { StoredMessage } from "@langchain/core/messages";
 import type {
   BaseChatModel,

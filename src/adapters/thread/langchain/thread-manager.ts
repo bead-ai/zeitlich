@@ -14,7 +14,7 @@ import {
   createThreadManager,
   type BaseThreadManager,
   type ThreadManagerConfig,
-} from "../../../lib/thread-manager";
+} from "../../../lib/thread";
 
 export type LangChainToolMessageContent = $InferMessageContent<
   MessageStructure,

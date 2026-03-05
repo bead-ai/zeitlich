@@ -4,7 +4,7 @@ import {
   createThreadManager,
   type BaseThreadManager,
   type ThreadManagerConfig,
-} from "../../../lib/thread-manager";
+} from "../../../lib/thread";
 import type { MessageContent, ToolMessageContent } from "../../../lib/types";
 
 /** A Content with a unique ID for idempotent Redis storage */

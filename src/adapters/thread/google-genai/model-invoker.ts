@@ -4,8 +4,9 @@ import type {
   Content,
   FunctionDeclaration,
 } from "@google/genai";
-import type { AgentResponse, SerializableToolDefinition } from "../../../lib/types";
-import type { ModelInvokerConfig } from "../../../lib/model-invoker";
+import type { SerializableToolDefinition } from "../../../lib/types";
+import type { AgentResponse } from "../../../lib/model";
+import type { ModelInvokerConfig } from "../../../lib/model";
 import { createGoogleGenAIThreadManager } from "./thread-manager";
 
 export interface GoogleGenAIModelInvokerConfig {

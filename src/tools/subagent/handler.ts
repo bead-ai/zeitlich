@@ -1,12 +1,12 @@
 import { executeChild, workflowInfo } from "@temporalio/workflow";
-import { getShortId } from "../../lib/thread-id";
+import { getShortId } from "../../lib/thread/id";
 import type { ToolHandlerResponse } from "../../lib/tool-router";
 import type { ToolMessageContent } from "../../lib/types";
 import type {
   InferSubagentResult,
   SubagentConfig,
   SubagentInput,
-} from "../../lib/types";
+} from "../../lib/subagent/types";
 import type { SubagentArgs } from "./tool";
 import type { z } from "zod";
 

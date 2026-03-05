@@ -1,4 +1,4 @@
-import type { SandboxFileSystem } from "./sandbox/types";
+import type { SandboxFileSystem } from "../sandbox/types";
 
 const basename = (path: string, separator: string): string => {
   if (path[path.length - 1] === separator) path = path.slice(0, -1);

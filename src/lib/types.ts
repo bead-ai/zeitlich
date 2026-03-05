@@ -1,17 +1,3 @@
-import type {
-  InferToolResults,
-  ParsedToolCallUnion,
-  RawToolCall,
-  ToolCallResultUnion,
-  ToolHandlerResponse,
-  ToolMap,
-} from "./tool-router";
-import type { Skill } from "./skills/types";
-import type { SandboxOps } from "./sandbox/types";
-
-import type { Duration } from "@temporalio/common";
-import type { z } from "zod";
-
 // ============================================================================
 // Framework-agnostic message types
 // ============================================================================
@@ -24,6 +10,10 @@ export type MessageContent = string | ContentPart[];
 
 /** Content returned by a tool handler */
 export type ToolMessageContent = MessageContent;
+
+// ============================================================================
+// Agent core types
+// ============================================================================
 
 /**
  * Agent execution status
@@ -76,33 +66,6 @@ export interface TokenUsage {
 }
 
 /**
- * Agent response from LLM invocation
- */
-export interface AgentResponse<M = unknown> {
-  message: M;
-  rawToolCalls: RawToolCall[];
-  usage?: TokenUsage;
-}
-
-/**
- * Thread operations required by a session.
- * Consumers provide these — typically by wrapping Temporal activities.
- */
-export interface ThreadOps {
-  /** Initialize an empty thread */
-  initializeThread(threadId: string): Promise<void>;
-  /** Append a human message to the thread */
-  appendHumanMessage(
-    threadId: string,
-    content: string | MessageContent
-  ): Promise<void>;
-  /** Append a tool result to the thread */
-  appendToolResult(config: ToolResultConfig): Promise<void>;
-  /** Append a system message to the thread */
-  appendSystemMessage(threadId: string, content: string): Promise<void>;
-}
-
-/**
  * Configuration for a Zeitlich agent
  */
 export interface AgentConfig {
@@ -110,51 +73,6 @@ export interface AgentConfig {
   agentName: string;
   /** Description, used for sub agents */
   description?: string;
-}
-
-/**
- * Configuration for a Zeitlich agent session
- */
-export interface SessionConfig<T extends ToolMap, M = unknown> {
-  /** The thread ID to use for the session (defaults to a short generated ID) */
-  threadId?: string;
-  /** Metadata for the session */
-  metadata?: Record<string, unknown>;
-  /** Whether to append the system prompt as message to the thread */
-  appendSystemPrompt?: boolean;
-  /** How many turns to run the session for */
-  maxTurns?: number;
-  /** Workflow-specific runAgent activity (with tools pre-bound) */
-  runAgent: RunAgentActivity<M>;
-  /** Thread operations (initialize, append messages, parse tool calls) */
-  threadOps?: ThreadOps;
-  /** Tool router for processing tool calls (optional if agent has no tools) */
-  tools?: T;
-  /** Subagent configurations */
-  subagents?: SubagentConfig[];
-  /** Skills available to this agent (metadata + instructions, loaded activity-side) */
-  skills?: Skill[];
-  /** Session lifecycle hooks */
-  hooks?: Hooks<T, ToolCallResultUnion<InferToolResults<T>>>;
-  /** Whether to process tools in parallel */
-  processToolsInParallel?: boolean;
-  /**
-   * Build context message content from agent-specific context.
-   * Returns MessageContent array for the initial HumanMessage.
-   */
-  buildContextMessage: () => MessageContent | Promise<MessageContent>;
-  /** When true, skip thread initialization and system prompt — append only the new human message to the existing thread. */
-  continueThread?: boolean;
-  /** How long to wait for input before cancelling the workflow */
-  waitForInputTimeout?: Duration;
-  /** Sandbox lifecycle operations (optional — omit for agents that don't need a sandbox) */
-  sandbox?: SandboxOps;
-  /**
-   * Pre-existing sandbox ID to reuse (e.g. inherited from a parent agent).
-   * When set, the session skips `createSandbox` and will not destroy the
-   * sandbox on exit (the owner is responsible for cleanup).
-   */
-  sandboxId?: string;
 }
 
 /**
@@ -181,13 +99,6 @@ export interface RunAgentConfig extends AgentConfig {
 }
 
 /**
- * Type signature for workflow-specific runAgent activity
- */
-export type RunAgentActivity<M = unknown> = (
-  config: RunAgentConfig
-) => Promise<AgentResponse<M>>;
-
-/**
  * Configuration for appending a tool result
  */
 export interface ToolResultConfig {
@@ -197,96 +108,6 @@ export interface ToolResultConfig {
   toolName: string;
   /** Content for the tool message (string or complex content parts) */
   content: ToolMessageContent;
-}
-
-// ============================================================================
-// Subagent Configuration
-// ============================================================================
-
-/** ToolHandlerResponse with threadId required (subagents must always surface their thread) */
-export type SubagentHandlerResponse<TResult = null> = ToolHandlerResponse<TResult> &
-  { threadId: string };
-
-export type SubagentWorkflow<TResult extends z.ZodType = z.ZodType> = (
-  input: SubagentInput
-) => Promise<SubagentHandlerResponse<z.infer<TResult> | null>>;
-
-/** Infer the z.infer'd result type from a SubagentConfig, or null if no schema */
-export type InferSubagentResult<T extends SubagentConfig> =
-  T extends SubagentConfig<infer S> ? z.infer<S> : null;
-
-/**
- * Configuration for a subagent that can be spawned by the parent workflow.
- *
- * @template TResult - Zod schema type for validating the child workflow's result
- */
-export interface SubagentConfig<TResult extends z.ZodType = z.ZodType> {
-  /** Identifier used in Task tool's subagent parameter */
-  agentName: string;
-  /** Description shown to the parent agent explaining what this subagent does */
-  description: string;
-  /** Whether this subagent is available (default: true). Disabled subagents are excluded from the Subagent tool. */
-  enabled?: boolean;
-  /** Temporal workflow function or type name (used with executeChild) */
-  workflow: string | SubagentWorkflow<TResult>;
-  /** Optional task queue - defaults to parent's queue if not specified */
-  taskQueue?: string;
-  /** Optional Zod schema to validate the child workflow's result. If omitted, result is passed through as-is. */
-  resultSchema?: TResult;
-  /** Optional static context passed to the subagent on every invocation */
-  context?: Record<string, unknown>;
-  /** Allow the parent agent to pass a threadId for this subagent to continue (default: false) */
-  allowThreadContinuation?: boolean;
-  /** Per-subagent lifecycle hooks */
-  hooks?: SubagentHooks;
-  /**
-   * Sandbox strategy for this subagent.
-   * - `'inherit'` (default): reuse the parent's sandbox (shared filesystem/exec).
-   * - `'own'`: the child creates and owns its own sandbox.
-   */
-  sandbox?: "inherit" | "own";
-}
-
-/**
- * Per-subagent lifecycle hooks - defined on a SubagentConfig.
- * Runs in addition to global hooks (global pre → subagent pre → execute → subagent post → global post).
- */
-export interface SubagentHooks<TArgs = unknown, TResult = unknown> {
-  /** Called before this subagent executes - can skip or modify args */
-  onPreExecution?: (ctx: {
-    args: TArgs;
-    threadId: string;
-    turn: number;
-  }) => PreToolUseHookResult | Promise<PreToolUseHookResult>;
-  /** Called after this subagent executes successfully */
-  onPostExecution?: (ctx: {
-    args: TArgs;
-    result: TResult;
-    threadId: string;
-    turn: number;
-    durationMs: number;
-  }) => void | Promise<void>;
-  /** Called when this subagent execution fails */
-  onExecutionFailure?: (ctx: {
-    args: TArgs;
-    error: Error;
-    threadId: string;
-    turn: number;
-  }) => PostToolUseFailureHookResult | Promise<PostToolUseFailureHookResult>;
-}
-
-/**
- * Input passed to child workflows when spawned as subagents
- */
-export interface SubagentInput {
-  /** The prompt/task from the parent agent */
-  prompt: string;
-  /** Optional context parameters passed from the parent agent */
-  context?: Record<string, unknown>;
-  /** When set, the subagent should continue this thread instead of starting a new one */
-  threadId?: string;
-  /** Sandbox ID inherited from the parent agent (when SubagentConfig.sandbox is 'inherit') */
-  sandboxId?: string;
 }
 
 // ============================================================================
@@ -321,7 +142,7 @@ export interface WorkflowTask {
 }
 
 // ============================================================================
-// Session Lifecycle Hooks
+// Session exit
 // ============================================================================
 
 /**
@@ -333,213 +154,6 @@ export type SessionExitReason =
   | "waiting_for_input"
   | "failed"
   | "cancelled";
-
-/**
- * Context for PreToolUse hook - called before tool execution
- */
-export interface PreToolUseHookContext<T extends ToolMap> {
-  /** The tool call about to be executed */
-  toolCall: ParsedToolCallUnion<T>;
-  /** Thread identifier */
-  threadId: string;
-  /** Current turn number */
-  turn: number;
-}
-
-/**
- * Result from PreToolUse hook - can block or modify execution
- */
-export interface PreToolUseHookResult {
-  /** Skip this tool call entirely */
-  skip?: boolean;
-  /** Modified args to use instead (must match schema) */
-  modifiedArgs?: unknown;
-}
-
-/**
- * PreToolUse hook - called before tool execution, can block or modify
- */
-export type PreToolUseHook<T extends ToolMap> = (
-  ctx: PreToolUseHookContext<T>
-) => PreToolUseHookResult | Promise<PreToolUseHookResult>;
-
-/**
- * Context for PostToolUse hook - called after successful tool execution
- */
-export interface PostToolUseHookContext<T extends ToolMap, TResult = unknown> {
-  /** The tool call that was executed */
-  toolCall: ParsedToolCallUnion<T>;
-  /** The result from the tool handler */
-  result: TResult;
-  /** Thread identifier */
-  threadId: string;
-  /** Current turn number */
-  turn: number;
-  /** Execution duration in milliseconds */
-  durationMs: number;
-}
-
-/**
- * PostToolUse hook - called after successful tool execution
- */
-export type PostToolUseHook<T extends ToolMap, TResult = unknown> = (
-  ctx: PostToolUseHookContext<T, TResult>
-) => void | Promise<void>;
-
-/**
- * Context for PostToolUseFailure hook - called when tool execution fails
- */
-export interface PostToolUseFailureHookContext<T extends ToolMap> {
-  /** The tool call that failed */
-  toolCall: ParsedToolCallUnion<T>;
-  /** The error that occurred */
-  error: Error;
-  /** Thread identifier */
-  threadId: string;
-  /** Current turn number */
-  turn: number;
-}
-
-/**
- * Result from PostToolUseFailure hook - can recover from errors
- */
-export interface PostToolUseFailureHookResult {
-  /** Provide a fallback result instead of throwing */
-  fallbackContent?: ToolMessageContent;
-  /** Whether to suppress the error (still logs, but continues) */
-  suppress?: boolean;
-}
-
-/**
- * PostToolUseFailure hook - called when tool execution fails
- */
-export type PostToolUseFailureHook<T extends ToolMap> = (
-  ctx: PostToolUseFailureHookContext<T>
-) => PostToolUseFailureHookResult | Promise<PostToolUseFailureHookResult>;
-
-/**
- * Context for SessionStart hook - called when session begins
- */
-export interface SessionStartHookContext {
-  /** Thread identifier */
-  threadId: string;
-  /** Name of the agent */
-  agentName: string;
-  /** Session metadata */
-  metadata: Record<string, unknown>;
-}
-
-/**
- * SessionStart hook - called when session begins
- */
-export type SessionStartHook = (
-  ctx: SessionStartHookContext
-) => void | Promise<void>;
-
-/**
- * Context for PreHumanMessageAppend hook - called before each human message is appended to the thread
- */
-export interface PreHumanMessageAppendHookContext {
-  /** The message about to be appended */
-  message: MessageContent;
-  /** Thread identifier */
-  threadId: string;
-}
-
-/**
- * PreHumanMessageAppend hook - called before each human message is appended to the thread
- */
-export type PreHumanMessageAppendHook = (
-  ctx: PreHumanMessageAppendHookContext
-) => void | Promise<void>;
-
-/**
- * PostHumanMessageAppend hook - called after each human message is appended to the thread
- */
-export type PostHumanMessageAppendHook = (
-  ctx: PostHumanMessageAppendHookContext
-) => void | Promise<void>;
-
-/**
- * Context for PostHumanMessageAppend hook - called after each human message is appended to the thread
- */
-export interface PostHumanMessageAppendHookContext {
-  /** The message that was appended */
-  message: MessageContent;
-  /** Thread identifier */
-  threadId: string;
-}
-
-/**
- * Context for SessionEnd hook - called when session ends
- */
-export interface SessionEndHookContext {
-  /** Thread identifier */
-  threadId: string;
-  /** Name of the agent */
-  agentName: string;
-  /** Reason the session ended */
-  exitReason: SessionExitReason;
-  /** Total turns executed */
-  turns: number;
-  /** Session metadata */
-  metadata: Record<string, unknown>;
-}
-
-/**
- * SessionEnd hook - called when session ends
- */
-export type SessionEndHook = (
-  ctx: SessionEndHookContext
-) => void | Promise<void>;
-
-/**
- * Per-tool lifecycle hooks - defined directly on a tool definition.
- * Runs in addition to global hooks (global pre → tool pre → execute → tool post → global post).
- */
-export interface ToolHooks<TArgs = unknown, TResult = unknown> {
-  /** Called before this tool executes - can skip or modify args */
-  onPreToolUse?: (ctx: {
-    args: TArgs;
-    threadId: string;
-    turn: number;
-  }) => PreToolUseHookResult | Promise<PreToolUseHookResult>;
-  /** Called after this tool executes successfully */
-  onPostToolUse?: (ctx: {
-    args: TArgs;
-    result: TResult;
-    threadId: string;
-    turn: number;
-    durationMs: number;
-  }) => void | Promise<void>;
-  /** Called when this tool execution fails */
-  onPostToolUseFailure?: (ctx: {
-    args: TArgs;
-    error: Error;
-    threadId: string;
-    turn: number;
-  }) => PostToolUseFailureHookResult | Promise<PostToolUseFailureHookResult>;
-}
-
-/**
- * Combined hooks interface for session lifecycle
- */
-export interface Hooks<T extends ToolMap, TResult = unknown> {
-  /** Called before each human message is appended to the thread */
-  onPreHumanMessageAppend?: PreHumanMessageAppendHook;
-  /** Called after each human message is appended to the thread */
-  onPostHumanMessageAppend?: PostHumanMessageAppendHook;
-  /** Called before each tool execution - can block or modify */
-  onPreToolUse?: PreToolUseHook<T>;
-  /** Called after each successful tool execution */
-  onPostToolUse?: PostToolUseHook<T, TResult>;
-  /** Called when tool execution fails */
-  onPostToolUseFailure?: PostToolUseFailureHook<T>;
-  /** Called when session starts */
-  onSessionStart?: SessionStartHook;
-  /** Called when session ends */
-  onSessionEnd?: SessionEndHook;
-}
 
 // ============================================================================
 // Agent Query/Update Name Helpers

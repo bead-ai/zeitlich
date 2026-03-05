@@ -5,44 +5,13 @@ import {
   setHandler,
   ApplicationFailure,
 } from "@temporalio/workflow";
-import type {
-  ThreadOps,
-  AgentConfig,
-  SessionStartHook,
-  SessionEndHook,
-  SessionExitReason,
-  SessionConfig,
-} from "./types";
-import type { SandboxOps } from "./sandbox/types";
-import { type AgentStateManager, type JsonSerializable } from "./state-manager";
-import {
-  createToolRouter,
-  type ParsedToolCallUnion,
-  type ToolMap,
-} from "./tool-router";
-import type { MessageContent } from "./types";
-import { getShortId } from "./thread-id";
-
-export interface ZeitlichSession<M = unknown> {
-  runSession<T extends JsonSerializable<T>>(args: {
-    stateManager: AgentStateManager<T>;
-  }): Promise<{
-    threadId: string;
-    finalMessage: M | null;
-    exitReason: SessionExitReason;
-    usage: ReturnType<AgentStateManager<T>["getTotalUsage"]>;
-  }>;
-}
-
-/**
- * Session-level hooks for lifecycle events
- */
-export interface SessionLifecycleHooks {
-  /** Called when session starts */
-  onSessionStart?: SessionStartHook;
-  /** Called when session ends */
-  onSessionEnd?: SessionEndHook;
-}
+import type { AgentConfig, SessionExitReason, MessageContent } from "../types";
+import type { ThreadOps, SessionConfig } from "./types";
+import type { SandboxOps } from "../sandbox/types";
+import { type AgentStateManager, type JsonSerializable } from "../state/types";
+import { createToolRouter } from "../tool-router/router";
+import type { ParsedToolCallUnion, ToolMap } from "../tool-router/types";
+import { getShortId } from "../thread/id";
 
 /**
  * Creates an agent session that manages the agent loop: LLM invocation,
@@ -93,7 +62,7 @@ export const createSession = async <T extends ToolMap, M = unknown>({
   waitForInputTimeout = "48h",
   sandbox: sandboxOps,
   sandboxId: inheritedSandboxId,
-}: SessionConfig<T, M> & AgentConfig): Promise<ZeitlichSession<M>> => {
+}: SessionConfig<T, M> & AgentConfig) => {
   const threadId = providedThreadId ?? getShortId();
 
   const {
@@ -113,7 +82,6 @@ export const createSession = async <T extends ToolMap, M = unknown>({
     parallel: processToolsInParallel,
   });
 
-  // Helper to call session end hook
   const callSessionEnd = async (
     exitReason: SessionExitReason,
     turns: number
@@ -132,6 +100,8 @@ export const createSession = async <T extends ToolMap, M = unknown>({
   return {
     runSession: async ({
       stateManager,
+    }: {
+      stateManager: AgentStateManager<JsonSerializable<Record<string, never>>>;
     }): Promise<{
       threadId: string;
       finalMessage: M | null;
@@ -214,7 +184,6 @@ export const createSession = async <T extends ToolMap, M = unknown>({
             stateManager.updateUsage(usage);
           }
 
-          // No tools configured - treat any non-end_turn as completed
           if (!toolRouter.hasTools() || rawToolCalls.length === 0) {
             stateManager.complete();
             exitReason = "completed";
@@ -226,7 +195,6 @@ export const createSession = async <T extends ToolMap, M = unknown>({
             };
           }
 
-          // Parse all tool calls uniformly through the router
           const parsedToolCalls: ParsedToolCallUnion<T>[] = [];
           for (const tc of rawToolCalls) {
             try {
@@ -243,7 +211,6 @@ export const createSession = async <T extends ToolMap, M = unknown>({
             }
           }
 
-          // Hooks can call stateManager.waitForInput() to pause the session
           const toolCallResults = await toolRouter.processToolCalls(
             parsedToolCalls,
             {
@@ -265,14 +232,12 @@ export const createSession = async <T extends ToolMap, M = unknown>({
             );
             if (!conditionMet) {
               stateManager.cancel();
-              // Wait briefly to allow pending waitForStateChange handlers to complete
               await condition(() => false, "2s");
               break;
             }
           }
         }
 
-        // Check if we hit max turns
         if (stateManager.getTurns() >= maxTurns && stateManager.isRunning()) {
           exitReason = "max_turns";
         }
@@ -280,10 +245,8 @@ export const createSession = async <T extends ToolMap, M = unknown>({
         exitReason = "failed";
         throw ApplicationFailure.fromError(error);
       } finally {
-        // SessionEnd hook - always called
         await callSessionEnd(exitReason, stateManager.getTurns());
 
-        // Destroy sandbox only if this session created it
         if (ownsSandbox && sandboxId && sandboxOps) {
           await sandboxOps.destroySandbox(sandboxId);
         }
