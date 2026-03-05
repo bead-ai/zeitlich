@@ -13,6 +13,8 @@ export interface FileEntry {
   size: number;
   /** ISO-8601 date string (JSON-safe) */
   mtime: string;
+  /** Consumer-defined metadata (e.g. mimeType, controlTestFileId). JSON-serializable. */
+  metadata?: Record<string, string | number | boolean | null>;
 }
 
 // ============================================================================

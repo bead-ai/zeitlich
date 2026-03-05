@@ -71,6 +71,11 @@ export class VirtualSandboxFileSystem<TCtx = unknown>
     return this.mutations;
   }
 
+  /** Look up a file entry by virtual path. */
+  getEntry(path: string): FileEntry | undefined {
+    return this.entries.get(normalisePath(path));
+  }
+
   // --------------------------------------------------------------------------
   // Read operations — delegate to resolver lazily
   // --------------------------------------------------------------------------
