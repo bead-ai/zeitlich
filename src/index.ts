@@ -64,5 +64,3 @@ export { createWriteFileHandler } from "./tools/write-file/handler";
 
 export { toTree } from "./lib/fs";
 
-// Skills (activity-side: filesystem provider)
-export { FileSystemSkillProvider } from "./lib/skills/fs-provider";

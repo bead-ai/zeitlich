@@ -1,10 +1,10 @@
-import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
+import type { SandboxFileSystem } from "../sandbox/types";
 import type { Skill, SkillMetadata, SkillProvider } from "./types";
 import { parseSkillFile } from "./parse";
 
 /**
- * Loads skills from a filesystem directory following the agentskills.io layout:
+ * Loads skills from a directory following the agentskills.io layout:
  *
  * ```
  * skills/
@@ -14,17 +14,21 @@ import { parseSkillFile } from "./parse";
  * │   └── SKILL.md
  * ```
  *
- * Activity-side only — cannot be used in Temporal workflow code.
+ * Uses the sandbox filesystem abstraction — works with any backend
+ * (in-memory, host FS, Wasmer, Daytona, etc.).
  */
 export class FileSystemSkillProvider implements SkillProvider {
-  constructor(private readonly baseDir: string) {}
+  constructor(
+    private readonly fs: SandboxFileSystem,
+    private readonly baseDir: string,
+  ) {}
 
   async listSkills(): Promise<SkillMetadata[]> {
     const dirs = await this.discoverSkillDirs();
     const skills: SkillMetadata[] = [];
 
     for (const dir of dirs) {
-      const raw = await readFile(join(this.baseDir, dir, "SKILL.md"), "utf-8");
+      const raw = await this.fs.readFile(join(this.baseDir, dir, "SKILL.md"));
       const { frontmatter } = parseSkillFile(raw);
       skills.push(frontmatter);
     }
@@ -33,15 +37,14 @@ export class FileSystemSkillProvider implements SkillProvider {
   }
 
   async getSkill(name: string): Promise<Skill> {
-    const raw = await readFile(
+    const raw = await this.fs.readFile(
       join(this.baseDir, name, "SKILL.md"),
-      "utf-8"
     );
     const { frontmatter, body } = parseSkillFile(raw);
 
     if (frontmatter.name !== name) {
       throw new Error(
-        `Skill directory "${name}" contains SKILL.md with mismatched name "${frontmatter.name}"`
+        `Skill directory "${name}" contains SKILL.md with mismatched name "${frontmatter.name}"`,
       );
     }
 
@@ -57,7 +60,7 @@ export class FileSystemSkillProvider implements SkillProvider {
     const skills: Skill[] = [];
 
     for (const dir of dirs) {
-      const raw = await readFile(join(this.baseDir, dir, "SKILL.md"), "utf-8");
+      const raw = await this.fs.readFile(join(this.baseDir, dir, "SKILL.md"));
       const { frontmatter, body } = parseSkillFile(raw);
       skills.push({ ...frontmatter, instructions: body });
     }
@@ -66,16 +69,14 @@ export class FileSystemSkillProvider implements SkillProvider {
   }
 
   private async discoverSkillDirs(): Promise<string[]> {
-    const entries = await readdir(this.baseDir, { withFileTypes: true });
+    const entries = await this.fs.readdirWithFileTypes(this.baseDir);
     const dirs: string[] = [];
 
     for (const entry of entries) {
-      if (!entry.isDirectory()) continue;
-      try {
-        await readFile(join(this.baseDir, entry.name, "SKILL.md"), "utf-8");
+      if (!entry.isDirectory) continue;
+      const skillPath = join(this.baseDir, entry.name, "SKILL.md");
+      if (await this.fs.exists(skillPath)) {
         dirs.push(entry.name);
-      } catch {
-        // No SKILL.md — skip
       }
     }
 

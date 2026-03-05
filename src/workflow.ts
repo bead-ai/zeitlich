@@ -151,6 +151,7 @@ export type { SubagentHandlerResponse, SubagentWorkflow } from "./lib/types";
 // Skills (types + workflow-safe utilities)
 export type { Skill, SkillMetadata, SkillProvider } from "./lib/skills/types";
 export { parseSkillFile } from "./lib/skills/parse";
+export { FileSystemSkillProvider } from "./lib/skills/fs-provider";
 export { createReadSkillTool } from "./tools/read-skill/tool";
 export { createReadSkillHandler } from "./tools/read-skill/handler";
 export type { ReadSkillArgs } from "./tools/read-skill/tool";
