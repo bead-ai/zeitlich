@@ -46,6 +46,15 @@ export type { ModelInvoker, ModelInvokerConfig } from "./lib/model";
 export { withAutoAppend, withSandbox } from "./lib/tool-router";
 export type { SandboxContext } from "./lib/tool-router";
 
+// Virtual sandbox adapter (activity-side)
+export {
+  createVirtualSandbox,
+  createBuildFileTreeActivity,
+  withVirtualSandbox,
+  VirtualSandboxFileSystem,
+} from "./adapters/sandbox/virtual";
+export type { VirtualSandboxContext } from "./adapters/sandbox/virtual";
+
 // Activity-side wrappers (requires Temporal client)
 export {
   queryParentWorkflowState,

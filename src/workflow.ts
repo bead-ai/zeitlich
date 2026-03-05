@@ -149,6 +149,16 @@ export {
   SandboxNotSupportedError,
 } from "./lib/sandbox/types";
 
+// Virtual sandbox (workflow-safe types + utility)
+export { applyTreeMutations } from "./adapters/sandbox/virtual";
+export type {
+  FileEntry,
+  FileResolver,
+  VirtualFileTree,
+  VirtualSandboxState,
+  TreeMutation,
+} from "./adapters/sandbox/virtual";
+
 // Subagent support
 export type { SubagentArgs } from "./lib/subagent";
 
