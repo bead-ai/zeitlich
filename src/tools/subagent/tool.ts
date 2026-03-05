@@ -89,5 +89,5 @@ export type SubagentArgs = {
   subagent: string;
   description: string;
   prompt: string;
-  threadId?: string;
+  threadId?: string | null;
 };

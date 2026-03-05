@@ -33,7 +33,7 @@ export function createSubagentHandler<
 
   return async (
     args: SubagentArgs,
-    context?: Record<string, unknown>,
+    context?: Record<string, unknown>
   ): Promise<ToolHandlerResponse<InferSubagentResult<T[number]> | null>> => {
     const config = subagents.find((s) => s.agentName === args.subagent);
 
@@ -53,6 +53,7 @@ export function createSubagentHandler<
       prompt: args.prompt,
       ...(config.context && { context: config.context }),
       ...(args.threadId &&
+        args.threadId !== null &&
         config.allowThreadContinuation && { threadId: args.threadId }),
       ...(inheritSandbox && { sandboxId: parentSandboxId }),
     };
@@ -63,10 +64,14 @@ export function createSubagentHandler<
       taskQueue: config.taskQueue ?? parentTaskQueue,
     };
 
-    const { toolResponse, data, usage, threadId: childThreadId } =
-      typeof config.workflow === "string"
-        ? await executeChild(config.workflow, childOpts)
-        : await executeChild(config.workflow, childOpts);
+    const {
+      toolResponse,
+      data,
+      usage,
+      threadId: childThreadId,
+    } = typeof config.workflow === "string"
+      ? await executeChild(config.workflow, childOpts)
+      : await executeChild(config.workflow, childOpts);
 
     if (!toolResponse) {
       return {
