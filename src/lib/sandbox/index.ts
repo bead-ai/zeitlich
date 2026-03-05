@@ -1,4 +1,5 @@
 export { SandboxManager } from "./manager";
+export { toTree } from "./tree";
 export type {
   Sandbox,
   SandboxCapabilities,

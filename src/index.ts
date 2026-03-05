@@ -62,4 +62,4 @@ export { createReadFileHandler } from "./tools/read-file/handler";
 
 export { createWriteFileHandler } from "./tools/write-file/handler";
 
-export { toTree } from "./lib/utils";
+export { toTree } from "./lib/sandbox";
