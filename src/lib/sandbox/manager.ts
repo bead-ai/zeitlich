@@ -68,14 +68,16 @@ export class SandboxManager {
    */
   createActivities(): SandboxOps {
     return {
-      createSandbox: async (options?: SandboxCreateOptions) => {
+      createSandbox: async (
+        options?: SandboxCreateOptions
+      ): Promise<{ sandboxId: string }> => {
         const sandboxId = await this.create(options);
         return { sandboxId };
       },
-      destroySandbox: async (sandboxId: string) => {
+      destroySandbox: async (sandboxId: string): Promise<void> => {
         await this.destroy(sandboxId);
       },
-      snapshotSandbox: async (sandboxId: string) => {
+      snapshotSandbox: async (sandboxId: string): Promise<SandboxSnapshot> => {
         return this.snapshot(sandboxId);
       },
     };

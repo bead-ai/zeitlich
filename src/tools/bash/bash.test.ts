@@ -14,7 +14,7 @@ describe("bash handler with sandbox", () => {
     });
   });
 
-  const ctx = (id: string) => ({ sandboxId: id });
+  const ctx = (id: string): { sandboxId: string } => ({ sandboxId: id });
 
   it("executes echo and captures stdout", async () => {
     const handler = createBashHandler(manager.getSandbox.bind(manager));
