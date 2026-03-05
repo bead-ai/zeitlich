@@ -130,8 +130,6 @@ export type {
   SubagentHandlerResponse,
   SubagentWorkflow,
 } from "./lib/subagent/types";
-export { buildSubagentRegistration } from "./lib/subagent";
-
 // Sandbox types (workflow-safe — no activity-side code)
 export type {
   Sandbox,
@@ -152,7 +150,6 @@ export {
 } from "./lib/sandbox/types";
 
 // Subagent support
-export { createSubagentTool } from "./lib/subagent";
 export type { SubagentArgs } from "./lib/subagent";
 
 // Skills (types + workflow-safe utilities)
@@ -160,7 +157,6 @@ export type { Skill, SkillMetadata, SkillProvider } from "./lib/skills/types";
 export { parseSkillFile } from "./lib/skills/parse";
 export { FileSystemSkillProvider } from "./lib/skills/fs-provider";
 export { createReadSkillTool, createReadSkillHandler } from "./lib/skills";
-export { buildSkillRegistration } from "./lib/skills";
 export type { ReadSkillArgs } from "./lib/skills";
 
 // Tool definitions (schemas only - no handlers)

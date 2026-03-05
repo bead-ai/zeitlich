@@ -598,18 +598,17 @@ const session = await createSession({
 
 Safe for use in Temporal workflow files:
 
-| Export                    | Description                                                                                            |
-| ------------------------- | ------------------------------------------------------------------------------------------------------ |
-| `createSession`           | Creates an agent session with tools, prompts, subagents, and hooks                                     |
-| `createAgentStateManager` | Creates a state manager for workflow state with query/update handlers                                  |
-| `createToolRouter`        | Creates a tool router (used internally by session, or for advanced use)                                |
-| `defineTool`              | Identity function for type-safe tool definition with handler and hooks                                 |
-| `defineSubagent`          | Identity function for type-safe subagent configuration                                                 |
-| `getShortId`              | Generate a compact, workflow-deterministic identifier (base-62, 12 chars)                              |
-| `createSubagentTool`      | Creates the Subagent tool for spawning child workflows                                                 |
-| Tool definitions          | `askUserQuestionTool`, `globTool`, `grepTool`, `readFileTool`, `writeFileTool`, `editTool`, `bashTool` |
-| Task tools                | `taskCreateTool`, `taskGetTool`, `taskListTool`, `taskUpdateTool` for workflow task management         |
-| Types                     | `SubagentWorkflow`, `ToolDefinition`, `ToolWithHandler`, `AgentConfig`, `SessionConfig`, etc.          |
+| Export                      | Description                                                                                            |
+| --------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `createSession`             | Creates an agent session with tools, prompts, subagents, and hooks                                     |
+| `createAgentStateManager`   | Creates a state manager for workflow state with query/update handlers                                  |
+| `createToolRouter`          | Creates a tool router (used internally by session, or for advanced use)                                |
+| `defineTool`                | Identity function for type-safe tool definition with handler and hooks                                 |
+| `defineSubagent`            | Identity function for type-safe subagent configuration                                                 |
+| `getShortId`                | Generate a compact, workflow-deterministic identifier (base-62, 12 chars)                              |
+| Tool definitions            | `askUserQuestionTool`, `globTool`, `grepTool`, `readFileTool`, `writeFileTool`, `editTool`, `bashTool` |
+| Task tools                  | `taskCreateTool`, `taskGetTool`, `taskListTool`, `taskUpdateTool` for workflow task management         |
+| Types                       | `SubagentWorkflow`, `ToolDefinition`, `ToolWithHandler`, `RouterContext`, `SessionConfig`, etc.        |
 
 ### Activity Entry Point (`zeitlich`)
 
@@ -644,6 +643,9 @@ LangChain-specific implementations:
 | `ModelInvokerConfig`    | Configuration passed to a model invoker                                      |
 | `ToolDefinition`        | Tool definition with name, description, and Zod schema                       |
 | `ToolWithHandler`       | Tool definition combined with its handler                                    |
+| `RouterContext`          | Base context every tool handler receives (`threadId`, `toolCallId`, `toolName`, `sandboxId?`) |
+| `Hooks`                 | Combined session lifecycle + tool execution hooks                            |
+| `ToolRouterHooks`       | Narrowed hook interface for tool execution only (pre/post/failure)            |
 | `SubagentConfig`        | Configuration for subagent workflows                                         |
 | `AgentState`            | Generic agent state type                                                     |
 

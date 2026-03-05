@@ -38,15 +38,26 @@ src/
 ├── index.ts              # Activity entry point (zeitlich)
 ├── workflow.ts            # Workflow entry point (zeitlich/workflow)
 ├── lib/                   # Core library code
-│   ├── tool-router.ts     # Tool routing and execution
-│   ├── types.ts           # Shared type definitions
+│   ├── types.ts           # Core shared types (zero internal deps)
+│   ├── hooks/             # Session lifecycle + message hooks, Hooks aggregate
+│   ├── model/             # AgentResponse, ModelInvoker, workflow helpers
+│   ├── session/           # createSession, SessionConfig, ThreadOps
+│   ├── state/             # createAgentStateManager, AgentState types
+│   ├── thread/            # Thread manager, ID generation
+│   ├── tool-router/       # Tool routing, execution, hook pipeline
+│   ├── subagent/          # Subagent tool, handler, registration, types
+│   ├── skills/            # Skill parsing, registration, filesystem provider
+│   └── sandbox/           # Sandbox manager, types, file tree generation
+├── tools/                 # Built-in tool implementations
+│   ├── bash/
+│   ├── edit/
+│   ├── glob/
 │   └── ...
-└── tools/                 # Built-in tool implementations
-    ├── bash/
-    ├── edit/
-    ├── glob/
-    └── ...
+└── adapters/              # LLM provider adapters
+    └── thread/langchain/  # LangChain adapter (thread ops + model invoker)
 ```
+
+Each `lib/` subdirectory has its own `types.ts` and `index.ts` barrel. The dependency chain flows downward: `types.ts` (core) → `tool-router/` → `hooks/`, `subagent/`, `session/`, etc.
 
 Two entry points exist due to Temporal's workflow sandboxing:
 
