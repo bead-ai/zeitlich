@@ -9,11 +9,7 @@ import type {
   ToolCallResultUnion,
   InferToolResults,
 } from "../tool-router/types";
-import type {
-  Hooks,
-  SessionStartHook,
-  SessionEndHook,
-} from "../hooks/types";
+import type { Hooks } from "../hooks/types";
 import type { SubagentConfig } from "../subagent/types";
 import type { Skill } from "../skills/types";
 import type { SandboxOps } from "../sandbox/types";
@@ -42,6 +38,8 @@ export interface ThreadOps {
  * Configuration for a Zeitlich agent session
  */
 export interface SessionConfig<T extends ToolMap, M = unknown> {
+  /** The name of the agent, should be unique within the workflows */
+  agentName: string;
   /** The thread ID to use for the session (defaults to a short generated ID) */
   threadId?: string;
   /** Metadata for the session */
@@ -92,14 +90,4 @@ export interface ZeitlichSession<M = unknown> {
     exitReason: SessionExitReason;
     usage: ReturnType<AgentStateManager<T>["getTotalUsage"]>;
   }>;
-}
-
-/**
- * Session-level hooks for lifecycle events
- */
-export interface SessionLifecycleHooks {
-  /** Called when session starts */
-  onSessionStart?: SessionStartHook;
-  /** Called when session ends */
-  onSessionEnd?: SessionEndHook;
 }

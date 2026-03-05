@@ -5,7 +5,7 @@ import {
   setHandler,
   ApplicationFailure,
 } from "@temporalio/workflow";
-import type { AgentConfig, SessionExitReason, MessageContent } from "../types";
+import type { SessionExitReason, MessageContent } from "../types";
 import type { ThreadOps, SessionConfig } from "./types";
 import type { SandboxOps } from "../sandbox/types";
 import { type AgentStateManager, type JsonSerializable } from "../state/types";
@@ -64,7 +64,7 @@ export const createSession = async <T extends ToolMap, M = unknown>({
   waitForInputTimeout = "48h",
   sandbox: sandboxOps,
   sandboxId: inheritedSandboxId,
-}: SessionConfig<T, M> & AgentConfig) => {
+}: SessionConfig<T, M>) => {
   const threadId = providedThreadId ?? getShortId();
 
   const {

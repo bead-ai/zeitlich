@@ -47,9 +47,7 @@ export function createGlobHandler(
   getSandbox: GetSandbox,
 ): ActivityToolHandler<GlobArgs, GlobResult> {
   return async (args, context) => {
-    const sandboxId = (context as Record<string, unknown>)?.sandboxId as
-      | string
-      | undefined;
+    const { sandboxId } = context;
 
     if (!sandboxId) {
       return {

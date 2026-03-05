@@ -19,9 +19,7 @@ export function createWriteFileHandler(
   getSandbox: GetSandbox,
 ): ActivityToolHandler<FileWriteArgs, WriteFileResult> {
   return async (args, context) => {
-    const sandboxId = (context as Record<string, unknown>)?.sandboxId as
-      | string
-      | undefined;
+    const { sandboxId } = context;
 
     if (!sandboxId) {
       return {

@@ -15,7 +15,7 @@ export type {
   ParsedToolCallUnion,
   AppendToolResultFn,
   ToolHandlerResponse,
-  ToolHandlerContext,
+  RouterContext,
   ToolHandler,
   ActivityToolHandler,
   ToolArgs,

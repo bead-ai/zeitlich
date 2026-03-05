@@ -2,7 +2,7 @@ import type { ToolMessageContent } from "../types";
 import type {
   ToolMap,
   ToolDefinition,
-  ToolHandlerContext,
+  RouterContext,
   ToolHandler,
   RawToolCall,
   ParsedToolCallUnion,
@@ -186,7 +186,6 @@ export function createToolRouter<T extends ToolMap>(
   async function processToolCall(
     toolCall: ParsedToolCallUnion<T>,
     turn: number,
-    handlerContext?: ToolHandlerContext,
     sandboxId?: string
   ): Promise<ToolCallResultUnion<TResults> | null> {
     const startTime = Date.now();
@@ -212,8 +211,7 @@ export function createToolRouter<T extends ToolMap>(
 
     try {
       if (tool) {
-        const enrichedContext = {
-          ...(handlerContext ?? {}),
+        const routerContext: RouterContext = {
           threadId: options.threadId,
           toolCallId: toolCall.id,
           toolName: toolCall.name,
@@ -221,7 +219,7 @@ export function createToolRouter<T extends ToolMap>(
         };
         const response = await tool.handler(
           effectiveArgs as Parameters<typeof tool.handler>[0],
-          enrichedContext as Parameters<typeof tool.handler>[1]
+          routerContext as Parameters<typeof tool.handler>[1]
         );
         result = response.data;
         content = response.toolResponse;
@@ -311,13 +309,12 @@ export function createToolRouter<T extends ToolMap>(
       }
 
       const turn = context?.turn ?? 0;
-      const handlerContext = context?.handlerContext;
       const sandboxId = context?.sandboxId;
 
       if (options.parallel) {
         const results = await Promise.all(
           toolCalls.map((tc) =>
-            processToolCall(tc, turn, handlerContext, sandboxId)
+            processToolCall(tc, turn, sandboxId)
           )
         );
         return results.filter(
@@ -330,7 +327,6 @@ export function createToolRouter<T extends ToolMap>(
         const result = await processToolCall(
           toolCall,
           turn,
-          handlerContext,
           sandboxId
         );
         if (result !== null) {
@@ -343,12 +339,11 @@ export function createToolRouter<T extends ToolMap>(
     async processToolCallsByName<
       TName extends ToolNames<T>,
       TResult,
-      TContext = ToolHandlerContext,
     >(
       toolCalls: ParsedToolCallUnion<T>[],
       toolName: TName,
-      handler: ToolHandler<ToolArgs<T, TName>, TResult, TContext>,
-      context?: ProcessToolCallsContext<TContext>
+      handler: ToolHandler<ToolArgs<T, TName>, TResult>,
+      context?: ProcessToolCallsContext
     ): Promise<ToolCallResult<TName, TResult>[]> {
       const matchingCalls = toolCalls.filter((tc) => tc.name === toolName);
 
@@ -356,20 +351,18 @@ export function createToolRouter<T extends ToolMap>(
         return [];
       }
 
-      const handlerContext = (context?.handlerContext ?? {}) as TContext;
-
       const processOne = async (
         toolCall: ParsedToolCallUnion<T>
       ): Promise<ToolCallResult<TName, TResult>> => {
-        const enrichedContext = {
-          ...(handlerContext ?? {}),
+        const routerContext: RouterContext = {
           threadId: options.threadId,
           toolCallId: toolCall.id,
           toolName: toolCall.name as TName,
-        } as TContext;
+          ...(context?.sandboxId !== undefined && { sandboxId: context.sandboxId }),
+        };
         const response = await handler(
           toolCall.args as ToolArgs<T, TName>,
-          enrichedContext
+          routerContext as Parameters<typeof handler>[1]
         );
 
         if (!response.resultAppended) {
@@ -451,7 +444,7 @@ export function defineTool<
   TName extends string,
   TSchema extends z.ZodType,
   TResult,
-  TContext = ToolHandlerContext,
+  TContext extends RouterContext = RouterContext,
 >(
   tool: ToolWithHandler<TName, TSchema, TResult, TContext>
 ): ToolWithHandler<TName, TSchema, TResult, TContext> {

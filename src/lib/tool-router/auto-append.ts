@@ -1,5 +1,5 @@
 import type { ToolResultConfig } from "../types";
-import type { ActivityToolHandler, ToolHandlerContext } from "./types";
+import type { ActivityToolHandler, RouterContext } from "./types";
 
 /**
  * Wraps a tool handler to automatically append its result directly to the
@@ -31,22 +31,18 @@ import type { ActivityToolHandler, ToolHandlerContext } from "./types";
 export function withAutoAppend<
   TArgs,
   TResult,
-  TContext extends ToolHandlerContext = ToolHandlerContext,
+  TContext extends RouterContext = RouterContext,
 >(
   threadHandler: (config: ToolResultConfig) => Promise<void>,
   handler: ActivityToolHandler<TArgs, TResult, TContext>
 ): ActivityToolHandler<TArgs, TResult, TContext> {
   return async (args: TArgs, context: TContext) => {
     const response = await handler(args, context);
-    const threadId = (context as Record<string, unknown>).threadId as string;
-    const toolCallId = (context as Record<string, unknown>)
-      .toolCallId as string;
-    const toolName = (context as Record<string, unknown>).toolName as string;
 
     await threadHandler({
-      threadId,
-      toolCallId,
-      toolName,
+      threadId: context.threadId,
+      toolCallId: context.toolCallId,
+      toolName: context.toolName,
       content: response.toolResponse,
     });
 

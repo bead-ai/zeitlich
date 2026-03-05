@@ -20,7 +20,7 @@
 
 // Session
 export { createSession, proxyDefaultThreadOps, proxySandboxOps } from "./lib/session";
-export type { ZeitlichSession, SessionLifecycleHooks, ThreadOps, SessionConfig } from "./lib/session";
+export type { ZeitlichSession, ThreadOps, SessionConfig } from "./lib/session";
 
 // Thread utilities
 export { getShortId } from "./lib/thread";
@@ -57,7 +57,7 @@ export type {
   // Handler types
   ToolHandler,
   ActivityToolHandler,
-  ToolHandlerContext,
+  RouterContext,
   ToolHandlerResponse,
   // Result types
   ToolArgs,

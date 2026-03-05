@@ -8,5 +8,4 @@ export type {
   ThreadOps,
   SessionConfig,
   ZeitlichSession,
-  SessionLifecycleHooks,
 } from "./types";

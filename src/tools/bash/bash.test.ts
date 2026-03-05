@@ -2,6 +2,7 @@ import { describe, expect, it, beforeEach } from "vitest";
 import { createBashHandler } from "./handler";
 import { SandboxManager } from "../../lib/sandbox/manager";
 import { InMemorySandboxProvider } from "../../adapters/sandbox/inmemory/index";
+import type { RouterContext } from "../../lib/tool-router/types";
 
 describe("bash handler with sandbox", () => {
   let manager: SandboxManager;
@@ -14,7 +15,12 @@ describe("bash handler with sandbox", () => {
     });
   });
 
-  const ctx = (id: string): { sandboxId: string } => ({ sandboxId: id });
+  const ctx = (id: string): RouterContext => ({
+    sandboxId: id,
+    threadId: "test-thread",
+    toolCallId: "test-call",
+    toolName: "Bash",
+  });
 
   it("executes echo and captures stdout", async () => {
     const handler = createBashHandler(manager.getSandbox.bind(manager));
@@ -81,7 +87,11 @@ describe("bash handler with sandbox", () => {
 
   it("returns error when no sandboxId in context", async () => {
     const handler = createBashHandler(manager.getSandbox.bind(manager));
-    const { toolResponse, data } = await handler({ command: "echo hi" }, {});
+    const { toolResponse, data } = await handler({ command: "echo hi" }, {
+      threadId: "test-thread",
+      toolCallId: "test-call",
+      toolName: "Bash",
+    });
     expect(toolResponse).toContain("No sandbox configured");
     expect(data).toBeNull();
   });

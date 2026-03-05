@@ -645,7 +645,6 @@ LangChain-specific implementations:
 | `ToolDefinition`        | Tool definition with name, description, and Zod schema                       |
 | `ToolWithHandler`       | Tool definition combined with its handler                                    |
 | `SubagentConfig`        | Configuration for subagent workflows                                         |
-| `SessionLifecycleHooks` | Lifecycle hooks interface                                                    |
 | `AgentState`            | Generic agent state type                                                     |
 
 ## Architecture

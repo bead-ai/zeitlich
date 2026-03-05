@@ -2,7 +2,7 @@ import type {
   QueryDefinition,
 } from "@temporalio/workflow";
 import type { UpdateDefinition } from "@temporalio/common/lib/interfaces";
-import type { AgentStatus, BaseAgentState, WorkflowTask } from "../types";
+import type { AgentStatus, BaseAgentState, TokenUsage, WorkflowTask } from "../types";
 import type { ToolDefinition } from "../tool-router/types";
 
 /**
@@ -117,13 +117,7 @@ export interface AgentStateManager<TCustom extends JsonSerializable<TCustom>> {
   setTools(newTools: ToolDefinition[]): void;
 
   /** Update the usage */
-  updateUsage(usage: {
-    inputTokens?: number;
-    outputTokens?: number;
-    cachedWriteTokens?: number;
-    cachedReadTokens?: number;
-    reasonTokens?: number;
-  }): void;
+  updateUsage(usage: TokenUsage): void;
 
   /** Get the total usage */
   getTotalUsage(): {

@@ -32,7 +32,7 @@ export interface ToolWithHandler<
   TName extends string = string,
   TSchema extends z.ZodType = z.ZodType,
   TResult = unknown,
-  TContext = ToolHandlerContext,
+  TContext extends RouterContext = RouterContext,
 > {
   name: TName;
   description: string;
@@ -142,18 +142,22 @@ export interface ToolHandlerResponse<TResult = null> {
 }
 
 /**
- * Context passed to tool handlers for additional data beyond tool args.
- * Use this to pass workflow state like file trees, user context, etc.
- * Generic so callers can type the context shape, e.g. ToolHandlerContext<ControlTestFsParams>.
+ * Base context the router always injects into every handler invocation.
+ * Handlers can rely on these fields being present without casting.
  */
-export type ToolHandlerContext<T = Record<string, unknown>> = T;
+export interface RouterContext {
+  threadId: string;
+  toolCallId: string;
+  toolName: string;
+  sandboxId?: string;
+}
 
 /**
  * A handler function for a specific tool.
- * Receives the parsed args and context, returns a response with content and result.
- * Context always has a value (defaults to empty object if not provided).
+ * Receives the parsed args and a context that always includes {@link RouterContext}
+ * fields, plus any additional properties when TContext extends RouterContext.
  */
-export type ToolHandler<TArgs, TResult, TContext = ToolHandlerContext> = (
+export type ToolHandler<TArgs, TResult, TContext extends RouterContext = RouterContext> = (
   args: TArgs,
   context: TContext
 ) => ToolHandlerResponse<TResult> | Promise<ToolHandlerResponse<TResult>>;
@@ -161,16 +165,15 @@ export type ToolHandler<TArgs, TResult, TContext = ToolHandlerContext> = (
 /**
  * Activity-compatible tool handler that always returns a Promise.
  * Use this for tool handlers registered as Temporal activities.
- * Context always has a value (defaults to empty object if not provided).
  *
  * @example
  * ```typescript
- * // Filesystem handler with context
  * const readHandler: ActivityToolHandler<
  *   FileReadArgs,
  *   ReadResult,
- *   { scopedNodes: FileNode[]; provider: FileSystemProvider }
+ *   RouterContext & { scopedNodes: FileNode[]; provider: FileSystemProvider }
  * > = async (args, context) => {
+ *   // context.threadId, context.sandboxId etc. are always available
  *   return readHandler(args, context.scopedNodes, context.provider);
  * };
  * ```
@@ -178,7 +181,7 @@ export type ToolHandler<TArgs, TResult, TContext = ToolHandlerContext> = (
 export type ActivityToolHandler<
   TArgs,
   TResult,
-  TContext = ToolHandlerContext,
+  TContext extends RouterContext = RouterContext,
 > = (args: TArgs, context: TContext) => Promise<ToolHandlerResponse<TResult>>;
 
 /**
@@ -195,7 +198,7 @@ export type ToolResult<T extends ToolMap, TName extends ToolNames<T>> =
   Extract<T[keyof T], { name: TName }>["handler"] extends ToolHandler<
     unknown,
     infer R,
-    unknown
+    RouterContext
   >
     ? Awaited<R>
     : never;
@@ -242,11 +245,9 @@ export type ToolCallResultUnion<TResults extends Record<string, unknown>> = {
 /**
  * Context passed to processToolCalls for hook execution and handler invocation
  */
-export interface ProcessToolCallsContext<THandlerContext = ToolHandlerContext> {
+export interface ProcessToolCallsContext {
   /** Current turn number (for hooks) */
   turn?: number;
-  /** Context passed to each tool handler (scopedNodes, provider, etc.) */
-  handlerContext?: THandlerContext;
   /** Active sandbox ID (when a sandbox is configured for this session) */
   sandboxId?: string;
 }
@@ -447,12 +448,11 @@ export interface ToolRouter<T extends ToolMap> {
   processToolCallsByName<
     TName extends ToolNames<T>,
     TResult,
-    TContext = ToolHandlerContext,
   >(
     toolCalls: ParsedToolCallUnion<T>[],
     toolName: TName,
-    handler: ToolHandler<ToolArgs<T, TName>, TResult, TContext>,
-    context?: ProcessToolCallsContext<TContext>
+    handler: ToolHandler<ToolArgs<T, TName>, TResult>,
+    context?: ProcessToolCallsContext
   ): Promise<ToolCallResult<TName, TResult>[]>;
 
   /**

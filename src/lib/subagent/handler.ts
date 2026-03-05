@@ -1,6 +1,6 @@
 import { executeChild, workflowInfo } from "@temporalio/workflow";
 import { getShortId } from "../thread/id";
-import type { ToolHandlerResponse } from "../tool-router";
+import type { ToolHandlerResponse, RouterContext } from "../tool-router";
 import type { ToolMessageContent } from "../types";
 import type {
   InferSubagentResult,
@@ -23,7 +23,7 @@ export function createSubagentHandler<
 
   return async (
     args: SubagentArgs,
-    context?: Record<string, unknown>
+    context: RouterContext
   ): Promise<ToolHandlerResponse<InferSubagentResult<T[number]> | null>> => {
     const config = subagents.find((s) => s.agentName === args.subagent);
 
@@ -35,8 +35,7 @@ export function createSubagentHandler<
 
     const childWorkflowId = `${args.subagent}-${getShortId()}`;
 
-    const parentSandboxId = (context as Record<string, unknown> | undefined)
-      ?.sandboxId as string | undefined;
+    const { sandboxId: parentSandboxId } = context;
     const inheritSandbox = config.sandbox !== "own" && !!parentSandboxId;
 
     const input: SubagentInput = {

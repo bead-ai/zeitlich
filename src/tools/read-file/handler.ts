@@ -20,9 +20,7 @@ export function createReadFileHandler(
   getSandbox: GetSandbox,
 ): ActivityToolHandler<FileReadArgs, ReadFileResult | null> {
   return async (args, context) => {
-    const sandboxId = (context as Record<string, unknown>)?.sandboxId as
-      | string
-      | undefined;
+    const { sandboxId } = context;
 
     if (!sandboxId) {
       return {
