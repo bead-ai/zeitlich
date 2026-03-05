@@ -32,7 +32,8 @@ export function createSubagentHandler<
   const { taskQueue: parentTaskQueue } = workflowInfo();
 
   return async (
-    args: SubagentArgs
+    args: SubagentArgs,
+    context?: Record<string, unknown>,
   ): Promise<ToolHandlerResponse<InferSubagentResult<T[number]> | null>> => {
     const config = subagents.find((s) => s.agentName === args.subagent);
 
@@ -44,11 +45,16 @@ export function createSubagentHandler<
 
     const childWorkflowId = `${args.subagent}-${getShortId()}`;
 
+    const parentSandboxId = (context as Record<string, unknown> | undefined)
+      ?.sandboxId as string | undefined;
+    const inheritSandbox = config.sandbox !== "own" && !!parentSandboxId;
+
     const input: SubagentInput = {
       prompt: args.prompt,
       ...(config.context && { context: config.context }),
       ...(args.threadId &&
         config.allowThreadContinuation && { threadId: args.threadId }),
+      ...(inheritSandbox && { sandboxId: parentSandboxId }),
     };
 
     const childOpts = {

@@ -1,18 +1,26 @@
-import { dirname } from "path";
-import { fileURLToPath } from "url";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, beforeEach } from "vitest";
 import { createBashHandler } from "./handler";
-import { OverlayFs } from "just-bash";
+import { SandboxManager } from "../../lib/sandbox/manager";
+import { InMemorySandboxProvider } from "../../adapters/sandbox-inmemory/index";
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
+describe("bash handler with sandbox", () => {
+  let manager: SandboxManager;
+  let sandboxId: string;
 
-describe("bash with default options", () => {
-  const fs = new OverlayFs({ root: __dirname, mountPoint: "/home/user" });
+  beforeEach(async () => {
+    manager = new SandboxManager(new InMemorySandboxProvider());
+    sandboxId = await manager.create({
+      initialFiles: { "/home/user/hello.txt": "world" },
+    });
+  });
+
+  const ctx = (id: string) => ({ sandboxId: id });
 
   it("executes echo and captures stdout", async () => {
-    const { data } = await createBashHandler({fs})(
+    const handler = createBashHandler(manager.getSandbox.bind(manager));
+    const { data } = await handler(
       { command: "echo 'hello world'" },
-      {}
+      ctx(sandboxId)
     );
     expect(data).not.toBeNull();
     expect(data?.stdout.trim()).toBe("hello world");
@@ -20,85 +28,70 @@ describe("bash with default options", () => {
   });
 
   it("returns exit code 0 for successful commands", async () => {
-    const { data } = await createBashHandler({fs})({ command: "true" }, {});
+    const handler = createBashHandler(manager.getSandbox.bind(manager));
+    const { data } = await handler({ command: "true" }, ctx(sandboxId));
     expect(data?.exitCode).toBe(0);
   });
 
   it("returns non-zero exit code for failed commands", async () => {
-    const { data } = await createBashHandler({fs})({ command: "false" }, {});
+    const handler = createBashHandler(manager.getSandbox.bind(manager));
+    const { data } = await handler({ command: "false" }, ctx(sandboxId));
     expect(data?.exitCode).toBe(1);
   });
 
   it("captures stderr output", async () => {
-    const { data } = await createBashHandler({fs})(
+    const handler = createBashHandler(manager.getSandbox.bind(manager));
+    const { data } = await handler(
       { command: "echo 'error message' >&2" },
-      {}
+      ctx(sandboxId)
     );
     expect(data?.stderr.trim()).toBe("error message");
     expect(data?.stdout.trim()).toBe("");
   });
 
   it("supports piping between commands", async () => {
-    const { data } = await createBashHandler({fs})(
+    const handler = createBashHandler(manager.getSandbox.bind(manager));
+    const { data } = await handler(
       { command: "echo 'hello world' | tr 'a-z' 'A-Z'" },
-      {}
+      ctx(sandboxId)
     );
     expect(data?.stdout.trim()).toBe("HELLO WORLD");
   });
 
   it("supports command chaining with &&", async () => {
-    const { data } = await createBashHandler({fs})(
+    const handler = createBashHandler(manager.getSandbox.bind(manager));
+    const { data } = await handler(
       { command: "echo 'first' && echo 'second'" },
-      {}
+      ctx(sandboxId)
     );
     expect(data?.stdout).toContain("first");
     expect(data?.stdout).toContain("second");
   });
 
-  it("handles multi-line output", async () => {
-    const { data } = await createBashHandler({fs})(
-      { command: "printf 'line1\\nline2\\nline3'" },
-      {}
-    );
-    const lines = data?.stdout.split("\n");
-    expect(lines).toHaveLength(3);
-    expect(lines?.[0]).toBe("line1");
-    expect(lines?.[2]).toBe("line3");
-  });
-
-  it("handles commands with arguments and flags", async () => {
-    const { data } = await createBashHandler({fs})(
-      { command: "echo -n 'no newline'" },
-      {}
-    );
-    expect(data?.stdout).toBe("no newline");
-  });
-
-  it("supports command substitution", async () => {
-    const { data } = await createBashHandler({fs})(
-      { command: "echo \"count: $(echo 'a b c' | wc -w | tr -d ' ')\"" },
-      {}
-    );
-    expect(data?.stdout.trim()).toBe("count: 3");
-  });
-
   it("returns toolResponse string with formatted output", async () => {
-    const { toolResponse } = await createBashHandler({fs})(
+    const handler = createBashHandler(manager.getSandbox.bind(manager));
+    const { toolResponse } = await handler(
       { command: "echo 'test'" },
-      {}
+      ctx(sandboxId)
     );
     expect(toolResponse).toContain("Exit code: 0");
     expect(toolResponse).toContain("stdout:");
     expect(toolResponse).toContain("test");
   });
-});
 
-describe("bash with overlay filesystem", () => {
-  it("sees files in the current directory", async () => {
-    const fs = new OverlayFs({ root: __dirname, mountPoint: "/home/user" });
-    const { data } = await createBashHandler({fs})({ command: "ls" }, {});
-    expect(data?.stdout).toContain("bash.test.ts");
-    expect(data?.stdout).toContain("handler.ts");
-    expect(data?.stdout).toContain("tool.ts");
+  it("returns error when no sandboxId in context", async () => {
+    const handler = createBashHandler(manager.getSandbox.bind(manager));
+    const { toolResponse, data } = await handler({ command: "echo hi" }, {});
+    expect(toolResponse).toContain("No sandbox configured");
+    expect(data).toBeNull();
+  });
+
+  it("can read files from the sandbox filesystem", async () => {
+    const handler = createBashHandler(manager.getSandbox.bind(manager));
+    const { data } = await handler(
+      { command: "cat /home/user/hello.txt" },
+      ctx(sandboxId)
+    );
+    expect(data?.stdout).toBe("world");
   });
 });

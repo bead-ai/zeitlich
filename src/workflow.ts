@@ -19,7 +19,7 @@
  */
 
 // Session
-export { createSession, proxyDefaultThreadOps } from "./lib/session";
+export { createSession, proxyDefaultThreadOps, proxySandboxOps } from "./lib/session";
 
 // Thread utilities
 export { getShortId } from "./lib/thread-id";
@@ -123,6 +123,25 @@ export {
 
 // Model invoker contract
 export type { ModelInvoker, ModelInvokerConfig } from "./lib/model-invoker";
+
+// Sandbox types (workflow-safe — no activity-side code)
+export type {
+  Sandbox,
+  SandboxCapabilities,
+  SandboxCreateOptions,
+  SandboxFileSystem,
+  SandboxOps,
+  SandboxProvider,
+  SandboxSnapshot,
+  ExecOptions,
+  ExecResult,
+  DirentEntry as SandboxDirentEntry,
+  FileStat as SandboxFileStat,
+} from "./lib/sandbox/types";
+export {
+  SandboxNotFoundError,
+  SandboxNotSupportedError,
+} from "./lib/sandbox/types";
 
 // Subagent support
 export { createSubagentTool } from "./tools/subagent/tool";

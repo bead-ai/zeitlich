@@ -1,52 +1,48 @@
 import type { ActivityToolHandler } from "../../lib/tool-router";
 import type { BashArgs } from "./tool";
-import { Bash, type BashOptions } from "just-bash";
+import type { Sandbox, ExecResult } from "../../lib/sandbox/types";
 
-type BashExecOut = {
-  exitCode: number;
-  stderr: string;
-  stdout: string;
-};
-
-/** BashOptions with `fs` required */
-type BashToolOptions = Required<Pick<BashOptions, "fs">> & Omit<BashOptions, "fs">;
+type GetSandbox = (id: string) => Sandbox;
 
 /**
- * Creates a Bash tool handler that executes shell commands in a sandboxed environment.
+ * Creates a Bash tool handler that executes shell commands via a {@link Sandbox}.
  *
- * @param bashOptions - Options including a required `fs` (file system implementation from `just-bash`)
+ * @param getSandbox - Looks up the sandbox for the given ID (typically `SandboxManager.getSandbox`)
  * @returns Activity tool handler for Bash tool calls
  *
  * @example
  * ```typescript
- * import { createBashHandler } from 'zeitlich';
+ * import { createBashHandler, SandboxManager } from 'zeitlich';
  *
- * const bashHandlerActivity = createBashHandler({ fs: inMemoryFileSystem });
+ * const manager = new SandboxManager(provider);
+ * const bashHandler = createBashHandler(manager.getSandbox.bind(manager));
  * ```
  */
 export const createBashHandler: (
-    bashOptions: BashToolOptions,
-) => ActivityToolHandler<BashArgs, BashExecOut | null> =
-  (bashOptions: BashToolOptions) => async (args: BashArgs, _context) => {
+  getSandbox: GetSandbox,
+) => ActivityToolHandler<BashArgs, ExecResult | null> =
+  (getSandbox) =>
+  async (args, context) => {
+    const sandboxId = (context as Record<string, unknown>)?.sandboxId as
+      | string
+      | undefined;
+
+    if (!sandboxId) {
+      return {
+        toolResponse:
+          "Error: No sandbox configured for this agent. The Bash tool requires a sandbox.",
+        data: null,
+      };
+    }
+
+    const sandbox = getSandbox(sandboxId);
     const { command } = args;
 
-    const mergedOptions: BashOptions = {
-      ...bashOptions,
-      executionLimits: {
-        maxStringLength: 52428800, // 50MB default
-        ...bashOptions.executionLimits,
-      },
-    };
-
-    const bash = new Bash(mergedOptions);
-
     try {
-      const { exitCode, stderr, stdout } = await bash.exec(command);
-      const bashExecOut = { exitCode, stderr, stdout };
-
+      const result = await sandbox.exec(command);
       return {
-        toolResponse: `Exit code: ${exitCode}\n\nstdout:\n${stdout}\n\nstderr:\n${stderr}`,
-        data: bashExecOut,
+        toolResponse: `Exit code: ${result.exitCode}\n\nstdout:\n${result.stdout}\n\nstderr:\n${result.stderr}`,
+        data: result,
       };
     } catch (error) {
       const err = error instanceof Error ? error : new Error("Unknown error");

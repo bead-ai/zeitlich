@@ -46,6 +46,16 @@
         "types": "./dist/adapters/google-genai/index.d.ts",
         "default": "./dist/adapters/google-genai/index.js"
       }
+    },
+    "./adapters/sandbox-inmemory": {
+      "import": {
+        "types": "./dist/adapters/sandbox-inmemory/index.d.ts",
+        "default": "./dist/adapters/sandbox-inmemory/index.js"
+      },
+      "require": {
+        "types": "./dist/adapters/sandbox-inmemory/index.d.ts",
+        "default": "./dist/adapters/sandbox-inmemory/index.js"
+      }
     }
   },
   "files": [

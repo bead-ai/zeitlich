@@ -13,6 +13,7 @@ import type {
   SessionExitReason,
   SessionConfig,
 } from "./types";
+import type { SandboxOps } from "./sandbox/types";
 import { type AgentStateManager, type JsonSerializable } from "./state-manager";
 import {
   createToolRouter,
@@ -90,6 +91,8 @@ export const createSession = async <T extends ToolMap, M = unknown>({
   appendSystemPrompt = true,
   continueThread = false,
   waitForInputTimeout = "48h",
+  sandbox: sandboxOps,
+  sandboxId: inheritedSandboxId,
 }: SessionConfig<T, M> & AgentConfig): Promise<ZeitlichSession<M>> => {
   const threadId = providedThreadId ?? getShortId();
 
@@ -154,6 +157,14 @@ export const createSession = async <T extends ToolMap, M = unknown>({
           stateManager.run();
         }
       );
+
+      // --- Sandbox lifecycle: create or inherit ---
+      let sandboxId: string | undefined = inheritedSandboxId;
+      const ownsSandbox = !sandboxId && !!sandboxOps;
+      if (ownsSandbox) {
+        const result = await sandboxOps.createSandbox({ id: threadId });
+        sandboxId = result.sandboxId;
+      }
 
       if (hooks.onSessionStart) {
         await hooks.onSessionStart({
@@ -237,6 +248,7 @@ export const createSession = async <T extends ToolMap, M = unknown>({
             parsedToolCalls,
             {
               turn: currentTurn,
+              ...(sandboxId !== undefined && { sandboxId }),
             }
           );
 
@@ -270,6 +282,11 @@ export const createSession = async <T extends ToolMap, M = unknown>({
       } finally {
         // SessionEnd hook - always called
         await callSessionEnd(exitReason, stateManager.getTurns());
+
+        // Destroy sandbox only if this session created it
+        if (ownsSandbox && sandboxId && sandboxOps) {
+          await sandboxOps.destroySandbox(sandboxId);
+        }
       }
 
       return {
@@ -306,6 +323,34 @@ export function proxyDefaultThreadOps(
         initialInterval: "5s",
         maximumInterval: "15m",
         backoffCoefficient: 4,
+      },
+    }
+  );
+}
+
+/**
+ * Proxy sandbox lifecycle operations as Temporal activities.
+ * Call this in workflow code when the agent needs a sandbox.
+ *
+ * @example
+ * ```typescript
+ * const session = await createSession({
+ *   sandbox: proxySandboxOps(),
+ *   // ...
+ * });
+ * ```
+ */
+export function proxySandboxOps(
+  options?: Parameters<typeof proxyActivities>[0]
+): SandboxOps {
+  return proxyActivities<SandboxOps>(
+    options ?? {
+      startToCloseTimeout: "30s",
+      retry: {
+        maximumAttempts: 3,
+        initialInterval: "2s",
+        maximumInterval: "30s",
+        backoffCoefficient: 2,
       },
     }
   );

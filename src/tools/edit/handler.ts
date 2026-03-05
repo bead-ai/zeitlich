@@ -1,36 +1,44 @@
 import type { ActivityToolHandler } from "../../lib/tool-router";
 import type { FileEditArgs } from "./tool";
-import type { IFileSystem } from "just-bash";
+import type { Sandbox } from "../../lib/sandbox/types";
 
-/**
- * Result of an edit operation
- */
 interface EditResult {
   path: string;
   success: boolean;
   replacements: number;
 }
 
-/**
- * Escape special regex characters in a string
- */
 function escapeRegExp(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+type GetSandbox = (id: string) => Sandbox;
+
 /**
- * Creates an edit handler that edits files within the scoped file tree.
+ * Creates an edit handler that edits files via a {@link Sandbox}.
  *
- * @param fs - File system implementation for I/O operations
+ * @param getSandbox - Looks up the sandbox for the given ID
  * @returns An ActivityToolHandler for edit tool calls
  */
 export function createEditHandler(
-  fs: IFileSystem
+  getSandbox: GetSandbox,
 ): ActivityToolHandler<FileEditArgs, EditResult> {
-  return async (args) => {
+  return async (args, context) => {
+    const sandboxId = (context as Record<string, unknown>)?.sandboxId as
+      | string
+      | undefined;
+
+    if (!sandboxId) {
+      return {
+        toolResponse:
+          "Error: No sandbox configured for this agent. The Edit tool requires a sandbox.",
+        data: { path: args.file_path, success: false, replacements: 0 },
+      };
+    }
+
+    const { fs } = getSandbox(sandboxId);
     const { file_path, old_string, new_string, replace_all = false } = args;
 
-    // Validate old_string !== new_string
     if (old_string === new_string) {
       return {
         toolResponse: `Error: old_string and new_string must be different.`,
@@ -39,7 +47,6 @@ export function createEditHandler(
     }
 
     try {
-      // Check if file exists
       const exists = await fs.exists(file_path);
       if (!exists) {
         return {
@@ -48,10 +55,8 @@ export function createEditHandler(
         };
       }
 
-      // Read current content
       const content = await fs.readFile(file_path);
 
-      // Check if old_string exists in the file
       if (!content.includes(old_string)) {
         return {
           toolResponse: `Error: Could not find the specified text in "${file_path}". Make sure old_string matches exactly (whitespace-sensitive).`,
@@ -59,12 +64,10 @@ export function createEditHandler(
         };
       }
 
-      // Count occurrences
       const escapedOldString = escapeRegExp(old_string);
       const globalRegex = new RegExp(escapedOldString, "g");
       const occurrences = (content.match(globalRegex) || []).length;
 
-      // Check uniqueness if not replace_all
       if (!replace_all && occurrences > 1) {
         return {
           toolResponse: `Error: old_string appears ${occurrences} times in "${file_path}". Either provide more context to make it unique, or use replace_all: true.`,
@@ -72,7 +75,6 @@ export function createEditHandler(
         };
       }
 
-      // Perform replacement
       let newContent: string;
       let replacements: number;
 
@@ -80,7 +82,6 @@ export function createEditHandler(
         newContent = content.split(old_string).join(new_string);
         replacements = occurrences;
       } else {
-        // Replace only the first occurrence
         const index = content.indexOf(old_string);
         newContent =
           content.slice(0, index) +
@@ -89,7 +90,6 @@ export function createEditHandler(
         replacements = 1;
       }
 
-      // Write the modified content
       await fs.writeFile(file_path, newContent);
 
       const summary = replace_all

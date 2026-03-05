@@ -281,6 +281,8 @@ export interface ProcessToolCallsContext<THandlerContext = ToolHandlerContext> {
   turn?: number;
   /** Context passed to each tool handler (scopedNodes, provider, etc.) */
   handlerContext?: THandlerContext;
+  /** Active sandbox ID (when a sandbox is configured for this session) */
+  sandboxId?: string;
 }
 
 // ============================================================================
@@ -464,7 +466,8 @@ export function createToolRouter<T extends ToolMap>(
   async function processToolCall(
     toolCall: ParsedToolCallUnion<T>,
     turn: number,
-    handlerContext?: ToolHandlerContext
+    handlerContext?: ToolHandlerContext,
+    sandboxId?: string,
   ): Promise<ToolCallResultUnion<TResults> | null> {
     const startTime = Date.now();
     const tool = toolMap.get(toolCall.name);
@@ -529,6 +532,7 @@ export function createToolRouter<T extends ToolMap>(
           threadId: options.threadId,
           toolCallId: toolCall.id,
           toolName: toolCall.name,
+          ...(sandboxId !== undefined && { sandboxId }),
         };
         const response = await tool.handler(
           effectiveArgs as Parameters<typeof tool.handler>[0],
@@ -703,10 +707,11 @@ export function createToolRouter<T extends ToolMap>(
 
       const turn = context?.turn ?? 0;
       const handlerContext = context?.handlerContext;
+      const sandboxId = context?.sandboxId;
 
       if (options.parallel) {
         const results = await Promise.all(
-          toolCalls.map((tc) => processToolCall(tc, turn, handlerContext))
+          toolCalls.map((tc) => processToolCall(tc, turn, handlerContext, sandboxId))
         );
         // Filter out null results (skipped tool calls)
         return results.filter(
@@ -717,7 +722,7 @@ export function createToolRouter<T extends ToolMap>(
       // Sequential processing
       const results: ToolCallResultUnion<TResults>[] = [];
       for (const toolCall of toolCalls) {
-        const result = await processToolCall(toolCall, turn, handlerContext);
+        const result = await processToolCall(toolCall, turn, handlerContext, sandboxId);
         if (result !== null) {
           results.push(result);
         }

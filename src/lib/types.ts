@@ -7,6 +7,7 @@ import type {
   ToolMap,
 } from "./tool-router";
 import type { Skill } from "./skills/types";
+import type { SandboxOps } from "./sandbox/types";
 
 import type { Duration } from "@temporalio/common";
 import type { z } from "zod";
@@ -146,6 +147,14 @@ export interface SessionConfig<T extends ToolMap, M = unknown> {
   continueThread?: boolean;
   /** How long to wait for input before cancelling the workflow */
   waitForInputTimeout?: Duration;
+  /** Sandbox lifecycle operations (optional — omit for agents that don't need a sandbox) */
+  sandbox?: SandboxOps;
+  /**
+   * Pre-existing sandbox ID to reuse (e.g. inherited from a parent agent).
+   * When set, the session skips `createSandbox` and will not destroy the
+   * sandbox on exit (the owner is responsible for cleanup).
+   */
+  sandboxId?: string;
 }
 
 /**
@@ -230,6 +239,12 @@ export interface SubagentConfig<TResult extends z.ZodType = z.ZodType> {
   allowThreadContinuation?: boolean;
   /** Per-subagent lifecycle hooks */
   hooks?: SubagentHooks;
+  /**
+   * Sandbox strategy for this subagent.
+   * - `'inherit'` (default): reuse the parent's sandbox (shared filesystem/exec).
+   * - `'own'`: the child creates and owns its own sandbox.
+   */
+  sandbox?: "inherit" | "own";
 }
 
 /**
@@ -270,6 +285,8 @@ export interface SubagentInput {
   context?: Record<string, unknown>;
   /** When set, the subagent should continue this thread instead of starting a new one */
   threadId?: string;
+  /** Sandbox ID inherited from the parent agent (when SubagentConfig.sandbox is 'inherit') */
+  sandboxId?: string;
 }
 
 // ============================================================================

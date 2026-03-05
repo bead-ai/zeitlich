@@ -10,10 +10,14 @@
  * ```typescript
  * // In your activities file
  * import {
+ *   SandboxManager,
  *   createBashHandler,
- *   createAskUserQuestionHandler,
+ *   createEditHandler,
  *   toTree,
  * } from 'zeitlich';
+ *
+ * // In-memory sandbox adapter
+ * import { InMemorySandboxProvider } from 'zeitlich/adapters/sandbox-inmemory';
  *
  * // LangChain adapter
  * import { createLangChainAdapter } from 'zeitlich/adapters/langchain';
@@ -43,13 +47,20 @@ export {
   createRunAgentActivity,
 } from "./lib/workflow-helpers";
 
+// Sandbox (activity-side: manager)
+export { SandboxManager } from "./lib/sandbox/manager";
+
 // Tool handlers (activity implementations)
-// All handlers follow the factory pattern: createXHandler(deps) => handler(args)
+// All handlers follow the factory pattern: createXHandler(getSandbox) => handler(args, context)
 export { createGlobHandler } from "./tools/glob/handler";
 
 export { createEditHandler } from "./tools/edit/handler";
 
 export { createBashHandler } from "./tools/bash/handler";
+
+export { createReadFileHandler } from "./tools/read-file/handler";
+
+export { createWriteFileHandler } from "./tools/write-file/handler";
 
 export { toTree } from "./lib/fs";
 

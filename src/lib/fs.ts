@@ -1,4 +1,4 @@
-import type { IFileSystem } from "just-bash";
+import type { SandboxFileSystem } from "./sandbox/types";
 
 const basename = (path: string, separator: string): string => {
   if (path[path.length - 1] === separator) path = path.slice(0, -1);
@@ -25,10 +25,10 @@ const printTree = async (
 };
 
 /**
- * Generates a formatted file tree string from an `IFileSystem` instance.
+ * Generates a formatted file tree string from a {@link SandboxFileSystem}.
  * Useful for including filesystem context in agent prompts.
  *
- * @param fs - File system implementation (e.g. from `just-bash`)
+ * @param fs - Sandbox filesystem implementation
  * @param opts - Optional configuration for tree generation
  * @param opts.dir - Root directory to start from (defaults to `/`)
  * @param opts.separator - Path separator (`/` or `\\`, defaults to `/`)
@@ -40,7 +40,7 @@ const printTree = async (
  * ```typescript
  * import { toTree } from 'zeitlich';
  *
- * const fileTree = await toTree(inMemoryFileSystem);
+ * const fileTree = await toTree(sandbox.fs);
  * // Returns:
  * // /
  * // ├─ src/
@@ -50,7 +50,7 @@ const printTree = async (
  * ```
  */
 export const toTree = async (
-  fs: IFileSystem,
+  fs: SandboxFileSystem,
   opts: {
     dir?: string;
     separator?: "/" | "\\";
@@ -67,7 +67,7 @@ export const toTree = async (
   const sort = opts.sort ?? true;
   let subtree = " (...)";
   if (depth > 0) {
-    const list = (await fs.readdirWithFileTypes?.(dir)) || [];
+    const list = await fs.readdirWithFileTypes(dir);
     if (sort) {
       list.sort((a, b) => {
         if (a.isDirectory && b.isDirectory) {
