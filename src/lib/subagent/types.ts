@@ -6,8 +6,8 @@ import type {
 } from "../tool-router/types";
 
 /** ToolHandlerResponse with threadId required (subagents must always surface their thread) */
-export type SubagentHandlerResponse<TResult = null> = ToolHandlerResponse<TResult> &
-  { threadId: string };
+export type SubagentHandlerResponse<TResult = null> =
+  ToolHandlerResponse<TResult> & { threadId: string };
 
 export type SubagentWorkflow<TResult extends z.ZodType = z.ZodType> = (
   input: SubagentInput
@@ -86,7 +86,7 @@ export interface SubagentInput {
   /** Optional context parameters passed from the parent agent */
   context?: Record<string, unknown>;
   /** When set, the subagent should continue this thread instead of starting a new one */
-  threadId?: string;
+  previousThreadId?: string;
   /** Sandbox ID inherited from the parent agent (when SubagentConfig.sandbox is 'inherit') */
   sandboxId?: string;
 }

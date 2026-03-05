@@ -1,4 +1,10 @@
-import { Bash, InMemoryFs, type BashOptions, type IFileSystem, type InitialFiles } from "just-bash";
+import {
+  Bash,
+  InMemoryFs,
+  type BashOptions,
+  type IFileSystem,
+  type InitialFiles,
+} from "just-bash";
 import type {
   Sandbox,
   SandboxCapabilities,
@@ -49,7 +55,7 @@ function toSandboxFs(fs: IFileSystem): SandboxFileSystem {
               isDirectory: s.isDirectory,
               isSymbolicLink: s.isSymbolicLink,
             };
-          }),
+          })
         );
       }
       return fs.readdirWithFileTypes(path);
@@ -84,7 +90,7 @@ class InMemorySandbox implements Sandbox {
   constructor(
     readonly id: string,
     private justBashFs: IFileSystem,
-    options?: InMemorySandboxOptions,
+    options?: InMemorySandboxOptions
   ) {
     this.fs = toSandboxFs(justBashFs);
     this.bashOptions = {
@@ -124,6 +130,10 @@ export class InMemorySandboxProvider implements SandboxProvider {
   private sandboxes = new Map<string, InMemorySandbox>();
 
   constructor(private defaultOptions?: InMemorySandboxOptions) {}
+
+  get(id: string): Sandbox | undefined {
+    return this.sandboxes.get(id);
+  }
 
   async create(options?: SandboxCreateOptions): Promise<Sandbox> {
     const id = options?.id ?? getShortId();
@@ -179,7 +189,7 @@ export class InMemorySandboxProvider implements SandboxProvider {
     const sandbox = new InMemorySandbox(
       snapshot.sandboxId,
       fs,
-      this.defaultOptions,
+      this.defaultOptions
     );
     this.sandboxes.set(sandbox.id, sandbox);
     return sandbox;

@@ -43,7 +43,7 @@ export function createSubagentHandler<
       ...(config.context && { context: config.context }),
       ...(args.threadId &&
         args.threadId !== null &&
-        config.allowThreadContinuation && { threadId: args.threadId }),
+        config.allowThreadContinuation && { previousThreadId: args.threadId }),
       ...(inheritSandbox && { sandboxId: parentSandboxId }),
     };
 

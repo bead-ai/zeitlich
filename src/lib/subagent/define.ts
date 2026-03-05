@@ -46,7 +46,7 @@ export function defineSubagent<
       | string
       | ((input: {
           prompt: string;
-          threadId?: string;
+          previousThreadId?: string;
           context: TContext;
         }) => Promise<SubagentHandlerResponse<z.infer<TResult> | null>>);
     context: TContext;
@@ -60,7 +60,7 @@ export function defineSubagent<TResult extends z.ZodType = z.ZodType>(
       | string
       | ((input: {
           prompt: string;
-          threadId?: string;
+          previousThreadId?: string;
         }) => Promise<SubagentHandlerResponse<z.infer<TResult> | null>>);
     hooks?: SubagentHooks<SubagentArgs, z.infer<TResult>>;
   }
