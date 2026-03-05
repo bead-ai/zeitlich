@@ -62,6 +62,8 @@
     "format:check": "prettier --check .",
     "typecheck": "tsc --noEmit",
     "prepublishOnly": "npm run build",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "clean": "rm -rf dist",
     "prepare": "husky",
     "prepack": "npm run build",
