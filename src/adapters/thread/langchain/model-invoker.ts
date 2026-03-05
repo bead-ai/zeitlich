@@ -26,14 +26,14 @@ export interface LangChainModelInvokerConfig {
  * @example
  * ```typescript
  * import { createLangChainModelInvoker } from 'zeitlich/adapters/thread/langchain';
- * import { createRunAgentActivity } from 'zeitlich';
+ * import { withParentWorkflowState } from 'zeitlich';
  * import { ChatAnthropic } from '@langchain/anthropic';
  *
  * const model = new ChatAnthropic({ model: "claude-sonnet-4-6" });
  * const invoker = createLangChainModelInvoker({ redis, model });
  *
- * // Wrap with createRunAgentActivity to use as runAgent activity:
- * return { runAgent: createRunAgentActivity(client, invoker) };
+ * // Wrap with withParentWorkflowState to use as runAgent activity:
+ * return { runAgent: withParentWorkflowState(client, invoker) };
  * ```
  */
 export function createLangChainModelInvoker({

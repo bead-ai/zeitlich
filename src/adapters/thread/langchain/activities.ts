@@ -37,19 +37,19 @@ export interface LangChainAdapter {
  *
  * The returned `threadOps` should be registered as Temporal activities on
  * the worker. The `invoker` (or invokers created via `createModelInvoker`)
- * should be wrapped with `createRunAgentActivity` for per-agent activities.
+ * should be wrapped with `withParentWorkflowState` for per-agent activities.
  *
  * @example
  * ```typescript
  * import { createLangChainAdapter } from 'zeitlich/adapters/thread/langchain';
- * import { createRunAgentActivity } from 'zeitlich';
+ * import { withParentWorkflowState } from 'zeitlich';
  *
  * const adapter = createLangChainAdapter({ redis, model });
  *
  * export function createActivities(client: WorkflowClient) {
  *   return {
  *     ...adapter.threadOps,
- *     runAgent: createRunAgentActivity(client, adapter.invoker),
+ *     runAgent: withParentWorkflowState(client, adapter.invoker),
  *   };
  * }
  * ```
@@ -61,8 +61,8 @@ export interface LangChainAdapter {
  * export function createActivities(client: WorkflowClient) {
  *   return {
  *     ...adapter.threadOps,
- *     runResearchAgent: createRunAgentActivity(client, adapter.createModelInvoker(claude)),
- *     runWriterAgent: createRunAgentActivity(client, adapter.createModelInvoker(gpt4)),
+ *     runResearchAgent: withParentWorkflowState(client, adapter.createModelInvoker(claude)),
+ *     runWriterAgent: withParentWorkflowState(client, adapter.createModelInvoker(gpt4)),
  *   };
  * }
  * ```

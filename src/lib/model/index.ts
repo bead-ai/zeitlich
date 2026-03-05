@@ -1,6 +1,6 @@
 export {
   queryParentWorkflowState,
-  createRunAgentActivity,
+  withParentWorkflowState,
 } from "./helpers";
 
 export type {

@@ -43,11 +43,11 @@ export type { ModelInvoker, ModelInvokerConfig } from "./lib/model";
 export { withAutoAppend, withSandbox } from "./lib/tool-router";
 export type { SandboxContext } from "./lib/tool-router";
 
-// Workflow state helpers (requires Temporal client)
+// Activity-side wrappers (requires Temporal client)
 export {
   queryParentWorkflowState,
-  createRunAgentActivity,
-} from "./lib/model";
+  withParentWorkflowState,
+} from "./lib/activity";
 
 // Sandbox (activity-side: manager)
 export { SandboxManager } from "./lib/sandbox/manager";
