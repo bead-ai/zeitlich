@@ -1,0 +1,41 @@
+<svg
+  width="512"
+  height="512"
+  viewBox="0 0 256 256"
+  fill="none"
+  xmlns="http://www.w3.org/2000/svg"
+  role="img"
+  aria-labelledby="title desc"
+>
+  <title id="title">Zeitlich Bildmarke</title>
+  <desc id="desc">
+    Circular temporal arcs around a resilient Z-like path, representing durable
+    AI orchestration over time.
+  </desc>
+
+  <defs>
+    <linearGradient id="zeitlichGradient" x1="40" y1="40" x2="216" y2="216">
+      <stop offset="0%" stop-color="#4F46E5" />
+      <stop offset="55%" stop-color="#0EA5E9" />
+      <stop offset="100%" stop-color="#22C55E" />
+    </linearGradient>
+  </defs>
+
+  <g stroke="url(#zeitlichGradient)" stroke-linecap="round" stroke-width="16">
+    <path d="M183 49 A96 96 0 0 1 219 95" />
+    <path d="M200 191 A96 96 0 0 1 36 153" />
+    <path d="M45 80 A96 96 0 0 1 202 66" />
+  </g>
+
+  <path
+    d="M88 84 H166 L108 128 L166 172 H88"
+    stroke="url(#zeitlichGradient)"
+    stroke-width="18"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+
+  <circle cx="88" cy="84" r="10" fill="#4F46E5" />
+  <circle cx="166" cy="172" r="10" fill="#22C55E" />
+  <circle cx="108" cy="128" r="7" fill="#0EA5E9" />
+</svg>

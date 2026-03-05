@@ -1,0 +1,112 @@
+<svg
+  width="512"
+  height="512"
+  viewBox="0 0 256 256"
+  fill="none"
+  xmlns="http://www.w3.org/2000/svg"
+  role="img"
+  aria-labelledby="title desc"
+>
+  <title id="title">Zeitlich Bildmarke Animated</title>
+  <desc id="desc">
+    Animated temporal arcs and pulsing nodes around a resilient Z-like core.
+  </desc>
+
+  <defs>
+    <linearGradient id="zeitlichGradient" x1="40" y1="40" x2="216" y2="216">
+      <stop offset="0%" stop-color="#4F46E5" />
+      <stop offset="55%" stop-color="#0EA5E9" />
+      <stop offset="100%" stop-color="#22C55E" />
+    </linearGradient>
+    <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="2.5" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+  </defs>
+
+  <style>
+    .orbit {
+      stroke: url(#zeitlichGradient);
+      stroke-width: 16;
+      stroke-linecap: round;
+      stroke-dasharray: 14 18;
+      animation: flow 4s linear infinite;
+    }
+    .orbit.slow {
+      animation-duration: 5.5s;
+    }
+    .orbit.fast {
+      animation-duration: 3.2s;
+    }
+    .core {
+      stroke: url(#zeitlichGradient);
+      stroke-width: 18;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      filter: url(#glow);
+      animation: breathe 2.8s ease-in-out infinite;
+      transform-origin: 128px 128px;
+      transform-box: fill-box;
+    }
+    .node {
+      animation: pulse 2.2s ease-in-out infinite;
+      transform-origin: center;
+      transform-box: fill-box;
+    }
+    .node.delay {
+      animation-delay: 0.65s;
+    }
+    .spark {
+      animation: pulse 1.6s ease-in-out infinite;
+    }
+    @keyframes flow {
+      from {
+        stroke-dashoffset: 0;
+      }
+      to {
+        stroke-dashoffset: -128;
+      }
+    }
+    @keyframes pulse {
+      0%,
+      100% {
+        opacity: 0.8;
+        transform: scale(1);
+      }
+      50% {
+        opacity: 1;
+        transform: scale(1.14);
+      }
+    }
+    @keyframes breathe {
+      0%,
+      100% {
+        opacity: 0.93;
+      }
+      50% {
+        opacity: 1;
+      }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .orbit,
+      .core,
+      .node,
+      .spark {
+        animation: none;
+      }
+    }
+  </style>
+
+  <path class="orbit fast" d="M183 49 A96 96 0 0 1 219 95" />
+  <path class="orbit" d="M200 191 A96 96 0 0 1 36 153" />
+  <path class="orbit slow" d="M45 80 A96 96 0 0 1 202 66" />
+
+  <path class="core" d="M88 84 H166 L108 128 L166 172 H88" />
+
+  <circle class="node" cx="88" cy="84" r="10" fill="#4F46E5" />
+  <circle class="node delay" cx="166" cy="172" r="10" fill="#22C55E" />
+  <circle class="spark" cx="108" cy="128" r="7" fill="#0EA5E9" />
+</svg>

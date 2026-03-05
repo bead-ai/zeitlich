@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Zeitlich Bildmarke Preview</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: radial-gradient(
+          1200px 700px at 20% 10%,
+          #1e293b 0%,
+          #0f172a 45%,
+          #020617 100%
+        );
+        color: #dbeafe;
+      }
+      main {
+        max-width: 1100px;
+        margin: 0 auto;
+        padding: 36px 24px 56px;
+      }
+      h1 {
+        margin: 0;
+        font-size: clamp(1.4rem, 2.6vw, 2rem);
+        letter-spacing: 0.01em;
+      }
+      p {
+        margin-top: 8px;
+        margin-bottom: 0;
+        color: #bfdbfe;
+      }
+      .grid {
+        margin-top: 24px;
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        gap: 16px;
+      }
+      .card {
+        background: rgba(15, 23, 42, 0.75);
+        border: 1px solid rgba(125, 211, 252, 0.2);
+        border-radius: 14px;
+        padding: 18px;
+        backdrop-filter: blur(6px);
+      }
+      .label {
+        font-size: 0.84rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: #7dd3fc;
+      }
+      .row {
+        margin-top: 14px;
+        display: flex;
+        align-items: center;
+        gap: 18px;
+        flex-wrap: wrap;
+      }
+      .swatch {
+        display: grid;
+        place-items: center;
+        border-radius: 12px;
+        border: 1px solid rgba(148, 163, 184, 0.3);
+      }
+      .swatch.light {
+        background: #f8fafc;
+      }
+      .swatch.dark {
+        background: #020617;
+      }
+      .sm {
+        width: 84px;
+        height: 84px;
+      }
+      .md {
+        width: 132px;
+        height: 132px;
+      }
+      .lg {
+        width: 210px;
+        height: 210px;
+      }
+      img {
+        width: 76%;
+        height: 76%;
+        object-fit: contain;
+      }
+      .lg img {
+        width: 82%;
+        height: 82%;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Zeitlich Bildmarke</h1>
+      <p>Durable AI orchestration represented as temporal arcs plus resilient core.</p>
+
+      <section class="grid">
+        <article class="card">
+          <div class="label">Static / neutral usage</div>
+          <div class="row">
+            <div class="swatch light sm">
+              <img src="./zeitlich-bildmarke.svg" alt="Zeitlich logo static small" />
+            </div>
+            <div class="swatch light md">
+              <img src="./zeitlich-bildmarke.svg" alt="Zeitlich logo static medium" />
+            </div>
+            <div class="swatch light lg">
+              <img src="./zeitlich-bildmarke.svg" alt="Zeitlich logo static large" />
+            </div>
+          </div>
+        </article>
+
+        <article class="card">
+          <div class="label">Animated / hero usage</div>
+          <div class="row">
+            <div class="swatch dark sm">
+              <img
+                src="./zeitlich-bildmarke-animated.svg"
+                alt="Zeitlich logo animated small"
+              />
+            </div>
+            <div class="swatch dark md">
+              <img
+                src="./zeitlich-bildmarke-animated.svg"
+                alt="Zeitlich logo animated medium"
+              />
+            </div>
+            <div class="swatch dark lg">
+              <img
+                src="./zeitlich-bildmarke-animated.svg"
+                alt="Zeitlich logo animated large"
+              />
+            </div>
+          </div>
+        </article>
+      </section>
+    </main>
+  </body>
+</html>
