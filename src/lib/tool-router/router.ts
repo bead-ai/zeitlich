@@ -1,8 +1,5 @@
 import type { ToolMessageContent, ToolResultConfig } from "../types";
 import type {
-  PostToolUseFailureHookResult,
-  PreToolUseHookResult,
-  ToolHooks,
   ToolMap,
   ToolDefinition,
   ToolHandlerContext,
@@ -22,25 +19,8 @@ import type {
   ProcessToolCallsContext,
   ToolWithHandler,
 } from "./types";
-import type {
-  SubagentConfig,
-  SubagentHandlerResponse,
-  SubagentHooks,
-} from "../subagent/types";
-
-import type { SubagentArgs } from "../../tools/subagent/tool";
 
 import type { z } from "zod";
-import {
-  createSubagentTool,
-  SUBAGENT_TOOL_NAME,
-} from "../../tools/subagent/tool";
-import { createSubagentHandler } from "../../tools/subagent/handler";
-import {
-  createReadSkillTool,
-  READ_SKILL_TOOL_NAME,
-} from "../../tools/read-skill/tool";
-import { createReadSkillHandler } from "../../tools/read-skill/handler";
 import { ApplicationFailure } from "@temporalio/workflow";
 
 /**
@@ -85,49 +65,12 @@ export function createToolRouter<T extends ToolMap>(
   }
 
   /** Check if a tool is enabled (defaults to true when not specified) */
-  const isEnabled = (tool: ToolMap[string] | SubagentConfig): boolean =>
-    tool.enabled ?? true;
+  const isEnabled = (tool: ToolMap[string]): boolean => tool.enabled ?? true;
 
-  if (options.subagents) {
-    if (options.subagents.length > 0) {
-      const subagentHooksMap = new Map<string, SubagentHooks>();
-      for (const s of options.subagents) {
-        if (s.hooks) subagentHooksMap.set(s.agentName, s.hooks);
-      }
-
-      const resolveSubagentName = (args: unknown): string =>
-        (args as SubagentArgs).subagent;
-
-      toolMap.set(SUBAGENT_TOOL_NAME, {
-        ...createSubagentTool(options.subagents),
-        handler: createSubagentHandler(options.subagents),
-        ...(subagentHooksMap.size > 0 && {
-          hooks: {
-            onPreToolUse: async (ctx): Promise<PreToolUseHookResult> => {
-              const hooks = subagentHooksMap.get(resolveSubagentName(ctx.args));
-              return hooks?.onPreExecution?.(ctx) ?? {};
-            },
-            onPostToolUse: async (ctx): Promise<void> => {
-              const hooks = subagentHooksMap.get(resolveSubagentName(ctx.args));
-              await hooks?.onPostExecution?.(ctx);
-            },
-            onPostToolUseFailure: async (
-              ctx
-            ): Promise<PostToolUseFailureHookResult> => {
-              const hooks = subagentHooksMap.get(resolveSubagentName(ctx.args));
-              return hooks?.onExecutionFailure?.(ctx) ?? {};
-            },
-          } satisfies ToolHooks,
-        }),
-      });
+  if (options.plugins) {
+    for (const plugin of options.plugins) {
+      toolMap.set(plugin.name, plugin);
     }
-  }
-
-  if (options.skills && options.skills.length > 0) {
-    toolMap.set(READ_SKILL_TOOL_NAME, {
-      ...createReadSkillTool(options.skills),
-      handler: createReadSkillHandler(options.skills),
-    });
   }
 
   async function processToolCall(
@@ -333,30 +276,15 @@ export function createToolRouter<T extends ToolMap>(
     },
 
     getToolDefinitions(): ToolDefinition[] {
-      const activeSubagents =
-        options.subagents?.filter((subagent) => isEnabled(subagent)) ?? [];
-      const activeSkills = options.skills ?? [];
-
-      return [
-        ...Array.from(toolMap)
-          .filter(
-            ([, tool]) =>
-              isEnabled(tool) &&
-              tool.name !== SUBAGENT_TOOL_NAME &&
-              tool.name !== READ_SKILL_TOOL_NAME
-          )
-          .map(([name, tool]) => ({
-            name,
-            description: tool.description,
-            schema: tool.schema,
-            strict: tool.strict,
-            max_uses: tool.max_uses,
-          })),
-        ...(activeSubagents.length > 0
-          ? [createSubagentTool(activeSubagents)]
-          : []),
-        ...(activeSkills.length > 0 ? [createReadSkillTool(activeSkills)] : []),
-      ];
+      return Array.from(toolMap)
+        .filter(([, tool]) => isEnabled(tool))
+        .map(([name, tool]) => ({
+          name,
+          description: tool.description,
+          schema: tool.schema,
+          strict: tool.strict,
+          max_uses: tool.max_uses,
+        }));
     },
 
     async processToolCalls(
@@ -570,70 +498,6 @@ export function defineTool<
   tool: ToolWithHandler<TName, TSchema, TResult, TContext>
 ): ToolWithHandler<TName, TSchema, TResult, TContext> {
   return tool;
-}
-
-/**
- * Identity function that provides full type inference for subagent configurations.
- * Verifies the workflow function's input parameters match the configured context,
- * and properly types the lifecycle hooks with Task tool args and inferred result type.
- *
- * @example
- * ```ts
- * // With typed context — workflow must accept { prompt, context }
- * const researcher = defineSubagent({
- *   name: "researcher",
- *   description: "Researches topics",
- *   workflow: researcherWorkflow, // (input: { prompt: string; context: { apiKey: string } }) => Promise<...>
- *   context: { apiKey: "..." },
- *   resultSchema: z.object({ findings: z.string() }),
- *   hooks: {
- *     onPostExecution: ({ result }) => {
- *       // result is typed as { findings: string }
- *     },
- *   },
- * });
- *
- * // Without context — workflow only needs { prompt }
- * const writer = defineSubagent({
- *   name: "writer",
- *   description: "Writes content",
- *   workflow: writerWorkflow, // (input: { prompt: string }) => Promise<...>
- *   resultSchema: z.object({ content: z.string() }),
- * });
- * ```
- */
-// With context — verifies workflow accepts { prompt, context: TContext }
-export function defineSubagent<
-  TResult extends z.ZodType = z.ZodType,
-  TContext extends Record<string, unknown> = Record<string, unknown>,
->(
-  config: Omit<SubagentConfig<TResult>, "hooks" | "workflow" | "context"> & {
-    workflow:
-      | string
-      | ((input: {
-          prompt: string;
-          threadId?: string;
-          context: TContext;
-        }) => Promise<SubagentHandlerResponse<z.infer<TResult> | null>>);
-    context: TContext;
-    hooks?: SubagentHooks<SubagentArgs, z.infer<TResult>>;
-  }
-): SubagentConfig<TResult>;
-// Without context — verifies workflow accepts { prompt }
-export function defineSubagent<TResult extends z.ZodType = z.ZodType>(
-  config: Omit<SubagentConfig<TResult>, "hooks" | "workflow"> & {
-    workflow:
-      | string
-      | ((input: {
-          prompt: string;
-          threadId?: string;
-        }) => Promise<SubagentHandlerResponse<z.infer<TResult> | null>>);
-    hooks?: SubagentHooks<SubagentArgs, z.infer<TResult>>;
-  }
-): SubagentConfig<TResult>;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function defineSubagent(config: any): SubagentConfig {
-  return config;
 }
 
 /**

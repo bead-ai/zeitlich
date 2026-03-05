@@ -12,6 +12,8 @@ import { type AgentStateManager, type JsonSerializable } from "../state/types";
 import { createToolRouter } from "../tool-router/router";
 import type { ParsedToolCallUnion, ToolMap } from "../tool-router/types";
 import { getShortId } from "../thread/id";
+import { buildSubagentRegistration } from "../subagent/register";
+import { buildSkillRegistration } from "../skills/register";
 
 /**
  * Creates an agent session that manages the agent loop: LLM invocation,
@@ -72,13 +74,22 @@ export const createSession = async <T extends ToolMap, M = unknown>({
     appendSystemMessage,
   } = threadOps ?? proxyDefaultThreadOps();
 
+  const plugins: ToolMap[string][] = [];
+  if (subagents) {
+    const reg = buildSubagentRegistration(subagents);
+    if (reg) plugins.push(reg);
+  }
+  if (skills) {
+    const reg = buildSkillRegistration(skills);
+    if (reg) plugins.push(reg);
+  }
+
   const toolRouter = createToolRouter({
     tools,
     appendToolResult,
     threadId,
     hooks,
-    subagents,
-    skills,
+    plugins,
     parallel: processToolsInParallel,
   });
 

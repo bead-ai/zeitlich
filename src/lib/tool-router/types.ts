@@ -5,8 +5,6 @@ import type {
   MessageContent,
   SessionExitReason,
 } from "../types";
-import type { SubagentConfig } from "../subagent/types";
-import type { Skill } from "../skills/types";
 import type { z } from "zod";
 
 // ============================================================================
@@ -484,10 +482,8 @@ export interface ToolRouterOptions<T extends ToolMap> {
   parallel?: boolean;
   /** Lifecycle hooks for tool execution */
   hooks?: Hooks<T, ToolCallResultUnion<InferToolResults<T>>>;
-  /** Subagent configurations */
-  subagents?: SubagentConfig[];
-  /** Skills available to the agent (auto-adds ReadSkill tool when non-empty) */
-  skills?: Skill[];
+  /** Additional tools to auto-register (e.g. subagent, skill tools built by register helpers) */
+  plugins?: ToolMap[string][];
 }
 
 /**

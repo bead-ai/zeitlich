@@ -2,7 +2,6 @@ export {
   createToolRouter,
   withAutoAppend,
   defineTool,
-  defineSubagent,
   hasNoOtherToolCalls,
 } from "./router";
 
