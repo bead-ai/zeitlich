@@ -91,6 +91,8 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@google/genai": "^1.44.0",
+    "@langchain/core": "^1.1.30",
     "@temporalio/envconfig": "^1.15.0",
     "@temporalio/worker": "^1.15.0",
     "@types/node": "^25.3.3",
