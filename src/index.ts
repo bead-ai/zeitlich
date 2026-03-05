@@ -29,6 +29,9 @@
 // (Activities can use these too)
 export * from "./workflow";
 
+// Skills (activity-side: filesystem provider uses node:path)
+export { FileSystemSkillProvider } from "./lib/skills/fs-provider";
+
 // Thread manager (generic, framework-agnostic)
 export { createThreadManager } from "./lib/thread";
 export type {
