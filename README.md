@@ -104,7 +104,8 @@ import {
 // In activity files and worker setup — framework-agnostic core
 import {
   createRunAgentActivity,
-  createBashHandler,
+  withSandbox,
+  bashHandler,
   createAskUserQuestionHandler,
   toTree,
 } from "zeitlich";
@@ -223,7 +224,8 @@ import type Redis from "ioredis";
 import type { WorkflowClient } from "@temporalio/client";
 import { ChatAnthropic } from "@langchain/anthropic";
 import {
-  createBashHandler,
+  withSandbox,
+  bashHandler,
   createAskUserQuestionHandler,
   createRunAgentActivity,
 } from "zeitlich";
@@ -251,7 +253,7 @@ export const createActivities = ({
       toolResponse: JSON.stringify(await performSearch(args.query)),
       data: null,
     }),
-    bashHandlerActivity: createBashHandler(sandboxManager),
+    bashHandlerActivity: withSandbox(sandboxManager, bashHandler),
     askUserQuestionHandlerActivity: createAskUserQuestionHandler(),
   };
 };
@@ -521,23 +523,24 @@ const session = await createSession({
 });
 ```
 
-For file operations, use the built-in tool handler factories. All handlers accept a `SandboxManager`:
+For file operations, use the built-in tool handlers wrapped with `withSandbox`:
 
 ```typescript
 import {
   SandboxManager,
-  createGlobHandler,
-  createEditHandler,
-  createBashHandler,
+  withSandbox,
+  globHandler,
+  editHandler,
+  bashHandler,
 } from "zeitlich";
 
 const sandboxManager = new SandboxManager(provider);
 
 export const createActivities = ({ redis, client }) => ({
   ...sandboxManager.createActivities(),
-  globHandlerActivity: createGlobHandler(sandboxManager),
-  editHandlerActivity: createEditHandler(sandboxManager),
-  bashHandlerActivity: createBashHandler(sandboxManager),
+  globHandlerActivity: withSandbox(sandboxManager, globHandler),
+  editHandlerActivity: withSandbox(sandboxManager, editHandler),
+  bashHandlerActivity: withSandbox(sandboxManager, bashHandler),
 });
 ```
 
@@ -568,11 +571,12 @@ import {
   askUserQuestionTool,
 } from "zeitlich/workflow";
 
-// Import handler factories in activities
+// Import handlers + wrapper in activities
 import {
-  createEditHandler,
-  createGlobHandler,
-  createBashHandler,
+  withSandbox,
+  editHandler,
+  globHandler,
+  bashHandler,
   createAskUserQuestionHandler,
 } from "zeitlich";
 ```
@@ -622,7 +626,8 @@ Framework-agnostic utilities for activities, worker setup, and Node.js code:
 | `createRunAgentActivity`  | Wraps a `ModelInvoker` into a `RunAgentActivity` with automatic tool loading                  |
 | `createThreadManager`     | Generic Redis-backed thread manager factory                                                   |
 | `toTree`                  | Generate file tree string from an `IFileSystem` instance                                      |
-| Tool handlers             | `createGlobHandler`, `createEditHandler`, `createBashHandler`, `createAskUserQuestionHandler` |
+| `withSandbox`             | Wraps a handler to auto-resolve sandbox from context (pairs with `withAutoAppend`)            |
+| Tool handlers             | `bashHandler`, `editHandler`, `globHandler`, `readFileHandler`, `writeFileHandler`, `createAskUserQuestionHandler` |
 
 ### LangChain Adapter Entry Point (`zeitlich/adapters/thread/langchain`)
 

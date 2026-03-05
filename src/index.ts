@@ -11,8 +11,9 @@
  * // In your activities file
  * import {
  *   SandboxManager,
- *   createBashHandler,
- *   createEditHandler,
+ *   withSandbox,
+ *   bashHandler,
+ *   editHandler,
  *   toTree,
  * } from 'zeitlich';
  *
@@ -38,8 +39,9 @@ export type {
 // Model invoker contract (framework-agnostic)
 export type { ModelInvoker, ModelInvokerConfig } from "./lib/model";
 
-// Auto-append wrapper for large tool results (activity-side only)
-export { withAutoAppend } from "./lib/tool-router";
+// Activity-side handler wrappers
+export { withAutoAppend, withSandbox } from "./lib/tool-router";
+export type { SandboxContext } from "./lib/tool-router";
 
 // Workflow state helpers (requires Temporal client)
 export {
@@ -51,15 +53,11 @@ export {
 export { SandboxManager } from "./lib/sandbox/manager";
 
 // Tool handlers (activity implementations)
-// All handlers follow the factory pattern: createXHandler(manager) => handler(args, context)
-export { createGlobHandler } from "./tools/glob/handler";
-
-export { createEditHandler } from "./tools/edit/handler";
-
-export { createBashHandler } from "./tools/bash/handler";
-
-export { createReadFileHandler } from "./tools/read-file/handler";
-
-export { createWriteFileHandler } from "./tools/write-file/handler";
+// Wrap sandbox handlers with withSandbox(manager, handler) at registration time
+export { bashHandler } from "./tools/bash/handler";
+export { editHandler } from "./tools/edit/handler";
+export { globHandler } from "./tools/glob/handler";
+export { readFileHandler } from "./tools/read-file/handler";
+export { writeFileHandler } from "./tools/write-file/handler";
 
 export { toTree } from "./lib/sandbox";

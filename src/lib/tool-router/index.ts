@@ -4,6 +4,8 @@ export {
   hasNoOtherToolCalls,
 } from "./router";
 export { withAutoAppend } from "./auto-append";
+export { withSandbox } from "./with-sandbox";
+export type { SandboxContext } from "./with-sandbox";
 
 export type {
   ToolDefinition,

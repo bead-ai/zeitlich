@@ -18,7 +18,7 @@ import { SandboxNotFoundError } from "./types";
  * const manager = new SandboxManager(new InMemorySandboxProvider());
  * const activities = {
  *   ...manager.createActivities(),
- *   bashHandler: createBashHandler(manager),
+ *   bashHandler: withSandbox(manager, bashHandler),
  * };
  * ```
  */

@@ -1,7 +1,7 @@
 import type { ActivityToolHandler } from "../../lib/tool-router";
+import type { SandboxContext } from "../../lib/tool-router/with-sandbox";
 import type { GlobArgs } from "./tool";
 import type { Sandbox } from "../../lib/sandbox/types";
-import type { SandboxManager } from "../../lib/sandbox/manager";
 
 interface GlobResult {
   files: string[];
@@ -37,48 +37,38 @@ async function walk(
 }
 
 /**
- * Creates a glob handler that searches within a {@link Sandbox} filesystem.
+ * Glob tool handler — searches files within a {@link Sandbox} filesystem.
  *
- * @param manager - The {@link SandboxManager} instance that holds live sandboxes
- * @returns An ActivityToolHandler for glob tool calls
+ * Wrap with {@link withSandbox} at activity registration time to inject the
+ * sandbox automatically.
  */
-export function createGlobHandler(
-  manager: SandboxManager,
-): ActivityToolHandler<GlobArgs, GlobResult> {
-  return async (args, context) => {
-    const { sandboxId } = context;
+export const globHandler: ActivityToolHandler<
+  GlobArgs,
+  GlobResult,
+  SandboxContext
+> = async (args, { sandbox }) => {
+  const { fs } = sandbox;
+  const { pattern, root = "/" } = args;
 
-    if (!sandboxId) {
-      return {
-        toolResponse:
-          "Error: No sandbox configured for this agent. The Glob tool requires a sandbox.",
-        data: { files: [] },
-      };
-    }
+  try {
+    const allFiles = await walk(fs, root);
+    const relativeTo = root.endsWith("/") ? root : `${root}/`;
+    const matched = allFiles
+      .map((f) => (f.startsWith(relativeTo) ? f.slice(relativeTo.length) : f))
+      .filter((f) => matchGlob(pattern, f));
 
-    const { fs } = manager.getSandbox(sandboxId);
-    const { pattern, root = "/" } = args;
-
-    try {
-      const allFiles = await walk(fs, root);
-      const relativeTo = root.endsWith("/") ? root : `${root}/`;
-      const matched = allFiles
-        .map((f) => (f.startsWith(relativeTo) ? f.slice(relativeTo.length) : f))
-        .filter((f) => matchGlob(pattern, f));
-
-      return {
-        toolResponse:
-          matched.length > 0
-            ? `Found ${matched.length} file(s):\n${matched.join("\n")}`
-            : `No files matched pattern "${pattern}"`,
-        data: { files: matched },
-      };
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Unknown error";
-      return {
-        toolResponse: `Error running glob: ${message}`,
-        data: { files: [] },
-      };
-    }
-  };
-}
+    return {
+      toolResponse:
+        matched.length > 0
+          ? `Found ${matched.length} file(s):\n${matched.join("\n")}`
+          : `No files matched pattern "${pattern}"`,
+      data: { files: matched },
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    return {
+      toolResponse: `Error running glob: ${message}`,
+      data: { files: [] },
+    };
+  }
+};
