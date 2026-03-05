@@ -1,12 +1,11 @@
 import type { ActivityToolHandler } from "../../lib/tool-router";
 import type { GlobArgs } from "./tool";
 import type { Sandbox } from "../../lib/sandbox/types";
+import type { SandboxManager } from "../../lib/sandbox/manager";
 
 interface GlobResult {
   files: string[];
 }
-
-type GetSandbox = (id: string) => Sandbox;
 
 /**
  * Simple glob-style matcher (supports `*` and `**`).
@@ -40,11 +39,11 @@ async function walk(
 /**
  * Creates a glob handler that searches within a {@link Sandbox} filesystem.
  *
- * @param getSandbox - Looks up the sandbox for the given ID
+ * @param manager - The {@link SandboxManager} instance that holds live sandboxes
  * @returns An ActivityToolHandler for glob tool calls
  */
 export function createGlobHandler(
-  getSandbox: GetSandbox,
+  manager: SandboxManager,
 ): ActivityToolHandler<GlobArgs, GlobResult> {
   return async (args, context) => {
     const { sandboxId } = context;
@@ -57,7 +56,7 @@ export function createGlobHandler(
       };
     }
 
-    const { fs } = getSandbox(sandboxId);
+    const { fs } = manager.getSandbox(sandboxId);
     const { pattern, root = "/" } = args;
 
     try {

@@ -1,6 +1,6 @@
 import type { ActivityToolHandler } from "../../lib/tool-router";
 import type { FileReadArgs } from "./tool";
-import type { Sandbox } from "../../lib/sandbox/types";
+import type { SandboxManager } from "../../lib/sandbox/manager";
 
 interface ReadFileResult {
   path: string;
@@ -8,16 +8,14 @@ interface ReadFileResult {
   totalLines?: number;
 }
 
-type GetSandbox = (id: string) => Sandbox;
-
 /**
  * Creates a read-file handler that reads files via a {@link Sandbox}.
  *
- * @param getSandbox - Looks up the sandbox for the given ID
+ * @param manager - The {@link SandboxManager} instance that holds live sandboxes
  * @returns An ActivityToolHandler for read-file tool calls
  */
 export function createReadFileHandler(
-  getSandbox: GetSandbox,
+  manager: SandboxManager,
 ): ActivityToolHandler<FileReadArgs, ReadFileResult | null> {
   return async (args, context) => {
     const { sandboxId } = context;
@@ -30,7 +28,7 @@ export function createReadFileHandler(
       };
     }
 
-    const { fs } = getSandbox(sandboxId);
+    const { fs } = manager.getSandbox(sandboxId);
     const { path, offset, limit } = args;
 
     try {

@@ -1,22 +1,20 @@
 import type { ActivityToolHandler } from "../../lib/tool-router";
 import type { FileWriteArgs } from "./tool";
-import type { Sandbox } from "../../lib/sandbox/types";
+import type { SandboxManager } from "../../lib/sandbox/manager";
 
 interface WriteFileResult {
   path: string;
   success: boolean;
 }
 
-type GetSandbox = (id: string) => Sandbox;
-
 /**
  * Creates a write-file handler that writes files via a {@link Sandbox}.
  *
- * @param getSandbox - Looks up the sandbox for the given ID
+ * @param manager - The {@link SandboxManager} instance that holds live sandboxes
  * @returns An ActivityToolHandler for write-file tool calls
  */
 export function createWriteFileHandler(
-  getSandbox: GetSandbox,
+  manager: SandboxManager,
 ): ActivityToolHandler<FileWriteArgs, WriteFileResult> {
   return async (args, context) => {
     const { sandboxId } = context;
@@ -29,7 +27,7 @@ export function createWriteFileHandler(
       };
     }
 
-    const { fs } = getSandbox(sandboxId);
+    const { fs } = manager.getSandbox(sandboxId);
     const { file_path, content } = args;
 
     try {

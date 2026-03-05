@@ -1,6 +1,6 @@
 import type { ActivityToolHandler } from "../../lib/tool-router";
 import type { FileEditArgs } from "./tool";
-import type { Sandbox } from "../../lib/sandbox/types";
+import type { SandboxManager } from "../../lib/sandbox/manager";
 
 interface EditResult {
   path: string;
@@ -12,16 +12,14 @@ function escapeRegExp(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-type GetSandbox = (id: string) => Sandbox;
-
 /**
  * Creates an edit handler that edits files via a {@link Sandbox}.
  *
- * @param getSandbox - Looks up the sandbox for the given ID
+ * @param manager - The {@link SandboxManager} instance that holds live sandboxes
  * @returns An ActivityToolHandler for edit tool calls
  */
 export function createEditHandler(
-  getSandbox: GetSandbox,
+  manager: SandboxManager,
 ): ActivityToolHandler<FileEditArgs, EditResult> {
   return async (args, context) => {
     const { sandboxId } = context;
@@ -34,7 +32,7 @@ export function createEditHandler(
       };
     }
 
-    const { fs } = getSandbox(sandboxId);
+    const { fs } = manager.getSandbox(sandboxId);
     const { file_path, old_string, new_string, replace_all = false } = args;
 
     if (old_string === new_string) {

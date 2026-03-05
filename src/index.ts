@@ -51,7 +51,7 @@ export {
 export { SandboxManager } from "./lib/sandbox/manager";
 
 // Tool handlers (activity implementations)
-// All handlers follow the factory pattern: createXHandler(getSandbox) => handler(args, context)
+// All handlers follow the factory pattern: createXHandler(manager) => handler(args, context)
 export { createGlobHandler } from "./tools/glob/handler";
 
 export { createEditHandler } from "./tools/edit/handler";

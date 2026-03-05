@@ -251,7 +251,7 @@ export const createActivities = ({
       toolResponse: JSON.stringify(await performSearch(args.query)),
       data: null,
     }),
-    bashHandlerActivity: createBashHandler({ fs: inMemoryFileSystem }),
+    bashHandlerActivity: createBashHandler(sandboxManager),
     askUserQuestionHandlerActivity: createAskUserQuestionHandler(),
   };
 };
@@ -521,20 +521,23 @@ const session = await createSession({
 });
 ```
 
-For file operations, use the built-in tool handler factories. All handlers accept an `IFileSystem`:
+For file operations, use the built-in tool handler factories. All handlers accept a `SandboxManager`:
 
 ```typescript
 import {
+  SandboxManager,
   createGlobHandler,
   createEditHandler,
   createBashHandler,
 } from "zeitlich";
 
+const sandboxManager = new SandboxManager(provider);
+
 export const createActivities = ({ redis, client }) => ({
-  generateFileTreeActivity: async () => toTree(inMemoryFileSystem),
-  globHandlerActivity: createGlobHandler(inMemoryFileSystem),
-  editHandlerActivity: createEditHandler(inMemoryFileSystem),
-  bashHandlerActivity: createBashHandler({ fs: inMemoryFileSystem }),
+  ...sandboxManager.createActivities(),
+  globHandlerActivity: createGlobHandler(sandboxManager),
+  editHandlerActivity: createEditHandler(sandboxManager),
+  bashHandlerActivity: createBashHandler(sandboxManager),
 });
 ```
 

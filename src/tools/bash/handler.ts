@@ -1,27 +1,18 @@
 import type { ActivityToolHandler } from "../../lib/tool-router";
 import type { BashArgs } from "./tool";
-import type { Sandbox, ExecResult } from "../../lib/sandbox/types";
-
-type GetSandbox = (id: string) => Sandbox;
+import type { ExecResult } from "../../lib/sandbox/types";
+import type { SandboxManager } from "../../lib/sandbox/manager";
 
 /**
  * Creates a Bash tool handler that executes shell commands via a {@link Sandbox}.
  *
- * @param getSandbox - Looks up the sandbox for the given ID (typically `SandboxManager.getSandbox`)
+ * @param manager - The {@link SandboxManager} instance that holds live sandboxes
  * @returns Activity tool handler for Bash tool calls
- *
- * @example
- * ```typescript
- * import { createBashHandler, SandboxManager } from 'zeitlich';
- *
- * const manager = new SandboxManager(provider);
- * const bashHandler = createBashHandler(manager.getSandbox.bind(manager));
- * ```
  */
 export const createBashHandler: (
-  getSandbox: GetSandbox,
+  manager: SandboxManager,
 ) => ActivityToolHandler<BashArgs, ExecResult | null> =
-  (getSandbox) =>
+  (manager) =>
   async (args, context) => {
     const { sandboxId } = context;
 
@@ -33,7 +24,7 @@ export const createBashHandler: (
       };
     }
 
-    const sandbox = getSandbox(sandboxId);
+    const sandbox = manager.getSandbox(sandboxId);
     const { command } = args;
 
     try {
