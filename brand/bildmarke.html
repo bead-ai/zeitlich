@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Zeitlich – Bildmarke</title>
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      height: 100%;
+      background: #030712;
+      overflow: hidden;
+      font-family: system-ui, -apple-system, sans-serif;
+    }
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+    canvas { display: block; cursor: crosshair; }
+    .controls {
+      position: fixed;
+      bottom: 28px;
+      display: flex;
+      gap: 10px;
+      z-index: 10;
+    }
+    .controls button {
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.12);
+      color: rgba(255,255,255,0.55);
+      padding: 7px 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 12px;
+      letter-spacing: 0.02em;
+      transition: all 0.25s;
+    }
+    .controls button:hover {
+      background: rgba(255,255,255,0.12);
+      color: rgba(255,255,255,0.85);
+      border-color: rgba(255,255,255,0.25);
+    }
+  </style>
+</head>
+<body>
+  <canvas id="c"></canvas>
+  <div class="controls">
+    <button onclick="exportMark()">Export PNG</button>
+    <button onclick="toggleBg()">Toggle Background</button>
+  </div>
+
+  <script>
+  (() => {
+    const canvas = document.getElementById('c');
+    const ctx = canvas.getContext('2d');
+
+    /* ── Configuration ──────────────────────────────────── */
+
+    const C = {
+      dark: true,
+      bgDark: '#030712',
+      bgLight: '#f1f5f9',
+      mark: {
+        padding: 0.19,
+        stroke: 0.058,
+        colors: ['#c4b5fd', '#a78bfa', '#818cf8', '#6366f1', '#3b82f6', '#0ea5e9', '#22d3ee'],
+        glow: 'rgba(99, 102, 241, 0.35)',
+      },
+      particles: {
+        count: 38,
+        speedMin: 0.00055,
+        speedMax: 0.0028,
+        sizeMin: 1.2,
+        sizeMax: 4,
+        trail: 5,
+        trailDecay: 0.65,
+      },
+    };
+
+    /* ── State ──────────────────────────────────────────── */
+
+    let W, H, dpr;
+    let mouseX = -9999, mouseY = -9999;
+    let hovered = false;
+    const particles = [];
+
+    /* ── Canvas Setup ───────────────────────────────────── */
+
+    function resize() {
+      dpr = window.devicePixelRatio || 1;
+      const size = Math.min(window.innerWidth, window.innerHeight) * 0.88;
+      W = H = size;
+      canvas.width = W * dpr;
+      canvas.height = H * dpr;
+      canvas.style.width = `${W}px`;
+      canvas.style.height = `${H}px`;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+
+    /* ── Z Path Geometry ────────────────────────────────── */
+
+    function zBox() {
+      const p = W * C.mark.padding;
+      return { l: p, r: W - p, t: p, b: H - p };
+    }
+
+    function segLengths(z) {
+      const top = z.r - z.l;
+      const diag = Math.hypot(z.r - z.l, z.b - z.t);
+      const bot = z.r - z.l;
+      return { top, diag, bot, total: top + diag + bot };
+    }
+
+    function pointAt(t, z) {
+      const s = segLengths(z);
+      const d = t * s.total;
+      if (d <= s.top) {
+        const f = d / s.top;
+        return { x: z.l + f * (z.r - z.l), y: z.t };
+      }
+      if (d <= s.top + s.diag) {
+        const f = (d - s.top) / s.diag;
+        return { x: z.r - f * (z.r - z.l), y: z.t + f * (z.b - z.t) };
+      }
+      const f = (d - s.top - s.diag) / s.bot;
+      return { x: z.l + f * (z.r - z.l), y: z.b };
+    }
+
+    /* ── Particle System ────────────────────────────────── */
+
+    function spawn() {
+      const { speedMin, speedMax, sizeMin, sizeMax } = C.particles;
+      return {
+        t: Math.random(),
+        v: speedMin + Math.random() * (speedMax - speedMin),
+        r: sizeMin + Math.random() * (sizeMax - sizeMin),
+        a: 0.45 + Math.random() * 0.55,
+        phase: Math.random() * Math.PI * 2,
+      };
+    }
+
+    function initParticles() {
+      for (let i = 0; i < C.particles.count; i++) particles.push(spawn());
+    }
+
+    /* ── Color Utilities ────────────────────────────────── */
+
+    function hexToRgb(hex) {
+      return [
+        parseInt(hex.slice(1, 3), 16),
+        parseInt(hex.slice(3, 5), 16),
+        parseInt(hex.slice(5, 7), 16),
+      ];
+    }
+
+    function lerpRgb(a, b, t) {
+      return a.map((v, i) => Math.round(v + (b[i] - v) * t));
+    }
+
+    const warmRgb = hexToRgb('#fbbf24');
+    const whiteRgb = [255, 255, 255];
+    const coolRgb = hexToRgb('#67e8f9');
+
+    function particleRgb(t) {
+      if (t < 0.35) {
+        const f = t / 0.35;
+        return lerpRgb(warmRgb, whiteRgb, f);
+      }
+      const f = (t - 0.35) / 0.65;
+      return lerpRgb(whiteRgb, coolRgb, f);
+    }
+
+    /* ── Rendering ──────────────────────────────────────── */
+
+    function drawBg() {
+      ctx.fillStyle = C.dark ? C.bgDark : C.bgLight;
+      ctx.fillRect(0, 0, W, H);
+      if (C.dark) {
+        const g = ctx.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, W * 0.55);
+        g.addColorStop(0, 'rgba(99, 102, 241, 0.035)');
+        g.addColorStop(0.6, 'rgba(14, 165, 233, 0.015)');
+        g.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 0, W, H);
+      }
+    }
+
+    function traceZ(c, z) {
+      c.beginPath();
+      c.moveTo(z.l, z.t);
+      c.lineTo(z.r, z.t);
+      c.lineTo(z.l, z.b);
+      c.lineTo(z.r, z.b);
+    }
+
+    function drawZ(z, time) {
+      const sw = W * C.mark.stroke;
+      const grad = ctx.createLinearGradient(z.r, z.t, z.l, z.b);
+      C.mark.colors.forEach((c, i) => grad.addColorStop(i / (C.mark.colors.length - 1), c));
+
+      ctx.save();
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+
+      const breathe = 0.6 + 0.4 * Math.sin(time * 0.0007);
+
+      // Proximity glow boost
+      const dx = mouseX - W / 2, dy = mouseY - H / 2;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      const prox = Math.max(0, 1 - dist / (W * 0.5));
+
+      // Glow layers
+      for (let i = 3; i >= 1; i--) {
+        ctx.globalAlpha = (0.06 + prox * 0.03) * i * breathe;
+        ctx.lineWidth = sw + i * sw * 0.55;
+        ctx.strokeStyle = C.mark.glow;
+        ctx.shadowColor = C.mark.colors[3];
+        ctx.shadowBlur = sw * i * 0.9 * breathe;
+        traceZ(ctx, z);
+        ctx.stroke();
+      }
+
+      // Main stroke
+      ctx.globalAlpha = C.dark ? 0.92 : 0.8;
+      ctx.lineWidth = sw;
+      ctx.shadowColor = 'transparent';
+      ctx.shadowBlur = 0;
+      ctx.strokeStyle = grad;
+      traceZ(ctx, z);
+      ctx.stroke();
+
+      ctx.restore();
+    }
+
+    function drawParticles(z, time) {
+      const { trail, trailDecay } = C.particles;
+      const mult = hovered ? 2.2 : 1;
+
+      ctx.save();
+      ctx.globalCompositeOperation = C.dark ? 'lighter' : 'source-over';
+
+      particles.forEach(p => {
+        // Twinkle
+        const twinkle = 0.7 + 0.3 * Math.sin(time * 0.003 + p.phase);
+
+        p.t = (p.t + p.v * mult) % 1;
+
+        let edge = 1;
+        if (p.t < 0.04) edge = p.t / 0.04;
+        else if (p.t > 0.96) edge = (1 - p.t) / 0.04;
+
+        const baseAlpha = p.a * edge * twinkle;
+        if (baseAlpha < 0.01) return;
+
+        for (let i = trail - 1; i >= 0; i--) {
+          const tt = (p.t - i * 0.009 + 1) % 1;
+          const pos = pointAt(tt, z);
+          const ta = baseAlpha * Math.pow(trailDecay, i);
+          const tr = p.r * (1 - i * 0.12);
+          if (ta < 0.01 || tr < 0.3) continue;
+
+          const rgb = particleRgb(tt);
+          const col = `rgb(${rgb[0]},${rgb[1]},${rgb[2]})`;
+
+          ctx.globalAlpha = ta * (C.dark ? 0.75 : 0.4);
+          ctx.fillStyle = col;
+          ctx.shadowColor = col;
+          ctx.shadowBlur = tr * 3;
+          ctx.beginPath();
+          ctx.arc(pos.x, pos.y, tr, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      });
+
+      ctx.restore();
+    }
+
+    /* ── Sweep Pulse ────────────────────────────────────── */
+
+    function drawPulse(z, time) {
+      const period = 5500;
+      const pt = ((time % period) / period);
+      const pos = pointAt(pt, z);
+      const sw = W * C.mark.stroke;
+
+      ctx.save();
+      ctx.globalCompositeOperation = C.dark ? 'lighter' : 'source-over';
+
+      const intensity = 0.35 + 0.15 * Math.sin(time * 0.002);
+      const rgb = particleRgb(pt);
+      const col = `rgba(${rgb[0]},${rgb[1]},${rgb[2]},${intensity})`;
+
+      const g = ctx.createRadialGradient(pos.x, pos.y, 0, pos.x, pos.y, sw * 1.8);
+      g.addColorStop(0, col);
+      g.addColorStop(1, 'rgba(0,0,0,0)');
+
+      ctx.fillStyle = g;
+      ctx.globalAlpha = 1;
+      ctx.beginPath();
+      ctx.arc(pos.x, pos.y, sw * 1.8, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.restore();
+    }
+
+    /* ── Animation Loop ─────────────────────────────────── */
+
+    function frame(time) {
+      drawBg();
+      const z = zBox();
+      drawZ(z, time);
+      drawPulse(z, time);
+      drawParticles(z, time);
+      requestAnimationFrame(frame);
+    }
+
+    /* ── Export ──────────────────────────────────────────── */
+
+    window.exportMark = function () {
+      const size = 1024;
+      const exp = document.createElement('canvas');
+      const ec = exp.getContext('2d');
+      exp.width = exp.height = size;
+
+      const savedW = W, savedH = H;
+      W = H = size;
+
+      ec.fillStyle = C.dark ? C.bgDark : C.bgLight;
+      ec.fillRect(0, 0, size, size);
+
+      const origCtx = ctx;
+      ctx = ec;
+      const z = zBox();
+      drawZ(z, 2000);
+
+      // Frozen particles at curated positions
+      const spots = [0.05, 0.12, 0.22, 0.31, 0.42, 0.53, 0.61, 0.7, 0.78, 0.88, 0.95];
+      spots.forEach(t => {
+        const pos = pointAt(t, z);
+        const rgb = particleRgb(t);
+        const col = `rgb(${rgb[0]},${rgb[1]},${rgb[2]})`;
+        ec.globalCompositeOperation = C.dark ? 'lighter' : 'source-over';
+        ec.globalAlpha = 0.7;
+        ec.fillStyle = col;
+        ec.shadowColor = col;
+        ec.shadowBlur = 8;
+        ec.beginPath();
+        ec.arc(pos.x, pos.y, 3.5, 0, Math.PI * 2);
+        ec.fill();
+      });
+
+      ctx = origCtx;
+      W = savedW;
+      H = savedH;
+
+      const a = document.createElement('a');
+      a.download = 'zeitlich-bildmarke.png';
+      a.href = exp.toDataURL('image/png');
+      a.click();
+    };
+
+    window.toggleBg = function () {
+      C.dark = !C.dark;
+      document.body.style.background = C.dark ? C.bgDark : C.bgLight;
+    };
+
+    /* ── Events ─────────────────────────────────────────── */
+
+    window.addEventListener('resize', resize);
+    canvas.addEventListener('mouseenter', () => { hovered = true; });
+    canvas.addEventListener('mouseleave', () => { hovered = false; mouseX = mouseY = -9999; });
+    canvas.addEventListener('mousemove', e => {
+      const rect = canvas.getBoundingClientRect();
+      mouseX = e.clientX - rect.left;
+      mouseY = e.clientY - rect.top;
+    });
+
+    /* ── Init ───────────────────────────────────────────── */
+
+    resize();
+    initParticles();
+    requestAnimationFrame(frame);
+  })();
+  </script>
+</body>
+</html>
