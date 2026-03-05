@@ -4,9 +4,9 @@ export default defineConfig({
   entry: {
     index: "src/index.ts",
     workflow: "src/workflow.ts",
-    "adapters/langchain/index": "src/adapters/langchain/index.ts",
-    "adapters/google-genai/index": "src/adapters/google-genai/index.ts",
-    "adapters/sandbox-inmemory/index": "src/adapters/sandbox-inmemory/index.ts",
+    "adapters/thread/langchain/index": "src/adapters/thread/langchain/index.ts",
+    "adapters/thread/google-genai/index": "src/adapters/thread/google-genai/index.ts",
+    "adapters/sandbox/inmemory/index": "src/adapters/sandbox/inmemory/index.ts",
   },
   format: ["esm", "cjs"],
   dts: true,

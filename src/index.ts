@@ -3,7 +3,7 @@
  *
  * Import from `zeitlich` in activity files and worker setup.
  * For LangChain-specific adapters (model invoker, thread manager, adapter),
- * import from `zeitlich/adapters/langchain`.
+ * import from `zeitlich/adapters/thread/langchain`.
  * For workflow code, use `zeitlich/workflow` instead.
  *
  * @example
@@ -17,10 +17,10 @@
  * } from 'zeitlich';
  *
  * // In-memory sandbox adapter
- * import { InMemorySandboxProvider } from 'zeitlich/adapters/sandbox-inmemory';
+ * import { InMemorySandboxProvider } from 'zeitlich/adapters/sandbox/inmemory';
  *
  * // LangChain adapter
- * import { createLangChainAdapter } from 'zeitlich/adapters/langchain';
+ * import { createLangChainAdapter } from 'zeitlich/adapters/thread/langchain';
  * ```
  */
 

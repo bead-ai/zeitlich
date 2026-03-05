@@ -1,8 +1,8 @@
 import type Redis from "ioredis";
 import type { GoogleGenAI, Content } from "@google/genai";
-import type { ThreadOps, ToolResultConfig } from "../../lib/types";
-import type { MessageContent } from "../../lib/types";
-import type { ModelInvoker } from "../../lib/model-invoker";
+import type { ThreadOps, ToolResultConfig } from "../../../lib/types";
+import type { MessageContent } from "../../../lib/types";
+import type { ModelInvoker } from "../../../lib/model-invoker";
 import { createGoogleGenAIThreadManager } from "./thread-manager";
 import { createGoogleGenAIModelInvoker } from "./model-invoker";
 
@@ -32,7 +32,7 @@ export interface GoogleGenAIAdapter {
  *
  * @example
  * ```typescript
- * import { createGoogleGenAIAdapter } from 'zeitlich/adapters/google-genai';
+ * import { createGoogleGenAIAdapter } from 'zeitlich/adapters/thread/google-genai';
  * import { createRunAgentActivity } from 'zeitlich';
  * import { GoogleGenAI } from '@google/genai';
  *

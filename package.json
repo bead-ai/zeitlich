@@ -27,34 +27,34 @@
         "default": "./dist/workflow.js"
       }
     },
-    "./adapters/langchain": {
+    "./adapters/thread/langchain": {
       "import": {
-        "types": "./dist/adapters/langchain/index.d.ts",
-        "default": "./dist/adapters/langchain/index.js"
+        "types": "./dist/adapters/thread/langchain/index.d.ts",
+        "default": "./dist/adapters/thread/langchain/index.js"
       },
       "require": {
-        "types": "./dist/adapters/langchain/index.d.ts",
-        "default": "./dist/adapters/langchain/index.js"
+        "types": "./dist/adapters/thread/langchain/index.d.ts",
+        "default": "./dist/adapters/thread/langchain/index.js"
       }
     },
-    "./adapters/google-genai": {
+    "./adapters/thread/google-genai": {
       "import": {
-        "types": "./dist/adapters/google-genai/index.d.ts",
-        "default": "./dist/adapters/google-genai/index.js"
+        "types": "./dist/adapters/thread/google-genai/index.d.ts",
+        "default": "./dist/adapters/thread/google-genai/index.js"
       },
       "require": {
-        "types": "./dist/adapters/google-genai/index.d.ts",
-        "default": "./dist/adapters/google-genai/index.js"
+        "types": "./dist/adapters/thread/google-genai/index.d.ts",
+        "default": "./dist/adapters/thread/google-genai/index.js"
       }
     },
-    "./adapters/sandbox-inmemory": {
+    "./adapters/sandbox/inmemory": {
       "import": {
-        "types": "./dist/adapters/sandbox-inmemory/index.d.ts",
-        "default": "./dist/adapters/sandbox-inmemory/index.js"
+        "types": "./dist/adapters/sandbox/inmemory/index.d.ts",
+        "default": "./dist/adapters/sandbox/inmemory/index.js"
       },
       "require": {
-        "types": "./dist/adapters/sandbox-inmemory/index.d.ts",
-        "default": "./dist/adapters/sandbox-inmemory/index.js"
+        "types": "./dist/adapters/sandbox/inmemory/index.d.ts",
+        "default": "./dist/adapters/sandbox/inmemory/index.js"
       }
     }
   },

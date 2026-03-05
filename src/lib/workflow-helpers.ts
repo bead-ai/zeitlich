@@ -30,7 +30,7 @@ export async function queryParentWorkflowState<T>(
  * @example
  * ```typescript
  * import { createRunAgentActivity } from 'zeitlich';
- * import { createLangChainModelInvoker } from 'zeitlich/adapters/langchain';
+ * import { createLangChainModelInvoker } from 'zeitlich/adapters/thread/langchain';
  *
  * const invoker = createLangChainModelInvoker({ redis, model });
  * return { runAgent: createRunAgentActivity(client, invoker) };

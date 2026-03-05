@@ -1,6 +1,6 @@
 import { describe, expect, it, beforeEach } from "vitest";
 import { SandboxManager } from "./manager";
-import { InMemorySandboxProvider } from "../../adapters/sandbox-inmemory/index";
+import { InMemorySandboxProvider } from "../../adapters/sandbox/inmemory/index";
 import { SandboxNotFoundError } from "./types";
 
 describe("SandboxManager", () => {

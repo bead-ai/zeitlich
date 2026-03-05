@@ -35,7 +35,7 @@ Temporal solves these problems for workflows. Zeitlich brings these guarantees t
 
 Zeitlich's core is framework-agnostic — it defines generic interfaces (`ModelInvoker`, `ThreadOps`, `MessageContent`) that work with any LLM SDK. Concrete implementations are provided via adapter packages.
 
-### LangChain Adapter (`zeitlich/adapters/langchain`)
+### LangChain Adapter (`zeitlich/adapters/thread/langchain`)
 
 The built-in LangChain adapter gives you:
 
@@ -45,7 +45,7 @@ The built-in LangChain adapter gives you:
 
 ```typescript
 import { ChatAnthropic } from "@langchain/anthropic";
-import { createLangChainAdapter } from "zeitlich/adapters/langchain";
+import { createLangChainAdapter } from "zeitlich/adapters/thread/langchain";
 import { createRunAgentActivity } from "zeitlich";
 
 const adapter = createLangChainAdapter({
@@ -78,7 +78,7 @@ npm install zeitlich ioredis
 **Peer dependencies:**
 
 - `ioredis` >= 5.0.0
-- `@langchain/core` >= 1.0.0 (optional — only needed when using `zeitlich/adapters/langchain`)
+- `@langchain/core` >= 1.0.0 (optional — only needed when using `zeitlich/adapters/thread/langchain`)
 
 **Required infrastructure:**
 
@@ -110,14 +110,14 @@ import {
 } from "zeitlich";
 
 // LangChain adapter — unified adapter for LLM invocation and thread management
-import { createLangChainAdapter } from "zeitlich/adapters/langchain";
+import { createLangChainAdapter } from "zeitlich/adapters/thread/langchain";
 ```
 
 **Why three entry points?**
 
 - `zeitlich/workflow` — Pure TypeScript, safe for Temporal's V8 sandbox
 - `zeitlich` — Activity-side utilities (Redis, filesystem), framework-agnostic
-- `zeitlich/adapters/langchain` — LangChain-specific adapter (model invocation + thread management)
+- `zeitlich/adapters/thread/langchain` — LangChain-specific adapter (model invocation + thread management)
 
 ## Examples
 
@@ -227,7 +227,7 @@ import {
   createAskUserQuestionHandler,
   createRunAgentActivity,
 } from "zeitlich";
-import { createLangChainAdapter } from "zeitlich/adapters/langchain";
+import { createLangChainAdapter } from "zeitlich/adapters/thread/langchain";
 
 export const createActivities = ({
   redis,
@@ -622,7 +622,7 @@ Framework-agnostic utilities for activities, worker setup, and Node.js code:
 | `toTree`                  | Generate file tree string from an `IFileSystem` instance                                      |
 | Tool handlers             | `createGlobHandler`, `createEditHandler`, `createBashHandler`, `createAskUserQuestionHandler` |
 
-### LangChain Adapter Entry Point (`zeitlich/adapters/langchain`)
+### LangChain Adapter Entry Point (`zeitlich/adapters/thread/langchain`)
 
 LangChain-specific implementations:
 
@@ -671,7 +671,7 @@ LangChain-specific implementations:
 │  └──────────────────────────────────────────────────────────┘  │
 │                              │                                  │
 │  ┌──────────────────────────────────────────────────────────┐  │
-│  │       LLM Adapter (zeitlich/adapters/langchain)           │  │
+│  │       LLM Adapter (zeitlich/adapters/thread/langchain)           │  │
 │  │  • createLangChainAdapter (thread ops + model invoker)    │  │
 │  │  • createLangChainThreadManager (message helpers)         │  │
 │  └──────────────────────────────────────────────────────────┘  │

@@ -9,7 +9,7 @@
  * import {
  *   createGoogleGenAIAdapter,
  *   createGoogleGenAIThreadManager,
- * } from 'zeitlich/adapters/google-genai';
+ * } from 'zeitlich/adapters/thread/google-genai';
  * import { GoogleGenAI } from '@google/genai';
  *
  * const client = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });

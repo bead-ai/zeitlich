@@ -9,7 +9,7 @@
  * import {
  *   createLangChainAdapter,
  *   createLangChainThreadManager,
- * } from 'zeitlich/adapters/langchain';
+ * } from 'zeitlich/adapters/thread/langchain';
  *
  * const adapter = createLangChainAdapter({ redis, model });
  * ```

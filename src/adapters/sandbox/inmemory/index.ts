@@ -10,9 +10,9 @@ import type {
   ExecResult,
   DirentEntry,
   FileStat,
-} from "../../lib/sandbox/types";
-import { SandboxNotFoundError } from "../../lib/sandbox/types";
-import { getShortId } from "../../lib/thread-id";
+} from "../../../lib/sandbox/types";
+import { SandboxNotFoundError } from "../../../lib/sandbox/types";
+import { getShortId } from "../../../lib/thread-id";
 
 // ============================================================================
 // Adapter: IFileSystem → SandboxFileSystem

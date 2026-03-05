@@ -1,7 +1,7 @@
 import type Redis from "ioredis";
-import type { ThreadOps, ToolResultConfig } from "../../lib/types";
+import type { ThreadOps, ToolResultConfig } from "../../../lib/types";
 import type { MessageContent } from "@langchain/core/messages";
-import type { ModelInvoker } from "../../lib/model-invoker";
+import type { ModelInvoker } from "../../../lib/model-invoker";
 import type { StoredMessage } from "@langchain/core/messages";
 import type {
   BaseChatModel,
@@ -40,7 +40,7 @@ export interface LangChainAdapter {
  *
  * @example
  * ```typescript
- * import { createLangChainAdapter } from 'zeitlich/adapters/langchain';
+ * import { createLangChainAdapter } from 'zeitlich/adapters/thread/langchain';
  * import { createRunAgentActivity } from 'zeitlich';
  *
  * const adapter = createLangChainAdapter({ redis, model });

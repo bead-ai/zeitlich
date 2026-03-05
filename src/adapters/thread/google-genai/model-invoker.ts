@@ -4,8 +4,8 @@ import type {
   Content,
   FunctionDeclaration,
 } from "@google/genai";
-import type { AgentResponse, SerializableToolDefinition } from "../../lib/types";
-import type { ModelInvokerConfig } from "../../lib/model-invoker";
+import type { AgentResponse, SerializableToolDefinition } from "../../../lib/types";
+import type { ModelInvokerConfig } from "../../../lib/model-invoker";
 import { createGoogleGenAIThreadManager } from "./thread-manager";
 
 export interface GoogleGenAIModelInvokerConfig {
@@ -52,7 +52,7 @@ function mergeConsecutiveContents(contents: Content[]): Content[] {
  *
  * @example
  * ```typescript
- * import { createGoogleGenAIModelInvoker } from 'zeitlich/adapters/google-genai';
+ * import { createGoogleGenAIModelInvoker } from 'zeitlich/adapters/thread/google-genai';
  * import { createRunAgentActivity } from 'zeitlich';
  * import { GoogleGenAI } from '@google/genai';
  *

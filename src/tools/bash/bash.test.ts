@@ -1,7 +1,7 @@
 import { describe, expect, it, beforeEach } from "vitest";
 import { createBashHandler } from "./handler";
 import { SandboxManager } from "../../lib/sandbox/manager";
-import { InMemorySandboxProvider } from "../../adapters/sandbox-inmemory/index";
+import { InMemorySandboxProvider } from "../../adapters/sandbox/inmemory/index";
 
 describe("bash handler with sandbox", () => {
   let manager: SandboxManager;

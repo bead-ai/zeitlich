@@ -1,6 +1,6 @@
 import type Redis from "ioredis";
-import type { AgentResponse } from "../../lib/types";
-import type { ModelInvokerConfig } from "../../lib/model-invoker";
+import type { AgentResponse } from "../../../lib/types";
+import type { ModelInvokerConfig } from "../../../lib/model-invoker";
 import { mapStoredMessagesToChatMessages } from "@langchain/core/messages";
 import type { StoredMessage } from "@langchain/core/messages";
 import { v4 as uuidv4 } from "uuid";
@@ -25,7 +25,7 @@ export interface LangChainModelInvokerConfig {
  *
  * @example
  * ```typescript
- * import { createLangChainModelInvoker } from 'zeitlich/adapters/langchain';
+ * import { createLangChainModelInvoker } from 'zeitlich/adapters/thread/langchain';
  * import { createRunAgentActivity } from 'zeitlich';
  * import { ChatAnthropic } from '@langchain/anthropic';
  *
