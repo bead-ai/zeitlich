@@ -4,16 +4,13 @@ import type { ModelInvokerConfig } from "../../../lib/model";
 import { mapStoredMessagesToChatMessages } from "@langchain/core/messages";
 import type { StoredMessage } from "@langchain/core/messages";
 import { v4 as uuidv4 } from "uuid";
-import type {
-  BaseChatModel,
-  BaseChatModelCallOptions,
-  BindToolsInput,
-} from "@langchain/core/language_models/chat_models";
+import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
 import { createLangChainThreadManager } from "./thread-manager";
 
-export interface LangChainModelInvokerConfig {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export interface LangChainModelInvokerConfig<TModel extends BaseChatModel<any> = BaseChatModel<any>> {
   redis: Redis;
-  model: BaseChatModel<BaseChatModelCallOptions & { tools?: BindToolsInput }>;
+  model: TModel;
 }
 
 /**
@@ -36,10 +33,10 @@ export interface LangChainModelInvokerConfig {
  * return { runAgent: withParentWorkflowState(client, invoker) };
  * ```
  */
-export function createLangChainModelInvoker({
-  redis,
-  model,
-}: LangChainModelInvokerConfig) {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function createLangChainModelInvoker<TModel extends BaseChatModel<any> = BaseChatModel<any>>(
+  { redis, model }: LangChainModelInvokerConfig<TModel>,
+) {
   return async function invokeLangChainModel(
     config: ModelInvokerConfig
   ): Promise<AgentResponse<StoredMessage>> {
@@ -88,14 +85,15 @@ export function createLangChainModelInvoker({
  * Convenience wrapper around createLangChainModelInvoker for cases where
  * you don't need to reuse the invoker.
  */
-export async function invokeLangChainModel({
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function invokeLangChainModel<TModel extends BaseChatModel<any> = BaseChatModel<any>>({
   redis,
   model,
   config,
 }: {
   redis: Redis;
   config: ModelInvokerConfig;
-  model: BaseChatModel<BaseChatModelCallOptions & { tools?: BindToolsInput }>;
+  model: TModel;
 }): Promise<AgentResponse<StoredMessage>> {
   const invoker = createLangChainModelInvoker({ redis, model });
   return invoker(config);

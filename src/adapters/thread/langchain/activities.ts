@@ -4,22 +4,15 @@ import type { MessageContent } from "@langchain/core/messages";
 import type { ThreadOps } from "../../../lib/session/types";
 import type { ModelInvoker } from "../../../lib/model";
 import type { StoredMessage } from "@langchain/core/messages";
-import type {
-  BaseChatModel,
-  BaseChatModelCallOptions,
-  BindToolsInput,
-} from "@langchain/core/language_models/chat_models";
+import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
 import { createLangChainThreadManager } from "./thread-manager";
 import { createLangChainModelInvoker } from "./model-invoker";
-
-type LangChainModel = BaseChatModel<
-  BaseChatModelCallOptions & { tools?: BindToolsInput }
->;
 
 export interface LangChainAdapterConfig {
   redis: Redis;
   /** Optional default model — if omitted, use `createModelInvoker()` to create invokers later */
-  model?: LangChainModel;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  model?: BaseChatModel<any>;
 }
 
 export interface LangChainAdapter {
@@ -28,7 +21,8 @@ export interface LangChainAdapter {
   /** Model invoker using the default model (only available when `model` was provided) */
   invoker: ModelInvoker<StoredMessage>;
   /** Create an invoker for a specific model (for multi-model setups) */
-  createModelInvoker(model: LangChainModel): ModelInvoker<StoredMessage>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  createModelInvoker(model: BaseChatModel<any>): ModelInvoker<StoredMessage>;
 }
 
 /**
@@ -101,7 +95,8 @@ export function createLangChainAdapter(
     },
   };
 
-  const makeInvoker = (model: LangChainModel): ModelInvoker<StoredMessage> =>
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const makeInvoker = (model: BaseChatModel<any>): ModelInvoker<StoredMessage> =>
     createLangChainModelInvoker({ redis, model });
 
   const invoker: ModelInvoker<StoredMessage> = config.model
