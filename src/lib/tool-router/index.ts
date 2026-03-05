@@ -1,9 +1,9 @@
 export {
   createToolRouter,
-  withAutoAppend,
   defineTool,
   hasNoOtherToolCalls,
 } from "./router";
+export { withAutoAppend } from "./auto-append";
 
 export type {
   ToolDefinition,
