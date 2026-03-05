@@ -72,6 +72,117 @@ export function createToolRouter<T extends ToolMap>(
     }
   }
 
+  /** Run global → per-tool pre-hooks. Returns null to skip, or the (possibly modified) args. */
+  async function runPreHooks(
+    toolCall: ParsedToolCallUnion<T>,
+    tool: ToolMap[string] | undefined,
+    turn: number
+  ): Promise<{ skip: true } | { skip: false; args: unknown }> {
+    let effectiveArgs: unknown = toolCall.args;
+
+    if (options.hooks?.onPreToolUse) {
+      const preResult = await options.hooks.onPreToolUse({
+        toolCall,
+        threadId: options.threadId,
+        turn,
+      });
+      if (preResult?.skip) return { skip: true };
+      if (preResult?.modifiedArgs !== undefined)
+        effectiveArgs = preResult.modifiedArgs;
+    }
+
+    if (tool?.hooks?.onPreToolUse) {
+      const preResult = await tool.hooks.onPreToolUse({
+        args: effectiveArgs,
+        threadId: options.threadId,
+        turn,
+      });
+      if (preResult?.skip) return { skip: true };
+      if (preResult?.modifiedArgs !== undefined)
+        effectiveArgs = preResult.modifiedArgs;
+    }
+
+    return { skip: false, args: effectiveArgs };
+  }
+
+  /**
+   * Run per-tool → global failure hooks. Returns recovery content/result,
+   * or throws if no hook recovers.
+   */
+  async function runFailureHooks(
+    toolCall: ParsedToolCallUnion<T>,
+    tool: ToolMap[string] | undefined,
+    error: unknown,
+    effectiveArgs: unknown,
+    turn: number
+  ): Promise<{ content: ToolMessageContent; result: unknown }> {
+    const err = error instanceof Error ? error : new Error(String(error));
+    const errorStr = String(error);
+
+    if (tool?.hooks?.onPostToolUseFailure) {
+      const r = await tool.hooks.onPostToolUseFailure({
+        args: effectiveArgs,
+        error: err,
+        threadId: options.threadId,
+        turn,
+      });
+      if (r?.fallbackContent !== undefined)
+        return { content: r.fallbackContent, result: { error: errorStr, recovered: true } };
+      if (r?.suppress)
+        return {
+          content: JSON.stringify({ error: errorStr, suppressed: true }),
+          result: { error: errorStr, suppressed: true },
+        };
+    }
+
+    if (options.hooks?.onPostToolUseFailure) {
+      const r = await options.hooks.onPostToolUseFailure({
+        toolCall,
+        error: err,
+        threadId: options.threadId,
+        turn,
+      });
+      if (r?.fallbackContent !== undefined)
+        return { content: r.fallbackContent, result: { error: errorStr, recovered: true } };
+      if (r?.suppress)
+        return {
+          content: JSON.stringify({ error: errorStr, suppressed: true }),
+          result: { error: errorStr, suppressed: true },
+        };
+    }
+
+    throw ApplicationFailure.fromError(error, { nonRetryable: true });
+  }
+
+  /** Run per-tool → global post-hooks. */
+  async function runPostHooks(
+    toolCall: ParsedToolCallUnion<T>,
+    tool: ToolMap[string] | undefined,
+    toolResult: ToolCallResultUnion<TResults>,
+    effectiveArgs: unknown,
+    turn: number,
+    durationMs: number
+  ): Promise<void> {
+    if (tool?.hooks?.onPostToolUse) {
+      await tool.hooks.onPostToolUse({
+        args: effectiveArgs,
+        result: toolResult.data,
+        threadId: options.threadId,
+        turn,
+        durationMs,
+      });
+    }
+    if (options.hooks?.onPostToolUse) {
+      await options.hooks.onPostToolUse({
+        toolCall,
+        result: toolResult,
+        threadId: options.threadId,
+        turn,
+        durationMs,
+      });
+    }
+  }
+
   async function processToolCall(
     toolCall: ParsedToolCallUnion<T>,
     turn: number,
@@ -80,54 +191,19 @@ export function createToolRouter<T extends ToolMap>(
   ): Promise<ToolCallResultUnion<TResults> | null> {
     const startTime = Date.now();
     const tool = toolMap.get(toolCall.name);
-    const toolHooks = tool?.hooks;
 
-    // --- PreToolUse: global then per-tool ---
-    let effectiveArgs: unknown = toolCall.args;
-    if (options.hooks?.onPreToolUse) {
-      const preResult = await options.hooks.onPreToolUse({
-        toolCall,
+    // --- Pre-hooks: may skip or modify args ---
+    const preResult = await runPreHooks(toolCall, tool, turn);
+    if (preResult.skip) {
+      await appendToolResult({
         threadId: options.threadId,
-        turn,
+        toolCallId: toolCall.id,
+        toolName: toolCall.name,
+        content: JSON.stringify({ skipped: true, reason: "Skipped by PreToolUse hook" }),
       });
-      if (preResult?.skip) {
-        await appendToolResult({
-          threadId: options.threadId,
-          toolCallId: toolCall.id,
-          toolName: toolCall.name,
-          content: JSON.stringify({
-            skipped: true,
-            reason: "Skipped by PreToolUse hook",
-          }),
-        });
-        return null;
-      }
-      if (preResult?.modifiedArgs !== undefined) {
-        effectiveArgs = preResult.modifiedArgs;
-      }
+      return null;
     }
-    if (toolHooks?.onPreToolUse) {
-      const preResult = await toolHooks.onPreToolUse({
-        args: effectiveArgs,
-        threadId: options.threadId,
-        turn,
-      });
-      if (preResult?.skip) {
-        await appendToolResult({
-          threadId: options.threadId,
-          toolCallId: toolCall.id,
-          toolName: toolCall.name,
-          content: JSON.stringify({
-            skipped: true,
-            reason: "Skipped by tool PreToolUse hook",
-          }),
-        });
-        return null;
-      }
-      if (preResult?.modifiedArgs !== undefined) {
-        effectiveArgs = preResult.modifiedArgs;
-      }
-    }
+    const effectiveArgs = preResult.args;
 
     // --- Execute handler ---
     let result: unknown;
@@ -155,54 +231,12 @@ export function createToolRouter<T extends ToolMap>(
         content = JSON.stringify(result, null, 2);
       }
     } catch (error) {
-      // --- PostToolUseFailure: per-tool then global ---
-      const err = error instanceof Error ? error : new Error(String(error));
-      let recovered = false;
-
-      if (toolHooks?.onPostToolUseFailure) {
-        const failureResult = await toolHooks.onPostToolUseFailure({
-          args: effectiveArgs,
-          error: err,
-          threadId: options.threadId,
-          turn,
-        });
-        if (failureResult?.fallbackContent !== undefined) {
-          content = failureResult.fallbackContent;
-          result = { error: String(error), recovered: true };
-          recovered = true;
-        } else if (failureResult?.suppress) {
-          content = JSON.stringify({ error: String(error), suppressed: true });
-          result = { error: String(error), suppressed: true };
-          recovered = true;
-        }
-      }
-
-      if (!recovered && options.hooks?.onPostToolUseFailure) {
-        const failureResult = await options.hooks.onPostToolUseFailure({
-          toolCall,
-          error: err,
-          threadId: options.threadId,
-          turn,
-        });
-        if (failureResult?.fallbackContent !== undefined) {
-          content = failureResult.fallbackContent;
-          result = { error: String(error), recovered: true };
-          recovered = true;
-        } else if (failureResult?.suppress) {
-          content = JSON.stringify({ error: String(error), suppressed: true });
-          result = { error: String(error), suppressed: true };
-          recovered = true;
-        }
-      }
-
-      if (!recovered) {
-        throw ApplicationFailure.fromError(error, {
-          nonRetryable: true,
-        });
-      }
+      const recovery = await runFailureHooks(toolCall, tool, error, effectiveArgs, turn);
+      result = recovery.result;
+      content = recovery.content;
     }
 
-    // Automatically append tool result to thread (unless handler already did)
+    // --- Append result to thread (unless handler already did) ---
     if (!resultAppended) {
       await appendToolResult({
         threadId: options.threadId,
@@ -218,26 +252,8 @@ export function createToolRouter<T extends ToolMap>(
       data: result,
     } as ToolCallResultUnion<TResults>;
 
-    // --- PostToolUse: per-tool then global ---
-    const durationMs = Date.now() - startTime;
-    if (toolHooks?.onPostToolUse) {
-      await toolHooks.onPostToolUse({
-        args: effectiveArgs,
-        result: result,
-        threadId: options.threadId,
-        turn,
-        durationMs,
-      });
-    }
-    if (options.hooks?.onPostToolUse) {
-      await options.hooks.onPostToolUse({
-        toolCall,
-        result: toolResult,
-        threadId: options.threadId,
-        turn,
-        durationMs,
-      });
-    }
+    // --- Post-hooks ---
+    await runPostHooks(toolCall, tool, toolResult, effectiveArgs, turn, Date.now() - startTime);
 
     return toolResult;
   }
