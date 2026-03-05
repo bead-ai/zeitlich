@@ -53,6 +53,7 @@ export type {
   ParsedToolCallUnion,
   // Router types
   ToolRouter,
+  ToolRouterHooks,
   // Handler types
   ToolHandler,
   ActivityToolHandler,
@@ -64,7 +65,7 @@ export type {
   ToolCallResult,
   ToolCallResultUnion,
   InferToolResults,
-  // Hook types
+  // Tool hook types
   PreToolUseHook,
   PreToolUseHookContext,
   PreToolUseHookResult,
@@ -73,20 +74,24 @@ export type {
   PostToolUseFailureHook,
   PostToolUseFailureHookContext,
   PostToolUseFailureHookResult,
-  PreHumanMessageAppendHook,
-  PreHumanMessageAppendHookContext,
-  PostHumanMessageAppendHook,
-  PostHumanMessageAppendHookContext,
-  Hooks,
   ToolHooks,
-  SessionStartHook,
-  SessionStartHookContext,
-  SessionEndHook,
-  SessionEndHookContext,
   // Other
   AppendToolResultFn,
   ProcessToolCallsContext,
 } from "./lib/tool-router";
+
+// Session & message lifecycle hooks
+export type {
+  Hooks,
+  SessionStartHook,
+  SessionStartHookContext,
+  SessionEndHook,
+  SessionEndHookContext,
+  PreHumanMessageAppendHook,
+  PreHumanMessageAppendHookContext,
+  PostHumanMessageAppendHook,
+  PostHumanMessageAppendHookContext,
+} from "./lib/hooks";
 
 // Core types
 export type {

@@ -2,8 +2,6 @@ import type {
   ToolMessageContent,
   TokenUsage,
   ToolResultConfig,
-  MessageContent,
-  SessionExitReason,
 } from "../types";
 import type { z } from "zod";
 
@@ -369,99 +367,16 @@ export type PostToolUseFailureHook<T extends ToolMap> = (
 ) => PostToolUseFailureHookResult | Promise<PostToolUseFailureHookResult>;
 
 /**
- * Context for SessionStart hook - called when session begins
+ * Tool execution hooks — the subset of hooks consumed by the tool router.
+ * Session/message lifecycle hooks live in lib/hooks/types.ts.
  */
-export interface SessionStartHookContext {
-  /** Thread identifier */
-  threadId: string;
-  /** Name of the agent */
-  agentName: string;
-  /** Session metadata */
-  metadata: Record<string, unknown>;
-}
-
-/**
- * SessionStart hook - called when session begins
- */
-export type SessionStartHook = (
-  ctx: SessionStartHookContext
-) => void | Promise<void>;
-
-/**
- * Context for PreHumanMessageAppend hook - called before each human message is appended to the thread
- */
-export interface PreHumanMessageAppendHookContext {
-  /** The message about to be appended */
-  message: MessageContent;
-  /** Thread identifier */
-  threadId: string;
-}
-
-/**
- * PreHumanMessageAppend hook - called before each human message is appended to the thread
- */
-export type PreHumanMessageAppendHook = (
-  ctx: PreHumanMessageAppendHookContext
-) => void | Promise<void>;
-
-/**
- * PostHumanMessageAppend hook - called after each human message is appended to the thread
- */
-export type PostHumanMessageAppendHook = (
-  ctx: PostHumanMessageAppendHookContext
-) => void | Promise<void>;
-
-/**
- * Context for PostHumanMessageAppend hook - called after each human message is appended to the thread
- */
-export interface PostHumanMessageAppendHookContext {
-  /** The message that was appended */
-  message: MessageContent;
-  /** Thread identifier */
-  threadId: string;
-}
-
-/**
- * Context for SessionEnd hook - called when session ends
- */
-export interface SessionEndHookContext {
-  /** Thread identifier */
-  threadId: string;
-  /** Name of the agent */
-  agentName: string;
-  /** Reason the session ended */
-  exitReason: SessionExitReason;
-  /** Total turns executed */
-  turns: number;
-  /** Session metadata */
-  metadata: Record<string, unknown>;
-}
-
-/**
- * SessionEnd hook - called when session ends
- */
-export type SessionEndHook = (
-  ctx: SessionEndHookContext
-) => void | Promise<void>;
-
-/**
- * Combined hooks interface for session lifecycle
- */
-export interface Hooks<T extends ToolMap, TResult = unknown> {
-  /** Called before each human message is appended to the thread */
-  onPreHumanMessageAppend?: PreHumanMessageAppendHook;
-  /** Called after each human message is appended to the thread */
-  onPostHumanMessageAppend?: PostHumanMessageAppendHook;
+export interface ToolRouterHooks<T extends ToolMap, TResult = unknown> {
   /** Called before each tool execution - can block or modify */
   onPreToolUse?: PreToolUseHook<T>;
   /** Called after each successful tool execution */
   onPostToolUse?: PostToolUseHook<T, TResult>;
   /** Called when tool execution fails */
   onPostToolUseFailure?: PostToolUseFailureHook<T>;
-  /** Called when session starts */
-  onSessionStart?: SessionStartHook;
-  /** Called when session ends */
-  onSessionEnd?: SessionEndHook;
 }
 
 // ============================================================================
@@ -480,8 +395,8 @@ export interface ToolRouterOptions<T extends ToolMap> {
   appendToolResult: AppendToolResultFn;
   /** Whether to process tools in parallel (default: true) */
   parallel?: boolean;
-  /** Lifecycle hooks for tool execution */
-  hooks?: Hooks<T, ToolCallResultUnion<InferToolResults<T>>>;
+  /** Tool execution lifecycle hooks (pre/post tool use) */
+  hooks?: ToolRouterHooks<T, ToolCallResultUnion<InferToolResults<T>>>;
   /** Additional tools to auto-register (e.g. subagent, skill tools built by register helpers) */
   plugins?: ToolMap[string][];
 }

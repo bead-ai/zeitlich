@@ -8,10 +8,12 @@ import type {
   ToolMap,
   ToolCallResultUnion,
   InferToolResults,
+} from "../tool-router/types";
+import type {
   Hooks,
   SessionStartHook,
   SessionEndHook,
-} from "../tool-router/types";
+} from "../hooks/types";
 import type { SubagentConfig } from "../subagent/types";
 import type { Skill } from "../skills/types";
 import type { SandboxOps } from "../sandbox/types";
