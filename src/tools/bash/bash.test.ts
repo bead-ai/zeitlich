@@ -12,9 +12,10 @@ describe("bash handler with sandbox", () => {
 
   beforeEach(async () => {
     manager = new SandboxManager(new InMemorySandboxProvider());
-    sandboxId = await manager.create({
+    const result = await manager.create({
       initialFiles: { "/home/user/hello.txt": "world" },
     });
+    sandboxId = result.sandboxId;
     handler = withSandbox(manager, bashHandler);
   });
 

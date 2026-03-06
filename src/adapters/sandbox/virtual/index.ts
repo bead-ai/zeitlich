@@ -5,7 +5,6 @@ import type {
   ExecResult,
 } from "../../../lib/sandbox/types";
 import { SandboxNotSupportedError } from "../../../lib/sandbox/types";
-import { getShortId } from "../../../lib/thread/id";
 import { VirtualSandboxFileSystem } from "./filesystem";
 import type {
   FileEntry,
@@ -52,45 +51,17 @@ class VirtualSandbox<TCtx = unknown> implements Sandbox {
 /**
  * Create an ephemeral {@link Sandbox} from a file tree and resolver.
  *
- * Used internally by {@link withVirtualSandbox}; consumers can also call
- * this directly if they need a sandbox outside the wrapper pattern.
+ * Used internally by {@link withVirtualSandbox} and
+ * {@link VirtualSandboxProvider}; consumers can also call this directly
+ * if they need a sandbox outside the wrapper pattern.
  */
 export function createVirtualSandbox<TCtx>(
+  id: string,
   tree: FileEntry[],
   resolver: FileResolver<TCtx>,
-  ctx: TCtx
+  ctx: TCtx,
 ): Sandbox & { fs: VirtualSandboxFileSystem<TCtx> } {
-  return new VirtualSandbox(getShortId(), tree, resolver, ctx);
-}
-
-// ============================================================================
-// buildFileTree activity factory
-// ============================================================================
-
-/**
- * Returns a Temporal activity function that resolves a set of file IDs into
- * a {@link VirtualFileTree}. Call once at workflow startup, store the result
- * in `AgentState`.
- *
- * @example
- * ```typescript
- * // Activity-side
- * const resolver: FileResolver<{ projectId: string }> = { ... };
- * export const activities = {
- *   buildFileTree: createBuildFileTreeActivity(resolver),
- * };
- *
- * // Workflow-side
- * const { buildFileTree } = proxyActivities<typeof activities>(...);
- * const fileTree = await buildFileTree(fileIds, { projectId });
- * ```
- */
-export function createBuildFileTreeActivity<TCtx>(
-  resolver: FileResolver<TCtx>
-): (fileIds: string[], ctx: TCtx) => Promise<VirtualFileTree> {
-  return async (fileIds: string[], ctx: TCtx) => {
-    return resolver.resolveEntries(fileIds, ctx);
-  };
+  return new VirtualSandbox(id, tree, resolver, ctx);
 }
 
 // ============================================================================
@@ -128,11 +99,13 @@ export function applyTreeMutations(
 
 // Re-exports for convenience
 export { VirtualSandboxFileSystem } from "./filesystem";
+export { VirtualSandboxProvider } from "./provider";
 export { withVirtualSandbox } from "./with-virtual-sandbox";
 export type {
   FileEntry,
   FileResolver,
   VirtualFileTree,
+  VirtualSandboxCreateOptions,
   VirtualSandboxState,
   VirtualSandboxContext,
   TreeMutation,

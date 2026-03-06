@@ -9,6 +9,7 @@ import type {
   Sandbox,
   SandboxCapabilities,
   SandboxCreateOptions,
+  SandboxCreateResult,
   SandboxFileSystem,
   SandboxProvider,
   SandboxSnapshot,
@@ -145,7 +146,7 @@ export class InMemorySandboxProvider implements SandboxProvider {
     }
   }
 
-  async create(options?: SandboxCreateOptions): Promise<Sandbox> {
+  async create(options?: SandboxCreateOptions): Promise<SandboxCreateResult> {
     const id = options?.id ?? getShortId();
     const initialFiles: InitialFiles = {};
 
@@ -158,7 +159,7 @@ export class InMemorySandboxProvider implements SandboxProvider {
     const fs = new InMemoryFs(initialFiles);
     const sandbox = new InMemorySandbox(id, fs, this.defaultOptions);
     this.sandboxes.set(id, sandbox);
-    return sandbox;
+    return { sandbox };
   }
 
   async snapshot(sandboxId: string): Promise<SandboxSnapshot> {

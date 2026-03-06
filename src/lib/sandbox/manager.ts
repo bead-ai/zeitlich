@@ -24,9 +24,11 @@ import type {
 export class SandboxManager {
   constructor(private provider: SandboxProvider) {}
 
-  async create(options?: SandboxCreateOptions): Promise<string> {
-    const sandbox = await this.provider.create(options);
-    return sandbox.id;
+  async create(
+    options?: SandboxCreateOptions,
+  ): Promise<{ sandboxId: string; stateUpdate?: Record<string, unknown> }> {
+    const { sandbox, stateUpdate } = await this.provider.create(options);
+    return { sandboxId: sandbox.id, ...(stateUpdate && { stateUpdate }) };
   }
 
   async getSandbox(id: string): Promise<Sandbox> {
@@ -53,10 +55,12 @@ export class SandboxManager {
   createActivities(): SandboxOps {
     return {
       createSandbox: async (
-        options?: SandboxCreateOptions
-      ): Promise<{ sandboxId: string }> => {
-        const sandboxId = await this.create(options);
-        return { sandboxId };
+        options?: SandboxCreateOptions,
+      ): Promise<{
+        sandboxId: string;
+        stateUpdate?: Record<string, unknown>;
+      }> => {
+        return this.create(options);
       },
       destroySandbox: async (sandboxId: string): Promise<void> => {
         await this.destroy(sandboxId);

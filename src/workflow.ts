@@ -135,6 +135,7 @@ export type {
   Sandbox,
   SandboxCapabilities,
   SandboxCreateOptions,
+  SandboxCreateResult,
   SandboxFileSystem,
   SandboxOps,
   SandboxProvider,

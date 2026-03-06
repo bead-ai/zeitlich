@@ -46,11 +46,14 @@ export type { SandboxContext } from "./lib/tool-router";
 // Virtual sandbox adapter (activity-side)
 export {
   createVirtualSandbox,
-  createBuildFileTreeActivity,
+  VirtualSandboxProvider,
   withVirtualSandbox,
   VirtualSandboxFileSystem,
 } from "./adapters/sandbox/virtual";
-export type { VirtualSandboxContext } from "./adapters/sandbox/virtual";
+export type {
+  VirtualSandboxContext,
+  VirtualSandboxCreateOptions,
+} from "./adapters/sandbox/virtual";
 
 // Activity-side wrappers (requires Temporal client)
 export {

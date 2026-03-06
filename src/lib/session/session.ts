@@ -145,6 +145,11 @@ export const createSession = async <T extends ToolMap, M = unknown>({
       if (ownsSandbox) {
         const result = await sandboxOps.createSandbox({ id: threadId });
         sandboxId = result.sandboxId;
+        if (result.stateUpdate) {
+          stateManager.mergeUpdate(
+            result.stateUpdate as Partial<TState>,
+          );
+        }
       }
 
       if (hooks.onSessionStart) {

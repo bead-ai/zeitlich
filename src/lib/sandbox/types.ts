@@ -107,11 +107,17 @@ export interface SandboxCreateOptions {
   env?: Record<string, string>;
 }
 
+export interface SandboxCreateResult {
+  sandbox: Sandbox;
+  /** Optional state to merge into the workflow's `AgentState` via the session. */
+  stateUpdate?: Record<string, unknown>;
+}
+
 export interface SandboxProvider {
   readonly id: string;
   readonly capabilities: SandboxCapabilities;
 
-  create(options?: SandboxCreateOptions): Promise<Sandbox>;
+  create(options?: SandboxCreateOptions): Promise<SandboxCreateResult>;
   get(sandboxId: string): Promise<Sandbox>;
   destroy(sandboxId: string): Promise<void>;
   snapshot(sandboxId: string): Promise<SandboxSnapshot>;
@@ -125,7 +131,7 @@ export interface SandboxProvider {
 export interface SandboxOps {
   createSandbox(
     options?: SandboxCreateOptions,
-  ): Promise<{ sandboxId: string }>;
+  ): Promise<{ sandboxId: string; stateUpdate?: Record<string, unknown> }>;
   destroySandbox(sandboxId: string): Promise<void>;
   snapshotSandbox(sandboxId: string): Promise<SandboxSnapshot>;
 }

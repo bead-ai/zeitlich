@@ -98,6 +98,9 @@ export interface AgentStateManager<TCustom extends JsonSerializable<TCustom>> {
   /** Set a custom state value by key */
   set<K extends keyof TCustom>(key: K, value: TCustom[K]): void;
 
+  /** Bulk-merge a partial update into custom state (e.g. from sandbox stateUpdate) */
+  mergeUpdate(update: Partial<TCustom>): void;
+
   /** Get full state for query handler */
   getCurrentState(): AgentState<TCustom>;
 

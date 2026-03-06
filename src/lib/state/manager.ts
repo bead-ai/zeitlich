@@ -176,6 +176,11 @@ export function createAgentStateManager<
       version++;
     },
 
+    mergeUpdate(update: Partial<TCustom>): void {
+      Object.assign(customState as object, update);
+      version++;
+    },
+
     getCurrentState(): AgentState<TCustom> {
       return buildState();
     },

@@ -11,21 +11,21 @@ describe("SandboxManager", () => {
   });
 
   it("creates a sandbox and returns an id", async () => {
-    const id = await manager.create();
-    expect(id).toBeTruthy();
-    const sandbox = await manager.getSandbox(id);
-    expect(sandbox.id).toBe(id);
+    const { sandboxId } = await manager.create();
+    expect(sandboxId).toBeTruthy();
+    const sandbox = await manager.getSandbox(sandboxId);
+    expect(sandbox.id).toBe(sandboxId);
   });
 
   it("creates a sandbox with a custom id", async () => {
-    const id = await manager.create({ id: "my-sandbox" });
-    expect(id).toBe("my-sandbox");
+    const { sandboxId } = await manager.create({ id: "my-sandbox" });
+    expect(sandboxId).toBe("my-sandbox");
   });
 
   it("gets an existing sandbox", async () => {
-    const id = await manager.create();
-    const sandbox = await manager.getSandbox(id);
-    expect(sandbox.id).toBe(id);
+    const { sandboxId } = await manager.create();
+    const sandbox = await manager.getSandbox(sandboxId);
+    expect(sandbox.id).toBe(sandboxId);
   });
 
   it("throws SandboxNotFoundError for unknown id", async () => {
@@ -35,10 +35,10 @@ describe("SandboxManager", () => {
   });
 
   it("destroys a sandbox", async () => {
-    const id = await manager.create();
-    await manager.getSandbox(id);
-    await manager.destroy(id);
-    await expect(manager.getSandbox(id)).rejects.toThrow(SandboxNotFoundError);
+    const { sandboxId } = await manager.create();
+    await manager.getSandbox(sandboxId);
+    await manager.destroy(sandboxId);
+    await expect(manager.getSandbox(sandboxId)).rejects.toThrow(SandboxNotFoundError);
   });
 
   it("destroy is idempotent for unknown ids", async () => {
@@ -46,21 +46,21 @@ describe("SandboxManager", () => {
   });
 
   it("snapshots and restores a sandbox", async () => {
-    const id = await manager.create({
+    const { sandboxId } = await manager.create({
       initialFiles: { "/data.txt": "hello" },
     });
-    const sandbox = await manager.getSandbox(id);
+    const sandbox = await manager.getSandbox(sandboxId);
     await sandbox.fs.writeFile("/extra.txt", "world");
 
-    const snapshot = await manager.snapshot(id);
-    expect(snapshot.sandboxId).toBe(id);
+    const snapshot = await manager.snapshot(sandboxId);
+    expect(snapshot.sandboxId).toBe(sandboxId);
     expect(snapshot.providerId).toBe("inmemory");
 
-    await manager.destroy(id);
-    await expect(manager.getSandbox(id)).rejects.toThrow(SandboxNotFoundError);
+    await manager.destroy(sandboxId);
+    await expect(manager.getSandbox(sandboxId)).rejects.toThrow(SandboxNotFoundError);
 
     const restoredId = await manager.restore(snapshot);
-    expect(restoredId).toBe(id);
+    expect(restoredId).toBe(sandboxId);
     const restored = await manager.getSandbox(restoredId);
     const content = await restored.fs.readFile("/data.txt");
     expect(content).toBe("hello");
@@ -92,20 +92,20 @@ describe("InMemorySandboxProvider", () => {
   });
 
   it("creates sandbox with initial files", async () => {
-    const id = await manager.create({
+    const { sandboxId } = await manager.create({
       initialFiles: {
         "/src/index.ts": 'console.log("hello");',
         "/README.md": "# Hello",
       },
     });
-    const sandbox = await manager.getSandbox(id);
+    const sandbox = await manager.getSandbox(sandboxId);
     const content = await sandbox.fs.readFile("/src/index.ts");
     expect(content).toBe('console.log("hello");');
   });
 
   it("supports filesystem operations", async () => {
-    const id = await manager.create();
-    const { fs } = await manager.getSandbox(id);
+    const { sandboxId } = await manager.create();
+    const { fs } = await manager.getSandbox(sandboxId);
 
     await fs.writeFile("/test.txt", "hello");
     expect(await fs.exists("/test.txt")).toBe(true);
@@ -123,10 +123,10 @@ describe("InMemorySandboxProvider", () => {
   });
 
   it("supports shell execution", async () => {
-    const id = await manager.create({
+    const { sandboxId } = await manager.create({
       initialFiles: { "/data.txt": "hello world" },
     });
-    const sandbox = await manager.getSandbox(id);
+    const sandbox = await manager.getSandbox(sandboxId);
 
     const result = await sandbox.exec("cat /data.txt");
     expect(result.exitCode).toBe(0);
@@ -134,8 +134,8 @@ describe("InMemorySandboxProvider", () => {
   });
 
   it("reports correct capabilities", async () => {
-    const id = await manager.create();
-    const sandbox = await manager.getSandbox(id);
+    const { sandboxId } = await manager.create();
+    const sandbox = await manager.getSandbox(sandboxId);
     expect(sandbox.capabilities).toEqual({
       filesystem: true,
       execution: true,
@@ -144,13 +144,13 @@ describe("InMemorySandboxProvider", () => {
   });
 
   it("readdirWithFileTypes works", async () => {
-    const id = await manager.create({
+    const { sandboxId } = await manager.create({
       initialFiles: {
         "/dir/a.txt": "a",
         "/dir/b.txt": "b",
       },
     });
-    const { fs } = await manager.getSandbox(id);
+    const { fs } = await manager.getSandbox(sandboxId);
     const entries = await fs.readdirWithFileTypes("/dir");
     expect(entries.length).toBe(2);
     expect(entries.every((e) => e.isFile)).toBe(true);

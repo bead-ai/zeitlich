@@ -1,4 +1,4 @@
-import type { Sandbox } from "../../../lib/sandbox/types";
+import type { Sandbox, SandboxCreateOptions } from "../../../lib/sandbox/types";
 import type { RouterContext } from "../../../lib/tool-router/types";
 
 // ============================================================================
@@ -72,14 +72,30 @@ export interface FileResolver<TCtx = unknown> {
 }
 
 // ============================================================================
+// Create Options
+// ============================================================================
+
+/**
+ * Options for {@link VirtualSandboxProvider.create}.
+ * Extends base options with file IDs to resolve and resolver context.
+ */
+export interface VirtualSandboxCreateOptions<TCtx>
+  extends SandboxCreateOptions {
+  fileIds: string[];
+  resolverContext: TCtx;
+}
+
+// ============================================================================
 // Workflow State Shape
 // ============================================================================
 
 /**
  * The portion of workflow `AgentState` that the virtual sandbox reads via
- * {@link queryParentWorkflowState}.
+ * {@link queryParentWorkflowState}. Populated automatically by the session
+ * from the provider's `stateUpdate` after `createSandbox`.
  */
 export interface VirtualSandboxState<TCtx = unknown> {
+  sandboxId: string;
   fileTree: FileEntry[];
   resolverContext: TCtx;
 }
