@@ -33,7 +33,7 @@ import type {
  */
 export class VirtualSandboxProvider<
   TCtx = unknown,
-  TMeta extends FileEntryMetadata = FileEntryMetadata,
+  TMeta = FileEntryMetadata,
 > implements SandboxProvider
 {
   readonly id = "virtual";

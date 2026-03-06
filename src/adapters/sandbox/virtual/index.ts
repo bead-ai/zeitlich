@@ -20,7 +20,7 @@ import type {
 
 class VirtualSandbox<
   TCtx = unknown,
-  TMeta extends FileEntryMetadata = FileEntryMetadata,
+  TMeta = FileEntryMetadata,
 > implements Sandbox
 {
   readonly capabilities: SandboxCapabilities = {
@@ -62,7 +62,7 @@ class VirtualSandbox<
  */
 export function createVirtualSandbox<
   TCtx,
-  TMeta extends FileEntryMetadata = FileEntryMetadata,
+  TMeta = FileEntryMetadata,
 >(
   id: string,
   tree: FileEntry<TMeta>[],
@@ -81,7 +81,7 @@ export function createVirtualSandbox<
  * returning a new array. Safe to call from workflow code.
  */
 export function applyTreeMutations<
-  TMeta extends FileEntryMetadata = FileEntryMetadata,
+  TMeta = FileEntryMetadata,
 >(
   tree: VirtualFileTree<TMeta>,
   mutations: TreeMutation<TMeta>[]

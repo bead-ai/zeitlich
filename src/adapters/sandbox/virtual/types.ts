@@ -9,27 +9,18 @@ import type { VirtualSandboxFileSystem } from "./filesystem";
 /** Allowed value types for file-entry metadata. */
 export type FileEntryMetadata = Record<string, string | number | boolean | null>;
 
-interface FileEntryBase {
+/** JSON-serializable metadata for a single file in the virtual tree. */
+export interface FileEntry<
+  TMeta = FileEntryMetadata,
+> {
   id: string;
   /** Virtual path inside the sandbox, e.g. "/src/index.ts" */
   path: string;
   size: number;
   /** ISO-8601 date string (JSON-safe) */
   mtime: string;
+  metadata: TMeta;
 }
-
-/**
- * JSON-serializable metadata for a single file in the virtual tree.
- *
- * When `TMeta` is narrowed to a specific shape, `metadata` becomes required.
- * With the default (`FileEntryMetadata`), it stays optional.
- */
-export type FileEntry<
-  TMeta extends FileEntryMetadata = FileEntryMetadata,
-> = FileEntryBase &
-  (FileEntryMetadata extends TMeta
-    ? { metadata?: TMeta }
-    : { metadata: TMeta });
 
 // ============================================================================
 // Virtual File Tree
@@ -40,7 +31,7 @@ export type FileEntry<
  * Directories are inferred from file paths at runtime.
  */
 export type VirtualFileTree<
-  TMeta extends FileEntryMetadata = FileEntryMetadata,
+  TMeta = FileEntryMetadata,
 > = FileEntry<TMeta>[];
 
 // ============================================================================
@@ -48,7 +39,7 @@ export type VirtualFileTree<
 // ============================================================================
 
 export type TreeMutation<
-  TMeta extends FileEntryMetadata = FileEntryMetadata,
+  TMeta = FileEntryMetadata,
 > =
   | { type: "add"; entry: FileEntry<TMeta> }
   | { type: "remove"; path: string }
@@ -65,32 +56,24 @@ export type TreeMutation<
  * (e.g. `{ projectId: string }`) without the resolver holding state.
  *
  * Generic over `TMeta` so resolved entries carry typed metadata.
- *
- * Injected into the adapter at worker setup time.
  */
 export interface FileResolver<
   TCtx = unknown,
-  TMeta extends FileEntryMetadata = FileEntryMetadata,
+  TMeta = FileEntryMetadata,
 > {
-  /** Resolve a set of IDs into file metadata (no content loaded). */
   resolveEntries(ids: string[], ctx: TCtx): Promise<FileEntry<TMeta>[]>;
-  /** Lazy-load file content by entry ID. */
   readFile(id: string, ctx: TCtx): Promise<string>;
-  /** Lazy-load file content as binary by entry ID. */
   readFileBuffer(id: string, ctx: TCtx): Promise<Uint8Array>;
-  /** Write content back for an existing entry. */
   writeFile(
     id: string,
     content: string | Uint8Array,
     ctx: TCtx,
   ): Promise<void>;
-  /** Create a new file and return its entry (with generated ID). */
   createFile(
     path: string,
     content: string | Uint8Array,
     ctx: TCtx,
   ): Promise<FileEntry<TMeta>>;
-  /** Delete a file by entry ID. */
   deleteFile(id: string, ctx: TCtx): Promise<void>;
 }
 
@@ -119,7 +102,7 @@ export interface VirtualSandboxCreateOptions<TCtx>
  */
 export interface VirtualSandboxState<
   TCtx = unknown,
-  TMeta extends FileEntryMetadata = FileEntryMetadata,
+  TMeta = FileEntryMetadata,
 > {
   sandboxId: string;
   fileTree: FileEntry<TMeta>[];
@@ -136,7 +119,7 @@ export interface VirtualSandboxState<
  */
 export interface VirtualSandboxContext<
   TCtx = unknown,
-  TMeta extends FileEntryMetadata = FileEntryMetadata,
+  TMeta = FileEntryMetadata,
 > extends RouterContext {
   sandbox: Sandbox & { fs: VirtualSandboxFileSystem<TCtx, TMeta> };
 }

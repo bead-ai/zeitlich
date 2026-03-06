@@ -47,7 +47,7 @@ export function withVirtualSandbox<
   TArgs,
   TResult,
   TCtx,
-  TMeta extends FileEntryMetadata = FileEntryMetadata,
+  TMeta = FileEntryMetadata,
 >(
   client: WorkflowClient,
   agentName: string,

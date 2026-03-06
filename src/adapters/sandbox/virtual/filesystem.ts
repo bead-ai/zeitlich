@@ -32,7 +32,7 @@ function parentDir(p: string): string {
  * Collect the set of implicit directory paths from a flat file list.
  * E.g. "/a/b/c.ts" contributes "/a/b", "/a", "/".
  */
-function inferDirectories(entries: FileEntry[]): Set<string> {
+function inferDirectories(entries: { path: string }[]): Set<string> {
   const dirs = new Set<string>();
   dirs.add("/");
   for (const entry of entries) {
@@ -55,7 +55,7 @@ function inferDirectories(entries: FileEntry[]): Set<string> {
  */
 export class VirtualSandboxFileSystem<
   TCtx = unknown,
-  TMeta extends FileEntryMetadata = FileEntryMetadata,
+  TMeta = FileEntryMetadata,
 > implements SandboxFileSystem
 {
   private entries: Map<string, FileEntry<TMeta>>;

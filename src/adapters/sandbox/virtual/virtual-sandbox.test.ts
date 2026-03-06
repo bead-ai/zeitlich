@@ -33,6 +33,7 @@ function createMockResolver(): {
         path: `/resolved/${id}.txt`,
         size: (store.get(id) ?? "").length,
         mtime: "2025-01-01T00:00:00.000Z",
+        metadata: {},
       })),
 
     readFile: async (id) => {
@@ -68,7 +69,7 @@ function createMockResolver(): {
         typeof content === "string"
           ? new TextEncoder().encode(content).byteLength
           : content.byteLength;
-      return { id, path, size, mtime: new Date().toISOString() };
+      return { id, path, size, mtime: new Date().toISOString(), metadata: {} };
     },
 
     deleteFile: async (id) => {
@@ -89,18 +90,21 @@ const sampleTree: FileEntry[] = [
     path: "/src/index.ts",
     size: 21,
     mtime: "2025-01-01T00:00:00.000Z",
+    metadata: {},
   },
   {
     id: "file-2",
     path: "/README.md",
     size: 28,
     mtime: "2025-01-01T00:00:00.000Z",
+    metadata: {},
   },
   {
     id: "file-3",
     path: "/src/styles/main.css",
     size: 21,
     mtime: "2025-01-01T00:00:00.000Z",
+    metadata: {},
   },
 ];
 
@@ -441,6 +445,7 @@ describe("applyTreeMutations", () => {
           path: "/new.txt",
           size: 5,
           mtime: "2025-06-01T00:00:00.000Z",
+          metadata: {},
         },
       },
     ]);
@@ -479,6 +484,7 @@ describe("applyTreeMutations", () => {
           path: "/src/index.ts",
           size: 10,
           mtime: "2025-06-01T00:00:00.000Z",
+          metadata: {},
         },
       },
     ]);
