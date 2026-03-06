@@ -131,8 +131,18 @@ export class InMemorySandboxProvider implements SandboxProvider {
 
   constructor(private defaultOptions?: InMemorySandboxOptions) {}
 
-  get(id: string): Sandbox | undefined {
-    return this.sandboxes.get(id);
+  async get(id: string): Promise<Sandbox> {
+    const sandbox = this.sandboxes.get(id);
+    if (!sandbox) throw new SandboxNotFoundError(id);
+    return sandbox;
+  }
+
+  async destroy(id: string): Promise<void> {
+    const sandbox = this.sandboxes.get(id);
+    if (sandbox) {
+      await sandbox.destroy();
+      this.sandboxes.delete(id);
+    }
   }
 
   async create(options?: SandboxCreateOptions): Promise<Sandbox> {

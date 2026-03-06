@@ -7,7 +7,12 @@ import type {
 import { SandboxNotSupportedError } from "../../../lib/sandbox/types";
 import { getShortId } from "../../../lib/thread/id";
 import { VirtualSandboxFileSystem } from "./filesystem";
-import type { FileEntry, FileResolver, TreeMutation, VirtualFileTree } from "./types";
+import type {
+  FileEntry,
+  FileResolver,
+  TreeMutation,
+  VirtualFileTree,
+} from "./types";
 
 // ============================================================================
 // VirtualSandbox
@@ -26,7 +31,7 @@ class VirtualSandbox<TCtx = unknown> implements Sandbox {
     readonly id: string,
     tree: FileEntry[],
     resolver: FileResolver<TCtx>,
-    ctx: TCtx,
+    ctx: TCtx
   ) {
     this.fs = new VirtualSandboxFileSystem(tree, resolver, ctx);
   }
@@ -53,7 +58,7 @@ class VirtualSandbox<TCtx = unknown> implements Sandbox {
 export function createVirtualSandbox<TCtx>(
   tree: FileEntry[],
   resolver: FileResolver<TCtx>,
-  ctx: TCtx,
+  ctx: TCtx
 ): Sandbox & { fs: VirtualSandboxFileSystem<TCtx> } {
   return new VirtualSandbox(getShortId(), tree, resolver, ctx);
 }
@@ -81,7 +86,7 @@ export function createVirtualSandbox<TCtx>(
  * ```
  */
 export function createBuildFileTreeActivity<TCtx>(
-  resolver: FileResolver<TCtx>,
+  resolver: FileResolver<TCtx>
 ): (fileIds: string[], ctx: TCtx) => Promise<VirtualFileTree> {
   return async (fileIds: string[], ctx: TCtx) => {
     return resolver.resolveEntries(fileIds, ctx);
@@ -98,7 +103,7 @@ export function createBuildFileTreeActivity<TCtx>(
  */
 export function applyTreeMutations(
   tree: VirtualFileTree,
-  mutations: TreeMutation[],
+  mutations: TreeMutation[]
 ): VirtualFileTree {
   let result = [...tree];
 
@@ -112,7 +117,7 @@ export function applyTreeMutations(
         break;
       case "update":
         result = result.map((e) =>
-          e.path === m.path ? { ...e, ...m.entry } : e,
+          e.path === m.path ? { ...e, ...m.entry } : e
         );
         break;
     }

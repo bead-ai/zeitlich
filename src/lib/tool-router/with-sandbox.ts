@@ -40,7 +40,7 @@ export interface SandboxContext extends RouterContext {
  * ```
  */
 export function withSandbox<TArgs, TResult>(
-  manager: { getSandbox(id: string): Sandbox },
+  manager: { getSandbox(id: string): Promise<Sandbox> },
   handler: ActivityToolHandler<TArgs, TResult, SandboxContext>,
 ): ActivityToolHandler<TArgs, TResult | null> {
   return async (args, context) => {
@@ -50,7 +50,7 @@ export function withSandbox<TArgs, TResult>(
         data: null,
       };
     }
-    const sandbox = manager.getSandbox(context.sandboxId);
+    const sandbox = await manager.getSandbox(context.sandboxId);
     return handler(args, { ...context, sandbox, sandboxId: context.sandboxId });
   };
 }

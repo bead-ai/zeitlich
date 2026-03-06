@@ -34,10 +34,7 @@ export { FileSystemSkillProvider } from "./lib/skills/fs-provider";
 
 // Thread manager (generic, framework-agnostic)
 export { createThreadManager } from "./lib/thread";
-export type {
-  BaseThreadManager,
-  ThreadManagerConfig,
-} from "./lib/thread";
+export type { BaseThreadManager, ThreadManagerConfig } from "./lib/thread";
 
 // Model invoker contract (framework-agnostic)
 export type { ModelInvoker, ModelInvokerConfig } from "./lib/model";

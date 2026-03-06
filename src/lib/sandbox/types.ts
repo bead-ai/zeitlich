@@ -112,6 +112,8 @@ export interface SandboxProvider {
   readonly capabilities: SandboxCapabilities;
 
   create(options?: SandboxCreateOptions): Promise<Sandbox>;
+  get(sandboxId: string): Promise<Sandbox>;
+  destroy(sandboxId: string): Promise<void>;
   snapshot(sandboxId: string): Promise<SandboxSnapshot>;
   restore(snapshot: SandboxSnapshot): Promise<Sandbox>;
 }
