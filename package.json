@@ -56,6 +56,16 @@
         "types": "./dist/adapters/sandbox/inmemory/index.d.ts",
         "default": "./dist/adapters/sandbox/inmemory/index.js"
       }
+    },
+    "./adapters/sandbox/daytona": {
+      "import": {
+        "types": "./dist/adapters/sandbox/daytona/index.d.ts",
+        "default": "./dist/adapters/sandbox/daytona/index.js"
+      },
+      "require": {
+        "types": "./dist/adapters/sandbox/daytona/index.d.ts",
+        "default": "./dist/adapters/sandbox/daytona/index.js"
+      }
     }
   },
   "files": [
@@ -100,6 +110,7 @@
     "node": ">=18"
   },
   "devDependencies": {
+    "@daytonaio/sdk": "^0.149.0",
     "@eslint/js": "^10.0.1",
     "@google/genai": "^1.44.0",
     "@langchain/core": "^1.1.30",
@@ -116,11 +127,15 @@
     "vitest": "^4.0.18"
   },
   "peerDependencies": {
+    "@daytonaio/sdk": ">=0.100.0",
     "@google/genai": "^1.43.0",
     "@langchain/core": ">=1.0.0",
     "ioredis": ">=5.0.0"
   },
   "peerDependenciesMeta": {
+    "@daytonaio/sdk": {
+      "optional": true
+    },
     "@google/genai": {
       "optional": true
     },
