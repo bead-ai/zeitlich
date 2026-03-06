@@ -154,6 +154,7 @@ export {
 export { applyTreeMutations } from "./adapters/sandbox/virtual";
 export type {
   FileEntry,
+  FileEntryMetadata,
   FileResolver,
   VirtualFileTree,
   VirtualSandboxState,

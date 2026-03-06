@@ -4,7 +4,12 @@ import type {
   FileStat,
 } from "../../../lib/sandbox/types";
 import { SandboxNotSupportedError } from "../../../lib/sandbox/types";
-import type { FileEntry, FileResolver, TreeMutation } from "./types";
+import type {
+  FileEntry,
+  FileEntryMetadata,
+  FileResolver,
+  TreeMutation,
+} from "./types";
 
 /**
  * Normalise a virtual path to a canonical form: absolute, no trailing slash
@@ -48,16 +53,18 @@ function inferDirectories(entries: FileEntry[]): Set<string> {
  * Directory structure is inferred from file paths. All mutations are tracked
  * and can be retrieved via {@link getMutations} after the handler completes.
  */
-export class VirtualSandboxFileSystem<TCtx = unknown>
-  implements SandboxFileSystem
+export class VirtualSandboxFileSystem<
+  TCtx = unknown,
+  TMeta extends FileEntryMetadata = FileEntryMetadata,
+> implements SandboxFileSystem
 {
-  private entries: Map<string, FileEntry>;
+  private entries: Map<string, FileEntry<TMeta>>;
   private directories: Set<string>;
-  private mutations: TreeMutation[] = [];
+  private mutations: TreeMutation<TMeta>[] = [];
 
   constructor(
-    tree: FileEntry[],
-    private resolver: FileResolver<TCtx>,
+    tree: FileEntry<TMeta>[],
+    private resolver: FileResolver<TCtx, TMeta>,
     private ctx: TCtx,
   ) {
     this.entries = new Map(
@@ -67,12 +74,12 @@ export class VirtualSandboxFileSystem<TCtx = unknown>
   }
 
   /** Return all mutations accumulated during this invocation. */
-  getMutations(): TreeMutation[] {
+  getMutations(): TreeMutation<TMeta>[] {
     return this.mutations;
   }
 
   /** Look up a file entry by virtual path. */
-  getEntry(path: string): FileEntry | undefined {
+  getEntry(path: string): FileEntry<TMeta> | undefined {
     return this.entries.get(normalisePath(path));
   }
 
@@ -177,7 +184,7 @@ export class VirtualSandboxFileSystem<TCtx = unknown>
         typeof content === "string"
           ? new TextEncoder().encode(content).byteLength
           : content.byteLength;
-      const updated: FileEntry = {
+      const updated: FileEntry<TMeta> = {
         ...existing,
         size,
         mtime: new Date().toISOString(),
@@ -209,7 +216,7 @@ export class VirtualSandboxFileSystem<TCtx = unknown>
     await this.resolver.writeFile(existing.id, appended, this.ctx);
 
     const size = new TextEncoder().encode(appended).byteLength;
-    const updated: FileEntry = {
+    const updated: FileEntry<TMeta> = {
       ...existing,
       size,
       mtime: new Date().toISOString(),

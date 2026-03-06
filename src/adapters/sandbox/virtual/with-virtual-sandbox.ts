@@ -3,6 +3,7 @@ import { queryParentWorkflowState } from "../../../lib/activity";
 import { agentQueryName } from "../../../lib/types";
 import type { ActivityToolHandler } from "../../../lib/tool-router/types";
 import type {
+  FileEntryMetadata,
   TreeMutation,
   VirtualSandboxContext,
   VirtualSandboxState,
@@ -42,17 +43,22 @@ import { createVirtualSandbox } from "./index";
  * const handler = withVirtualSandbox(client, "myAgent", provider, readHandler);
  * ```
  */
-export function withVirtualSandbox<TArgs, TResult, TCtx>(
+export function withVirtualSandbox<
+  TArgs,
+  TResult,
+  TCtx,
+  TMeta extends FileEntryMetadata = FileEntryMetadata,
+>(
   client: WorkflowClient,
   agentName: string,
-  provider: VirtualSandboxProvider<TCtx>,
-  handler: ActivityToolHandler<TArgs, TResult, VirtualSandboxContext>,
+  provider: VirtualSandboxProvider<TCtx, TMeta>,
+  handler: ActivityToolHandler<TArgs, TResult, VirtualSandboxContext<TCtx, TMeta>>,
 ): ActivityToolHandler<
   TArgs,
-  { result: TResult; treeMutations: TreeMutation[] } | null
+  { result: TResult; treeMutations: TreeMutation<TMeta>[] } | null
 > {
   return async (args, context) => {
-    const state = await queryParentWorkflowState<VirtualSandboxState<TCtx>>(
+    const state = await queryParentWorkflowState<VirtualSandboxState<TCtx, TMeta>>(
       client,
       agentQueryName(agentName),
     );

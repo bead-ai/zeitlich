@@ -6,7 +6,11 @@ import type {
 import { SandboxNotSupportedError } from "../../../lib/sandbox/types";
 import { getShortId } from "../../../lib/thread/id";
 import { createVirtualSandbox } from "./index";
-import type { FileResolver, VirtualSandboxCreateOptions } from "./types";
+import type {
+  FileEntryMetadata,
+  FileResolver,
+  VirtualSandboxCreateOptions,
+} from "./types";
 
 /**
  * Stateless {@link SandboxProvider} backed by a {@link FileResolver}.
@@ -27,8 +31,10 @@ import type { FileResolver, VirtualSandboxCreateOptions } from "./types";
  * };
  * ```
  */
-export class VirtualSandboxProvider<TCtx = unknown>
-  implements SandboxProvider
+export class VirtualSandboxProvider<
+  TCtx = unknown,
+  TMeta extends FileEntryMetadata = FileEntryMetadata,
+> implements SandboxProvider
 {
   readonly id = "virtual";
   readonly capabilities: SandboxCapabilities = {
@@ -37,9 +43,9 @@ export class VirtualSandboxProvider<TCtx = unknown>
     persistence: true,
   };
 
-  readonly resolver: FileResolver<TCtx>;
+  readonly resolver: FileResolver<TCtx, TMeta>;
 
-  constructor(resolver: FileResolver<TCtx>) {
+  constructor(resolver: FileResolver<TCtx, TMeta>) {
     this.resolver = resolver;
   }
 

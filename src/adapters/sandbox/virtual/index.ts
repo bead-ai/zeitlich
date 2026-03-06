@@ -8,6 +8,7 @@ import { SandboxNotSupportedError } from "../../../lib/sandbox/types";
 import { VirtualSandboxFileSystem } from "./filesystem";
 import type {
   FileEntry,
+  FileEntryMetadata,
   FileResolver,
   TreeMutation,
   VirtualFileTree,
@@ -17,19 +18,23 @@ import type {
 // VirtualSandbox
 // ============================================================================
 
-class VirtualSandbox<TCtx = unknown> implements Sandbox {
+class VirtualSandbox<
+  TCtx = unknown,
+  TMeta extends FileEntryMetadata = FileEntryMetadata,
+> implements Sandbox
+{
   readonly capabilities: SandboxCapabilities = {
     filesystem: true,
     execution: false,
     persistence: true,
   };
 
-  readonly fs: VirtualSandboxFileSystem<TCtx>;
+  readonly fs: VirtualSandboxFileSystem<TCtx, TMeta>;
 
   constructor(
     readonly id: string,
-    tree: FileEntry[],
-    resolver: FileResolver<TCtx>,
+    tree: FileEntry<TMeta>[],
+    resolver: FileResolver<TCtx, TMeta>,
     ctx: TCtx
   ) {
     this.fs = new VirtualSandboxFileSystem(tree, resolver, ctx);
@@ -55,12 +60,15 @@ class VirtualSandbox<TCtx = unknown> implements Sandbox {
  * {@link VirtualSandboxProvider}; consumers can also call this directly
  * if they need a sandbox outside the wrapper pattern.
  */
-export function createVirtualSandbox<TCtx>(
+export function createVirtualSandbox<
+  TCtx,
+  TMeta extends FileEntryMetadata = FileEntryMetadata,
+>(
   id: string,
-  tree: FileEntry[],
-  resolver: FileResolver<TCtx>,
+  tree: FileEntry<TMeta>[],
+  resolver: FileResolver<TCtx, TMeta>,
   ctx: TCtx,
-): Sandbox & { fs: VirtualSandboxFileSystem<TCtx> } {
+): Sandbox & { fs: VirtualSandboxFileSystem<TCtx, TMeta> } {
   return new VirtualSandbox(id, tree, resolver, ctx);
 }
 
@@ -72,10 +80,12 @@ export function createVirtualSandbox<TCtx>(
  * Apply a list of {@link TreeMutation}s to a {@link VirtualFileTree},
  * returning a new array. Safe to call from workflow code.
  */
-export function applyTreeMutations(
-  tree: VirtualFileTree,
-  mutations: TreeMutation[]
-): VirtualFileTree {
+export function applyTreeMutations<
+  TMeta extends FileEntryMetadata = FileEntryMetadata,
+>(
+  tree: VirtualFileTree<TMeta>,
+  mutations: TreeMutation<TMeta>[]
+): VirtualFileTree<TMeta> {
   let result = [...tree];
 
   for (const m of mutations) {
@@ -103,6 +113,7 @@ export { VirtualSandboxProvider } from "./provider";
 export { withVirtualSandbox } from "./with-virtual-sandbox";
 export type {
   FileEntry,
+  FileEntryMetadata,
   FileResolver,
   VirtualFileTree,
   VirtualSandboxCreateOptions,
