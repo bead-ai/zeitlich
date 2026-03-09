@@ -59,7 +59,7 @@ export function withVirtualSandbox<
   >
 ): ActivityToolHandler<
   TArgs,
-  { result: TResult; treeMutations: TreeMutation<TMeta>[] } | null
+  (TResult & { treeMutations: TreeMutation<TMeta>[] }) | null
 > {
   return async (args, context) => {
     const state = await queryParentWorkflowState<
@@ -85,7 +85,10 @@ export function withVirtualSandbox<
 
     return {
       toolResponse: response.toolResponse,
-      data: { result: response.data, treeMutations: mutations },
+      data: {
+        ...(response.data ?? {}),
+        treeMutations: mutations,
+      } as TResult & { treeMutations: TreeMutation<TMeta>[] },
     };
   };
 }
