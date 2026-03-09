@@ -112,6 +112,7 @@ export function applyTreeMutations<
 export { VirtualSandboxFileSystem } from "./filesystem";
 export { VirtualSandboxProvider } from "./provider";
 export { withVirtualSandbox } from "./with-virtual-sandbox";
+export { fileEntriesToTree } from "./tree";
 export type {
   FileEntry,
   FileEntryMetadata,
