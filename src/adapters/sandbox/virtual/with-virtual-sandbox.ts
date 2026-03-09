@@ -52,16 +52,19 @@ export function withVirtualSandbox<
   client: WorkflowClient,
   agentName: string,
   provider: VirtualSandboxProvider<TCtx, TMeta>,
-  handler: ActivityToolHandler<TArgs, TResult, VirtualSandboxContext<TCtx, TMeta>>,
+  handler: ActivityToolHandler<
+    TArgs,
+    TResult,
+    VirtualSandboxContext<TCtx, TMeta>
+  >
 ): ActivityToolHandler<
   TArgs,
   { result: TResult; treeMutations: TreeMutation<TMeta>[] } | null
 > {
   return async (args, context) => {
-    const state = await queryParentWorkflowState<VirtualSandboxState<TCtx, TMeta>>(
-      client,
-      agentQueryName(agentName),
-    );
+    const state = await queryParentWorkflowState<
+      VirtualSandboxState<TCtx, TMeta>
+    >(client, agentQueryName(agentName));
 
     const { sandboxId, fileTree, resolverContext } = state;
     if (!fileTree || !sandboxId) {
@@ -75,7 +78,7 @@ export function withVirtualSandbox<
       sandboxId,
       fileTree,
       provider.resolver,
-      resolverContext,
+      resolverContext
     );
     const response = await handler(args, { ...context, sandbox });
     const mutations = sandbox.fs.getMutations();

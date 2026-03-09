@@ -74,38 +74,44 @@ export function createVirtualSandbox<
 }
 
 // ============================================================================
-// applyTreeMutations — workflow-safe pure utility
+// applyTreeMutations — workflow-safe utility
 // ============================================================================
 
 /**
- * Apply a list of {@link TreeMutation}s to a {@link VirtualFileTree},
- * returning a new array. Safe to call from workflow code.
+ * Apply a list of {@link TreeMutation}s to the `fileTree` stored in a state
+ * manager instance, updating it in place and returning the new tree.
+ *
+ * The `stateManager` parameter is structurally typed so any
+ * {@link AgentStateManager} whose custom state includes
+ * `fileTree: VirtualFileTree<TMeta>` will satisfy it.
  */
-export function applyTreeMutations<
-  TMeta = FileEntryMetadata,
->(
-  tree: VirtualFileTree<TMeta>,
-  mutations: TreeMutation<TMeta>[]
+export function applyTreeMutations<TMeta = FileEntryMetadata>(
+  stateManager: {
+    get(key: "fileTree"): VirtualFileTree<TMeta>;
+    set(key: "fileTree", value: VirtualFileTree<TMeta>): void;
+  },
+  mutations: TreeMutation<TMeta>[],
 ): VirtualFileTree<TMeta> {
-  let result = [...tree];
+  let tree = [...stateManager.get("fileTree")];
 
   for (const m of mutations) {
     switch (m.type) {
       case "add":
-        result.push(m.entry);
+        tree.push(m.entry);
         break;
       case "remove":
-        result = result.filter((e) => e.path !== m.path);
+        tree = tree.filter((e) => e.path !== m.path);
         break;
       case "update":
-        result = result.map((e) =>
+        tree = tree.map((e) =>
           e.path === m.path ? { ...e, ...m.entry } : e
         );
         break;
     }
   }
 
-  return result;
+  stateManager.set("fileTree", tree);
+  return tree;
 }
 
 // Re-exports for convenience
