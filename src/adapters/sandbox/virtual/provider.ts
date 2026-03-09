@@ -34,7 +34,7 @@ import type {
 export class VirtualSandboxProvider<
   TCtx = unknown,
   TMeta = FileEntryMetadata,
-> implements SandboxProvider
+> implements SandboxProvider<VirtualSandboxCreateOptions<TCtx>>
 {
   readonly id = "virtual";
   readonly capabilities: SandboxCapabilities = {

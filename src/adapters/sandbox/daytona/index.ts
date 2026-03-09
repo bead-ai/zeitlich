@@ -65,7 +65,9 @@ class DaytonaSandboxImpl implements Sandbox {
 // DaytonaSandboxProvider
 // ============================================================================
 
-export class DaytonaSandboxProvider implements SandboxProvider {
+export class DaytonaSandboxProvider
+  implements SandboxProvider<DaytonaSandboxCreateOptions>
+{
   readonly id = "daytona";
   readonly capabilities: SandboxCapabilities = {
     filesystem: true,

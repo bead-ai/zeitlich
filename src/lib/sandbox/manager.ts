@@ -21,11 +21,14 @@ import type {
  * };
  * ```
  */
-export class SandboxManager<TSandbox extends Sandbox = Sandbox> {
-  constructor(private provider: SandboxProvider) {}
+export class SandboxManager<
+  TOptions extends SandboxCreateOptions = SandboxCreateOptions,
+  TSandbox extends Sandbox = Sandbox,
+> {
+  constructor(private provider: SandboxProvider<TOptions>) {}
 
   async create(
-    options?: SandboxCreateOptions,
+    options?: TOptions,
   ): Promise<{ sandboxId: string; stateUpdate?: Record<string, unknown> }> {
     const { sandbox, stateUpdate } = await this.provider.create(options);
     return { sandboxId: sandbox.id, ...(stateUpdate && { stateUpdate }) };
@@ -52,10 +55,10 @@ export class SandboxManager<TSandbox extends Sandbox = Sandbox> {
    * Returns Temporal activity functions matching {@link SandboxOps}.
    * Spread these into your worker's activity map.
    */
-  createActivities(): SandboxOps {
+  createActivities(): SandboxOps<TOptions> {
     return {
       createSandbox: async (
-        options?: SandboxCreateOptions,
+        options?: TOptions,
       ): Promise<{
         sandboxId: string;
         stateUpdate?: Record<string, unknown>;

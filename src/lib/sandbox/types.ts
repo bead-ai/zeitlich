@@ -113,11 +113,13 @@ export interface SandboxCreateResult {
   stateUpdate?: Record<string, unknown>;
 }
 
-export interface SandboxProvider {
+export interface SandboxProvider<
+  TOptions extends SandboxCreateOptions = SandboxCreateOptions,
+> {
   readonly id: string;
   readonly capabilities: SandboxCapabilities;
 
-  create(options?: SandboxCreateOptions): Promise<SandboxCreateResult>;
+  create(options?: TOptions): Promise<SandboxCreateResult>;
   get(sandboxId: string): Promise<Sandbox>;
   destroy(sandboxId: string): Promise<void>;
   snapshot(sandboxId: string): Promise<SandboxSnapshot>;
@@ -128,9 +130,11 @@ export interface SandboxProvider {
 // SandboxOps — workflow-side activity interface (like ThreadOps)
 // ============================================================================
 
-export interface SandboxOps {
+export interface SandboxOps<
+  TOptions extends SandboxCreateOptions = SandboxCreateOptions,
+> {
   createSandbox(
-    options?: SandboxCreateOptions,
+    options?: TOptions,
   ): Promise<{ sandboxId: string; stateUpdate?: Record<string, unknown> }>;
   destroySandbox(sandboxId: string): Promise<void>;
   snapshotSandbox(sandboxId: string): Promise<SandboxSnapshot>;
