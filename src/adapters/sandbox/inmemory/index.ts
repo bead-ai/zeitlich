@@ -78,7 +78,12 @@ export interface InMemorySandboxOptions {
   bashOptions?: Omit<BashOptions, "fs">;
 }
 
-class InMemorySandbox implements Sandbox {
+/**
+ * An in-memory {@link Sandbox} backed by `just-bash`.
+ */
+export type InMemorySandbox = Sandbox & { fs: SandboxFileSystem };
+
+class InMemorySandboxImpl implements Sandbox {
   readonly capabilities: SandboxCapabilities = {
     filesystem: true,
     execution: true,
@@ -128,7 +133,7 @@ export class InMemorySandboxProvider implements SandboxProvider {
     persistence: true,
   };
 
-  private sandboxes = new Map<string, InMemorySandbox>();
+  private sandboxes = new Map<string, InMemorySandboxImpl>();
 
   constructor(private defaultOptions?: InMemorySandboxOptions) {}
 
@@ -157,7 +162,7 @@ export class InMemorySandboxProvider implements SandboxProvider {
     }
 
     const fs = new InMemoryFs(initialFiles);
-    const sandbox = new InMemorySandbox(id, fs, this.defaultOptions);
+    const sandbox = new InMemorySandboxImpl(id, fs, this.defaultOptions);
     this.sandboxes.set(id, sandbox);
     return { sandbox };
   }
@@ -197,7 +202,7 @@ export class InMemorySandboxProvider implements SandboxProvider {
     }
 
     const fs = new InMemoryFs(initialFiles);
-    const sandbox = new InMemorySandbox(
+    const sandbox = new InMemorySandboxImpl(
       snapshot.sandboxId,
       fs,
       this.defaultOptions

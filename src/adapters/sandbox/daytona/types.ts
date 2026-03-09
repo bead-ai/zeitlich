@@ -1,4 +1,10 @@
-import type { SandboxCreateOptions } from "../../../lib/sandbox/types";
+import type { Sandbox, SandboxCreateOptions } from "../../../lib/sandbox/types";
+import type { DaytonaSandboxFileSystem } from "./filesystem";
+
+/**
+ * A Daytona-backed {@link Sandbox} with its typed filesystem.
+ */
+export type DaytonaSandbox = Sandbox & { fs: DaytonaSandboxFileSystem };
 
 export interface DaytonaSandboxConfig {
   apiKey?: string;

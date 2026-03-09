@@ -25,7 +25,7 @@ import type {
 // DaytonaSandbox
 // ============================================================================
 
-class DaytonaSandbox implements Sandbox {
+class DaytonaSandboxImpl implements Sandbox {
   readonly capabilities: SandboxCapabilities = {
     filesystem: true,
     execution: true,
@@ -74,7 +74,7 @@ export class DaytonaSandboxProvider implements SandboxProvider {
   };
 
   private client: Daytona;
-  private sandboxes = new Map<string, DaytonaSandbox>();
+  private sandboxes = new Map<string, DaytonaSandboxImpl>();
 
   constructor(config?: DaytonaSandboxConfig) {
     this.client = new Daytona(config);
@@ -96,7 +96,7 @@ export class DaytonaSandboxProvider implements SandboxProvider {
       { timeout: options?.timeout ?? 60 },
     );
 
-    const sandbox = new DaytonaSandbox(sdkSandbox.id, sdkSandbox);
+    const sandbox = new DaytonaSandboxImpl(sdkSandbox.id, sdkSandbox);
     this.sandboxes.set(sandbox.id, sandbox);
 
     if (options?.initialFiles) {
@@ -114,7 +114,7 @@ export class DaytonaSandboxProvider implements SandboxProvider {
 
     try {
       const sdkSandbox = await this.client.get(sandboxId);
-      const sandbox = new DaytonaSandbox(sdkSandbox.id, sdkSandbox);
+      const sandbox = new DaytonaSandboxImpl(sdkSandbox.id, sdkSandbox);
       this.sandboxes.set(sandbox.id, sandbox);
       return sandbox;
     } catch {
@@ -154,6 +154,7 @@ export class DaytonaSandboxProvider implements SandboxProvider {
 // Re-exports
 export { DaytonaSandboxFileSystem } from "./filesystem";
 export type {
+  DaytonaSandbox,
   DaytonaSandboxConfig,
   DaytonaSandboxCreateOptions,
 } from "./types";
