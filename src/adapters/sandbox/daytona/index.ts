@@ -17,6 +17,7 @@ import {
 } from "../../../lib/sandbox/types";
 import { DaytonaSandboxFileSystem } from "./filesystem";
 import type {
+  DaytonaSandbox,
   DaytonaSandboxConfig,
   DaytonaSandboxCreateOptions,
 } from "./types";
@@ -66,7 +67,7 @@ class DaytonaSandboxImpl implements Sandbox {
 // ============================================================================
 
 export class DaytonaSandboxProvider
-  implements SandboxProvider<DaytonaSandboxCreateOptions>
+  implements SandboxProvider<DaytonaSandboxCreateOptions, DaytonaSandbox>
 {
   readonly id = "daytona";
   readonly capabilities: SandboxCapabilities = {
@@ -110,7 +111,7 @@ export class DaytonaSandboxProvider
     return { sandbox };
   }
 
-  async get(sandboxId: string): Promise<Sandbox> {
+  async get(sandboxId: string): Promise<DaytonaSandbox> {
     const cached = this.sandboxes.get(sandboxId);
     if (cached) return cached;
 
@@ -146,7 +147,7 @@ export class DaytonaSandboxProvider
     );
   }
 
-  async restore(_snapshot: SandboxSnapshot): Promise<Sandbox> {
+  async restore(_snapshot: SandboxSnapshot): Promise<never> {
     throw new SandboxNotSupportedError(
       "restore (use Daytona's native snapshot API directly)",
     );

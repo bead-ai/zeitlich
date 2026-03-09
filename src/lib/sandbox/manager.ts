@@ -25,17 +25,17 @@ export class SandboxManager<
   TOptions extends SandboxCreateOptions = SandboxCreateOptions,
   TSandbox extends Sandbox = Sandbox,
 > {
-  constructor(private provider: SandboxProvider<TOptions>) {}
+  constructor(private provider: SandboxProvider<TOptions, TSandbox>) {}
 
   async create(
-    options?: TOptions,
+    options?: TOptions
   ): Promise<{ sandboxId: string; stateUpdate?: Record<string, unknown> }> {
     const { sandbox, stateUpdate } = await this.provider.create(options);
     return { sandboxId: sandbox.id, ...(stateUpdate && { stateUpdate }) };
   }
 
   async getSandbox(id: string): Promise<TSandbox> {
-    return this.provider.get(id) as Promise<TSandbox>;
+    return this.provider.get(id);
   }
 
   async destroy(id: string): Promise<void> {
@@ -58,7 +58,7 @@ export class SandboxManager<
   createActivities(): SandboxOps<TOptions> {
     return {
       createSandbox: async (
-        options?: TOptions,
+        options?: TOptions
       ): Promise<{
         sandboxId: string;
         stateUpdate?: Record<string, unknown>;

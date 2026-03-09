@@ -115,12 +115,13 @@ export interface SandboxCreateResult {
 
 export interface SandboxProvider<
   TOptions extends SandboxCreateOptions = SandboxCreateOptions,
+  TSandbox extends Sandbox = Sandbox,
 > {
   readonly id: string;
   readonly capabilities: SandboxCapabilities;
 
   create(options?: TOptions): Promise<SandboxCreateResult>;
-  get(sandboxId: string): Promise<Sandbox>;
+  get(sandboxId: string): Promise<TSandbox>;
   destroy(sandboxId: string): Promise<void>;
   snapshot(sandboxId: string): Promise<SandboxSnapshot>;
   restore(snapshot: SandboxSnapshot): Promise<Sandbox>;
