@@ -6,7 +6,7 @@ interface TreeNode {
   isFile: boolean;
 }
 
-const buildTree = (entries: FileEntry[]): TreeNode => {
+const buildTree = (entries: Pick<FileEntry, "path">[]): TreeNode => {
   const root: TreeNode = { name: "/", children: new Map(), isFile: false };
 
   for (const entry of entries) {
@@ -26,11 +26,7 @@ const buildTree = (entries: FileEntry[]): TreeNode => {
   return root;
 };
 
-const printNode = (
-  node: TreeNode,
-  tab: string,
-  sort: boolean
-): string => {
+const printNode = (node: TreeNode, tab: string, sort: boolean): string => {
   const entries = [...node.children.values()];
   if (sort) {
     entries.sort((a, b) => {
@@ -77,7 +73,7 @@ const printNode = (
  * ```
  */
 export function fileEntriesToTree(
-  entries: FileEntry[],
+  entries: Pick<FileEntry, "path">[],
   opts: { sort?: boolean } = {}
 ): string {
   const sort = opts.sort ?? true;
