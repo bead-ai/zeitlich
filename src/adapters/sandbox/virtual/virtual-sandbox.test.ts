@@ -1,7 +1,8 @@
 import { describe, expect, it, beforeEach } from "vitest";
 import type { FileEntry, FileResolver } from "./types";
 import { VirtualSandboxFileSystem } from "./filesystem";
-import { createVirtualSandbox, applyTreeMutations } from "./index";
+import { createVirtualSandbox } from "./index";
+import { applyVirtualTreeMutations } from "./mutations";
 import { VirtualSandboxProvider } from "./provider";
 import { SandboxNotSupportedError } from "../../../lib/sandbox/types";
 
@@ -430,10 +431,10 @@ describe("VirtualSandboxProvider", () => {
 });
 
 // ============================================================================
-// applyTreeMutations
+// applyVirtualTreeMutations
 // ============================================================================
 
-describe("applyTreeMutations", () => {
+describe("applyVirtualTreeMutations", () => {
   function mockStateManager(tree: FileEntry[]) {
     let fileTree = tree;
     return {
@@ -445,7 +446,7 @@ describe("applyTreeMutations", () => {
 
   it("applies add mutation", () => {
     const sm = mockStateManager([...sampleTree]);
-    const result = applyTreeMutations(sm, [
+    const result = applyVirtualTreeMutations(sm, [
       {
         type: "add",
         entry: {
@@ -464,7 +465,7 @@ describe("applyTreeMutations", () => {
 
   it("applies remove mutation", () => {
     const sm = mockStateManager([...sampleTree]);
-    const result = applyTreeMutations(sm, [
+    const result = applyVirtualTreeMutations(sm, [
       { type: "remove", path: "/src/index.ts" },
     ]);
     expect(result).toHaveLength(sampleTree.length - 1);
@@ -474,7 +475,7 @@ describe("applyTreeMutations", () => {
 
   it("applies update mutation", () => {
     const sm = mockStateManager([...sampleTree]);
-    const result = applyTreeMutations(sm, [
+    const result = applyVirtualTreeMutations(sm, [
       {
         type: "update",
         path: "/README.md",
@@ -489,7 +490,7 @@ describe("applyTreeMutations", () => {
 
   it("applies multiple mutations in order", () => {
     const sm = mockStateManager([...sampleTree]);
-    const result = applyTreeMutations(sm, [
+    const result = applyVirtualTreeMutations(sm, [
       { type: "remove", path: "/src/index.ts" },
       {
         type: "add",
@@ -510,7 +511,7 @@ describe("applyTreeMutations", () => {
   it("does not mutate the original array passed to the state manager", () => {
     const original = [...sampleTree];
     const sm = mockStateManager(sampleTree);
-    applyTreeMutations(sm, [
+    applyVirtualTreeMutations(sm, [
       { type: "remove", path: "/src/index.ts" },
     ]);
     expect(sampleTree).toEqual(original);

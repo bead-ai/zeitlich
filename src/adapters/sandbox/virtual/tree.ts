@@ -64,7 +64,7 @@ const printNode = (node: TreeNode, tab: string, sort: boolean): string => {
  *
  * @example
  * ```typescript
- * const tree = fileEntriesToTree(state.fileTree);
+ * const tree = formatVirtualFileTree(state.fileTree);
  * // /
  * // ├─ src/
  * // │  ├─ index.ts
@@ -72,7 +72,7 @@ const printNode = (node: TreeNode, tab: string, sort: boolean): string => {
  * // └─ package.json
  * ```
  */
-export function fileEntriesToTree<T>(
+export function formatVirtualFileTree<T>(
   entries: FileEntry<T>[],
   opts: { sort?: boolean } = {}
 ): string {

@@ -150,8 +150,10 @@ export {
   SandboxNotSupportedError,
 } from "./lib/sandbox/types";
 
-// Virtual sandbox (workflow-safe types + utility)
-export { applyTreeMutations } from "./adapters/sandbox/virtual";
+// Virtual sandbox (workflow-safe — imported from leaf modules to avoid
+// pulling activity-side code like VirtualSandboxFileSystem / Provider).
+export { applyVirtualTreeMutations } from "./adapters/sandbox/virtual/mutations";
+export { formatVirtualFileTree } from "./adapters/sandbox/virtual/tree";
 export type {
   FileEntry,
   FileEntryMetadata,
@@ -159,7 +161,7 @@ export type {
   VirtualFileTree,
   VirtualSandboxState,
   TreeMutation,
-} from "./adapters/sandbox/virtual";
+} from "./adapters/sandbox/virtual/types";
 
 // Subagent support
 export type { SubagentArgs } from "./lib/subagent";
