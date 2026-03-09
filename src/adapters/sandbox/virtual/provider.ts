@@ -52,15 +52,14 @@ export class VirtualSandboxProvider<
   async create(
     options?: VirtualSandboxCreateOptions<TCtx>,
   ): Promise<SandboxCreateResult> {
-    if (!options?.fileIds || !("resolverContext" in (options ?? {}))) {
+    if (!options || !("resolverContext" in options)) {
       throw new Error(
-        "VirtualSandboxProvider.create requires fileIds and resolverContext",
+        "VirtualSandboxProvider.create requires resolverContext",
       );
     }
 
     const sandboxId = options.id ?? getShortId();
     const fileTree = await this.resolver.resolveEntries(
-      options.fileIds,
       options.resolverContext,
     );
 

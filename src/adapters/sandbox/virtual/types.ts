@@ -7,12 +7,13 @@ import type { VirtualSandboxFileSystem } from "./filesystem";
 // ============================================================================
 
 /** Allowed value types for file-entry metadata. */
-export type FileEntryMetadata = Record<string, string | number | boolean | null>;
+export type FileEntryMetadata = Record<
+  string,
+  string | number | boolean | null
+>;
 
 /** JSON-serializable metadata for a single file in the virtual tree. */
-export interface FileEntry<
-  TMeta = FileEntryMetadata,
-> {
+export interface FileEntry<TMeta = FileEntryMetadata> {
   id: string;
   /** Virtual path inside the sandbox, e.g. "/src/index.ts" */
   path: string;
@@ -30,17 +31,13 @@ export interface FileEntry<
  * Flat list of file entries.
  * Directories are inferred from file paths at runtime.
  */
-export type VirtualFileTree<
-  TMeta = FileEntryMetadata,
-> = FileEntry<TMeta>[];
+export type VirtualFileTree<TMeta = FileEntryMetadata> = FileEntry<TMeta>[];
 
 // ============================================================================
 // Tree Mutations
 // ============================================================================
 
-export type TreeMutation<
-  TMeta = FileEntryMetadata,
-> =
+export type TreeMutation<TMeta = FileEntryMetadata> =
   | { type: "add"; entry: FileEntry<TMeta> }
   | { type: "remove"; path: string }
   | { type: "update"; path: string; entry: Partial<FileEntry<TMeta>> };
@@ -57,22 +54,15 @@ export type TreeMutation<
  *
  * Generic over `TMeta` so resolved entries carry typed metadata.
  */
-export interface FileResolver<
-  TCtx = unknown,
-  TMeta = FileEntryMetadata,
-> {
-  resolveEntries(ids: string[], ctx: TCtx): Promise<FileEntry<TMeta>[]>;
+export interface FileResolver<TCtx = unknown, TMeta = FileEntryMetadata> {
+  resolveEntries(ctx: TCtx): Promise<FileEntry<TMeta>[]>;
   readFile(id: string, ctx: TCtx): Promise<string>;
   readFileBuffer(id: string, ctx: TCtx): Promise<Uint8Array>;
-  writeFile(
-    id: string,
-    content: string | Uint8Array,
-    ctx: TCtx,
-  ): Promise<void>;
+  writeFile(id: string, content: string | Uint8Array, ctx: TCtx): Promise<void>;
   createFile(
     path: string,
     content: string | Uint8Array,
-    ctx: TCtx,
+    ctx: TCtx
   ): Promise<FileEntry<TMeta>>;
   deleteFile(id: string, ctx: TCtx): Promise<void>;
 }
@@ -83,11 +73,11 @@ export interface FileResolver<
 
 /**
  * Options for {@link VirtualSandboxProvider.create}.
- * Extends base options with file IDs to resolve and resolver context.
+ * Extends base options with resolver context.
  */
-export interface VirtualSandboxCreateOptions<TCtx>
-  extends SandboxCreateOptions {
-  fileIds: string[];
+export interface VirtualSandboxCreateOptions<
+  TCtx,
+> extends SandboxCreateOptions {
   resolverContext: TCtx;
 }
 

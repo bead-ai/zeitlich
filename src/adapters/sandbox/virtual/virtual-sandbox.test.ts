@@ -27,8 +27,8 @@ function createMockResolver(): {
   let nextId = 100;
 
   const resolver: FileResolver<TestCtx> = {
-    resolveEntries: async (ids) =>
-      ids.map((id) => ({
+    resolveEntries: async () =>
+      [...store.keys()].map((id) => ({
         id,
         path: `/resolved/${id}.txt`,
         size: (store.get(id) ?? "").length,
@@ -364,11 +364,10 @@ describe("createVirtualSandbox", () => {
 // ============================================================================
 
 describe("VirtualSandboxProvider", () => {
-  it("create resolves file IDs and returns sandbox + stateUpdate", async () => {
+  it("create resolves entries and returns sandbox + stateUpdate", async () => {
     const { resolver } = createMockResolver();
     const provider = new VirtualSandboxProvider(resolver);
     const { sandbox, stateUpdate } = await provider.create({
-      fileIds: ["file-1", "file-2"],
       resolverContext: ctx,
     });
     expect(sandbox.capabilities.filesystem).toBe(true);
@@ -379,7 +378,7 @@ describe("VirtualSandboxProvider", () => {
     expect(stateUpdate).toBeDefined();
     expect(stateUpdate?.resolverContext).toEqual(ctx);
     expect(Array.isArray(stateUpdate?.fileTree)).toBe(true);
-    expect((stateUpdate?.fileTree as FileEntry[]).length).toBe(2);
+    expect((stateUpdate?.fileTree as FileEntry[]).length).toBe(3);
   });
 
   it("create uses provided id as sandbox id", async () => {
@@ -387,7 +386,6 @@ describe("VirtualSandboxProvider", () => {
     const provider = new VirtualSandboxProvider(resolver);
     const { sandbox, stateUpdate } = await provider.create({
       id: "my-sandbox",
-      fileIds: ["file-1"],
       resolverContext: ctx,
     });
     expect(sandbox.id).toBe("my-sandbox");
@@ -426,7 +424,7 @@ describe("VirtualSandboxProvider", () => {
     const { resolver } = createMockResolver();
     const provider = new VirtualSandboxProvider(resolver);
     await expect(provider.create()).rejects.toThrow(
-      "requires fileIds and resolverContext",
+      "requires resolverContext",
     );
   });
 });
