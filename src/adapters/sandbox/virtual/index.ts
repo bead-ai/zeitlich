@@ -12,13 +12,14 @@ import type {
   FileResolver,
   TreeMutation,
   VirtualFileTree,
+  VirtualSandbox,
 } from "./types";
 
 // ============================================================================
 // VirtualSandbox
 // ============================================================================
 
-class VirtualSandbox<
+class VirtualSandboxImpl<
   TCtx = unknown,
   TMeta = FileEntryMetadata,
 > implements Sandbox
@@ -68,8 +69,8 @@ export function createVirtualSandbox<
   tree: FileEntry<TMeta>[],
   resolver: FileResolver<TCtx, TMeta>,
   ctx: TCtx,
-): Sandbox & { fs: VirtualSandboxFileSystem<TCtx, TMeta> } {
-  return new VirtualSandbox(id, tree, resolver, ctx);
+): VirtualSandbox<TCtx, TMeta> {
+  return new VirtualSandboxImpl(id, tree, resolver, ctx);
 }
 
 // ============================================================================
@@ -119,5 +120,6 @@ export type {
   VirtualSandboxCreateOptions,
   VirtualSandboxState,
   VirtualSandboxContext,
+  VirtualSandbox,
   TreeMutation,
 } from "./types";

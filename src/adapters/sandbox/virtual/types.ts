@@ -110,6 +110,18 @@ export interface VirtualSandboxState<
 }
 
 // ============================================================================
+// VirtualSandbox instance type
+// ============================================================================
+
+/**
+ * A {@link Sandbox} whose filesystem is backed by a {@link VirtualSandboxFileSystem}.
+ */
+export type VirtualSandbox<
+  TCtx = unknown,
+  TMeta = FileEntryMetadata,
+> = Sandbox & { fs: VirtualSandboxFileSystem<TCtx, TMeta> };
+
+// ============================================================================
 // Handler Context
 // ============================================================================
 
@@ -121,5 +133,5 @@ export interface VirtualSandboxContext<
   TCtx = unknown,
   TMeta = FileEntryMetadata,
 > extends RouterContext {
-  sandbox: Sandbox & { fs: VirtualSandboxFileSystem<TCtx, TMeta> };
+  sandbox: VirtualSandbox<TCtx, TMeta>;
 }
