@@ -21,7 +21,7 @@ import type {
  * };
  * ```
  */
-export class SandboxManager {
+export class SandboxManager<TSandbox extends Sandbox = Sandbox> {
   constructor(private provider: SandboxProvider) {}
 
   async create(
@@ -31,8 +31,8 @@ export class SandboxManager {
     return { sandboxId: sandbox.id, ...(stateUpdate && { stateUpdate }) };
   }
 
-  async getSandbox(id: string): Promise<Sandbox> {
-    return this.provider.get(id);
+  async getSandbox(id: string): Promise<TSandbox> {
+    return this.provider.get(id) as Promise<TSandbox>;
   }
 
   async destroy(id: string): Promise<void> {
