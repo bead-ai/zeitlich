@@ -6,7 +6,7 @@ interface TreeNode {
   isFile: boolean;
 }
 
-const buildTree = (entries: Pick<FileEntry, "path">[]): TreeNode => {
+const buildTree = <T>(entries: FileEntry<T>[]): TreeNode => {
   const root: TreeNode = { name: "/", children: new Map(), isFile: false };
 
   for (const entry of entries) {
@@ -72,8 +72,8 @@ const printNode = (node: TreeNode, tab: string, sort: boolean): string => {
  * // └─ package.json
  * ```
  */
-export function fileEntriesToTree(
-  entries: Pick<FileEntry, "path">[],
+export function fileEntriesToTree<T>(
+  entries: FileEntry<T>[],
   opts: { sort?: boolean } = {}
 ): string {
   const sort = opts.sort ?? true;
