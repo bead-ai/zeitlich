@@ -54,7 +54,7 @@ function mergeConsecutiveContents(contents: Content[]): Content[] {
  * @example
  * ```typescript
  * import { createGoogleGenAIModelInvoker } from 'zeitlich/adapters/thread/google-genai';
- * import { withParentWorkflowState } from 'zeitlich';
+ * import { createRunAgentActivity } from 'zeitlich';
  * import { GoogleGenAI } from '@google/genai';
  *
  * const client = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
@@ -64,7 +64,7 @@ function mergeConsecutiveContents(contents: Content[]): Content[] {
  *   model: 'gemini-2.5-flash',
  * });
  *
- * return { runAgent: withParentWorkflowState(client, invoker) };
+ * return { runAgent: createRunAgentActivity(client, invoker) };
  * ```
  */
 export function createGoogleGenAIModelInvoker({

@@ -46,8 +46,10 @@ export type { SandboxContext } from "./lib/tool-router";
 // Activity-side wrappers (requires Temporal client)
 export {
   queryParentWorkflowState,
+  createRunAgentActivity,
   withParentWorkflowState,
 } from "./lib/activity";
+export type { AgentStateContext } from "./lib/activity";
 
 // Sandbox (activity-side: manager)
 export { SandboxManager } from "./lib/sandbox/manager";

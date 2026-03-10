@@ -29,12 +29,12 @@ export interface GoogleGenAIAdapter {
  *
  * The returned `threadOps` should be registered as Temporal activities on
  * the worker. The `invoker` (or invokers created via `createModelInvoker`)
- * should be wrapped with `withParentWorkflowState` for per-agent activities.
+ * should be wrapped with `createRunAgentActivity` for per-agent activities.
  *
  * @example
  * ```typescript
  * import { createGoogleGenAIAdapter } from 'zeitlich/adapters/thread/google-genai';
- * import { withParentWorkflowState } from 'zeitlich';
+ * import { createRunAgentActivity } from 'zeitlich';
  * import { GoogleGenAI } from '@google/genai';
  *
  * const client = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
@@ -43,7 +43,7 @@ export interface GoogleGenAIAdapter {
  * export function createActivities(temporalClient: WorkflowClient) {
  *   return {
  *     ...adapter.threadOps,
- *     runAgent: withParentWorkflowState(temporalClient, adapter.invoker),
+ *     runAgent: createRunAgentActivity(temporalClient, adapter.invoker),
  *   };
  * }
  * ```
@@ -55,11 +55,11 @@ export interface GoogleGenAIAdapter {
  * export function createActivities(temporalClient: WorkflowClient) {
  *   return {
  *     ...adapter.threadOps,
- *     runResearchAgent: withParentWorkflowState(
+ *     runResearchAgent: createRunAgentActivity(
  *       temporalClient,
  *       adapter.createModelInvoker('gemini-2.5-pro'),
  *     ),
- *     runFastAgent: withParentWorkflowState(
+ *     runFastAgent: createRunAgentActivity(
  *       temporalClient,
  *       adapter.createModelInvoker('gemini-2.5-flash'),
  *     ),

@@ -23,14 +23,13 @@ export interface LangChainModelInvokerConfig<TModel extends BaseChatModel<any> =
  * @example
  * ```typescript
  * import { createLangChainModelInvoker } from 'zeitlich/adapters/thread/langchain';
- * import { withParentWorkflowState } from 'zeitlich';
+ * import { createRunAgentActivity } from 'zeitlich';
  * import { ChatAnthropic } from '@langchain/anthropic';
  *
  * const model = new ChatAnthropic({ model: "claude-sonnet-4-6" });
  * const invoker = createLangChainModelInvoker({ redis, model });
  *
- * // Wrap with withParentWorkflowState to use as runAgent activity:
- * return { runAgent: withParentWorkflowState(client, invoker) };
+ * return { runAgent: createRunAgentActivity(client, invoker) };
  * ```
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

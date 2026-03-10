@@ -46,7 +46,7 @@ The built-in LangChain adapter gives you:
 ```typescript
 import { ChatAnthropic } from "@langchain/anthropic";
 import { createLangChainAdapter } from "zeitlich/adapters/thread/langchain";
-import { withParentWorkflowState } from "zeitlich";
+import { createRunAgentActivity } from "zeitlich";
 
 const adapter = createLangChainAdapter({
   redis,
@@ -56,7 +56,7 @@ const adapter = createLangChainAdapter({
 export function createActivities(client: WorkflowClient) {
   return {
     ...adapter.threadOps,
-    runAgent: withParentWorkflowState(client, adapter.invoker),
+    runAgent: createRunAgentActivity(client, adapter.invoker),
   };
 }
 ```
@@ -103,6 +103,7 @@ import {
 
 // In activity files and worker setup — framework-agnostic core
 import {
+  createRunAgentActivity,
   withParentWorkflowState,
   withSandbox,
   bashHandler,
@@ -227,7 +228,7 @@ import {
   withSandbox,
   bashHandler,
   createAskUserQuestionHandler,
-  withParentWorkflowState,
+  createRunAgentActivity,
 } from "zeitlich";
 import { createLangChainAdapter } from "zeitlich/adapters/thread/langchain";
 
@@ -248,7 +249,7 @@ export const createActivities = ({
 
   return {
     ...threadOps,
-    runAgentActivity: withParentWorkflowState(client, invoker),
+    runAgentActivity: createRunAgentActivity(client, invoker),
     searchHandlerActivity: async (args: { query: string }) => ({
       toolResponse: JSON.stringify(await performSearch(args.query)),
       data: null,
@@ -623,7 +624,8 @@ Framework-agnostic utilities for activities, worker setup, and Node.js code:
 
 | Export                    | Description                                                                                   |
 | ------------------------- | --------------------------------------------------------------------------------------------- |
-| `withParentWorkflowState` | Wraps a `ModelInvoker` to auto-fetch parent workflow state before each invocation             |
+| `createRunAgentActivity`  | Wraps a handler into a `RunAgentActivity` with auto-fetched parent workflow state             |
+| `withParentWorkflowState`  | Wraps a tool handler into an `ActivityToolHandler` with auto-fetched parent workflow state    |
 | `createThreadManager`     | Generic Redis-backed thread manager factory                                                   |
 | `toTree`                  | Generate file tree string from an `IFileSystem` instance                                      |
 | `withSandbox`             | Wraps a handler to auto-resolve sandbox from context (pairs with `withAutoAppend`)            |
