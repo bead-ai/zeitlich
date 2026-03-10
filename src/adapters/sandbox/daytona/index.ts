@@ -77,7 +77,6 @@ export class DaytonaSandboxProvider
   };
 
   private client: Daytona;
-  private sandboxes = new Map<string, DaytonaSandboxImpl>();
 
   constructor(config?: DaytonaSandboxConfig) {
     this.client = new Daytona(config);
@@ -100,7 +99,6 @@ export class DaytonaSandboxProvider
     );
 
     const sandbox = new DaytonaSandboxImpl(sdkSandbox.id, sdkSandbox);
-    this.sandboxes.set(sandbox.id, sandbox);
 
     if (options?.initialFiles) {
       for (const [path, content] of Object.entries(options.initialFiles)) {
@@ -112,27 +110,15 @@ export class DaytonaSandboxProvider
   }
 
   async get(sandboxId: string): Promise<DaytonaSandbox> {
-    const cached = this.sandboxes.get(sandboxId);
-    if (cached) return cached;
-
     try {
       const sdkSandbox = await this.client.get(sandboxId);
-      const sandbox = new DaytonaSandboxImpl(sdkSandbox.id, sdkSandbox);
-      this.sandboxes.set(sandbox.id, sandbox);
-      return sandbox;
+      return new DaytonaSandboxImpl(sdkSandbox.id, sdkSandbox);
     } catch {
       throw new SandboxNotFoundError(sandboxId);
     }
   }
 
   async destroy(sandboxId: string): Promise<void> {
-    const sandbox = this.sandboxes.get(sandboxId);
-    if (sandbox) {
-      await sandbox.destroy();
-      this.sandboxes.delete(sandboxId);
-      return;
-    }
-
     try {
       const sdkSandbox = await this.client.get(sandboxId);
       await this.client.delete(sdkSandbox);
