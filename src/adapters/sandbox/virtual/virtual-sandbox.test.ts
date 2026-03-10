@@ -435,12 +435,16 @@ describe("VirtualSandboxProvider", () => {
 // ============================================================================
 
 describe("applyVirtualTreeMutations", () => {
-  function mockStateManager(tree: FileEntry[]) {
+  function mockStateManager(tree: FileEntry[]): {
+    get: (_key: "fileTree") => FileEntry[];
+    set: (_key: "fileTree", value: FileEntry[]) => void;
+    current: () => FileEntry[];
+  } {
     let fileTree = tree;
     return {
-      get(_key: "fileTree") { return fileTree; },
-      set(_key: "fileTree", value: FileEntry[]) { fileTree = value; },
-      current() { return fileTree; },
+      get: (_key: "fileTree"): FileEntry[] => fileTree,
+      set: (_key: "fileTree", value: FileEntry[]): void => { fileTree = value; },
+      current: (): FileEntry[] => fileTree,
     };
   }
 
