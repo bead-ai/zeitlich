@@ -129,6 +129,7 @@
     "@types/node": "^25.3.3",
     "eslint": "^10.0.2",
     "husky": "^9.1.7",
+    "just-bash": "^2.12.8",
     "prettier": "^3.8.1",
     "release-please": "^17.3.0",
     "tsup": "^8.5.1",
@@ -140,7 +141,8 @@
     "@daytonaio/sdk": ">=0.100.0",
     "@google/genai": "^1.43.0",
     "@langchain/core": ">=1.0.0",
-    "ioredis": ">=5.0.0"
+    "ioredis": ">=5.0.0",
+    "just-bash": ">=2.0.0"
   },
   "peerDependenciesMeta": {
     "@daytonaio/sdk": {
@@ -150,6 +152,9 @@
       "optional": true
     },
     "@langchain/core": {
+      "optional": true
+    },
+    "just-bash": {
       "optional": true
     }
   },
@@ -162,7 +167,6 @@
     "@temporalio/common": "^1.15.0",
     "@temporalio/plugin": "^1.15.0",
     "@temporalio/workflow": "^1.15.0",
-    "just-bash": "^2.11.6",
     "zod": "^4.3.6"
   }
 }
