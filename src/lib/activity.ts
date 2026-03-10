@@ -35,12 +35,12 @@ export async function queryParentWorkflowState<T>(
  * return { runAgent: createRunAgentActivity(client, invoker) };
  * ```
  */
-export function createRunAgentActivity<R>(
+export function createRunAgentActivity<R, S extends BaseAgentState = BaseAgentState>(
   client: WorkflowClient,
-  handler: (config: RunAgentConfig & { state: BaseAgentState }) => Promise<R>,
+  handler: (config: RunAgentConfig & { state: S }) => Promise<R>,
 ): (config: RunAgentConfig) => Promise<R> {
   return async (config: RunAgentConfig) => {
-    const state = await queryParentWorkflowState<BaseAgentState>(client);
+    const state = await queryParentWorkflowState<S>(client);
     return handler({ ...config, state });
   };
 }
@@ -48,33 +48,40 @@ export function createRunAgentActivity<R>(
 /**
  * Context injected into tool handlers created via {@link withParentWorkflowState}.
  */
-export interface AgentStateContext extends RouterContext {
-  state: BaseAgentState;
+export interface AgentStateContext<S extends BaseAgentState = BaseAgentState> extends RouterContext {
+  state: S;
 }
 
 /**
  * Wraps a tool handler into an `ActivityToolHandler` by auto-fetching the
  * parent workflow's agent state before each invocation.
  *
+ * @typeParam S - Custom agent state type (defaults to `BaseAgentState`)
+ *
  * @example
  * ```typescript
  * import { withParentWorkflowState, type AgentStateContext } from 'zeitlich';
  *
- * const myHandler = withParentWorkflowState(client, async (args, ctx) => {
- *   console.log(ctx.state.systemPrompt);
- *   return { toolResponse: 'done', data: null };
- * });
+ * // With custom state:
+ * interface MyState extends BaseAgentState { customField: string }
+ * const myHandler = withParentWorkflowState<MyArgs, MyResult, MyState>(
+ *   client,
+ *   async (args, ctx) => {
+ *     console.log(ctx.state.customField);
+ *     return { toolResponse: 'done', data: null };
+ *   },
+ * );
  * ```
  */
-export function withParentWorkflowState<TArgs, TResult>(
+export function withParentWorkflowState<TArgs, TResult, S extends BaseAgentState = BaseAgentState>(
   client: WorkflowClient,
   handler: (
     args: TArgs,
-    context: AgentStateContext,
+    context: AgentStateContext<S>,
   ) => Promise<ToolHandlerResponse<TResult>>,
 ): ActivityToolHandler<TArgs, TResult> {
   return async (args, context) => {
-    const state = await queryParentWorkflowState<BaseAgentState>(client);
+    const state = await queryParentWorkflowState<S>(client);
     return handler(args, { ...context, state });
   };
 }
