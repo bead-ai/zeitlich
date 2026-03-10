@@ -1,4 +1,7 @@
-import type { ThreadManagerConfig, BaseThreadManager } from "./types";
+import type {
+  ThreadManagerConfig,
+  BaseThreadManager,
+} from "./types";
 
 const THREAD_TTL_SECONDS = 60 * 60 * 24 * 90; // 90 days
 
@@ -83,6 +86,22 @@ export function createThreadManager<T>(
         await redis.rpush(redisKey, ...messages.map(serialize));
         await redis.expire(redisKey, THREAD_TTL_SECONDS);
       }
+    },
+
+    async fork(newThreadId: string): Promise<BaseThreadManager<T>> {
+      await assertThreadExists();
+      const data = await redis.lrange(redisKey, 0, -1);
+      const forked = createThreadManager({
+        ...config,
+        threadId: newThreadId,
+      });
+      await forked.initialize();
+      if (data.length > 0) {
+        const newKey = getThreadKey(newThreadId, key);
+        await redis.rpush(newKey, ...data);
+        await redis.expire(newKey, THREAD_TTL_SECONDS);
+      }
+      return forked;
     },
 
     async delete(): Promise<void> {

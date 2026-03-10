@@ -433,7 +433,7 @@ The `Subagent` tool is automatically added when subagents are configured, allowi
 
 ### Thread Continuation
 
-By default, each session initializes a fresh thread. To continue an existing thread (e.g., resuming a conversation after a workflow completes), pass `continueThread: true` along with the previous `threadId`:
+By default, each session initializes a fresh thread. To continue from an existing thread (e.g., resuming a conversation after a workflow completes), pass `continueThread: true` along with the previous `threadId`:
 
 ```typescript
 import { createSession } from "zeitlich/workflow";
@@ -444,13 +444,15 @@ const session = await createSession({
   // ... other config
 });
 
-// Later — new workflow picks up the same thread
+// Later — new workflow forks the previous thread
 const resumedSession = await createSession({
-  threadId: savedThreadId, // pass the ID from the first run
-  continueThread: true, // skip thread init + system prompt
+  threadId: savedThreadId, // the thread to continue from
+  continueThread: true, // fork into a new thread with the old messages
   // ... other config
 });
 ```
+
+When `continueThread` is true the session **forks** the provided thread — it copies all messages into a new thread and operates on the copy. The original thread is never mutated, so multiple sessions can safely continue from the same thread in parallel.
 
 `getShortId()` produces compact, workflow-deterministic IDs (~12 base-62 chars) that are more token-efficient than UUIDs.
 
@@ -459,26 +461,24 @@ const resumedSession = await createSession({
 Subagents can opt in to thread continuation via `allowThreadContinuation`. When enabled, the parent agent can pass a `threadId` to resume a previous subagent conversation:
 
 ```typescript
-import { getShortId, type SubagentWorkflow } from "zeitlich/workflow";
+import { type SubagentWorkflow } from "zeitlich/workflow";
 
 // Subagent workflow that supports continuation
 export const researcherWorkflow: SubagentWorkflow = async ({
   prompt,
-  threadId,
+  previousThreadId,
 }) => {
-  const effectiveThreadId = threadId ?? getShortId();
-
   const session = await createSession({
-    threadId: effectiveThreadId,
-    continueThread: !!threadId,
+    threadId: previousThreadId, // undefined → fresh thread, set → fork
+    continueThread: !!previousThreadId,
     // ... other config
   });
 
-  const { finalMessage } = await session.runSession({ stateManager });
+  const { threadId, finalMessage } = await session.runSession({ stateManager });
   return {
     toolResponse: finalMessage ? extractText(finalMessage) : "No response",
     data: null,
-    threadId: effectiveThreadId,
+    threadId,
   };
 };
 

@@ -28,6 +28,12 @@ export interface BaseThreadManager<T> {
    * same message ids are atomically skipped via a Redis Lua script.
    */
   append(messages: T[]): Promise<void>;
+  /**
+   * Copy all messages from this thread into a new thread, leaving the
+   * original intact. Returns the new thread's manager. Safe for parallel
+   * forks — each call creates an independent copy.
+   */
+  fork(newThreadId: string): Promise<BaseThreadManager<T>>;
   /** Delete the thread */
   delete(): Promise<void>;
 }

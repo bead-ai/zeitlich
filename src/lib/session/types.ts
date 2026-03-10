@@ -32,6 +32,8 @@ export interface ThreadOps {
   appendToolResult(config: ToolResultConfig): Promise<void>;
   /** Append a system message to the thread */
   appendSystemMessage(threadId: string, content: string): Promise<void>;
+  /** Copy all messages from sourceThreadId into a new thread at targetThreadId */
+  forkThread(sourceThreadId: string, targetThreadId: string): Promise<void>;
 }
 
 /**

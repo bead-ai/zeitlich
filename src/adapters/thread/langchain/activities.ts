@@ -93,6 +93,17 @@ export function createLangChainAdapter(
       const thread = createLangChainThreadManager({ redis, threadId });
       await thread.appendToolMessage(content, toolCallId);
     },
+
+    async forkThread(
+      sourceThreadId: string,
+      targetThreadId: string,
+    ): Promise<void> {
+      const thread = createLangChainThreadManager({
+        redis,
+        threadId: sourceThreadId,
+      });
+      await thread.fork(targetThreadId);
+    },
   };
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

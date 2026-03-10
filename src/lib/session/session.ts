@@ -65,13 +65,16 @@ export const createSession = async <T extends ToolMap, M = unknown>({
   sandbox: sandboxOps,
   sandboxId: inheritedSandboxId,
 }: SessionConfig<T, M>): Promise<ZeitlichSession<M>> => {
-  const threadId = providedThreadId ?? getShortId();
+  const sourceThreadId = continueThread ? providedThreadId : undefined;
+  const threadId =
+    continueThread && providedThreadId ? getShortId() : (providedThreadId ?? getShortId());
 
   const {
     appendToolResult,
     appendHumanMessage,
     initializeThread,
     appendSystemMessage,
+    forkThread,
   } = threadOps ?? proxyDefaultThreadOps();
 
   const plugins: ToolMap[string][] = [];
@@ -162,7 +165,9 @@ export const createSession = async <T extends ToolMap, M = unknown>({
 
       const systemPrompt = stateManager.getSystemPrompt();
 
-      if (!continueThread) {
+      if (continueThread && sourceThreadId) {
+        await forkThread(sourceThreadId, threadId);
+      } else {
         if (appendSystemPrompt) {
           if (!systemPrompt || systemPrompt.trim() === "") {
             throw ApplicationFailure.create({

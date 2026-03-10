@@ -99,6 +99,17 @@ export function createGoogleGenAIAdapter(
       const thread = createGoogleGenAIThreadManager({ redis, threadId });
       await thread.appendToolResult(toolCallId, toolName, content);
     },
+
+    async forkThread(
+      sourceThreadId: string,
+      targetThreadId: string,
+    ): Promise<void> {
+      const thread = createGoogleGenAIThreadManager({
+        redis,
+        threadId: sourceThreadId,
+      });
+      await thread.fork(targetThreadId);
+    },
   };
 
   const makeInvoker = (model: string): ModelInvoker<Content> =>
