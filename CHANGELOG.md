@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.15](https://github.com/bead-ai/zeitlich/compare/v0.2.14...v0.2.15) (2026-03-10)
+
+
+### Code Refactoring
+
+* implement thread forking functionality ([40de4b7](https://github.com/bead-ai/zeitlich/commit/40de4b799f2e983d53fef8c2d9e3766160c38cbd))
+* improve subagent registration logic and dynamic configuration ([0213855](https://github.com/bead-ai/zeitlich/commit/0213855086f8dd0d8d36a9fcf1115e32f2080470))
+
+
+### Miscellaneous Chores
+
+* release 0.2.15 ([2fe046a](https://github.com/bead-ai/zeitlich/commit/2fe046ace301a92873f9c1a3a799c17bc2224e73))
+
 ## [0.2.14](https://github.com/bead-ai/zeitlich/compare/v0.2.13...v0.2.14) (2026-03-10)
 
 
