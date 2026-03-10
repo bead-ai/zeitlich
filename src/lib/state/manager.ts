@@ -9,15 +9,9 @@ import {
   type BaseAgentState,
   type WorkflowTask,
   isTerminalStatus,
-  agentQueryName,
-  agentStateChangeUpdateName,
 } from "../types";
 import type { ToolDefinition } from "../tool-router/types";
-import type {
-  AgentState,
-  AgentStateManager,
-  JsonSerializable,
-} from "./types";
+import type { AgentState, AgentStateManager, JsonSerializable } from "./types";
 import { z } from "zod";
 
 /**
@@ -52,10 +46,8 @@ export function createAgentStateManager<
   TCustom extends JsonSerializable<TCustom> = Record<string, never>,
 >({
   initialState,
-  agentName,
 }: {
   initialState?: Partial<BaseAgentState> & TCustom;
-  agentName: string;
 }): AgentStateManager<TCustom> {
   let status: AgentStatus = initialState?.status ?? "RUNNING";
   let version = initialState?.version ?? 0;
@@ -90,11 +82,9 @@ export function createAgentStateManager<
     } as AgentState<TCustom>;
   }
 
-  const stateQuery = defineQuery<AgentState<TCustom>>(
-    agentQueryName(agentName)
-  );
+  const stateQuery = defineQuery<AgentState<TCustom>>("getAgentState");
   const stateChangeUpdate = defineUpdate<AgentState<TCustom>, [number]>(
-    agentStateChangeUpdateName(agentName)
+    "waitForAgentStateChange"
   );
 
   setHandler(stateQuery, () => buildState());

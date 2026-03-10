@@ -19,7 +19,11 @@
  */
 
 // Session
-export { createSession, proxyDefaultThreadOps, proxySandboxOps } from "./lib/session";
+export {
+  createSession,
+  proxyDefaultThreadOps,
+  proxySandboxOps,
+} from "./lib/session";
 export type { ZeitlichSession, ThreadOps, SessionConfig } from "./lib/session";
 
 // Thread utilities
@@ -113,14 +117,15 @@ export type {
   TaskStatus,
   WorkflowTask,
 } from "./lib/types";
-export {
-  isTerminalStatus,
-  agentQueryName,
-  agentStateChangeUpdateName,
-} from "./lib/types";
+export { isTerminalStatus } from "./lib/types";
 
 // Model types
-export type { AgentResponse, RunAgentActivity, ModelInvoker, ModelInvokerConfig } from "./lib/model";
+export type {
+  AgentResponse,
+  RunAgentActivity,
+  ModelInvoker,
+  ModelInvokerConfig,
+} from "./lib/model";
 
 // Subagent types
 export type {

@@ -2,22 +2,20 @@ import { Context } from "@temporalio/activity";
 import type { WorkflowClient } from "@temporalio/client";
 import type { ModelInvoker, AgentResponse } from "./model/types";
 import type { BaseAgentState, RunAgentConfig } from "./types";
-import { agentQueryName } from "./types";
 
 /**
  * Query the parent workflow's state from within an activity.
  * Resolves the workflow handle from the current activity context.
  */
 export async function queryParentWorkflowState<T>(
-  client: WorkflowClient,
-  queryName: string
+  client: WorkflowClient
 ): Promise<T> {
   const { workflowExecution } = Context.current().info;
   const handle = client.getHandle(
     workflowExecution.workflowId,
     workflowExecution.runId
   );
-  return handle.query<T>(queryName);
+  return handle.query<T>("getAgentState");
 }
 
 /**
@@ -42,10 +40,7 @@ export function withParentWorkflowState<M>(
   invoker: ModelInvoker<M>
 ): (config: RunAgentConfig) => Promise<AgentResponse<M>> {
   return async (config: RunAgentConfig) => {
-    const state = await queryParentWorkflowState<BaseAgentState>(
-      client,
-      agentQueryName(config.agentName)
-    );
+    const state = await queryParentWorkflowState<BaseAgentState>(client);
     return invoker({ ...config, state });
   };
 }

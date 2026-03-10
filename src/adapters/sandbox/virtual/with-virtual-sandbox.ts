@@ -1,6 +1,5 @@
 import type { WorkflowClient } from "@temporalio/client";
 import { queryParentWorkflowState } from "../../../lib/activity";
-import { agentQueryName } from "../../../lib/types";
 import type { ActivityToolHandler } from "../../../lib/tool-router/types";
 import type {
   FileEntryMetadata,
@@ -50,7 +49,6 @@ export function withVirtualSandbox<
   TMeta = FileEntryMetadata,
 >(
   client: WorkflowClient,
-  agentName: string,
   provider: VirtualSandboxProvider<TCtx, TMeta>,
   handler: ActivityToolHandler<
     TArgs,
@@ -62,9 +60,8 @@ export function withVirtualSandbox<
   (TResult & { treeMutations: TreeMutation<TMeta>[] }) | null
 > {
   return async (args, context) => {
-    const state = await queryParentWorkflowState<
-      VirtualSandboxState<TCtx, TMeta>
-    >(client, agentQueryName(agentName));
+    const state =
+      await queryParentWorkflowState<VirtualSandboxState<TCtx, TMeta>>(client);
 
     const { sandboxId, fileTree, resolverContext } = state;
     if (!fileTree || !sandboxId) {

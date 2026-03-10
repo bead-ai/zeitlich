@@ -155,18 +155,6 @@ export type SessionExitReason =
   | "failed"
   | "cancelled";
 
-// ============================================================================
-// Agent Query/Update Name Helpers
-// ============================================================================
-
-/** Derives the query name for an agent's state (usable in both workflow and activity code) */
-export const agentQueryName = (agentName: string) =>
-  `get${agentName}State` as const;
-
-/** Derives the update name for waiting on an agent's state change */
-export const agentStateChangeUpdateName = (agentName: string) =>
-  `waitFor${agentName}StateChange` as const;
-
 /**
  * Helper to check if status is terminal
  */
