@@ -2,6 +2,74 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.14](https://github.com/bead-ai/zeitlich/compare/v0.2.13...v0.2.14) (2026-03-10)
+
+
+### Features
+
+* add Daytona adapter support and update dependencies ([42cea4b](https://github.com/bead-ai/zeitlich/commit/42cea4bf2595effa5bc1c91dbd170774f2a230ef))
+* add Daytona adapter support and update dependencies ([bebb2c8](https://github.com/bead-ai/zeitlich/commit/bebb2c8c598dd0f4b23e3960f414cb68cc9a6210))
+* add Google GenAI adapter for enhanced model invocation and thread management ([d96e15c](https://github.com/bead-ai/zeitlich/commit/d96e15cc633c72d275d85aea3c2184667e3d3af1))
+* add sandbox layer ([7f48985](https://github.com/bead-ai/zeitlich/commit/7f489853fce569807f02a763b73adf047b3a7afa))
+* cleaner langchain thread id ([fa255e7](https://github.com/bead-ai/zeitlich/commit/fa255e7f24f5ea8fa7d3ce59040c4596d8d60865))
+* export fileEntriesToTree function from virtual sandbox module ([96b72d2](https://github.com/bead-ai/zeitlich/commit/96b72d2bc306615aed8767bcdf18511197370a32))
+* introduce new type definitions for tool router, subagent, model, session, and state management ([0d70680](https://github.com/bead-ai/zeitlich/commit/0d70680450c90a08cabc7b88430e4637db0f0f1f))
+* introduce thread management adapters for Google GenAI and LangChain ([9b15d3a](https://github.com/bead-ai/zeitlich/commit/9b15d3a0e96c5d1879825fb174bf8625707a8cc6))
+* refactor FileSystemSkillProvider to use sandbox filesystem abstraction ([d3a5f81](https://github.com/bead-ai/zeitlich/commit/d3a5f81dd86bfdaeded8a81937948fbc2adc72fc))
+* remove agent name requirement for queries ([1d01342](https://github.com/bead-ai/zeitlich/commit/1d0134227b0b2a903120e3bae9429544e28cc3fc))
+
+
+### Bug Fixes
+
+* generic file entry ([e462e13](https://github.com/bead-ai/zeitlich/commit/e462e1384a6585a8d8e42ad141d01cbb1028df07))
+* thread ids ([f908b1d](https://github.com/bead-ai/zeitlich/commit/f908b1df0bf4c256f6725d30ac984eb87ff192d8))
+
+
+### Code Refactoring
+
+* add virtual sandbox adapter exports ([e0f3f82](https://github.com/bead-ai/zeitlich/commit/e0f3f820c7cead4e35ddbcf6d5d8c1d1c00e25eb))
+* add withSandbox wrapper ([2b70f86](https://github.com/bead-ai/zeitlich/commit/2b70f865191096458c4a303a94cf92a139b6ecab))
+* cleanup types ([554e132](https://github.com/bead-ai/zeitlich/commit/554e13274996caededa8b26f8e150427a14c13a3))
+* consolidate tool execution hooks and update type definitions ([88ba405](https://github.com/bead-ai/zeitlich/commit/88ba4051677d9988f4e918b4bd0c8eae3073b255))
+* enhance return type structure in withVirtualSandbox function ([6e82e8f](https://github.com/bead-ai/zeitlich/commit/6e82e8fbfdfc8b5575f99a7d7e72cf75779a518a))
+* enhance sandbox provider and manager type definitions ([e5bcd20](https://github.com/bead-ai/zeitlich/commit/e5bcd203bb8a44951b10c4301414b4d76fc810a3))
+* enhance subagent type definitions for improved response handling ([4b5cbc7](https://github.com/bead-ai/zeitlich/commit/4b5cbc7e33bb85ed76864446c776d6ed6bd1e5bf))
+* enhance tool call processing with pre and post hooks ([4d62bff](https://github.com/bead-ai/zeitlich/commit/4d62bffadb27f40573bedea2d8626902853bb403))
+* enhance type safety in createRunAgentActivity and withParentWorkflowState ([31cc08c](https://github.com/bead-ai/zeitlich/commit/31cc08c783310146eb03840b1732785e8d98bd38))
+* enhance virtual sandbox functionality ([093e0d2](https://github.com/bead-ai/zeitlich/commit/093e0d22563cac47d12e847022fe356c765fc5b0))
+* enhance virtual sandbox type definitions ([75d4322](https://github.com/bead-ai/zeitlich/commit/75d43225f1e2759190dde022ab51edb32426728e))
+* extend error handling by inheriting from ApplicationFailure ([6cce6d7](https://github.com/bead-ai/zeitlich/commit/6cce6d7a93a9f86df7b28406da9be9245641bc23))
+* generalize fileEntriesToTree function to accept any FileEntry type ([9d4ca8f](https://github.com/bead-ai/zeitlich/commit/9d4ca8f235e6f4df77c8ebfe41c75af646dd2f3d))
+* improve type definitions in Daytona sandbox provider and manager ([e4a443b](https://github.com/bead-ai/zeitlich/commit/e4a443b698be6af7f411bf81476536cc63377f4b))
+* improve type definitions in withVirtualSandbox function ([6ab6b1c](https://github.com/bead-ai/zeitlich/commit/6ab6b1cbf33cebc3c1c9d2323622a418c0c785d9))
+* move fs ([f1d5121](https://github.com/bead-ai/zeitlich/commit/f1d512145968191995a096783a16b09cb7b0dd73))
+* move to router ([b32997d](https://github.com/bead-ai/zeitlich/commit/b32997d9e91a6df6c89247d34197df23c77f982f))
+* remove FileSystemSkillProvider export from index.ts ([c306a93](https://github.com/bead-ai/zeitlich/commit/c306a93f121461d11fc25bc32f4e3a18c568d901))
+* rename and update applyTreeMutations to applyVirtualTreeMutations ([f4c9e12](https://github.com/bead-ai/zeitlich/commit/f4c9e1259d3145826ce78bcf708a593dc9ce0301))
+* rename sandbox implementations and enhance type definitions ([0c36722](https://github.com/bead-ai/zeitlich/commit/0c367226ebd6a65bbab8be4bc4176f3b4f38ce7a))
+* rename VirtualSandbox and update type definitions ([2db7517](https://github.com/bead-ai/zeitlich/commit/2db751723d668d116bd2849e5c361d78ca7877de))
+* reorganize FileSystemSkillProvider export ([ccaa7fe](https://github.com/bead-ai/zeitlich/commit/ccaa7fe7f205bf868ea39a2de6470e645e05bb89))
+* replace createRunAgentActivity with withParentWorkflowState ([5e14c18](https://github.com/bead-ai/zeitlich/commit/5e14c18be1c16843275232710a9f31a409e47fea))
+* replace withParentWorkflowState with createRunAgentActivity ([00e2f0c](https://github.com/bead-ai/zeitlich/commit/00e2f0c480d5cc793d6441ab03b60d59d4af3843))
+* sandbox more generic ([6c72fdf](https://github.com/bead-ai/zeitlich/commit/6c72fdf830c3efe08adb7c3f92997e602d51bc80))
+* simplify DaytonaSandboxProvider by removing sandbox caching ([310beca](https://github.com/bead-ai/zeitlich/commit/310beca76ee9d26934c7cc0f7214c4c7d30d147e))
+* simplify model type definitions in LangChain adapter ([3cfcc1e](https://github.com/bead-ai/zeitlich/commit/3cfcc1e4981d6d2aa699d4be3048ebe27d184502))
+* structure ([6d9e0cd](https://github.com/bead-ai/zeitlich/commit/6d9e0cdcaba8b2a5cc8fd5e1044b415e141705d8))
+* update Bash handler to use SandboxManager directly ([3f854f0](https://github.com/bead-ai/zeitlich/commit/3f854f0569f10e4614886bbc5aed8150b3c02635))
+* update fileEntriesToTree function to use more specific type for entries ([c84be09](https://github.com/bead-ai/zeitlich/commit/c84be09569b8186ce2de799a07a35eef54ebfbca))
+* update README and CONTRIBUTING files for improved clarity and structure ([06a7cf2](https://github.com/bead-ai/zeitlich/commit/06a7cf2d190a3be8383adfc6d91cf1e2f7e14fce))
+* update session type definitions and improve return types ([d94c6dc](https://github.com/bead-ai/zeitlich/commit/d94c6dc559bdad9a8737a477f56e647100d0b402))
+
+
+### Documentation
+
+* add AGENTS.md with Cursor Cloud setup instructions ([#25](https://github.com/bead-ai/zeitlich/issues/25)) ([ad50f4c](https://github.com/bead-ai/zeitlich/commit/ad50f4c348fae1588e9ab501ccc69927cfef29f1))
+
+
+### Miscellaneous Chores
+
+* release 0.2.14 ([1fc218b](https://github.com/bead-ai/zeitlich/commit/1fc218bb83183538fb06918ecceef873abae4680))
+
 ## [0.2.13](https://github.com/bead-ai/zeitlich/compare/v0.2.12...v0.2.13) (2026-03-04)
 
 
