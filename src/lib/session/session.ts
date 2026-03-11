@@ -253,6 +253,7 @@ export const createSession = async <T extends ToolMap, M = unknown>({
             );
             if (!conditionMet) {
               stateManager.cancel();
+              exitReason = "cancelled";
               await condition(() => false, "2s");
               break;
             }
