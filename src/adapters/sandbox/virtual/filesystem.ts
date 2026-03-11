@@ -4,6 +4,7 @@ import type {
   FileStat,
 } from "../../../lib/sandbox/types";
 import { SandboxNotSupportedError } from "../../../lib/sandbox/types";
+import { posix } from "node:path";
 import type {
   FileEntry,
   FileEntryMetadata,
@@ -16,10 +17,7 @@ import type {
  * (except root), no double slashes.
  */
 function normalisePath(p: string): string {
-  if (!p.startsWith("/")) p = "/" + p;
-  p = p.replace(/\/+/g, "/");
-  if (p.length > 1 && p.endsWith("/")) p = p.slice(0, -1);
-  return p;
+  return posix.resolve("/", p);
 }
 
 /** Return the parent directory of a normalised path ("/a/b" → "/a"). */
@@ -325,10 +323,7 @@ export class VirtualSandboxFileSystem<
   }
 
   resolvePath(base: string, path: string): string {
-    if (path.startsWith("/")) return normalisePath(path);
-    const combined =
-      base.endsWith("/") ? base + path : base + "/" + path;
-    return normalisePath(combined);
+    return posix.resolve(normalisePath(base), path);
   }
 
   // --------------------------------------------------------------------------

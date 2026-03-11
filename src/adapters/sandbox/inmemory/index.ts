@@ -26,14 +26,16 @@ import { getShortId } from "../../../lib/thread/id";
 // ============================================================================
 
 function toSandboxFs(fs: IFileSystem): SandboxFileSystem {
+  const normalisePath = (path: string): string => fs.resolvePath("/", path);
+
   return {
-    readFile: (path) => fs.readFile(path),
-    readFileBuffer: (path) => fs.readFileBuffer(path),
-    writeFile: (path, content) => fs.writeFile(path, content),
-    appendFile: (path, content) => fs.appendFile(path, content),
-    exists: (path) => fs.exists(path),
+    readFile: (path) => fs.readFile(normalisePath(path)),
+    readFileBuffer: (path) => fs.readFileBuffer(normalisePath(path)),
+    writeFile: (path, content) => fs.writeFile(normalisePath(path), content),
+    appendFile: (path, content) => fs.appendFile(normalisePath(path), content),
+    exists: (path) => fs.exists(normalisePath(path)),
     stat: async (path): Promise<FileStat> => {
-      const s = await fs.stat(path);
+      const s = await fs.stat(normalisePath(path));
       return {
         isFile: s.isFile,
         isDirectory: s.isDirectory,
@@ -42,14 +44,16 @@ function toSandboxFs(fs: IFileSystem): SandboxFileSystem {
         mtime: s.mtime,
       };
     },
-    mkdir: (path, opts) => fs.mkdir(path, opts),
-    readdir: (path) => fs.readdir(path),
+    mkdir: (path, opts) => fs.mkdir(normalisePath(path), opts),
+    readdir: (path) => fs.readdir(normalisePath(path)),
     readdirWithFileTypes: async (path): Promise<DirentEntry[]> => {
+      const dirPath = normalisePath(path);
       if (!fs.readdirWithFileTypes) {
-        const names = await fs.readdir(path);
+        const names = await fs.readdir(dirPath);
         return Promise.all(
           names.map(async (name) => {
-            const s = await fs.stat(`${path}/${name}`);
+            const childPath = fs.resolvePath(dirPath, name);
+            const s = await fs.stat(childPath);
             return {
               name,
               isFile: s.isFile,
@@ -59,13 +63,13 @@ function toSandboxFs(fs: IFileSystem): SandboxFileSystem {
           })
         );
       }
-      return fs.readdirWithFileTypes(path);
+      return fs.readdirWithFileTypes(dirPath);
     },
-    rm: (path, opts) => fs.rm(path, opts),
-    cp: (src, dest, opts) => fs.cp(src, dest, opts),
-    mv: (src, dest) => fs.mv(src, dest),
-    readlink: (path) => fs.readlink(path),
-    resolvePath: (base, p) => fs.resolvePath(base, p),
+    rm: (path, opts) => fs.rm(normalisePath(path), opts),
+    cp: (src, dest, opts) => fs.cp(normalisePath(src), normalisePath(dest), opts),
+    mv: (src, dest) => fs.mv(normalisePath(src), normalisePath(dest)),
+    readlink: (path) => fs.readlink(normalisePath(path)),
+    resolvePath: (base, p) => fs.resolvePath(normalisePath(base), p),
   };
 }
 
