@@ -38,9 +38,12 @@ export function createSubagentHandler<
     const { sandboxId: parentSandboxId } = context;
     const inheritSandbox = config.sandbox !== "own" && !!parentSandboxId;
 
+    const settings = config.resolveSettings?.();
+
     const input: SubagentInput = {
       prompt: args.prompt,
       ...(config.context && { context: config.context }),
+      ...(settings !== undefined && { settings }),
       ...(args.threadId &&
         args.threadId !== null &&
         config.allowThreadContinuation && { previousThreadId: args.threadId }),

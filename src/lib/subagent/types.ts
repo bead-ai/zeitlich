@@ -9,20 +9,33 @@ import type {
 export type SubagentHandlerResponse<TResult = null> =
   ToolHandlerResponse<TResult> & { threadId: string };
 
-export type SubagentWorkflow<TResult extends z.ZodType = z.ZodType> = (
-  input: SubagentInput
+export type SubagentWorkflow<
+  TResult extends z.ZodType = z.ZodType,
+  TSettings extends Record<string, unknown> = Record<string, unknown>,
+> = (
+  input: SubagentInput<TSettings>
 ) => Promise<SubagentHandlerResponse<z.infer<TResult> | null>>;
 
 /** Infer the z.infer'd result type from a SubagentConfig, or null if no schema */
 export type InferSubagentResult<T extends SubagentConfig> =
-  T extends SubagentConfig<infer S> ? z.infer<S> : null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  T extends SubagentConfig<infer S, any> ? z.infer<S> : null;
+
+/** Infer the settings type from a SubagentConfig */
+export type InferSubagentSettings<T extends SubagentConfig> =
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  T extends SubagentConfig<any, infer S> ? S : Record<string, unknown>;
 
 /**
  * Configuration for a subagent that can be spawned by the parent workflow.
  *
  * @template TResult - Zod schema type for validating the child workflow's result
+ * @template TSettings - Type of settings resolved from parent state at invocation time
  */
-export interface SubagentConfig<TResult extends z.ZodType = z.ZodType> {
+export interface SubagentConfig<
+  TResult extends z.ZodType = z.ZodType,
+  TSettings extends Record<string, unknown> = Record<string, unknown>,
+> {
   /** Identifier used in Task tool's subagent parameter */
   agentName: string;
   /** Description shown to the parent agent explaining what this subagent does */
@@ -30,13 +43,19 @@ export interface SubagentConfig<TResult extends z.ZodType = z.ZodType> {
   /** Whether this subagent is available (default: true). Disabled subagents are excluded from the Subagent tool. */
   enabled?: boolean;
   /** Temporal workflow function or type name (used with executeChild) */
-  workflow: string | SubagentWorkflow<TResult>;
+  workflow: string | SubagentWorkflow<TResult, TSettings>;
   /** Optional task queue - defaults to parent's queue if not specified */
   taskQueue?: string;
   /** Optional Zod schema to validate the child workflow's result. If omitted, result is passed through as-is. */
   resultSchema?: TResult;
   /** Optional static context passed to the subagent on every invocation */
   context?: Record<string, unknown>;
+  /**
+   * Resolve type-safe settings from parent state at invocation time.
+   * Called each time the subagent is spawned. Unlike `context` (static),
+   * settings are dynamically resolved and can read parent workflow state.
+   */
+  resolveSettings?: () => TSettings;
   /** Allow the parent agent to pass a threadId for this subagent to continue (default: false) */
   allowThreadContinuation?: boolean;
   /** Per-subagent lifecycle hooks */
@@ -78,13 +97,22 @@ export interface SubagentHooks<TArgs = unknown, TResult = unknown> {
 }
 
 /**
- * Input passed to child workflows when spawned as subagents
+ * Input passed to child workflows when spawned as subagents.
+ *
+ * @template TSettings - Type-safe settings resolved from parent state via `resolveSettings`
  */
-export interface SubagentInput {
+export interface SubagentInput<
+  TSettings extends Record<string, unknown> = Record<string, unknown>,
+> {
   /** The prompt/task from the parent agent */
   prompt: string;
   /** Optional context parameters passed from the parent agent */
   context?: Record<string, unknown>;
+  /**
+   * Type-safe settings resolved from parent state at invocation time.
+   * Present when the SubagentConfig defines `resolveSettings`.
+   */
+  settings?: TSettings;
   /** When set, the subagent should continue this thread instead of starting a new one */
   previousThreadId?: string;
   /** Sandbox ID inherited from the parent agent (when SubagentConfig.sandbox is 'inherit') */
