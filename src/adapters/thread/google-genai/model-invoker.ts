@@ -1,12 +1,7 @@
+import type { Content, FunctionDeclaration, GoogleGenAI } from "@google/genai";
 import type Redis from "ioredis";
-import type {
-  GoogleGenAI,
-  Content,
-  FunctionDeclaration,
-} from "@google/genai";
+import type { AgentResponse, ModelInvokerConfig } from "../../../lib/model";
 import type { SerializableToolDefinition } from "../../../lib/types";
-import type { AgentResponse } from "../../../lib/model";
-import type { ModelInvokerConfig } from "../../../lib/model";
 import { createGoogleGenAIThreadManager } from "./thread-manager";
 
 export interface GoogleGenAIModelInvokerConfig {
@@ -97,9 +92,7 @@ export function createGoogleGenAIModelInvoker({
 
     const functionDeclarations = toFunctionDeclarations(state.tools);
     const tools =
-      functionDeclarations.length > 0
-        ? [{ functionDeclarations }]
-        : undefined;
+      functionDeclarations.length > 0 ? [{ functionDeclarations }] : undefined;
 
     const response = await client.models.generateContent({
       model,

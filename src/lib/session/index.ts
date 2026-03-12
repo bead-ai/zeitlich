@@ -5,7 +5,7 @@ export {
 } from "./session";
 
 export type {
-  ThreadOps,
   SessionConfig,
+  ThreadOps,
   ZeitlichSession,
 } from "./types";

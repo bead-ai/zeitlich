@@ -1,10 +1,10 @@
+import { posix } from "node:path";
 import type {
-  SandboxFileSystem,
   DirentEntry,
   FileStat,
+  SandboxFileSystem,
 } from "../../../lib/sandbox/types";
 import { SandboxNotSupportedError } from "../../../lib/sandbox/types";
-import { posix } from "node:path";
 import type {
   FileEntry,
   FileEntryMetadata,
@@ -51,10 +51,8 @@ function inferDirectories(entries: { path: string }[]): Set<string> {
  * Directory structure is inferred from file paths. All mutations are tracked
  * and can be retrieved via {@link getMutations} after the handler completes.
  */
-export class VirtualSandboxFileSystem<
-  TCtx = unknown,
-  TMeta = FileEntryMetadata,
-> implements SandboxFileSystem
+export class VirtualSandboxFileSystem<TCtx = unknown, TMeta = FileEntryMetadata>
+  implements SandboxFileSystem
 {
   private entries: Map<string, FileEntry<TMeta>>;
   private directories: Set<string>;
@@ -65,9 +63,7 @@ export class VirtualSandboxFileSystem<
     private resolver: FileResolver<TCtx, TMeta>,
     private ctx: TCtx,
   ) {
-    this.entries = new Map(
-      tree.map((e) => [normalisePath(e.path), e]),
-    );
+    this.entries = new Map(tree.map((e) => [normalisePath(e.path), e]));
     this.directories = inferDirectories(tree);
   }
 
@@ -135,7 +131,7 @@ export class VirtualSandboxFileSystem<
     if (!this.directories.has(norm)) {
       throw new Error(`ENOENT: no such directory: ${path}`);
     }
-    const prefix = norm === "/" ? "/" : norm + "/";
+    const prefix = norm === "/" ? "/" : `${norm}/`;
     const names = new Set<string>();
 
     for (const p of this.entries.keys()) {
@@ -158,7 +154,7 @@ export class VirtualSandboxFileSystem<
   async readdirWithFileTypes(path: string): Promise<DirentEntry[]> {
     const names = await this.readdir(path);
     const norm = normalisePath(path);
-    const prefix = norm === "/" ? "/" : norm + "/";
+    const prefix = norm === "/" ? "/" : `${norm}/`;
 
     return names.map((name) => {
       const full = prefix + name;
@@ -223,12 +219,15 @@ export class VirtualSandboxFileSystem<
     this.mutations.push({ type: "update", path: norm, entry: updated });
   }
 
-  async mkdir(_path: string, _options?: { recursive?: boolean }): Promise<void> {
+  async mkdir(
+    _path: string,
+    _options?: { recursive?: boolean },
+  ): Promise<void> {
     const norm = normalisePath(_path);
     if (this.directories.has(norm)) return;
 
     if (_options?.recursive) {
-      this.addParentDirectories(norm + "/placeholder");
+      this.addParentDirectories(`${norm}/placeholder`);
       this.directories.add(norm);
     } else {
       const parent = parentDir(norm);
@@ -257,7 +256,7 @@ export class VirtualSandboxFileSystem<
       if (!options?.recursive) {
         throw new Error(`EISDIR: is a directory (use recursive): ${path}`);
       }
-      const prefix = norm === "/" ? "/" : norm + "/";
+      const prefix = norm === "/" ? "/" : `${norm}/`;
       for (const [p, e] of this.entries) {
         if (p.startsWith(prefix)) {
           await this.resolver.deleteFile(e.id, this.ctx);
@@ -299,7 +298,7 @@ export class VirtualSandboxFileSystem<
       throw new Error(`EISDIR: is a directory (use recursive): ${src}`);
     }
 
-    const prefix = normSrc === "/" ? "/" : normSrc + "/";
+    const prefix = normSrc === "/" ? "/" : `${normSrc}/`;
     for (const [p, e] of this.entries) {
       if (p.startsWith(prefix)) {
         const relative = p.slice(normSrc.length);

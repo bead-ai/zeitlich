@@ -1,8 +1,8 @@
 import type { z } from "zod";
 import type {
-  ToolHandlerResponse,
-  PreToolUseHookResult,
   PostToolUseFailureHookResult,
+  PreToolUseHookResult,
+  ToolHandlerResponse,
 } from "../tool-router/types";
 
 /** ToolHandlerResponse with threadId required (subagents must always surface their thread) */
@@ -10,7 +10,7 @@ export type SubagentHandlerResponse<TResult = null> =
   ToolHandlerResponse<TResult> & { threadId: string };
 
 export type SubagentWorkflow<TResult extends z.ZodType = z.ZodType> = (
-  input: SubagentInput
+  input: SubagentInput,
 ) => Promise<SubagentHandlerResponse<z.infer<TResult> | null>>;
 
 /** Infer the z.infer'd result type from a SubagentConfig, or null if no schema */

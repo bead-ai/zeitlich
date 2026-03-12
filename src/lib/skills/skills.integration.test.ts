@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { parseSkillFile } from "./parse";
-import { createReadSkillTool } from "./tool";
 import { createReadSkillHandler } from "./handler";
+import { parseSkillFile } from "./parse";
 import { buildSkillRegistration } from "./register";
+import { createReadSkillTool } from "./tool";
 import type { Skill } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -45,7 +45,10 @@ Body content here.`;
     expect(frontmatter.license).toBe("MIT");
     expect(frontmatter.compatibility).toBe("linux-only");
     expect(frontmatter.allowedTools).toEqual(["bash", "grep", "read-file"]);
-    expect(frontmatter.metadata).toEqual({ author: "test-author", version: "1.0" });
+    expect(frontmatter.metadata).toEqual({
+      author: "test-author",
+      version: "1.0",
+    });
     expect(body).toBe("Body content here.");
   });
 
@@ -112,7 +115,8 @@ description: No body content
   });
 
   it("handles CRLF line endings", () => {
-    const raw = "---\r\nname: crlf-skill\r\ndescription: CRLF test\r\n---\r\nBody with CRLF";
+    const raw =
+      "---\r\nname: crlf-skill\r\ndescription: CRLF test\r\n---\r\nBody with CRLF";
 
     const { frontmatter, body } = parseSkillFile(raw);
     expect(frontmatter.name).toBe("crlf-skill");
@@ -238,7 +242,7 @@ describe("createReadSkillHandler", () => {
     const result = handler({ skill_name: "nonexistent" });
 
     expect(typeof result.toolResponse).toBe("string");
-    expect((result.toolResponse as string)).toContain("not found");
+    expect(result.toolResponse as string).toContain("not found");
     expect(result.data).toBeNull();
   });
 

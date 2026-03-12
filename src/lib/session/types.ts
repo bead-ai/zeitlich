@@ -1,20 +1,20 @@
 import type { Duration } from "@temporalio/common";
+import type { Hooks } from "../hooks/types";
+import type { RunAgentActivity } from "../model/types";
+import type { SandboxOps } from "../sandbox/types";
+import type { Skill } from "../skills/types";
+import type { AgentStateManager, JsonSerializable } from "../state/types";
+import type { SubagentConfig } from "../subagent/types";
+import type {
+  InferToolResults,
+  ToolCallResultUnion,
+  ToolMap,
+} from "../tool-router/types";
 import type {
   MessageContent,
-  ToolResultConfig,
   SessionExitReason,
+  ToolResultConfig,
 } from "../types";
-import type {
-  ToolMap,
-  ToolCallResultUnion,
-  InferToolResults,
-} from "../tool-router/types";
-import type { Hooks } from "../hooks/types";
-import type { SubagentConfig } from "../subagent/types";
-import type { Skill } from "../skills/types";
-import type { SandboxOps } from "../sandbox/types";
-import type { RunAgentActivity } from "../model/types";
-import type { AgentStateManager, JsonSerializable } from "../state/types";
 
 /**
  * Thread operations required by a session.
@@ -26,7 +26,7 @@ export interface ThreadOps {
   /** Append a human message to the thread */
   appendHumanMessage(
     threadId: string,
-    content: string | MessageContent
+    content: string | MessageContent,
   ): Promise<void>;
   /** Append a tool result to the thread */
   appendToolResult(config: ToolResultConfig): Promise<void>;

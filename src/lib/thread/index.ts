@@ -1,7 +1,7 @@
-export { createThreadManager } from "./manager";
 export { getShortId } from "./id";
+export { createThreadManager } from "./manager";
 
 export type {
-  ThreadManagerConfig,
   BaseThreadManager,
+  ThreadManagerConfig,
 } from "./types";

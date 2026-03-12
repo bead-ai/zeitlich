@@ -1,11 +1,15 @@
 import {
   Bash,
-  InMemoryFs,
   type BashOptions,
   type IFileSystem,
   type InitialFiles,
+  InMemoryFs,
 } from "just-bash";
 import type {
+  DirentEntry,
+  ExecOptions,
+  ExecResult,
+  FileStat,
   Sandbox,
   SandboxCapabilities,
   SandboxCreateOptions,
@@ -13,10 +17,6 @@ import type {
   SandboxFileSystem,
   SandboxProvider,
   SandboxSnapshot,
-  ExecOptions,
-  ExecResult,
-  DirentEntry,
-  FileStat,
 } from "../../../lib/sandbox/types";
 import { SandboxNotFoundError } from "../../../lib/sandbox/types";
 import { getShortId } from "../../../lib/thread/id";
@@ -60,13 +60,14 @@ function toSandboxFs(fs: IFileSystem): SandboxFileSystem {
               isDirectory: s.isDirectory,
               isSymbolicLink: s.isSymbolicLink,
             };
-          })
+          }),
         );
       }
       return fs.readdirWithFileTypes(dirPath);
     },
     rm: (path, opts) => fs.rm(normalisePath(path), opts),
-    cp: (src, dest, opts) => fs.cp(normalisePath(src), normalisePath(dest), opts),
+    cp: (src, dest, opts) =>
+      fs.cp(normalisePath(src), normalisePath(dest), opts),
     mv: (src, dest) => fs.mv(normalisePath(src), normalisePath(dest)),
     readlink: (path) => fs.readlink(normalisePath(path)),
     resolvePath: (base, p) => fs.resolvePath(normalisePath(base), p),
@@ -100,7 +101,7 @@ class InMemorySandboxImpl implements Sandbox {
   constructor(
     readonly id: string,
     private justBashFs: IFileSystem,
-    options?: InMemorySandboxOptions
+    options?: InMemorySandboxOptions,
   ) {
     this.fs = toSandboxFs(justBashFs);
     this.bashOptions = {
@@ -209,7 +210,7 @@ export class InMemorySandboxProvider implements SandboxProvider {
     const sandbox = new InMemorySandboxImpl(
       snapshot.sandboxId,
       fs,
-      this.defaultOptions
+      this.defaultOptions,
     );
     this.sandboxes.set(sandbox.id, sandbox);
     return sandbox;

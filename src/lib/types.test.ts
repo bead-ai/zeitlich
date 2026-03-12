@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { isTerminalStatus } from "./types";
 import type { AgentStatus } from "./types";
+import { isTerminalStatus } from "./types";
 
 describe("isTerminalStatus", () => {
   it("returns true for COMPLETED", () => {

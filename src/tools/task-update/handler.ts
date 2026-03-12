@@ -1,7 +1,4 @@
-import type {
-  AgentStateManager,
-  JsonSerializable,
-} from "../../lib/state";
+import type { AgentStateManager, JsonSerializable } from "../../lib/state";
 import type { ToolHandler } from "../../lib/tool-router";
 import type { WorkflowTask } from "../../lib/types";
 import type { TaskUpdateArgs } from "./tool";
@@ -15,14 +12,16 @@ import type { TaskUpdateArgs } from "./tool";
 export function createTaskUpdateHandler<
   TCustom extends JsonSerializable<TCustom>,
 >(
-  stateManager: AgentStateManager<TCustom>
+  stateManager: AgentStateManager<TCustom>,
 ): ToolHandler<TaskUpdateArgs, WorkflowTask | null> {
   return (args) => {
     const task = stateManager.getTask(args.taskId);
 
     if (!task) {
       return {
-        toolResponse: JSON.stringify({ error: `Task not found: ${args.taskId}` }),
+        toolResponse: JSON.stringify({
+          error: `Task not found: ${args.taskId}`,
+        }),
         data: null,
       };
     }

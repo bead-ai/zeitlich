@@ -1,11 +1,11 @@
+import { posix } from "node:path";
 import type { Sandbox as DaytonaSdkSandbox } from "@daytonaio/sdk";
 import type {
-  SandboxFileSystem,
   DirentEntry,
   FileStat,
+  SandboxFileSystem,
 } from "../../../lib/sandbox/types";
 import { SandboxNotSupportedError } from "../../../lib/sandbox/types";
-import { posix } from "node:path";
 
 /**
  * {@link SandboxFileSystem} backed by a Daytona SDK sandbox.
@@ -42,10 +42,7 @@ export class DaytonaSandboxFileSystem implements SandboxFileSystem {
     await this.sandbox.fs.uploadFile(buf, norm);
   }
 
-  async appendFile(
-    path: string,
-    content: string | Uint8Array,
-  ): Promise<void> {
+  async appendFile(path: string, content: string | Uint8Array): Promise<void> {
     const norm = this.normalisePath(path);
     let existing: Buffer;
     try {
@@ -82,10 +79,7 @@ export class DaytonaSandboxFileSystem implements SandboxFileSystem {
     };
   }
 
-  async mkdir(
-    path: string,
-    _options?: { recursive?: boolean },
-  ): Promise<void> {
+  async mkdir(path: string, _options?: { recursive?: boolean }): Promise<void> {
     const norm = this.normalisePath(path);
     await this.sandbox.fs.createFolder(norm, "755");
   }
@@ -131,9 +125,13 @@ export class DaytonaSandboxFileSystem implements SandboxFileSystem {
       if (!options?.recursive) {
         throw new Error(`EISDIR: is a directory (use recursive): ${src}`);
       }
-      await this.sandbox.process.executeCommand(`cp -r "${normSrc}" "${normDest}"`);
+      await this.sandbox.process.executeCommand(
+        `cp -r "${normSrc}" "${normDest}"`,
+      );
     } else {
-      await this.sandbox.process.executeCommand(`cp "${normSrc}" "${normDest}"`);
+      await this.sandbox.process.executeCommand(
+        `cp "${normSrc}" "${normDest}"`,
+      );
     }
   }
 

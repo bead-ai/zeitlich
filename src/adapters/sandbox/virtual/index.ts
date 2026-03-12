@@ -1,8 +1,8 @@
 import type {
-  Sandbox,
-  SandboxCapabilities,
   ExecOptions,
   ExecResult,
+  Sandbox,
+  SandboxCapabilities,
 } from "../../../lib/sandbox/types";
 import { SandboxNotSupportedError } from "../../../lib/sandbox/types";
 import { VirtualSandboxFileSystem } from "./filesystem";
@@ -17,10 +17,8 @@ import type {
 // VirtualSandbox
 // ============================================================================
 
-class VirtualSandboxImpl<
-  TCtx = unknown,
-  TMeta = FileEntryMetadata,
-> implements Sandbox
+class VirtualSandboxImpl<TCtx = unknown, TMeta = FileEntryMetadata>
+  implements Sandbox
 {
   readonly capabilities: SandboxCapabilities = {
     filesystem: true,
@@ -34,7 +32,7 @@ class VirtualSandboxImpl<
     readonly id: string,
     tree: FileEntry<TMeta>[],
     resolver: FileResolver<TCtx, TMeta>,
-    ctx: TCtx
+    ctx: TCtx,
   ) {
     this.fs = new VirtualSandboxFileSystem(tree, resolver, ctx);
   }
@@ -59,10 +57,7 @@ class VirtualSandboxImpl<
  * {@link VirtualSandboxProvider}; consumers can also call this directly
  * if they need a sandbox outside the wrapper pattern.
  */
-export function createVirtualSandbox<
-  TCtx,
-  TMeta = FileEntryMetadata,
->(
+export function createVirtualSandbox<TCtx, TMeta = FileEntryMetadata>(
   id: string,
   tree: FileEntry<TMeta>[],
   resolver: FileResolver<TCtx, TMeta>,
@@ -74,15 +69,15 @@ export function createVirtualSandbox<
 // Re-exports for convenience
 export { VirtualSandboxFileSystem } from "./filesystem";
 export { VirtualSandboxProvider } from "./provider";
-export { withVirtualSandbox } from "./with-virtual-sandbox";
 export type {
   FileEntry,
   FileEntryMetadata,
   FileResolver,
+  TreeMutation,
   VirtualFileTree,
+  VirtualSandbox,
+  VirtualSandboxContext,
   VirtualSandboxCreateOptions,
   VirtualSandboxState,
-  VirtualSandboxContext,
-  VirtualSandbox,
-  TreeMutation,
 } from "./types";
+export { withVirtualSandbox } from "./with-virtual-sandbox";

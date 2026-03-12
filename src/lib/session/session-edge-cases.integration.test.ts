@@ -1,10 +1,10 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
-import type { ToolResultConfig, TokenUsage } from "../types";
-import type { ThreadOps } from "./types";
 import type { RunAgentActivity } from "../model/types";
-import type { RawToolCall } from "../tool-router/types";
 import type { SandboxOps } from "../sandbox/types";
+import type { RawToolCall } from "../tool-router/types";
+import type { TokenUsage, ToolResultConfig } from "../types";
+import type { ThreadOps } from "./types";
 
 let idCounter = 0;
 
@@ -40,10 +40,10 @@ vi.mock("@temporalio/workflow", () => {
   };
 });
 
-import { createSession } from "./session";
 import { createAgentStateManager } from "../state/manager";
 import { defineTool } from "../tool-router/router";
-import type { ToolHandlerResponse, RouterContext } from "../tool-router/types";
+import type { RouterContext, ToolHandlerResponse } from "../tool-router/types";
+import { createSession } from "./session";
 
 type TurnScript = {
   message: unknown;
@@ -73,7 +73,9 @@ function createMockThreadOps() {
   return { ops, log };
 }
 
-function createScriptedRunAgent(turns: TurnScript[]): RunAgentActivity<unknown> {
+function createScriptedRunAgent(
+  turns: TurnScript[],
+): RunAgentActivity<unknown> {
   let call = 0;
   return async () => {
     const turn = turns[call++];
@@ -199,7 +201,10 @@ describe("createSession edge cases", () => {
     const errorResults = log.filter((l) => {
       if (l.op !== "appendToolResult") return false;
       const config = l.args[0] as ToolResultConfig;
-      return typeof config.content === "string" && config.content.includes("Invalid tool call");
+      return (
+        typeof config.content === "string" &&
+        config.content.includes("Invalid tool call")
+      );
     });
     expect(errorResults).toHaveLength(2);
   });
@@ -363,9 +368,7 @@ describe("createSession edge cases", () => {
       agentName: "TestAgent",
       threadId: "thread-1",
       metadata: { env: "test", version: 42 },
-      runAgent: createScriptedRunAgent([
-        { message: "done", toolCalls: [] },
-      ]),
+      runAgent: createScriptedRunAgent([{ message: "done", toolCalls: [] }]),
       threadOps: ops,
       buildContextMessage: () => "go",
       hooks: {
@@ -687,7 +690,9 @@ describe("createSession edge cases", () => {
     });
     expect(echoResult).toBeDefined();
     if (echoResult) {
-      expect((echoResult.args[0] as ToolResultConfig).content).toBe("Echo: valid");
+      expect((echoResult.args[0] as ToolResultConfig).content).toBe(
+        "Echo: valid",
+      );
     }
 
     const unknownResult = toolResults.find((l) => {
@@ -699,7 +704,8 @@ describe("createSession edge cases", () => {
       ? (unknownResult.args[0] as ToolResultConfig).content
       : undefined;
     expect(
-      typeof unknownContent === "string" && unknownContent.includes("Invalid tool call"),
+      typeof unknownContent === "string" &&
+        unknownContent.includes("Invalid tool call"),
     ).toBe(true);
   });
 
@@ -711,9 +717,7 @@ describe("createSession edge cases", () => {
     const session = await createSession({
       agentName: "TestAgent",
       threadId: "thread-1",
-      runAgent: createScriptedRunAgent([
-        { message: "done", toolCalls: [] },
-      ]),
+      runAgent: createScriptedRunAgent([{ message: "done", toolCalls: [] }]),
       threadOps: ops,
       buildContextMessage: () => [
         { type: "text", text: "Hello" },
@@ -842,7 +846,10 @@ describe("createSession edge cases", () => {
       buildContextMessage: () => "go",
       hooks: {
         onPreToolUse: async ({ toolCall }) => {
-          if (toolCall.args && (toolCall.args as { text: string }).text === "skip-me") {
+          if (
+            toolCall.args &&
+            (toolCall.args as { text: string }).text === "skip-me"
+          ) {
             return { skip: true };
           }
           return {};
@@ -861,7 +868,9 @@ describe("createSession edge cases", () => {
     const toolResult = toolResults[0];
     if (!toolResult) throw new Error("expected tool result");
     const content = (toolResult.args[0] as ToolResultConfig).content;
-    expect(typeof content === "string" && content.includes("Skipped")).toBe(true);
+    expect(typeof content === "string" && content.includes("Skipped")).toBe(
+      true,
+    );
   });
 
   // --- Sandbox snapshot is not called on normal flow ---

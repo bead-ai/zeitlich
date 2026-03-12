@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
 vi.mock("@temporalio/workflow", () => {
@@ -15,10 +15,7 @@ vi.mock("@temporalio/workflow", () => {
       err.nonRetryable = nonRetryable;
       return err;
     }
-    static fromError(
-      error: unknown,
-      options?: { nonRetryable?: boolean },
-    ) {
+    static fromError(error: unknown, options?: { nonRetryable?: boolean }) {
       const src = error instanceof Error ? error : new Error(String(error));
       const err = new MockApplicationFailure(src.message);
       err.nonRetryable = options?.nonRetryable;
@@ -28,13 +25,9 @@ vi.mock("@temporalio/workflow", () => {
   return { ApplicationFailure: MockApplicationFailure };
 });
 
-import { createToolRouter, defineTool, hasNoOtherToolCalls } from "./router";
-import type {
-  ToolMap,
-  ToolHandlerResponse,
-  AppendToolResultFn,
-} from "./types";
 import type { ToolResultConfig } from "../types";
+import { createToolRouter, defineTool, hasNoOtherToolCalls } from "./router";
+import type { AppendToolResultFn, ToolHandlerResponse, ToolMap } from "./types";
 
 function createAppendSpy() {
   const calls: ToolResultConfig[] = [];
@@ -146,7 +139,11 @@ describe("createToolRouter edge cases", () => {
       },
     });
 
-    const parsed = router.parseToolCall({ id: "tc-1", name: "Hooked", args: {} });
+    const parsed = router.parseToolCall({
+      id: "tc-1",
+      name: "Hooked",
+      args: {},
+    });
     await router.processToolCalls([parsed], { turn: 1 });
 
     expect(order).toEqual(["global-pre", "tool-pre", "handler"]);
@@ -185,7 +182,11 @@ describe("createToolRouter edge cases", () => {
       },
     });
 
-    const parsed = router.parseToolCall({ id: "tc-1", name: "Hooked", args: {} });
+    const parsed = router.parseToolCall({
+      id: "tc-1",
+      name: "Hooked",
+      args: {},
+    });
     await router.processToolCalls([parsed], { turn: 1 });
 
     expect(order).toEqual(["global-pre-skip"]);
@@ -219,7 +220,11 @@ describe("createToolRouter edge cases", () => {
       },
     });
 
-    const parsed = router.parseToolCall({ id: "tc-1", name: "Hooked", args: {} });
+    const parsed = router.parseToolCall({
+      id: "tc-1",
+      name: "Hooked",
+      args: {},
+    });
     await router.processToolCalls([parsed], { turn: 1 });
 
     expect(order).toEqual(["tool-post", "global-post"]);
@@ -259,7 +264,10 @@ describe("createToolRouter edge cases", () => {
     const results = await router.processToolCalls([parsed], { turn: 1 });
 
     expect(at(appendSpy.calls, 0).content).toBe("tool-level recovery");
-    expect(at(results, 0).data).toEqual({ error: "Error: boom", recovered: true });
+    expect(at(results, 0).data).toEqual({
+      error: "Error: boom",
+      recovered: true,
+    });
     expect(globalHookSpy).not.toHaveBeenCalled();
   });
 
@@ -324,10 +332,10 @@ describe("createToolRouter edge cases", () => {
       parallel: true,
     });
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const results = await router.processToolCalls([
       { id: "tc-1", name: "Unknown1", args: {} },
       { id: "tc-2", name: "Unknown2", args: {} },
+      // biome-ignore lint/suspicious/noExplicitAny: test helper casting
     ] as any);
 
     expect(results).toHaveLength(2);
@@ -365,7 +373,11 @@ describe("createToolRouter edge cases", () => {
       plugins: [pluginTool],
     });
 
-    const parsed = router.parseToolCall({ id: "tc-1", name: "MyTool", args: {} });
+    const parsed = router.parseToolCall({
+      id: "tc-1",
+      name: "MyTool",
+      args: {},
+    });
     const results = await router.processToolCalls([parsed]);
 
     expect(at(results, 0).data).toEqual({ source: "plugin" });
@@ -421,7 +433,11 @@ describe("createToolRouter edge cases", () => {
       appendToolResult: appendSpy.fn,
     });
 
-    const parsed = router.parseToolCall({ id: "tc-1", name: "Complex", args: {} });
+    const parsed = router.parseToolCall({
+      id: "tc-1",
+      name: "Complex",
+      args: {},
+    });
     await router.processToolCalls([parsed]);
 
     const appended = at(appendSpy.calls, 0);
@@ -435,7 +451,9 @@ describe("createToolRouter edge cases", () => {
       name: "Sync" as const,
       description: "sync handler",
       schema: z.object({ n: z.number() }),
-      handler: (args: { n: number }): ToolHandlerResponse<{ doubled: number }> => ({
+      handler: (args: {
+        n: number;
+      }): ToolHandlerResponse<{ doubled: number }> => ({
         toolResponse: `${args.n * 2}`,
         data: { doubled: args.n * 2 },
       }),
@@ -447,7 +465,11 @@ describe("createToolRouter edge cases", () => {
       appendToolResult: appendSpy.fn,
     });
 
-    const parsed = router.parseToolCall({ id: "tc-1", name: "Sync", args: { n: 5 } });
+    const parsed = router.parseToolCall({
+      id: "tc-1",
+      name: "Sync",
+      args: { n: 5 },
+    });
     const results = await router.processToolCalls([parsed]);
 
     expect(at(results, 0).data).toEqual({ doubled: 10 });
@@ -504,7 +526,11 @@ describe("createToolRouter edge cases", () => {
       appendToolResult: appendSpy.fn,
     });
 
-    const parsed = router.parseToolCall({ id: "tc-1", name: "Suppress", args: {} });
+    const parsed = router.parseToolCall({
+      id: "tc-1",
+      name: "Suppress",
+      args: {},
+    });
     const results = await router.processToolCalls([parsed], { turn: 1 });
 
     expect(at(results, 0).data).toEqual({
@@ -590,7 +616,11 @@ describe("createToolRouter edge cases", () => {
       },
     });
 
-    const parsed = router.parseToolCall({ id: "tc-1", name: "ThrowString", args: {} });
+    const parsed = router.parseToolCall({
+      id: "tc-1",
+      name: "ThrowString",
+      args: {},
+    });
     const results = await router.processToolCalls([parsed], { turn: 1 });
 
     expect(at(results, 0).data).toEqual({

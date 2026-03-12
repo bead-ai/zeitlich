@@ -21,7 +21,12 @@ export {
   type LangChainAdapter,
   type LangChainAdapterConfig,
 } from "./activities";
-
+// Model invoker (for advanced use — prefer adapter.createModelInvoker)
+export {
+  createLangChainModelInvoker,
+  invokeLangChainModel,
+  type LangChainModelInvokerConfig,
+} from "./model-invoker";
 // Thread manager
 export {
   createLangChainThreadManager,
@@ -29,10 +34,3 @@ export {
   type LangChainThreadManagerConfig,
   type LangChainToolMessageContent,
 } from "./thread-manager";
-
-// Model invoker (for advanced use — prefer adapter.createModelInvoker)
-export {
-  createLangChainModelInvoker,
-  invokeLangChainModel,
-  type LangChainModelInvokerConfig,
-} from "./model-invoker";

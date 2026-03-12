@@ -1,8 +1,5 @@
+import type { ToolMap, ToolRouterHooks } from "../tool-router/types";
 import type { MessageContent, SessionExitReason } from "../types";
-import type {
-  ToolMap,
-  ToolRouterHooks,
-} from "../tool-router/types";
 
 // ============================================================================
 // Session Lifecycle Hooks
@@ -21,7 +18,7 @@ export interface SessionStartHookContext {
  * SessionStart hook - called when session begins
  */
 export type SessionStartHook = (
-  ctx: SessionStartHookContext
+  ctx: SessionStartHookContext,
 ) => void | Promise<void>;
 
 /**
@@ -39,7 +36,7 @@ export interface SessionEndHookContext {
  * SessionEnd hook - called when session ends
  */
 export type SessionEndHook = (
-  ctx: SessionEndHookContext
+  ctx: SessionEndHookContext,
 ) => void | Promise<void>;
 
 // ============================================================================
@@ -58,7 +55,7 @@ export interface PreHumanMessageAppendHookContext {
  * PreHumanMessageAppend hook - called before each human message is appended to the thread
  */
 export type PreHumanMessageAppendHook = (
-  ctx: PreHumanMessageAppendHookContext
+  ctx: PreHumanMessageAppendHookContext,
 ) => void | Promise<void>;
 
 /**
@@ -73,7 +70,7 @@ export interface PostHumanMessageAppendHookContext {
  * PostHumanMessageAppend hook - called after each human message is appended to the thread
  */
 export type PostHumanMessageAppendHook = (
-  ctx: PostHumanMessageAppendHookContext
+  ctx: PostHumanMessageAppendHookContext,
 ) => void | Promise<void>;
 
 // ============================================================================

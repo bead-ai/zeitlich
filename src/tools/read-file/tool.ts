@@ -21,7 +21,7 @@ The tool returns the file content in an appropriate format:
       .number()
       .optional()
       .describe(
-        "Line number to start reading from (1-indexed, for text files)"
+        "Line number to start reading from (1-indexed, for text files)",
       ),
     limit: z
       .number()

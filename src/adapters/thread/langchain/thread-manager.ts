@@ -1,4 +1,3 @@
-import type Redis from "ioredis";
 import {
   type $InferMessageContent,
   AIMessage,
@@ -9,10 +8,11 @@ import {
   SystemMessage,
   ToolMessage,
 } from "@langchain/core/messages";
+import type Redis from "ioredis";
 import { v4 as uuidv4 } from "uuid";
 import {
-  createThreadManager,
   type BaseThreadManager,
+  createThreadManager,
   type ThreadManagerConfig,
 } from "../../../lib/thread";
 
@@ -29,7 +29,8 @@ export interface LangChainThreadManagerConfig {
 }
 
 /** Thread manager with LangChain StoredMessage convenience helpers */
-export interface LangChainThreadManager extends BaseThreadManager<StoredMessage> {
+export interface LangChainThreadManager
+  extends BaseThreadManager<StoredMessage> {
   createHumanMessage(content: string | MessageContent): StoredMessage;
   createSystemMessage(content: string): StoredMessage;
   createAIMessage(

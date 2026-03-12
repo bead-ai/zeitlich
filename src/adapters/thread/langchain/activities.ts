@@ -1,17 +1,16 @@
-import type Redis from "ioredis";
-import type { ToolResultConfig } from "../../../lib/types";
-import type { MessageContent } from "@langchain/core/messages";
-import type { ThreadOps } from "../../../lib/session/types";
-import type { ModelInvoker } from "../../../lib/model";
-import type { StoredMessage } from "@langchain/core/messages";
 import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
-import { createLangChainThreadManager } from "./thread-manager";
+import type { MessageContent, StoredMessage } from "@langchain/core/messages";
+import type Redis from "ioredis";
+import type { ModelInvoker } from "../../../lib/model";
+import type { ThreadOps } from "../../../lib/session/types";
+import type { ToolResultConfig } from "../../../lib/types";
 import { createLangChainModelInvoker } from "./model-invoker";
+import { createLangChainThreadManager } from "./thread-manager";
 
 export interface LangChainAdapterConfig {
   redis: Redis;
   /** Optional default model — if omitted, use `createModelInvoker()` to create invokers later */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // biome-ignore lint/suspicious/noExplicitAny: LangChain generic parameter
   model?: BaseChatModel<any>;
 }
 
@@ -21,7 +20,7 @@ export interface LangChainAdapter {
   /** Model invoker using the default model (only available when `model` was provided) */
   invoker: ModelInvoker<StoredMessage>;
   /** Create an invoker for a specific model (for multi-model setups) */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // biome-ignore lint/suspicious/noExplicitAny: LangChain generic parameter
   createModelInvoker(model: BaseChatModel<any>): ModelInvoker<StoredMessage>;
 }
 
@@ -62,7 +61,7 @@ export interface LangChainAdapter {
  * ```
  */
 export function createLangChainAdapter(
-  config: LangChainAdapterConfig
+  config: LangChainAdapterConfig,
 ): LangChainAdapter {
   const { redis } = config;
 
@@ -74,7 +73,7 @@ export function createLangChainAdapter(
 
     async appendHumanMessage(
       threadId: string,
-      content: string | MessageContent
+      content: string | MessageContent,
     ): Promise<void> {
       const thread = createLangChainThreadManager({ redis, threadId });
       await thread.appendHumanMessage(content);
@@ -82,7 +81,7 @@ export function createLangChainAdapter(
 
     async appendSystemMessage(
       threadId: string,
-      content: string
+      content: string,
     ): Promise<void> {
       const thread = createLangChainThreadManager({ redis, threadId });
       await thread.appendSystemMessage(content);
@@ -106,8 +105,9 @@ export function createLangChainAdapter(
     },
   };
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const makeInvoker = (model: BaseChatModel<any>): ModelInvoker<StoredMessage> =>
+  const makeInvoker = (
+    model: BaseChatModel<any>,
+  ): ModelInvoker<StoredMessage> =>
     createLangChainModelInvoker({ redis, model });
 
   const invoker: ModelInvoker<StoredMessage> = config.model
@@ -115,7 +115,7 @@ export function createLangChainAdapter(
     : ((() => {
         throw new Error(
           "No default model provided to createLangChainAdapter. " +
-            "Either pass `model` in the config or use `createModelInvoker(model)` instead."
+            "Either pass `model` in the config or use `createModelInvoker(model)` instead.",
         );
       }) as unknown as ModelInvoker<StoredMessage>);
 

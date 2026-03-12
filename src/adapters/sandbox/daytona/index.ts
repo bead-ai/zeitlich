@@ -1,15 +1,12 @@
-import {
-  Daytona,
-  type Sandbox as DaytonaSdkSandbox,
-} from "@daytonaio/sdk";
+import { Daytona, type Sandbox as DaytonaSdkSandbox } from "@daytonaio/sdk";
 import type {
+  ExecOptions,
+  ExecResult,
   Sandbox,
   SandboxCapabilities,
   SandboxCreateResult,
   SandboxProvider,
   SandboxSnapshot,
-  ExecOptions,
-  ExecResult,
 } from "../../../lib/sandbox/types";
 import {
   SandboxNotFoundError,
