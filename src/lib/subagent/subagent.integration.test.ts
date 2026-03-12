@@ -480,11 +480,14 @@ describe("defineSubagentWorkflow", () => {
     let capturedPrompt: string | undefined;
     let capturedSession: SubagentSessionInput | undefined;
 
-    const workflow = defineSubagentWorkflow(async (prompt, sessionInput) => {
-      capturedPrompt = prompt;
-      capturedSession = sessionInput;
-      return { toolResponse: "ok", data: null, threadId: "t" };
-    });
+    const workflow = defineSubagentWorkflow(
+      { name: "test", description: "test agent" },
+      async (prompt, sessionInput) => {
+        capturedPrompt = prompt;
+        capturedSession = sessionInput;
+        return { toolResponse: "ok", data: null, threadId: "t" };
+      },
+    );
 
     await workflow("go", { previousThreadId: "prev-42" });
 
@@ -497,10 +500,13 @@ describe("defineSubagentWorkflow", () => {
 
   it("maps sandboxId", async () => {
     let capturedSession: SubagentSessionInput | undefined;
-    const workflow = defineSubagentWorkflow(async (_prompt, sessionInput) => {
-      capturedSession = sessionInput;
-      return { toolResponse: "ok", data: null, threadId: "t" };
-    });
+    const workflow = defineSubagentWorkflow(
+      { name: "test", description: "test agent" },
+      async (_prompt, sessionInput) => {
+        capturedSession = sessionInput;
+        return { toolResponse: "ok", data: null, threadId: "t" };
+      },
+    );
 
     await workflow("go", { sandboxId: "sb-123" });
     expect(capturedSession).toEqual({ sandboxId: "sb-123" });
@@ -508,10 +514,13 @@ describe("defineSubagentWorkflow", () => {
 
   it("passes context as optional third argument", async () => {
     let capturedContext: Record<string, unknown> | undefined;
-    const workflow = defineSubagentWorkflow(async (_prompt, _sessionInput, context) => {
-      capturedContext = context;
-      return { toolResponse: "ok", data: null, threadId: "t" };
-    });
+    const workflow = defineSubagentWorkflow(
+      { name: "test", description: "test agent" },
+      async (_prompt, _sessionInput, context) => {
+        capturedContext = context;
+        return { toolResponse: "ok", data: null, threadId: "t" };
+      },
+    );
 
     await workflow("go", {}, { key: "val" });
 
@@ -520,26 +529,44 @@ describe("defineSubagentWorkflow", () => {
 
   it("supports omitted context", async () => {
     let capturedContext: Record<string, unknown> | undefined;
-    const workflow = defineSubagentWorkflow(async (_prompt, _sessionInput, context) => {
-      capturedContext = context;
-      return { toolResponse: "ok", data: null, threadId: "t" };
-    });
+    const workflow = defineSubagentWorkflow(
+      { name: "test", description: "test agent" },
+      async (_prompt, _sessionInput, context) => {
+        capturedContext = context;
+        return { toolResponse: "ok", data: null, threadId: "t" };
+      },
+    );
 
     await workflow("go", { sandboxId: "sb" });
     expect(capturedContext).toBeUndefined();
   });
 
   it("returns the handler response unchanged", async () => {
-    const workflow = defineSubagentWorkflow(async () => ({
-      toolResponse: "result text",
-      data: { count: 42 },
-      threadId: "child-thread",
-    }));
+    const workflow = defineSubagentWorkflow(
+      { name: "test", description: "test agent" },
+      async () => ({
+        toolResponse: "result text",
+        data: { count: 42 },
+        threadId: "child-thread",
+      }),
+    );
 
     const result = await workflow("go", {});
 
     expect(result.toolResponse).toBe("result text");
     expect(result.data).toEqual({ count: 42 });
     expect(result.threadId).toBe("child-thread");
+  });
+
+  it("attaches metadata to the returned workflow function", () => {
+    const schema = z.object({ findings: z.string() });
+    const workflow = defineSubagentWorkflow(
+      { name: "researcher", description: "Researches topics", resultSchema: schema },
+      async () => ({ toolResponse: "ok", data: null, threadId: "t" }),
+    );
+
+    expect(workflow.agentName).toBe("researcher");
+    expect(workflow.description).toBe("Researches topics");
+    expect(workflow.resultSchema).toBe(schema);
   });
 });

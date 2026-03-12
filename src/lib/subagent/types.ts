@@ -26,6 +26,23 @@ export type SubagentWorkflow<TResult extends z.ZodType = z.ZodType> = (
   context?: Record<string, unknown>,
 ) => Promise<SubagentHandlerResponse<z.infer<TResult> | null>>;
 
+/**
+ * A subagent workflow with embedded metadata (name, description, resultSchema).
+ * Created by `defineSubagentWorkflow` — pass directly to `defineSubagent`.
+ */
+export type SubagentDefinition<
+  TResult extends z.ZodType = z.ZodType,
+  TContext extends Record<string, unknown> = Record<string, unknown>,
+> = ((
+  prompt: string,
+  workflowInput: SubagentWorkflowInput,
+  context?: TContext,
+) => Promise<SubagentHandlerResponse<z.infer<TResult> | null>>) & {
+  readonly agentName: string;
+  readonly description: string;
+  readonly resultSchema?: TResult;
+};
+
 /** Infer the z.infer'd result type from a SubagentConfig, or null if no schema */
 export type InferSubagentResult<T extends SubagentConfig> =
   T extends SubagentConfig<infer S> ? z.infer<S> : null;

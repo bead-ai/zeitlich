@@ -1,5 +1,6 @@
 export type {
   SubagentConfig,
+  SubagentDefinition,
   SubagentHooks,
   SubagentHandlerResponse,
   SubagentWorkflow,

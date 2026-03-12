@@ -132,6 +132,7 @@ export type {
 // Subagent types
 export type {
   SubagentConfig,
+  SubagentDefinition,
   SubagentHooks,
   SubagentHandlerResponse,
   SubagentWorkflow,
