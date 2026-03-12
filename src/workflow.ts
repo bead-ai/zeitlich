@@ -45,7 +45,7 @@ export {
   hasNoOtherToolCalls,
   defineTool,
 } from "./lib/tool-router";
-export { defineSubagent, defineSubagentWorkflow, bindSubagentState } from "./lib/subagent";
+export { defineSubagent, defineSubagentWorkflow } from "./lib/subagent";
 export type {
   // Tool definition types
   ToolDefinition,
@@ -135,7 +135,6 @@ export type {
   SubagentHandlerResponse,
   SubagentWorkflow,
   SubagentSessionInput,
-  InferSubagentSettings,
 } from "./lib/subagent/types";
 // Sandbox types (workflow-safe — no activity-side code)
 export type {

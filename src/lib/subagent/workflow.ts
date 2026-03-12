@@ -40,15 +40,12 @@ import type {
  * );
  * ```
  */
-export function defineSubagentWorkflow<
-  TSettings extends Record<string, unknown> = Record<string, unknown>,
-  TResult = null,
->(
+export function defineSubagentWorkflow<TResult = null>(
   fn: (
-    input: SubagentInput<TSettings>,
+    input: SubagentInput,
     sessionInput: SubagentSessionInput,
   ) => Promise<SubagentHandlerResponse<TResult>>,
-): (input: SubagentInput<TSettings>) => Promise<SubagentHandlerResponse<TResult>> {
+): (input: SubagentInput) => Promise<SubagentHandlerResponse<TResult>> {
   return async (input) => {
     const sessionInput: SubagentSessionInput = {
       ...(input.previousThreadId && {

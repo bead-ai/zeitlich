@@ -27,10 +27,8 @@ vi.mock("@temporalio/workflow", () => {
 import { createSubagentTool, SUBAGENT_TOOL_NAME } from "./tool";
 import { createSubagentHandler } from "./handler";
 import { buildSubagentRegistration } from "./register";
-import { bindSubagentState } from "./bind";
 import { defineSubagentWorkflow } from "./workflow";
 import type { SubagentConfig, SubagentSessionInput } from "./types";
-import type { AgentStateManager } from "../state/types";
 
 // ---------------------------------------------------------------------------
 // createSubagentTool
@@ -344,140 +342,6 @@ describe("createSubagentHandler", () => {
 });
 
 // ---------------------------------------------------------------------------
-// createSubagentHandler — resolveSettings
-// ---------------------------------------------------------------------------
-
-describe("createSubagentHandler — resolveSettings", () => {
-  it("injects settings from resolveSettings into child input", async () => {
-    const { executeChild } = await import("@temporalio/workflow");
-    const execMock = executeChild as ReturnType<typeof vi.fn>;
-    execMock.mockResolvedValueOnce({
-      toolResponse: "ok",
-      data: null,
-      threadId: "child-t",
-    });
-
-    const settingsSubagent: SubagentConfig = {
-      agentName: "settings-agent",
-      description: "Has settings",
-      workflow: "workflow",
-      resolveSettings: () => ({ model: "gpt-4", temperature: 0.7 }),
-    };
-
-    const handler = createSubagentHandler([settingsSubagent]);
-
-    await handler(
-      { subagent: "settings-agent", description: "test", prompt: "test" },
-      { threadId: "t", toolCallId: "tc", toolName: "Subagent" },
-    );
-
-    const lastCall = execMock.mock.calls[execMock.mock.calls.length - 1];
-    if (!lastCall) throw new Error("expected exec call");
-    const input = lastCall[1].args[0];
-    expect(input.settings).toEqual({ model: "gpt-4", temperature: 0.7 });
-  });
-
-  it("calls resolveSettings on each invocation (dynamic)", async () => {
-    const { executeChild } = await import("@temporalio/workflow");
-    const execMock = executeChild as ReturnType<typeof vi.fn>;
-    execMock.mockResolvedValue({
-      toolResponse: "ok",
-      data: null,
-      threadId: "child-t",
-    });
-
-    let callCount = 0;
-    const dynamicSubagent: SubagentConfig = {
-      agentName: "dynamic-agent",
-      description: "Dynamic settings",
-      workflow: "workflow",
-      resolveSettings: () => {
-        callCount++;
-        return { invocation: callCount };
-      },
-    };
-
-    const handler = createSubagentHandler([dynamicSubagent]);
-
-    await handler(
-      { subagent: "dynamic-agent", description: "test", prompt: "first" },
-      { threadId: "t", toolCallId: "tc1", toolName: "Subagent" },
-    );
-
-    await handler(
-      { subagent: "dynamic-agent", description: "test", prompt: "second" },
-      { threadId: "t", toolCallId: "tc2", toolName: "Subagent" },
-    );
-
-    const calls = execMock.mock.calls;
-    const penultimate = calls[calls.length - 2];
-    const last = calls[calls.length - 1];
-    if (!penultimate || !last) throw new Error("expected two exec calls");
-    expect(penultimate[1].args[0].settings).toEqual({ invocation: 1 });
-    expect(last[1].args[0].settings).toEqual({ invocation: 2 });
-  });
-
-  it("does not include settings when resolveSettings is not configured", async () => {
-    const { executeChild } = await import("@temporalio/workflow");
-    const execMock = executeChild as ReturnType<typeof vi.fn>;
-    execMock.mockResolvedValueOnce({
-      toolResponse: "ok",
-      data: null,
-      threadId: "child-t",
-    });
-
-    const plainSubagent: SubagentConfig = {
-      agentName: "plain",
-      description: "No settings",
-      workflow: "workflow",
-    };
-
-    const handler = createSubagentHandler([plainSubagent]);
-
-    await handler(
-      { subagent: "plain", description: "test", prompt: "test" },
-      { threadId: "t", toolCallId: "tc", toolName: "Subagent" },
-    );
-
-    const lastCall = execMock.mock.calls[execMock.mock.calls.length - 1];
-    if (!lastCall) throw new Error("expected exec call");
-    const input = lastCall[1].args[0];
-    expect(input.settings).toBeUndefined();
-  });
-
-  it("passes both context and settings when both are configured", async () => {
-    const { executeChild } = await import("@temporalio/workflow");
-    const execMock = executeChild as ReturnType<typeof vi.fn>;
-    execMock.mockResolvedValueOnce({
-      toolResponse: "ok",
-      data: null,
-      threadId: "child-t",
-    });
-
-    const bothSubagent: SubagentConfig = {
-      agentName: "both-agent",
-      description: "Context + settings",
-      workflow: "workflow",
-      context: { apiKey: "static-key" },
-      resolveSettings: () => ({ model: "gpt-4" }),
-    };
-
-    const handler = createSubagentHandler([bothSubagent]);
-
-    await handler(
-      { subagent: "both-agent", description: "test", prompt: "test" },
-      { threadId: "t", toolCallId: "tc", toolName: "Subagent" },
-    );
-
-    const lastCall = execMock.mock.calls[execMock.mock.calls.length - 1];
-    if (!lastCall) throw new Error("expected exec call");
-    const input = lastCall[1].args[0];
-    expect(input.context).toEqual({ apiKey: "static-key" });
-    expect(input.settings).toEqual({ model: "gpt-4" });
-  });
-});
-
-// ---------------------------------------------------------------------------
 // buildSubagentRegistration
 // ---------------------------------------------------------------------------
 
@@ -604,52 +468,6 @@ describe("buildSubagentRegistration", () => {
 });
 
 // ---------------------------------------------------------------------------
-// bindSubagentState
-// ---------------------------------------------------------------------------
-
-describe("bindSubagentState", () => {
-  interface TestState { model: string; apiKey: string; verbose: boolean }
-
-  function createMockStateManager(state: TestState): AgentStateManager<TestState> {
-    return {
-      get: <K extends keyof TestState>(key: K) => state[key],
-    } as AgentStateManager<TestState>;
-  }
-
-  it("picks specified keys from state manager", () => {
-    const sm = createMockStateManager({ model: "gpt-4", apiKey: "sk-123", verbose: true });
-    const resolve = bindSubagentState(sm, ["model", "apiKey"]);
-
-    expect(resolve()).toEqual({ model: "gpt-4", apiKey: "sk-123" });
-  });
-
-  it("reflects latest state on each call", () => {
-    const state: TestState = { model: "gpt-4", apiKey: "sk-123", verbose: false };
-    const sm = createMockStateManager(state);
-    const resolve = bindSubagentState(sm, ["model"]);
-
-    expect(resolve()).toEqual({ model: "gpt-4" });
-
-    state.model = "gpt-4o";
-    expect(resolve()).toEqual({ model: "gpt-4o" });
-  });
-
-  it("returns all specified keys", () => {
-    const sm = createMockStateManager({ model: "gpt-4", apiKey: "sk-123", verbose: true });
-    const resolve = bindSubagentState(sm, ["model", "apiKey", "verbose"]);
-
-    expect(resolve()).toEqual({ model: "gpt-4", apiKey: "sk-123", verbose: true });
-  });
-
-  it("returns empty object for empty keys array", () => {
-    const sm = createMockStateManager({ model: "gpt-4", apiKey: "sk-123", verbose: true });
-    const resolve = bindSubagentState(sm, []);
-
-    expect(resolve()).toEqual({});
-  });
-});
-
-// ---------------------------------------------------------------------------
 // defineSubagentWorkflow
 // ---------------------------------------------------------------------------
 
@@ -724,7 +542,6 @@ describe("defineSubagentWorkflow", () => {
     await workflow({
       prompt: "research",
       context: { key: "val" },
-      settings: { model: "gpt-4" },
       previousThreadId: "prev",
       sandboxId: "sb",
     });
@@ -732,7 +549,6 @@ describe("defineSubagentWorkflow", () => {
     expect(capturedInput).toEqual({
       prompt: "research",
       context: { key: "val" },
-      settings: { model: "gpt-4" },
       previousThreadId: "prev",
       sandboxId: "sb",
     });
