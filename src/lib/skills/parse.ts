@@ -12,11 +12,13 @@ export function parseSkillFile(raw: string): {
   body: string;
 } {
   const trimmed = raw.replace(/^\uFEFF/, ""); // strip BOM
-  const match = trimmed.match(/^---[ \t]*\r?\n([\s\S]*?)\r?\n---[ \t]*\r?\n?([\s\S]*)$/);
+  const match = trimmed.match(
+    /^---[ \t]*\r?\n([\s\S]*?)\r?\n---[ \t]*\r?\n?([\s\S]*)$/,
+  );
 
   if (!match) {
     throw new Error(
-      "SKILL.md must start with YAML frontmatter delimited by ---"
+      "SKILL.md must start with YAML frontmatter delimited by ---",
     );
   }
 

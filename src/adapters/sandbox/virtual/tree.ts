@@ -44,10 +44,10 @@ const printNode = (node: TreeNode, tab: string, sort: boolean): string => {
     const childTab = tab + (isLast ? "   " : "│  ");
 
     if (entry.isFile) {
-      str += "\n" + tab + branch + " " + entry.name;
+      str += `\n${tab}${branch} ${entry.name}`;
     } else {
       const subtree = printNode(entry, childTab, sort);
-      str += "\n" + tab + branch + " " + entry.name + "/" + subtree;
+      str += `\n${tab}${branch} ${entry.name}/${subtree}`;
     }
   }
   return str;
@@ -74,9 +74,9 @@ const printNode = (node: TreeNode, tab: string, sort: boolean): string => {
  */
 export function formatVirtualFileTree<T>(
   entries: FileEntry<T>[],
-  opts: { sort?: boolean } = {}
+  opts: { sort?: boolean } = {},
 ): string {
   const sort = opts.sort ?? true;
   const root = buildTree(entries);
-  return "/" + printNode(root, "", sort);
+  return `/${printNode(root, "", sort)}`;
 }

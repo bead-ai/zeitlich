@@ -1,19 +1,19 @@
 import {
-  proxyActivities,
+  ApplicationFailure,
   condition,
   defineUpdate,
+  proxyActivities,
   setHandler,
-  ApplicationFailure,
 } from "@temporalio/workflow";
-import type { SessionExitReason, MessageContent } from "../types";
-import type { ThreadOps, SessionConfig, ZeitlichSession } from "./types";
 import type { SandboxOps } from "../sandbox/types";
-import { type AgentStateManager, type JsonSerializable } from "../state/types";
+import { buildSkillRegistration } from "../skills/register";
+import type { AgentStateManager, JsonSerializable } from "../state/types";
+import { buildSubagentRegistration } from "../subagent/register";
+import { getShortId } from "../thread/id";
 import { createToolRouter } from "../tool-router/router";
 import type { ParsedToolCallUnion, ToolMap } from "../tool-router/types";
-import { getShortId } from "../thread/id";
-import { buildSubagentRegistration } from "../subagent/register";
-import { buildSkillRegistration } from "../skills/register";
+import type { MessageContent, SessionExitReason } from "../types";
+import type { SessionConfig, ThreadOps, ZeitlichSession } from "./types";
 
 /**
  * Creates an agent session that manages the agent loop: LLM invocation,
@@ -67,7 +67,9 @@ export const createSession = async <T extends ToolMap, M = unknown>({
 }: SessionConfig<T, M>): Promise<ZeitlichSession<M>> => {
   const sourceThreadId = continueThread ? providedThreadId : undefined;
   const threadId =
-    continueThread && providedThreadId ? getShortId() : (providedThreadId ?? getShortId());
+    continueThread && providedThreadId
+      ? getShortId()
+      : (providedThreadId ?? getShortId());
 
   const {
     appendToolResult,
@@ -98,7 +100,7 @@ export const createSession = async <T extends ToolMap, M = unknown>({
 
   const callSessionEnd = async (
     exitReason: SessionExitReason,
-    turns: number
+    turns: number,
   ): Promise<void> => {
     if (hooks.onSessionEnd) {
       await hooks.onSessionEnd({
@@ -139,7 +141,7 @@ export const createSession = async <T extends ToolMap, M = unknown>({
             });
           }
           stateManager.run();
-        }
+        },
       );
 
       // --- Sandbox lifecycle: create or inherit ---
@@ -149,9 +151,7 @@ export const createSession = async <T extends ToolMap, M = unknown>({
         const result = await sandboxOps.createSandbox({ id: threadId });
         sandboxId = result.sandboxId;
         if (result.stateUpdate) {
-          stateManager.mergeUpdate(
-            result.stateUpdate as Partial<TState>,
-          );
+          stateManager.mergeUpdate(result.stateUpdate as Partial<TState>);
         }
       }
 
@@ -237,7 +237,7 @@ export const createSession = async <T extends ToolMap, M = unknown>({
             {
               turn: currentTurn,
               ...(sandboxId !== undefined && { sandboxId }),
-            }
+            },
           );
 
           for (const result of toolCallResults) {
@@ -249,7 +249,7 @@ export const createSession = async <T extends ToolMap, M = unknown>({
           if (stateManager.getStatus() === "WAITING_FOR_INPUT") {
             const conditionMet = await condition(
               () => stateManager.getStatus() === "RUNNING",
-              waitForInputTimeout
+              waitForInputTimeout,
             );
             if (!conditionMet) {
               stateManager.cancel();
@@ -298,7 +298,7 @@ export const createSession = async <T extends ToolMap, M = unknown>({
  * ```
  */
 export function proxyDefaultThreadOps(
-  options?: Parameters<typeof proxyActivities>[0]
+  options?: Parameters<typeof proxyActivities>[0],
 ): ThreadOps {
   return proxyActivities<ThreadOps>(
     options ?? {
@@ -309,7 +309,7 @@ export function proxyDefaultThreadOps(
         maximumInterval: "15m",
         backoffCoefficient: 4,
       },
-    }
+    },
   );
 }
 
@@ -326,7 +326,7 @@ export function proxyDefaultThreadOps(
  * ```
  */
 export function proxySandboxOps(
-  options?: Parameters<typeof proxyActivities>[0]
+  options?: Parameters<typeof proxyActivities>[0],
 ): SandboxOps {
   return proxyActivities<SandboxOps>(
     options ?? {
@@ -337,6 +337,6 @@ export function proxySandboxOps(
         maximumInterval: "30s",
         backoffCoefficient: 2,
       },
-    }
+    },
   );
 }

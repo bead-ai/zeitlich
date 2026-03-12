@@ -1,14 +1,14 @@
-import type Redis from "ioredis";
-import type { AgentResponse } from "../../../lib/model";
-import type { ModelInvokerConfig } from "../../../lib/model";
-import { mapStoredMessagesToChatMessages } from "@langchain/core/messages";
-import type { StoredMessage } from "@langchain/core/messages";
-import { v4 as uuidv4 } from "uuid";
 import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
+import type { StoredMessage } from "@langchain/core/messages";
+import { mapStoredMessagesToChatMessages } from "@langchain/core/messages";
+import type Redis from "ioredis";
+import { v4 as uuidv4 } from "uuid";
+import type { AgentResponse, ModelInvokerConfig } from "../../../lib/model";
 import { createLangChainThreadManager } from "./thread-manager";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export interface LangChainModelInvokerConfig<TModel extends BaseChatModel<any> = BaseChatModel<any>> {
+export interface LangChainModelInvokerConfig<
+  TModel extends BaseChatModel<any> = BaseChatModel<any>,
+> {
   redis: Redis;
   model: TModel;
 }
@@ -32,12 +32,11 @@ export interface LangChainModelInvokerConfig<TModel extends BaseChatModel<any> =
  * return { runAgent: createRunAgentActivity(client, invoker) };
  * ```
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function createLangChainModelInvoker<TModel extends BaseChatModel<any> = BaseChatModel<any>>(
-  { redis, model }: LangChainModelInvokerConfig<TModel>,
-) {
+export function createLangChainModelInvoker<
+  TModel extends BaseChatModel<any> = BaseChatModel<any>,
+>({ redis, model }: LangChainModelInvokerConfig<TModel>) {
   return async function invokeLangChainModel(
-    config: ModelInvokerConfig
+    config: ModelInvokerConfig,
   ): Promise<AgentResponse<StoredMessage>> {
     const { threadId, agentName, state, metadata } = config;
 
@@ -52,7 +51,7 @@ export function createLangChainModelInvoker<TModel extends BaseChatModel<any> = 
         runId,
         metadata: { thread_id: `${agentName}-${threadId}`, ...metadata },
         tools: state.tools,
-      }
+      },
     );
 
     await thread.append([response.toDict()]);
@@ -84,8 +83,9 @@ export function createLangChainModelInvoker<TModel extends BaseChatModel<any> = 
  * Convenience wrapper around createLangChainModelInvoker for cases where
  * you don't need to reuse the invoker.
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export async function invokeLangChainModel<TModel extends BaseChatModel<any> = BaseChatModel<any>>({
+export async function invokeLangChainModel<
+  TModel extends BaseChatModel<any> = BaseChatModel<any>,
+>({
   redis,
   model,
   config,

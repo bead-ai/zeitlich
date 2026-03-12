@@ -8,7 +8,7 @@ const basename = (path: string, separator: string): string => {
 
 const printTree = async (
   tab = "",
-  children: ((tab: string) => Promise<string | null>)[]
+  children: ((tab: string) => Promise<string | null>)[],
 ): Promise<string> => {
   let str = "";
   let last = children.length - 1;
@@ -17,9 +17,9 @@ const printTree = async (
     const fn = children[i];
     if (!fn) continue;
     const isLast = i === last;
-    const child = await fn(tab + (isLast ? " " : "│") + "  ");
+    const child = await fn(`${tab + (isLast ? " " : "│")}  `);
     const branch = child ? (isLast ? "└─" : "├─") : "│";
-    str += "\n" + tab + branch + (child ? " " + child : "");
+    str += `\n${tab}${branch}${child ? ` ${child}` : ""}`;
   }
   return str;
 };
@@ -57,7 +57,7 @@ export const toTree = async (
     depth?: number;
     tab?: string;
     sort?: boolean;
-  } = {}
+  } = {},
 ): Promise<string> => {
   const separator = opts.separator || "/";
   let dir = opts.dir || separator;
@@ -91,13 +91,11 @@ export const toTree = async (
             tab,
           });
         } else if (entry.isSymbolicLink) {
-          return (
-            "" + entry.name + " → " + (await fs.readlink(dir + entry.name))
-          );
+          return `${entry.name} → ${await fs.readlink(dir + entry.name)}`;
         } else {
-          return "" + entry.name;
+          return `${entry.name}`;
         }
-      })
+      }),
     );
   }
   const base = basename(dir, separator) + separator;

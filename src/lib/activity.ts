@@ -1,23 +1,23 @@
 import { Context } from "@temporalio/activity";
 import type { WorkflowClient } from "@temporalio/client";
-import type { BaseAgentState, RunAgentConfig } from "./types";
 import type {
   ActivityToolHandler,
   RouterContext,
   ToolHandlerResponse,
 } from "./tool-router/types";
+import type { BaseAgentState, RunAgentConfig } from "./types";
 
 /**
  * Query the parent workflow's state from within an activity.
  * Resolves the workflow handle from the current activity context.
  */
 export async function queryParentWorkflowState<T>(
-  client: WorkflowClient
+  client: WorkflowClient,
 ): Promise<T> {
   const { workflowExecution } = Context.current().info;
   const handle = client.getHandle(
     workflowExecution.workflowId,
-    workflowExecution.runId
+    workflowExecution.runId,
   );
   return handle.query<T>("getAgentState");
 }
@@ -35,7 +35,10 @@ export async function queryParentWorkflowState<T>(
  * return { runAgent: createRunAgentActivity(client, invoker) };
  * ```
  */
-export function createRunAgentActivity<R, S extends BaseAgentState = BaseAgentState>(
+export function createRunAgentActivity<
+  R,
+  S extends BaseAgentState = BaseAgentState,
+>(
   client: WorkflowClient,
   handler: (config: RunAgentConfig & { state: S }) => Promise<R>,
 ): (config: RunAgentConfig) => Promise<R> {
@@ -48,7 +51,8 @@ export function createRunAgentActivity<R, S extends BaseAgentState = BaseAgentSt
 /**
  * Context injected into tool handlers created via {@link withParentWorkflowState}.
  */
-export interface AgentStateContext<S extends BaseAgentState = BaseAgentState> extends RouterContext {
+export interface AgentStateContext<S extends BaseAgentState = BaseAgentState>
+  extends RouterContext {
   state: S;
 }
 
@@ -73,7 +77,11 @@ export interface AgentStateContext<S extends BaseAgentState = BaseAgentState> ex
  * );
  * ```
  */
-export function withParentWorkflowState<TArgs, TResult, S extends BaseAgentState = BaseAgentState>(
+export function withParentWorkflowState<
+  TArgs,
+  TResult,
+  S extends BaseAgentState = BaseAgentState,
+>(
   client: WorkflowClient,
   handler: (
     args: TArgs,

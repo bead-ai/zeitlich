@@ -1,7 +1,7 @@
+import type { ExecResult } from "../../lib/sandbox/types";
 import type { ActivityToolHandler } from "../../lib/tool-router";
 import type { SandboxContext } from "../../lib/tool-router/with-sandbox";
 import type { BashArgs } from "./tool";
-import type { ExecResult } from "../../lib/sandbox/types";
 
 /**
  * Bash tool handler — executes shell commands inside a {@link Sandbox}.

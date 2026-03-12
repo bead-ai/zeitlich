@@ -1,5 +1,5 @@
-import type { TokenUsage, BaseAgentState, RunAgentConfig } from "../types";
 import type { RawToolCall } from "../tool-router/types";
+import type { BaseAgentState, RunAgentConfig, TokenUsage } from "../types";
 
 /**
  * Agent response from LLM invocation
@@ -14,7 +14,7 @@ export interface AgentResponse<M = unknown> {
  * Type signature for workflow-specific runAgent activity
  */
 export type RunAgentActivity<M = unknown> = (
-  config: RunAgentConfig
+  config: RunAgentConfig,
 ) => Promise<AgentResponse<M>>;
 
 /**
@@ -38,5 +38,5 @@ export interface ModelInvokerConfig {
  * implementations of this type.
  */
 export type ModelInvoker<M = unknown> = (
-  config: ModelInvokerConfig
+  config: ModelInvokerConfig,
 ) => Promise<AgentResponse<M>>;

@@ -1,10 +1,10 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
-import type { ToolResultConfig, TokenUsage } from "../types";
-import type { ThreadOps } from "./types";
 import type { RunAgentActivity } from "../model/types";
-import type { RawToolCall } from "../tool-router/types";
 import type { SandboxOps } from "../sandbox/types";
+import type { RawToolCall } from "../tool-router/types";
+import type { TokenUsage, ToolResultConfig } from "../types";
+import type { ThreadOps } from "./types";
 
 // ---------------------------------------------------------------------------
 // Mock @temporalio/workflow
@@ -38,15 +38,16 @@ vi.mock("@temporalio/workflow", () => {
     defineUpdate: (name: string) => ({ __type: "update", name }),
     defineQuery: (name: string) => ({ __type: "query", name }),
     setHandler: (_def: unknown, _handler: unknown) => {},
-    uuid4: () => `00000000-0000-0000-0000-${String(++idCounter).padStart(12, "0")}`,
+    uuid4: () =>
+      `00000000-0000-0000-0000-${String(++idCounter).padStart(12, "0")}`,
     ApplicationFailure: MockApplicationFailure,
   };
 });
 
-import { createSession } from "./session";
 import { createAgentStateManager } from "../state/manager";
 import { defineTool } from "../tool-router/router";
-import type { ToolHandlerResponse, RouterContext } from "../tool-router/types";
+import type { RouterContext, ToolHandlerResponse } from "../tool-router/types";
+import { createSession } from "./session";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -88,7 +89,9 @@ type TurnScript = {
   usage?: TokenUsage;
 };
 
-function createScriptedRunAgent(turns: TurnScript[]): RunAgentActivity<unknown> {
+function createScriptedRunAgent(
+  turns: TurnScript[],
+): RunAgentActivity<unknown> {
   let call = 0;
   return async () => {
     const turn = turns[call++];
@@ -135,9 +138,7 @@ describe("createSession integration", () => {
     const session = await createSession({
       agentName: "TestAgent",
       threadId: "thread-1",
-      runAgent: createScriptedRunAgent([
-        { message: "Hello!", toolCalls: [] },
-      ]),
+      runAgent: createScriptedRunAgent([{ message: "Hello!", toolCalls: [] }]),
       threadOps: ops,
       buildContextMessage: () => "What is 2+2?",
     });
@@ -284,9 +285,7 @@ describe("createSession integration", () => {
     const session = await createSession({
       agentName: "TestAgent",
       threadId: "thread-1",
-      runAgent: createScriptedRunAgent([
-        { message: "done", toolCalls: [] },
-      ]),
+      runAgent: createScriptedRunAgent([{ message: "done", toolCalls: [] }]),
       threadOps: ops,
       buildContextMessage: () => "hi",
       hooks: {
@@ -340,9 +339,7 @@ describe("createSession integration", () => {
       agentName: "TestAgent",
       threadId: "thread-1",
       appendSystemPrompt: false,
-      runAgent: createScriptedRunAgent([
-        { message: "ok", toolCalls: [] },
-      ]),
+      runAgent: createScriptedRunAgent([{ message: "ok", toolCalls: [] }]),
       threadOps: ops,
       buildContextMessage: () => "hi",
     });
@@ -498,9 +495,7 @@ describe("createSession integration", () => {
     const session = await createSession({
       agentName: "TestAgent",
       threadId: "thread-1",
-      runAgent: createScriptedRunAgent([
-        { message: "done", toolCalls: [] },
-      ]),
+      runAgent: createScriptedRunAgent([{ message: "done", toolCalls: [] }]),
       threadOps: ops,
       buildContextMessage: () => "go",
       sandbox: sandboxOps,
@@ -539,9 +534,7 @@ describe("createSession integration", () => {
     const session = await createSession({
       agentName: "TestAgent",
       threadId: "thread-1",
-      runAgent: createScriptedRunAgent([
-        { message: "done", toolCalls: [] },
-      ]),
+      runAgent: createScriptedRunAgent([{ message: "done", toolCalls: [] }]),
       threadOps: ops,
       buildContextMessage: () => "go",
       sandbox: sandboxOps,
@@ -676,9 +669,7 @@ describe("createSession integration", () => {
 
     const session = await createSession({
       agentName: "TestAgent",
-      runAgent: createScriptedRunAgent([
-        { message: "done", toolCalls: [] },
-      ]),
+      runAgent: createScriptedRunAgent([{ message: "done", toolCalls: [] }]),
       threadOps: ops,
       buildContextMessage: () => "go",
     });
@@ -747,9 +738,7 @@ describe("createSession integration", () => {
     const session = await createSession({
       agentName: "TestAgent",
       threadId: "thread-1",
-      runAgent: createScriptedRunAgent([
-        { message: "done", toolCalls: [] },
-      ]),
+      runAgent: createScriptedRunAgent([{ message: "done", toolCalls: [] }]),
       threadOps: ops,
       buildContextMessage: async () => {
         await new Promise((r) => setTimeout(r, 5));
@@ -789,9 +778,7 @@ describe("createSession integration", () => {
     const session = await createSession({
       agentName: "TestAgent",
       threadId: "thread-1",
-      runAgent: createScriptedRunAgent([
-        { message: "done", toolCalls: [] },
-      ]),
+      runAgent: createScriptedRunAgent([{ message: "done", toolCalls: [] }]),
       threadOps: ops,
       buildContextMessage: () => "go",
       sandbox: sandboxOps,
@@ -831,7 +818,11 @@ describe("createSession integration", () => {
           toolCalls: [{ id: "tc-1", name: "UsageTool", args: {} }],
           usage: { inputTokens: 100, outputTokens: 50 },
         },
-        { message: "done", toolCalls: [], usage: { inputTokens: 80, outputTokens: 40 } },
+        {
+          message: "done",
+          toolCalls: [],
+          usage: { inputTokens: 80, outputTokens: 40 },
+        },
       ]),
       threadOps: ops,
       tools: { UsageTool: usageTool },

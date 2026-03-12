@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
 let idCounter = 0;
@@ -14,8 +14,8 @@ vi.mock("@temporalio/workflow", () => {
   };
 });
 
-import { createAgentStateManager } from "./manager";
 import type { WorkflowTask } from "../types";
+import { createAgentStateManager } from "./manager";
 
 describe("createAgentStateManager integration", () => {
   beforeEach(() => {
@@ -147,7 +147,11 @@ describe("createAgentStateManager integration", () => {
     const sm = createAgentStateManager({});
 
     sm.updateUsage({ inputTokens: 100, outputTokens: 50 });
-    sm.updateUsage({ inputTokens: 200, outputTokens: 100, cachedWriteTokens: 30 });
+    sm.updateUsage({
+      inputTokens: 200,
+      outputTokens: 100,
+      cachedWriteTokens: 30,
+    });
     sm.updateUsage({ cachedReadTokens: 20, reasonTokens: 10 });
 
     expect(sm.getTotalUsage()).toEqual({

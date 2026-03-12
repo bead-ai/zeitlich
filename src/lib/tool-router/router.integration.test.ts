@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
 vi.mock("@temporalio/workflow", () => {
@@ -15,10 +15,7 @@ vi.mock("@temporalio/workflow", () => {
       err.nonRetryable = nonRetryable;
       return err;
     }
-    static fromError(
-      error: unknown,
-      options?: { nonRetryable?: boolean },
-    ) {
+    static fromError(error: unknown, options?: { nonRetryable?: boolean }) {
       const src = error instanceof Error ? error : new Error(String(error));
       const err = new MockApplicationFailure(src.message);
       err.nonRetryable = options?.nonRetryable;
@@ -28,14 +25,14 @@ vi.mock("@temporalio/workflow", () => {
   return { ApplicationFailure: MockApplicationFailure };
 });
 
+import type { ToolResultConfig } from "../types";
 import { createToolRouter, defineTool } from "./router";
 import type {
-  ToolMap,
-  ToolHandlerResponse,
-  RouterContext,
   AppendToolResultFn,
+  RouterContext,
+  ToolHandlerResponse,
+  ToolMap,
 } from "./types";
-import type { ToolResultConfig } from "../types";
 
 // ---------------------------------------------------------------------------
 // Test tool definitions
@@ -45,7 +42,9 @@ const echoTool = defineTool({
   name: "Echo" as const,
   description: "Echoes back the input",
   schema: z.object({ text: z.string() }),
-  handler: async (args: { text: string }): Promise<ToolHandlerResponse<{ echoed: string }>> => ({
+  handler: async (args: {
+    text: string;
+  }): Promise<ToolHandlerResponse<{ echoed: string }>> => ({
     toolResponse: `Echo: ${args.text}`,
     data: { echoed: args.text },
   }),
@@ -55,7 +54,10 @@ const mathTool = defineTool({
   name: "Add" as const,
   description: "Adds two numbers",
   schema: z.object({ a: z.number(), b: z.number() }),
-  handler: async (args: { a: number; b: number }): Promise<ToolHandlerResponse<{ sum: number }>> => ({
+  handler: async (args: {
+    a: number;
+    b: number;
+  }): Promise<ToolHandlerResponse<{ sum: number }>> => ({
     toolResponse: `Sum: ${args.a + args.b}`,
     data: { sum: args.a + args.b },
   }),
@@ -65,7 +67,9 @@ const failingTool = defineTool({
   name: "Fail" as const,
   description: "Always fails",
   schema: z.object({ reason: z.string() }),
-  handler: async (args: { reason: string }): Promise<ToolHandlerResponse<null>> => {
+  handler: async (args: {
+    reason: string;
+  }): Promise<ToolHandlerResponse<null>> => {
     throw new Error(args.reason);
   },
 });
@@ -285,7 +289,7 @@ describe("createToolRouter integration", () => {
 
     // Force an unknown tool call (bypassing parseToolCall validation)
     const results = await router.processToolCalls([
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // biome-ignore lint/suspicious/noExplicitAny: test helper casting
       { id: "tc-1", name: "NonExistent", args: {} } as any,
     ]);
 
@@ -352,12 +356,18 @@ describe("createToolRouter integration", () => {
       },
     });
 
-    const parsed = router.parseToolCall({ id: "tc-1", name: "Skippable", args: {} });
+    const parsed = router.parseToolCall({
+      id: "tc-1",
+      name: "Skippable",
+      args: {},
+    });
     const results = await router.processToolCalls([parsed], { turn: 1 });
 
     expect(handlerSpy).not.toHaveBeenCalled();
     expect(results).toHaveLength(0);
-    expect(at(appendSpy.calls, 0).content).toContain("Skipped by PreToolUse hook");
+    expect(at(appendSpy.calls, 0).content).toContain(
+      "Skipped by PreToolUse hook",
+    );
   });
 
   it("pre-hook can modify arguments", async () => {
@@ -416,7 +426,11 @@ describe("createToolRouter integration", () => {
       appendToolResult: appendSpy.fn,
     });
 
-    const parsed = router.parseToolCall({ id: "tc-1", name: "Hooked", args: {} });
+    const parsed = router.parseToolCall({
+      id: "tc-1",
+      name: "Hooked",
+      args: {},
+    });
     const results = await router.processToolCalls([parsed], { turn: 1 });
 
     expect(handlerSpy).not.toHaveBeenCalled();
@@ -445,7 +459,10 @@ describe("createToolRouter integration", () => {
     await router.processToolCalls([parsed], { turn: 1 });
 
     expect(hookData).not.toBeNull();
-    const data = hookData as unknown as { result: { data: unknown }; durationMs: number };
+    const data = hookData as unknown as {
+      result: { data: unknown };
+      durationMs: number;
+    };
     expect(data.result.data).toEqual({ sum: 7 });
     expect(data.durationMs).toBeGreaterThanOrEqual(0);
   });
@@ -506,7 +523,10 @@ describe("createToolRouter integration", () => {
     const results = await router.processToolCalls([parsed], { turn: 1 });
 
     expect(results).toHaveLength(1);
-    expect(at(results, 0).data).toEqual({ error: "Error: boom", recovered: true });
+    expect(at(results, 0).data).toEqual({
+      error: "Error: boom",
+      recovered: true,
+    });
     expect(at(appendSpy.calls, 0).content).toBe("recovered gracefully");
   });
 
@@ -515,7 +535,9 @@ describe("createToolRouter integration", () => {
       name: "Fail" as const,
       description: "fails but suppresses",
       schema: z.object({ reason: z.string() }),
-      handler: async (args: { reason: string }): Promise<ToolHandlerResponse<null>> => {
+      handler: async (args: {
+        reason: string;
+      }): Promise<ToolHandlerResponse<null>> => {
         throw new Error(args.reason);
       },
       hooks: {
@@ -691,7 +713,11 @@ describe("createToolRouter integration", () => {
       appendToolResult: appendSpy.fn,
     });
 
-    const parsed = router.parseToolCall({ id: "tc-1", name: "SelfAppend", args: {} });
+    const parsed = router.parseToolCall({
+      id: "tc-1",
+      name: "SelfAppend",
+      args: {},
+    });
     await router.processToolCalls([parsed]);
 
     expect(appendSpy.calls).toHaveLength(0);

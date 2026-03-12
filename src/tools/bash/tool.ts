@@ -28,7 +28,7 @@ Use this tool to:
     command: z
       .string()
       .describe(
-        "The bash command to execute. Can include pipes (|), redirects (>, >>), logical operators (&&, ||), and shell features like command substitution $(...)."
+        "The bash command to execute. Can include pipes (|), redirects (>, >>), logical operators (&&, ||), and shell features like command substitution $(...).",
       ),
   }),
   strict: true,

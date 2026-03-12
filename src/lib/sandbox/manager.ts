@@ -28,7 +28,7 @@ export class SandboxManager<
   constructor(private provider: SandboxProvider<TOptions, TSandbox>) {}
 
   async create(
-    options?: TOptions
+    options?: TOptions,
   ): Promise<{ sandboxId: string; stateUpdate?: Record<string, unknown> }> {
     const { sandbox, stateUpdate } = await this.provider.create(options);
     return { sandboxId: sandbox.id, ...(stateUpdate && { stateUpdate }) };
@@ -58,7 +58,7 @@ export class SandboxManager<
   createActivities(): SandboxOps<TOptions> {
     return {
       createSandbox: async (
-        options?: TOptions
+        options?: TOptions,
       ): Promise<{
         sandboxId: string;
         stateUpdate?: Record<string, unknown>;

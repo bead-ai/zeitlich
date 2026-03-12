@@ -25,13 +25,13 @@ IMPORTANT:
     new_string: z
       .string()
       .describe(
-        "The text to replace it with (must be different from old_string)"
+        "The text to replace it with (must be different from old_string)",
       ),
     replace_all: z
       .boolean()
       .optional()
       .describe(
-        "If true, replace all occurrences of old_string (default: false)"
+        "If true, replace all occurrences of old_string (default: false)",
       ),
   }),
   strict: true,

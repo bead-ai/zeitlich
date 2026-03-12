@@ -1,6 +1,10 @@
 export { SandboxManager } from "./manager";
 export { toTree } from "./tree";
 export type {
+  DirentEntry,
+  ExecOptions,
+  ExecResult,
+  FileStat,
   Sandbox,
   SandboxCapabilities,
   SandboxCreateOptions,
@@ -8,10 +12,6 @@ export type {
   SandboxOps,
   SandboxProvider,
   SandboxSnapshot,
-  ExecOptions,
-  ExecResult,
-  DirentEntry,
-  FileStat,
 } from "./types";
 export {
   SandboxNotFoundError,

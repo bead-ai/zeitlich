@@ -1,7 +1,4 @@
-import type {
-  ThreadManagerConfig,
-  BaseThreadManager,
-} from "./types";
+import type { BaseThreadManager, ThreadManagerConfig } from "./types";
 
 const THREAD_TTL_SECONDS = 60 * 60 * 24 * 90; // 90 days
 

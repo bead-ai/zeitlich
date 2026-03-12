@@ -1,8 +1,8 @@
-import type Redis from "ioredis";
 import type { Content, Part } from "@google/genai";
+import type Redis from "ioredis";
 import {
-  createThreadManager,
   type BaseThreadManager,
+  createThreadManager,
   type ThreadManagerConfig,
 } from "../../../lib/thread";
 import type { MessageContent, ToolMessageContent } from "../../../lib/types";

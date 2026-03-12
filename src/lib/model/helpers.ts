@@ -1,6 +1,6 @@
+export type { AgentStateContext } from "../activity";
 export {
-  queryParentWorkflowState,
   createRunAgentActivity,
+  queryParentWorkflowState,
   withParentWorkflowState,
 } from "../activity";
-export type { AgentStateContext } from "../activity";

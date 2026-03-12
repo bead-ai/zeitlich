@@ -5,15 +5,17 @@ vi.mock("@temporalio/workflow", () => {
   let counter = 0;
   return {
     workflowInfo: () => ({ taskQueue: "default-queue" }),
-    executeChild: vi.fn(async (_workflow: unknown, opts: { args: unknown[] }) => {
-      const input = (opts.args as [{ prompt: string }])[0];
-      return {
-        toolResponse: `Response to: ${input.prompt}`,
-        data: { result: "child-data" },
-        threadId: "child-thread-1",
-        usage: { inputTokens: 100, outputTokens: 50 },
-      };
-    }),
+    executeChild: vi.fn(
+      async (_workflow: unknown, opts: { args: unknown[] }) => {
+        const input = (opts.args as [{ prompt: string }])[0];
+        return {
+          toolResponse: `Response to: ${input.prompt}`,
+          data: { result: "child-data" },
+          threadId: "child-thread-1",
+          usage: { inputTokens: 100, outputTokens: 50 },
+        };
+      },
+    ),
     uuid4: () => {
       counter++;
       const bytes = Array.from({ length: 16 }, (_, i) =>
@@ -24,9 +26,9 @@ vi.mock("@temporalio/workflow", () => {
   };
 });
 
-import { createSubagentTool, SUBAGENT_TOOL_NAME } from "./tool";
 import { createSubagentHandler } from "./handler";
 import { buildSubagentRegistration } from "./register";
+import { createSubagentTool, SUBAGENT_TOOL_NAME } from "./tool";
 import type { SubagentConfig } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -301,7 +303,12 @@ describe("createSubagentHandler", () => {
 
     await handler(
       { subagent: "inherit-agent", description: "test", prompt: "test" },
-      { threadId: "t", toolCallId: "tc", toolName: "Subagent", sandboxId: "parent-sb" },
+      {
+        threadId: "t",
+        toolCallId: "tc",
+        toolName: "Subagent",
+        sandboxId: "parent-sb",
+      },
     );
 
     const lastCall = execMock.mock.calls[execMock.mock.calls.length - 1];
@@ -330,7 +337,12 @@ describe("createSubagentHandler", () => {
 
     await handler(
       { subagent: "own-agent", description: "test", prompt: "test" },
-      { threadId: "t", toolCallId: "tc", toolName: "Subagent", sandboxId: "parent-sb" },
+      {
+        threadId: "t",
+        toolCallId: "tc",
+        toolName: "Subagent",
+        sandboxId: "parent-sb",
+      },
     );
 
     const lastCall = execMock.mock.calls[execMock.mock.calls.length - 1];

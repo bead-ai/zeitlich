@@ -1,14 +1,14 @@
 import type { WorkflowClient } from "@temporalio/client";
 import { queryParentWorkflowState } from "../../../lib/activity";
 import type { ActivityToolHandler } from "../../../lib/tool-router/types";
+import { createVirtualSandbox } from "./index";
+import type { VirtualSandboxProvider } from "./provider";
 import type {
   FileEntryMetadata,
   TreeMutation,
   VirtualSandboxContext,
   VirtualSandboxState,
 } from "./types";
-import type { VirtualSandboxProvider } from "./provider";
-import { createVirtualSandbox } from "./index";
 
 /**
  * Wraps a tool handler that needs a virtual sandbox, automatically querying
@@ -54,7 +54,7 @@ export function withVirtualSandbox<
     TArgs,
     TResult,
     VirtualSandboxContext<TCtx, TMeta>
-  >
+  >,
 ): ActivityToolHandler<
   TArgs,
   (TResult & { treeMutations: TreeMutation<TMeta>[] }) | null
@@ -75,7 +75,7 @@ export function withVirtualSandbox<
       sandboxId,
       fileTree,
       provider.resolver,
-      resolverContext
+      resolverContext,
     );
     const response = await handler(args, { ...context, sandbox });
     const mutations = sandbox.fs.getMutations();

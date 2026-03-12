@@ -1,7 +1,7 @@
 import type { ToolMap } from "../tool-router/types";
-import type { Skill } from "./types";
-import { createReadSkillTool } from "./tool";
 import { createReadSkillHandler } from "./handler";
+import { createReadSkillTool } from "./tool";
+import type { Skill } from "./types";
 
 /**
  * Builds a fully wired tool entry for the ReadSkill tool.
@@ -9,7 +9,7 @@ import { createReadSkillHandler } from "./handler";
  * Returns null if no skills are provided.
  */
 export function buildSkillRegistration(
-  skills: Skill[]
+  skills: Skill[],
 ): ToolMap[string] | null {
   if (skills.length === 0) return null;
 

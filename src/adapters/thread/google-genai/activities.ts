@@ -1,11 +1,10 @@
+import type { Content, GoogleGenAI } from "@google/genai";
 import type Redis from "ioredis";
-import type { GoogleGenAI, Content } from "@google/genai";
-import type { ToolResultConfig } from "../../../lib/types";
-import type { MessageContent } from "../../../lib/types";
-import type { ThreadOps } from "../../../lib/session/types";
 import type { ModelInvoker } from "../../../lib/model";
-import { createGoogleGenAIThreadManager } from "./thread-manager";
+import type { ThreadOps } from "../../../lib/session/types";
+import type { MessageContent, ToolResultConfig } from "../../../lib/types";
 import { createGoogleGenAIModelInvoker } from "./model-invoker";
+import { createGoogleGenAIThreadManager } from "./thread-manager";
 
 export interface GoogleGenAIAdapterConfig {
   redis: Redis;

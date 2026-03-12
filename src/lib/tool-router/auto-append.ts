@@ -34,7 +34,7 @@ export function withAutoAppend<
   TContext extends RouterContext = RouterContext,
 >(
   threadHandler: (config: ToolResultConfig) => Promise<void>,
-  handler: ActivityToolHandler<TArgs, TResult, TContext>
+  handler: ActivityToolHandler<TArgs, TResult, TContext>,
 ): ActivityToolHandler<TArgs, TResult, TContext> {
   return async (args: TArgs, context: TContext) => {
     const response = await handler(args, context);

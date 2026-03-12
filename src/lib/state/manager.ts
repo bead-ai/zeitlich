@@ -4,15 +4,15 @@ import {
   defineUpdate,
   setHandler,
 } from "@temporalio/workflow";
+import { z } from "zod";
+import type { ToolDefinition } from "../tool-router/types";
 import {
   type AgentStatus,
   type BaseAgentState,
-  type WorkflowTask,
   isTerminalStatus,
+  type WorkflowTask,
 } from "../types";
-import type { ToolDefinition } from "../tool-router/types";
 import type { AgentState, AgentStateManager, JsonSerializable } from "./types";
-import { z } from "zod";
 
 /**
  * Creates an agent state manager for tracking workflow state.
@@ -84,14 +84,14 @@ export function createAgentStateManager<
 
   const stateQuery = defineQuery<AgentState<TCustom>>("getAgentState");
   const stateChangeUpdate = defineUpdate<AgentState<TCustom>, [number]>(
-    "waitForAgentStateChange"
+    "waitForAgentStateChange",
   );
 
   setHandler(stateQuery, () => buildState());
   setHandler(stateChangeUpdate, async (lastKnownVersion: number) => {
     await condition(
       () => version > lastKnownVersion || isTerminalStatus(status),
-      "55s"
+      "55s",
     );
     return buildState();
   });

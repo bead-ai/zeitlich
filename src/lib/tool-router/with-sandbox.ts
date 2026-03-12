@@ -1,5 +1,9 @@
 import type { Sandbox } from "../sandbox/types";
-import type { ActivityToolHandler, RouterContext, ToolHandlerResponse } from "./types";
+import type {
+  ActivityToolHandler,
+  RouterContext,
+  ToolHandlerResponse,
+} from "./types";
 
 /**
  * Extended router context with a resolved {@link Sandbox} instance.

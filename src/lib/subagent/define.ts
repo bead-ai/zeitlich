@@ -1,10 +1,10 @@
 import type { z } from "zod";
+import type { SubagentArgs } from "./tool";
 import type {
   SubagentConfig,
   SubagentHandlerResponse,
   SubagentHooks,
 } from "./types";
-import type { SubagentArgs } from "./tool";
 
 /**
  * Identity function that provides full type inference for subagent configurations.
@@ -51,7 +51,7 @@ export function defineSubagent<
         }) => Promise<SubagentHandlerResponse<z.infer<TResult> | null>>);
     context: TContext;
     hooks?: SubagentHooks<SubagentArgs, z.infer<TResult>>;
-  }
+  },
 ): SubagentConfig<TResult>;
 // Without context — verifies workflow accepts { prompt }
 export function defineSubagent<TResult extends z.ZodType = z.ZodType>(
@@ -63,9 +63,9 @@ export function defineSubagent<TResult extends z.ZodType = z.ZodType>(
           previousThreadId?: string;
         }) => Promise<SubagentHandlerResponse<z.infer<TResult> | null>>);
     hooks?: SubagentHooks<SubagentArgs, z.infer<TResult>>;
-  }
+  },
 ): SubagentConfig<TResult>;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+// biome-ignore lint/suspicious/noExplicitAny: overload implementation signature
 export function defineSubagent(config: any): SubagentConfig {
   return config;
 }

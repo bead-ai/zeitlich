@@ -1,10 +1,10 @@
-import { describe, expect, it, beforeEach } from "vitest";
-import type { FileEntry, FileResolver } from "./types";
+import { beforeEach, describe, expect, it } from "vitest";
+import { SandboxNotSupportedError } from "../../../lib/sandbox/types";
 import { VirtualSandboxFileSystem } from "./filesystem";
 import { createVirtualSandbox } from "./index";
 import { applyVirtualTreeMutations } from "./mutations";
 import { VirtualSandboxProvider } from "./provider";
-import { SandboxNotSupportedError } from "../../../lib/sandbox/types";
+import type { FileEntry, FileResolver } from "./types";
 
 // ============================================================================
 // Mock resolver
@@ -287,9 +287,7 @@ describe("VirtualSandboxFileSystem", () => {
   });
 
   it("rm force does not throw for missing path", async () => {
-    await expect(
-      fs.rm("/nonexistent", { force: true }),
-    ).resolves.not.toThrow();
+    await expect(fs.rm("/nonexistent", { force: true })).resolves.not.toThrow();
   });
 
   // --- cp / mv ---
@@ -424,9 +422,7 @@ describe("VirtualSandboxProvider", () => {
   it("create throws without required options", async () => {
     const { resolver } = createMockResolver();
     const provider = new VirtualSandboxProvider(resolver);
-    await expect(provider.create()).rejects.toThrow(
-      "requires resolverContext",
-    );
+    await expect(provider.create()).rejects.toThrow("requires resolverContext");
   });
 });
 
@@ -443,7 +439,9 @@ describe("applyVirtualTreeMutations", () => {
     let fileTree = tree;
     return {
       get: (_key: "fileTree"): FileEntry[] => fileTree,
-      set: (_key: "fileTree", value: FileEntry[]): void => { fileTree = value; },
+      set: (_key: "fileTree", value: FileEntry[]): void => {
+        fileTree = value;
+      },
       current: (): FileEntry[] => fileTree,
     };
   }
@@ -515,9 +513,7 @@ describe("applyVirtualTreeMutations", () => {
   it("does not mutate the original array passed to the state manager", () => {
     const original = [...sampleTree];
     const sm = mockStateManager(sampleTree);
-    applyVirtualTreeMutations(sm, [
-      { type: "remove", path: "/src/index.ts" },
-    ]);
+    applyVirtualTreeMutations(sm, [{ type: "remove", path: "/src/index.ts" }]);
     expect(sampleTree).toEqual(original);
   });
 });

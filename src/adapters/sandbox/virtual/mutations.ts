@@ -1,4 +1,4 @@
-import type { FileEntryMetadata, VirtualFileTree, TreeMutation } from "./types";
+import type { FileEntryMetadata, TreeMutation, VirtualFileTree } from "./types";
 
 /**
  * Apply a list of {@link TreeMutation}s to the `fileTree` stored in a state
@@ -26,9 +26,7 @@ export function applyVirtualTreeMutations<TMeta = FileEntryMetadata>(
         tree = tree.filter((e) => e.path !== m.path);
         break;
       case "update":
-        tree = tree.map((e) =>
-          e.path === m.path ? { ...e, ...m.entry } : e
-        );
+        tree = tree.map((e) => (e.path === m.path ? { ...e, ...m.entry } : e));
         break;
     }
   }

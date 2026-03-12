@@ -1,7 +1,7 @@
+import type { Sandbox } from "../../lib/sandbox/types";
 import type { ActivityToolHandler } from "../../lib/tool-router";
 import type { SandboxContext } from "../../lib/tool-router/with-sandbox";
 import type { GlobArgs } from "./tool";
-import type { Sandbox } from "../../lib/sandbox/types";
 
 interface GlobResult {
   files: string[];
@@ -19,10 +19,7 @@ function matchGlob(pattern: string, path: string): boolean {
   return new RegExp(`^${regex}$`).test(path);
 }
 
-async function walk(
-  fs: Sandbox["fs"],
-  dir: string,
-): Promise<string[]> {
+async function walk(fs: Sandbox["fs"], dir: string): Promise<string[]> {
   const results: string[] = [];
   const entries = await fs.readdirWithFileTypes(dir);
   for (const entry of entries) {

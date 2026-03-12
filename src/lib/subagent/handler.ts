@@ -1,14 +1,14 @@
 import { executeChild, workflowInfo } from "@temporalio/workflow";
+import type { z } from "zod";
 import { getShortId } from "../thread/id";
-import type { ToolHandlerResponse, RouterContext } from "../tool-router";
+import type { RouterContext, ToolHandlerResponse } from "../tool-router";
 import type { ToolMessageContent } from "../types";
+import type { SubagentArgs } from "./tool";
 import type {
   InferSubagentResult,
   SubagentConfig,
   SubagentInput,
 } from "./types";
-import type { SubagentArgs } from "./tool";
-import type { z } from "zod";
 
 /**
  * Creates a Subagent tool handler that spawns child workflows for configured subagents.
@@ -23,13 +23,13 @@ export function createSubagentHandler<
 
   return async (
     args: SubagentArgs,
-    context: RouterContext
+    context: RouterContext,
   ): Promise<ToolHandlerResponse<InferSubagentResult<T[number]> | null>> => {
     const config = subagents.find((s) => s.agentName === args.subagent);
 
     if (!config) {
       throw new Error(
-        `Unknown subagent: ${args.subagent}. Available: ${subagents.map((s) => s.agentName).join(", ")}`
+        `Unknown subagent: ${args.subagent}. Available: ${subagents.map((s) => s.agentName).join(", ")}`,
       );
     }
 

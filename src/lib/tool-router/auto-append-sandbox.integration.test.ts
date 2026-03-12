@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
-import { withAutoAppend } from "./auto-append";
-import { withSandbox } from "./with-sandbox";
-import type { RouterContext, ToolHandlerResponse } from "./types";
-import type { ToolResultConfig } from "../types";
 import type { Sandbox } from "../sandbox/types";
+import type { ToolResultConfig } from "../types";
+import { withAutoAppend } from "./auto-append";
+import type { RouterContext, ToolHandlerResponse } from "./types";
+import { withSandbox } from "./with-sandbox";
 
 // ---------------------------------------------------------------------------
 // withAutoAppend
@@ -81,10 +81,7 @@ describe("withAutoAppend", () => {
     const wrapped = withAutoAppend(threadHandler, innerHandler);
 
     await expect(
-      wrapped(
-        {},
-        { threadId: "t", toolCallId: "tc", toolName: "Fail" },
-      ),
+      wrapped({}, { threadId: "t", toolCallId: "tc", toolName: "Fail" }),
     ).rejects.toThrow("handler failed");
 
     expect(appendSpy).not.toHaveBeenCalled();
@@ -155,7 +152,7 @@ describe("withSandbox", () => {
         cp: async () => {},
         mv: async () => {},
         readlink: async () => "",
-        resolvePath: (base: string, path: string) => base + "/" + path,
+        resolvePath: (base: string, path: string) => `${base}/${path}`,
       },
       exec: async () => ({ stdout: "", stderr: "", exitCode: 0 }),
       destroy: async () => {},
@@ -284,7 +281,9 @@ describe("withSandbox", () => {
     const mockSandbox = createMockSandbox();
     const manager = { getSandbox: async () => mockSandbox };
 
-    let capturedCtx: (RouterContext & { sandbox: Sandbox; sandboxId: string }) | null = null;
+    let capturedCtx:
+      | (RouterContext & { sandbox: Sandbox; sandboxId: string })
+      | null = null;
 
     const handler = async (
       _args: unknown,

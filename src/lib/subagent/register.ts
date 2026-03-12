@@ -1,13 +1,17 @@
+import type { z } from "zod";
 import type {
-  PreToolUseHookResult,
   PostToolUseFailureHookResult,
+  PreToolUseHookResult,
   ToolHooks,
   ToolMap,
 } from "../tool-router/types";
-import type { SubagentConfig, SubagentHooks } from "./types";
-import type { z } from "zod";
-import { createSubagentTool, SUBAGENT_TOOL_NAME, type SubagentArgs } from "./tool";
 import { createSubagentHandler } from "./handler";
+import {
+  createSubagentTool,
+  SUBAGENT_TOOL_NAME,
+  type SubagentArgs,
+} from "./tool";
+import type { SubagentConfig, SubagentHooks } from "./types";
 
 /**
  * Builds a fully wired tool entry for the Subagent tool,
@@ -20,11 +24,12 @@ import { createSubagentHandler } from "./handler";
  * Returns null if no subagents are configured.
  */
 export function buildSubagentRegistration(
-  subagents: SubagentConfig[]
+  subagents: SubagentConfig[],
 ): ToolMap[string] | null {
   if (subagents.length === 0) return null;
 
-  const getEnabled = (): SubagentConfig[] => subagents.filter((s) => s.enabled ?? true);
+  const getEnabled = (): SubagentConfig[] =>
+    subagents.filter((s) => s.enabled ?? true);
 
   const subagentHooksMap = new Map<string, SubagentHooks>();
   for (const s of subagents) {
@@ -57,7 +62,7 @@ export function buildSubagentRegistration(
           await hooks?.onPostExecution?.(ctx);
         },
         onPostToolUseFailure: async (
-          ctx
+          ctx,
         ): Promise<PostToolUseFailureHookResult> => {
           const hooks = subagentHooksMap.get(resolveSubagentName(ctx.args));
           return hooks?.onExecutionFailure?.(ctx) ?? {};

@@ -24,9 +24,9 @@ npm install
 npm run dev       # Build in watch mode
 npm run build     # One-off build
 npm run typecheck # Type checking
-npm run lint      # Lint with ESLint
+npm run lint      # Lint with Biome
 npm run lint:fix  # Lint and auto-fix
-npm run format    # Format with Prettier
+npm run format    # Format with Biome
 ```
 
 A pre-commit hook runs `lint` and `typecheck` automatically via Husky.
@@ -90,8 +90,7 @@ Example: `feat: add support for streaming tool responses`
 
 ## Code Style
 
-- **Formatter**: Prettier (double quotes, semicolons, 2-space indent, trailing commas)
-- **Linter**: ESLint with typescript-eslint
+- **Formatter & Linter**: Biome (double quotes, semicolons, 2-space indent, trailing commas)
 - Run `npm run format` and `npm run lint:fix` to auto-fix
 
 ## Pull Requests
