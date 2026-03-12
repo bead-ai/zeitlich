@@ -118,3 +118,16 @@ export interface SubagentInput<
   /** Sandbox ID inherited from the parent agent (when SubagentConfig.sandbox is 'inherit') */
   sandboxId?: string;
 }
+
+/**
+ * Session config fields derived from `SubagentInput`, ready to spread
+ * into `createSession`. Produced by `defineSubagentWorkflow`.
+ */
+export interface SubagentSessionInput {
+  /** Thread ID to continue (set from `SubagentInput.previousThreadId`) */
+  threadId?: string;
+  /** Whether to continue an existing thread (true when `previousThreadId` is present) */
+  continueThread?: boolean;
+  /** Sandbox ID inherited from the parent agent */
+  sandboxId?: string;
+}

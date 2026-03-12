@@ -6,7 +6,7 @@ import {
   ApplicationFailure,
 } from "@temporalio/workflow";
 import type { SessionExitReason, MessageContent } from "../types";
-import type { ThreadOps, SessionConfig, SubagentSessionConfig, ZeitlichSession } from "./types";
+import type { ThreadOps, SessionConfig, ZeitlichSession } from "./types";
 import type { SandboxOps } from "../sandbox/types";
 import { type AgentStateManager, type JsonSerializable } from "../state/types";
 import { createToolRouter } from "../tool-router/router";
@@ -340,55 +340,3 @@ export function proxySandboxOps(
     }
   );
 }
-
-/**
- * Creates a session for a subagent workflow, automatically mapping
- * `SubagentInput` fields to the underlying `SessionConfig`.
- *
- * Handles:
- * - `previousThreadId` → `threadId` + `continueThread`
- * - `sandboxId` → inherited sandbox
- * - `prompt` / `context` / `settings` → available in `buildContextMessage`
- *
- * @example
- * ```typescript
- * import { createSubagentSession, createAgentStateManager } from 'zeitlich/workflow';
- * import type { SubagentWorkflow } from 'zeitlich/workflow';
- *
- * export const researcherWorkflow: SubagentWorkflow = async (input) => {
- *   const stateManager = createAgentStateManager({
- *     initialState: { systemPrompt: "You are a researcher." },
- *   });
- *
- *   const session = await createSubagentSession({
- *     input,
- *     agentName: "researcher",
- *     runAgent: runAgentActivity,
- *     tools: { Bash: defineTool({ ...bashTool, handler: bashHandler }) },
- *     buildContextMessage: ({ prompt }) => [{ type: "text", text: prompt }],
- *   });
- *
- *   const { finalMessage, threadId } = await session.runSession({ stateManager });
- *   return { toolResponse: extractText(finalMessage), data: null, threadId };
- * };
- * ```
- */
-export const createSubagentSession = async <
-  T extends ToolMap,
-  TSettings extends Record<string, unknown> = Record<string, unknown>,
-  M = unknown,
->({
-  input,
-  buildContextMessage: buildCtx,
-  ...rest
-}: SubagentSessionConfig<T, TSettings, M>): Promise<ZeitlichSession<M>> => {
-  return createSession({
-    ...rest,
-    ...(input.previousThreadId && {
-      threadId: input.previousThreadId,
-      continueThread: true,
-    }),
-    ...(input.sandboxId && { sandboxId: input.sandboxId }),
-    buildContextMessage: () => buildCtx(input),
-  });
-};

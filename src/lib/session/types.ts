@@ -10,7 +10,7 @@ import type {
   InferToolResults,
 } from "../tool-router/types";
 import type { Hooks } from "../hooks/types";
-import type { SubagentConfig, SubagentInput } from "../subagent/types";
+import type { SubagentConfig } from "../subagent/types";
 import type { Skill } from "../skills/types";
 import type { SandboxOps } from "../sandbox/types";
 import type { RunAgentActivity } from "../model/types";
@@ -92,33 +92,4 @@ export interface ZeitlichSession<M = unknown> {
     exitReason: SessionExitReason;
     usage: ReturnType<AgentStateManager<T>["getTotalUsage"]>;
   }>;
-}
-
-/**
- * Configuration for a subagent session — wraps `SessionConfig` to automatically
- * handle `SubagentInput` fields (`previousThreadId`, `sandboxId`, `settings`).
- *
- * Omits fields that are derived from the input:
- * - `threadId` / `continueThread` — set from `input.previousThreadId`
- * - `sandboxId` — set from `input.sandboxId`
- * - `buildContextMessage` — replaced with an input-aware version
- *
- * @template T - Tool map type
- * @template TSettings - Settings type resolved from parent state
- * @template M - Model response type
- */
-export interface SubagentSessionConfig<
-  T extends ToolMap,
-  TSettings extends Record<string, unknown> = Record<string, unknown>,
-  M = unknown,
-> extends Omit<
-    SessionConfig<T, M>,
-    "buildContextMessage" | "threadId" | "continueThread" | "sandboxId"
-  > {
-  /** The SubagentInput received from the parent agent */
-  input: SubagentInput<TSettings>;
-  /** Build context message with access to the full subagent input (prompt, context, settings) */
-  buildContextMessage: (
-    input: SubagentInput<TSettings>
-  ) => MessageContent | Promise<MessageContent>;
 }

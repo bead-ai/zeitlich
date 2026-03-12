@@ -1,6 +1,5 @@
 export {
   createSession,
-  createSubagentSession,
   proxyDefaultThreadOps,
   proxySandboxOps,
 } from "./session";
@@ -8,6 +7,5 @@ export {
 export type {
   ThreadOps,
   SessionConfig,
-  SubagentSessionConfig,
   ZeitlichSession,
 } from "./types";

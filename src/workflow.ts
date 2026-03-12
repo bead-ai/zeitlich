@@ -21,16 +21,10 @@
 // Session
 export {
   createSession,
-  createSubagentSession,
   proxyDefaultThreadOps,
   proxySandboxOps,
 } from "./lib/session";
-export type {
-  ZeitlichSession,
-  ThreadOps,
-  SessionConfig,
-  SubagentSessionConfig,
-} from "./lib/session";
+export type { ZeitlichSession, ThreadOps, SessionConfig } from "./lib/session";
 
 // Thread utilities
 export { getShortId } from "./lib/thread";
@@ -51,7 +45,7 @@ export {
   hasNoOtherToolCalls,
   defineTool,
 } from "./lib/tool-router";
-export { defineSubagent, bindSubagentState } from "./lib/subagent";
+export { defineSubagent, defineSubagentWorkflow, bindSubagentState } from "./lib/subagent";
 export type {
   // Tool definition types
   ToolDefinition,
@@ -140,6 +134,7 @@ export type {
   SubagentInput,
   SubagentHandlerResponse,
   SubagentWorkflow,
+  SubagentSessionInput,
   InferSubagentSettings,
 } from "./lib/subagent/types";
 // Sandbox types (workflow-safe — no activity-side code)
