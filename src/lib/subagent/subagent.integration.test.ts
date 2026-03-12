@@ -27,7 +27,8 @@ vi.mock("@temporalio/workflow", () => {
 import { createSubagentTool, SUBAGENT_TOOL_NAME } from "./tool";
 import { createSubagentHandler } from "./handler";
 import { buildSubagentRegistration } from "./register";
-import type { SubagentConfig } from "./types";
+import { defineSubagentWorkflow } from "./workflow";
+import type { SubagentConfig, SubagentSessionInput } from "./types";
 
 // ---------------------------------------------------------------------------
 // createSubagentTool
@@ -463,5 +464,107 @@ describe("buildSubagentRegistration", () => {
       expect(reg.description).toContain("Agent A");
       expect(reg.description).not.toContain("Agent B");
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// defineSubagentWorkflow
+// ---------------------------------------------------------------------------
+
+describe("defineSubagentWorkflow", () => {
+  it("maps previousThreadId to threadId + continueThread", async () => {
+    let capturedSession: SubagentSessionInput | undefined;
+
+    const workflow = defineSubagentWorkflow(async (_input, sessionInput) => {
+      capturedSession = sessionInput;
+      return { toolResponse: "ok", data: null, threadId: "t" };
+    });
+
+    await workflow({ prompt: "go", previousThreadId: "prev-42" });
+
+    expect(capturedSession).toEqual({
+      threadId: "prev-42",
+      continueThread: true,
+    });
+  });
+
+  it("maps sandboxId", async () => {
+    let capturedSession: SubagentSessionInput | undefined;
+
+    const workflow = defineSubagentWorkflow(async (_input, sessionInput) => {
+      capturedSession = sessionInput;
+      return { toolResponse: "ok", data: null, threadId: "t" };
+    });
+
+    await workflow({ prompt: "go", sandboxId: "sb-123" });
+
+    expect(capturedSession).toEqual({ sandboxId: "sb-123" });
+  });
+
+  it("maps both previousThreadId and sandboxId together", async () => {
+    let capturedSession: SubagentSessionInput | undefined;
+
+    const workflow = defineSubagentWorkflow(async (_input, sessionInput) => {
+      capturedSession = sessionInput;
+      return { toolResponse: "ok", data: null, threadId: "t" };
+    });
+
+    await workflow({ prompt: "go", previousThreadId: "prev-1", sandboxId: "sb-1" });
+
+    expect(capturedSession).toEqual({
+      threadId: "prev-1",
+      continueThread: true,
+      sandboxId: "sb-1",
+    });
+  });
+
+  it("returns empty sessionInput when no previousThreadId or sandboxId", async () => {
+    let capturedSession: SubagentSessionInput | undefined;
+
+    const workflow = defineSubagentWorkflow(async (_input, sessionInput) => {
+      capturedSession = sessionInput;
+      return { toolResponse: "ok", data: null, threadId: "t" };
+    });
+
+    await workflow({ prompt: "go" });
+
+    expect(capturedSession).toEqual({});
+  });
+
+  it("passes full SubagentInput as first argument", async () => {
+    let capturedInput: unknown;
+
+    const workflow = defineSubagentWorkflow(async (input, _sessionInput) => {
+      capturedInput = input;
+      return { toolResponse: "ok", data: null, threadId: "t" };
+    });
+
+    await workflow({
+      prompt: "research",
+      context: { key: "val" },
+      previousThreadId: "prev",
+      sandboxId: "sb",
+    });
+
+    expect(capturedInput).toEqual({
+      prompt: "research",
+      context: { key: "val" },
+      previousThreadId: "prev",
+      sandboxId: "sb",
+    });
+  });
+
+  it("returns the handler response unchanged", async () => {
+    const workflow = defineSubagentWorkflow(async () => ({
+      toolResponse: "result text",
+      data: { count: 42 },
+      threadId: "child-thread",
+    }));
+
+    const result = await workflow({ prompt: "go" });
+
+    expect(result.toolResponse).toBe("result text");
+    expect(result.data).toEqual({ count: 42 });
+    expect(result.threadId).toBe("child-thread");
   });
 });
