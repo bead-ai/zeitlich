@@ -96,7 +96,7 @@ export function createLangChainAdapter(
 
     async forkThread(
       sourceThreadId: string,
-      targetThreadId: string,
+      targetThreadId: string
     ): Promise<void> {
       const thread = createLangChainThreadManager({
         redis,
@@ -106,18 +106,20 @@ export function createLangChainAdapter(
     },
   };
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const makeInvoker = (model: BaseChatModel<any>): ModelInvoker<StoredMessage> =>
+  const makeInvoker = (
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    model: BaseChatModel<any>
+  ): ModelInvoker<StoredMessage> =>
     createLangChainModelInvoker({ redis, model });
 
   const invoker: ModelInvoker<StoredMessage> = config.model
     ? makeInvoker(config.model)
-    : ((() => {
+    : () => {
         throw new Error(
           "No default model provided to createLangChainAdapter. " +
             "Either pass `model` in the config or use `createModelInvoker(model)` instead."
         );
-      }) as unknown as ModelInvoker<StoredMessage>);
+      };
 
   return {
     threadOps,
