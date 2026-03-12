@@ -21,10 +21,16 @@
 // Session
 export {
   createSession,
+  createSubagentSession,
   proxyDefaultThreadOps,
   proxySandboxOps,
 } from "./lib/session";
-export type { ZeitlichSession, ThreadOps, SessionConfig } from "./lib/session";
+export type {
+  ZeitlichSession,
+  ThreadOps,
+  SessionConfig,
+  SubagentSessionConfig,
+} from "./lib/session";
 
 // Thread utilities
 export { getShortId } from "./lib/thread";

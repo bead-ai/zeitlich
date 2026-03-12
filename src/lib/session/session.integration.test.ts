@@ -43,7 +43,7 @@ vi.mock("@temporalio/workflow", () => {
   };
 });
 
-import { createSession } from "./session";
+import { createSession, createSubagentSession } from "./session";
 import { createAgentStateManager } from "../state/manager";
 import { defineTool } from "../tool-router/router";
 import type { ToolHandlerResponse, RouterContext } from "../tool-router/types";
@@ -848,5 +848,149 @@ describe("createSession integration", () => {
     // Note: handler-level usage is not forwarded through router results
     expect(result.usage.totalInputTokens).toBe(180);
     expect(result.usage.totalOutputTokens).toBe(90);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// createSubagentSession
+// ---------------------------------------------------------------------------
+
+describe("createSubagentSession", () => {
+  let threadOps: ReturnType<typeof createMockThreadOps>;
+
+  beforeEach(() => {
+    threadOps = createMockThreadOps();
+    idCounter = 0;
+  });
+
+  it("forwards previousThreadId as continueThread + threadId", async () => {
+    const runAgent = createScriptedRunAgent([]);
+
+    const session = await createSubagentSession({
+      input: {
+        prompt: "research this",
+        previousThreadId: "prev-thread-42",
+      },
+      agentName: "sub",
+      runAgent,
+      threadOps: threadOps.ops,
+      buildContextMessage: ({ prompt }) => [{ type: "text", text: prompt }],
+    });
+
+    const stateManager = createAgentStateManager({
+      initialState: { systemPrompt: "You are a sub-agent." },
+    });
+
+    const result = await session.runSession({ stateManager });
+
+    const forkCall = threadOps.log.find((e) => e.op === "forkThread");
+    if (!forkCall) throw new Error("expected forkThread call");
+    expect(at(forkCall.args as string[], 0)).toBe("prev-thread-42");
+
+    expect(result.exitReason).toBe("completed");
+  });
+
+  it("starts fresh thread when previousThreadId is absent", async () => {
+    const runAgent = createScriptedRunAgent([]);
+
+    const session = await createSubagentSession({
+      input: { prompt: "start fresh" },
+      agentName: "sub",
+      runAgent,
+      threadOps: threadOps.ops,
+      buildContextMessage: ({ prompt }) => [{ type: "text", text: prompt }],
+    });
+
+    const stateManager = createAgentStateManager({
+      initialState: { systemPrompt: "You are a sub-agent." },
+    });
+
+    await session.runSession({ stateManager });
+
+    const forkCall = threadOps.log.find((e) => e.op === "forkThread");
+    expect(forkCall).toBeUndefined();
+
+    const initCall = threadOps.log.find((e) => e.op === "appendSystemMessage");
+    expect(initCall).toBeDefined();
+  });
+
+  it("forwards sandboxId from input", async () => {
+    const runAgent = createScriptedRunAgent([
+      {
+        message: null,
+        toolCalls: [{ id: "tc1", name: "Echo", args: { text: "hi" } }],
+      },
+    ]);
+
+    const echoTool = createEchoTool();
+
+    const session = await createSubagentSession({
+      input: { prompt: "use sandbox", sandboxId: "sb-inherited" },
+      agentName: "sub",
+      runAgent,
+      threadOps: threadOps.ops,
+      tools: { Echo: echoTool },
+      buildContextMessage: ({ prompt }) => [{ type: "text", text: prompt }],
+    });
+
+    const stateManager = createAgentStateManager({
+      initialState: { systemPrompt: "You are a sub-agent." },
+    });
+
+    await session.runSession({ stateManager });
+
+    const toolResultOp = threadOps.log.find((e) => e.op === "appendToolResult");
+    expect(toolResultOp).toBeDefined();
+  });
+
+  it("passes full input to buildContextMessage", async () => {
+    const capturedInputs: unknown[] = [];
+    const runAgent = createScriptedRunAgent([]);
+
+    const session = await createSubagentSession({
+      input: {
+        prompt: "do work",
+        context: { apiKey: "sk-123" },
+        settings: { model: "gpt-4" },
+      },
+      agentName: "sub",
+      runAgent,
+      threadOps: threadOps.ops,
+      buildContextMessage: (input) => {
+        capturedInputs.push(input);
+        return [{ type: "text", text: input.prompt }];
+      },
+    });
+
+    const stateManager = createAgentStateManager({
+      initialState: { systemPrompt: "prompt" },
+    });
+
+    await session.runSession({ stateManager });
+
+    expect(capturedInputs).toHaveLength(1);
+    const captured = at(capturedInputs, 0) as Record<string, unknown>;
+    expect(captured.prompt).toBe("do work");
+    expect(captured.context).toEqual({ apiKey: "sk-123" });
+    expect(captured.settings).toEqual({ model: "gpt-4" });
+  });
+
+  it("does not set sandboxId when absent from input", async () => {
+    const runAgent = createScriptedRunAgent([]);
+
+    const session = await createSubagentSession({
+      input: { prompt: "no sandbox" },
+      agentName: "sub",
+      runAgent,
+      threadOps: threadOps.ops,
+      buildContextMessage: ({ prompt }) => [{ type: "text", text: prompt }],
+    });
+
+    const stateManager = createAgentStateManager({
+      initialState: { systemPrompt: "prompt" },
+    });
+
+    const result = await session.runSession({ stateManager });
+    expect(result.exitReason).toBe("completed");
   });
 });

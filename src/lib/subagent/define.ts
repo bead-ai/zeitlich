@@ -8,91 +8,35 @@ import type { SubagentArgs } from "./tool";
 
 /**
  * Identity function that provides full type inference for subagent configurations.
- * Verifies the workflow function's input parameters match the configured context
- * and/or settings, and properly types the lifecycle hooks with Task tool args
- * and inferred result type.
+ * Verifies the workflow function's input parameters match the configured context,
+ * and properly types the lifecycle hooks with Task tool args and inferred result type.
  *
  * @example
  * ```ts
- * // With typed settings (resolved from parent state at invocation time)
+ * // With typed context — workflow must accept { prompt, context }
  * const researcher = defineSubagent({
- *   agentName: "researcher",
+ *   name: "researcher",
  *   description: "Researches topics",
- *   workflow: researcherWorkflow,
- *   resolveSettings: () => ({ model: stateManager.get("model") }),
+ *   workflow: researcherWorkflow, // (input: { prompt: string; context: { apiKey: string } }) => Promise<...>
+ *   context: { apiKey: "..." },
  *   resultSchema: z.object({ findings: z.string() }),
+ *   hooks: {
+ *     onPostExecution: ({ result }) => {
+ *       // result is typed as { findings: string }
+ *     },
+ *   },
  * });
  *
- * // With both context and settings
+ * // Without context — workflow only needs { prompt }
  * const writer = defineSubagent({
- *   agentName: "writer",
+ *   name: "writer",
  *   description: "Writes content",
- *   workflow: writerWorkflow,
- *   context: { apiKey: "..." },
- *   resolveSettings: () => ({ tone: stateManager.get("tone") }),
+ *   workflow: writerWorkflow, // (input: { prompt: string }) => Promise<...>
  *   resultSchema: z.object({ content: z.string() }),
- * });
- *
- * // With typed context only (static)
- * const basic = defineSubagent({
- *   agentName: "basic",
- *   description: "Basic agent",
- *   workflow: basicWorkflow,
- *   context: { apiKey: "..." },
- * });
- *
- * // Minimal — no context or settings
- * const simple = defineSubagent({
- *   agentName: "simple",
- *   description: "Simple agent",
- *   workflow: simpleWorkflow,
  * });
  * ```
  */
-// ── Overload 1: context + resolveSettings ──
-export function defineSubagent<
-  TResult extends z.ZodType = z.ZodType,
-  TContext extends Record<string, unknown> = Record<string, unknown>,
-  TSettings extends Record<string, unknown> = Record<string, unknown>,
->(
-  config: Omit<
-    SubagentConfig<TResult, TSettings>,
-    "hooks" | "workflow" | "context" | "resolveSettings"
-  > & {
-    workflow:
-      | string
-      | ((input: {
-          prompt: string;
-          previousThreadId?: string;
-          context: TContext;
-          settings: TSettings;
-        }) => Promise<SubagentHandlerResponse<z.infer<TResult> | null>>);
-    context: TContext;
-    resolveSettings: () => TSettings;
-    hooks?: SubagentHooks<SubagentArgs, z.infer<TResult>>;
-  }
-): SubagentConfig<TResult, TSettings>;
-// ── Overload 2: resolveSettings only ──
-export function defineSubagent<
-  TResult extends z.ZodType = z.ZodType,
-  TSettings extends Record<string, unknown> = Record<string, unknown>,
->(
-  config: Omit<
-    SubagentConfig<TResult, TSettings>,
-    "hooks" | "workflow" | "resolveSettings"
-  > & {
-    workflow:
-      | string
-      | ((input: {
-          prompt: string;
-          previousThreadId?: string;
-          settings: TSettings;
-        }) => Promise<SubagentHandlerResponse<z.infer<TResult> | null>>);
-    resolveSettings: () => TSettings;
-    hooks?: SubagentHooks<SubagentArgs, z.infer<TResult>>;
-  }
-): SubagentConfig<TResult, TSettings>;
-// ── Overload 3: context only ──
+// With context — verifies workflow accepts { prompt, context: TContext }
 export function defineSubagent<
   TResult extends z.ZodType = z.ZodType,
   TContext extends Record<string, unknown> = Record<string, unknown>,
@@ -109,7 +53,7 @@ export function defineSubagent<
     hooks?: SubagentHooks<SubagentArgs, z.infer<TResult>>;
   }
 ): SubagentConfig<TResult>;
-// ── Overload 4: basic (no context, no settings) ──
+// Without context — verifies workflow accepts { prompt }
 export function defineSubagent<TResult extends z.ZodType = z.ZodType>(
   config: Omit<SubagentConfig<TResult>, "hooks" | "workflow"> & {
     workflow:
