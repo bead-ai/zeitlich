@@ -15,10 +15,17 @@ import { posix } from "node:path";
  * (e.g. `appendFile`, `cp`) are composed from primitives.
  */
 export class DaytonaSandboxFileSystem implements SandboxFileSystem {
-  constructor(private sandbox: DaytonaSdkSandbox) {}
+  readonly workspaceBase: string;
+
+  constructor(
+    private sandbox: DaytonaSdkSandbox,
+    workspaceBase = "/home/daytona",
+  ) {
+    this.workspaceBase = posix.resolve("/", workspaceBase);
+  }
 
   private normalisePath(path: string): string {
-    return posix.resolve("/", path);
+    return posix.resolve(this.workspaceBase, path);
   }
 
   async readFile(path: string): Promise<string> {

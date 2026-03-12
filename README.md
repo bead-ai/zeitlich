@@ -545,6 +545,56 @@ export const createActivities = ({ redis, client }) => ({
 });
 ```
 
+#### Sandbox Path Semantics (Virtual + Daytona)
+
+Filesystem adapters now apply the same path rules:
+
+- Absolute paths are used as-is (canonicalized).
+- Relative paths are resolved from `/`.
+- Paths are normalized (duplicate slashes removed, `.`/`..` collapsed).
+
+This means `readFile("a/b.txt")` is treated as `/a/b.txt` across adapters.
+
+Each `fs` instance also exposes `workspaceBase`, which is the base used for relative paths.
+
+**Virtual sandbox example (path-only calls):**
+
+```typescript
+import { createVirtualSandbox, VirtualSandboxProvider } from "zeitlich";
+
+const provider = new VirtualSandboxProvider(resolver);
+const { sandbox } = await provider.create({
+  resolverContext: { projectId: "p1" },
+  workspaceBase: "/repo",
+});
+
+const fs = sandbox.fs;
+console.log(fs.workspaceBase); // "/repo"
+
+await fs.writeFile("src/index.ts", 'export const ok = true;\n');
+const content = await fs.readFile("src/index.ts"); // reads /repo/src/index.ts
+```
+
+**Daytona sandbox example (base `/home/daytona`):**
+
+```typescript
+import { DaytonaSandboxProvider } from "zeitlich";
+
+const provider = new DaytonaSandboxProvider();
+const { sandbox } = await provider.create({
+  workspaceBase: "/home/daytona",
+});
+
+const fs = sandbox.fs;
+console.log(fs.workspaceBase); // "/home/daytona"
+
+await fs.mkdir("project", { recursive: true });
+await fs.writeFile("project/README.md", "# Hello from Daytona\n");
+const content = await fs.readFile("project/README.md");
+```
+
+For Daytona, use `workspaceBase: "/home/daytona"` (or your own working dir) so relative paths stay in the expected workspace.
+
 ### Built-in Tools
 
 Zeitlich provides ready-to-use tool definitions and handlers for common agent operations.

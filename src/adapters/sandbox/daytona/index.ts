@@ -38,8 +38,9 @@ class DaytonaSandboxImpl implements Sandbox {
   constructor(
     readonly id: string,
     private sdkSandbox: DaytonaSdkSandbox,
+    workspaceBase = "/home/daytona",
   ) {
-    this.fs = new DaytonaSandboxFileSystem(sdkSandbox);
+    this.fs = new DaytonaSandboxFileSystem(sdkSandbox, workspaceBase);
   }
 
   async exec(command: string, options?: ExecOptions): Promise<ExecResult> {
@@ -77,9 +78,12 @@ export class DaytonaSandboxProvider
   };
 
   private client: Daytona;
+  private readonly defaultWorkspaceBase: string;
+  private workspaceBaseById = new Map<string, string>();
 
   constructor(config?: DaytonaSandboxConfig) {
     this.client = new Daytona(config);
+    this.defaultWorkspaceBase = config?.workspaceBase ?? "/home/daytona";
   }
 
   async create(
@@ -98,7 +102,13 @@ export class DaytonaSandboxProvider
       { timeout: options?.timeout ?? 60 },
     );
 
-    const sandbox = new DaytonaSandboxImpl(sdkSandbox.id, sdkSandbox);
+    const workspaceBase = options?.workspaceBase ?? this.defaultWorkspaceBase;
+    this.workspaceBaseById.set(sdkSandbox.id, workspaceBase);
+    const sandbox = new DaytonaSandboxImpl(
+      sdkSandbox.id,
+      sdkSandbox,
+      workspaceBase,
+    );
 
     if (options?.initialFiles) {
       for (const [path, content] of Object.entries(options.initialFiles)) {
@@ -112,7 +122,9 @@ export class DaytonaSandboxProvider
   async get(sandboxId: string): Promise<DaytonaSandbox> {
     try {
       const sdkSandbox = await this.client.get(sandboxId);
-      return new DaytonaSandboxImpl(sdkSandbox.id, sdkSandbox);
+      const workspaceBase =
+        this.workspaceBaseById.get(sandboxId) ?? this.defaultWorkspaceBase;
+      return new DaytonaSandboxImpl(sdkSandbox.id, sdkSandbox, workspaceBase);
     } catch {
       throw new SandboxNotFoundError(sandboxId);
     }
@@ -122,6 +134,7 @@ export class DaytonaSandboxProvider
     try {
       const sdkSandbox = await this.client.get(sandboxId);
       await this.client.delete(sdkSandbox);
+      this.workspaceBaseById.delete(sandboxId);
     } catch {
       // Already gone
     }

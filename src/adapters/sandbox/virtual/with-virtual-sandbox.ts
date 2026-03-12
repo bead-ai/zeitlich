@@ -15,7 +15,7 @@ import { createVirtualSandbox } from "./index";
  * the parent workflow for the current file tree and resolver context.
  *
  * On each invocation the wrapper:
- * 1. Queries the workflow's `AgentState` for `fileTree` and `resolverContext`
+ * 1. Queries the workflow's `AgentState` for `fileTree`, `resolverContext`, and `workspaceBase`
  * 2. Creates an ephemeral {@link VirtualSandbox} from tree + provider's resolver
  * 3. Runs the inner handler
  * 4. Returns the handler's result together with any {@link TreeMutation}s
@@ -63,7 +63,7 @@ export function withVirtualSandbox<
     const state =
       await queryParentWorkflowState<VirtualSandboxState<TCtx, TMeta>>(client);
 
-    const { sandboxId, fileTree, resolverContext } = state;
+    const { sandboxId, fileTree, resolverContext, workspaceBase } = state;
     if (!fileTree || !sandboxId) {
       return {
         toolResponse: `Error: No fileTree/sandboxId in agent state. The ${context.toolName} tool requires a virtual sandbox.`,
@@ -75,7 +75,8 @@ export function withVirtualSandbox<
       sandboxId,
       fileTree,
       provider.resolver,
-      resolverContext
+      resolverContext,
+      workspaceBase ?? "/",
     );
     const response = await handler(args, { ...context, sandbox });
     const mutations = sandbox.fs.getMutations();

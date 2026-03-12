@@ -16,7 +16,7 @@ import type {
  * Stateless {@link SandboxProvider} backed by a {@link FileResolver}.
  *
  * The provider holds **no internal state**. All sandbox state (sandboxId,
- * fileTree, resolverContext) is returned as a `stateUpdate` from
+ * fileTree, resolverContext, workspaceBase) is returned as a `stateUpdate` from
  * {@link create} and merged into the workflow's `AgentState` by the session.
  * {@link withVirtualSandbox} reads this state back on every tool invocation.
  *
@@ -59,12 +59,14 @@ export class VirtualSandboxProvider<
     const fileTree = await this.resolver.resolveEntries(
       options.resolverContext
     );
+    const workspaceBase = options.workspaceBase ?? "/";
 
     const sandbox = createVirtualSandbox(
       sandboxId,
       fileTree,
       this.resolver,
-      options.resolverContext
+      options.resolverContext,
+      workspaceBase,
     );
 
     return {
@@ -73,6 +75,7 @@ export class VirtualSandboxProvider<
         sandboxId,
         fileTree,
         resolverContext: options.resolverContext,
+        workspaceBase,
       },
     };
   }

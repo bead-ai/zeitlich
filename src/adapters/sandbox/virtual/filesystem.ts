@@ -12,12 +12,9 @@ import type {
   TreeMutation,
 } from "./types";
 
-/**
- * Normalise a virtual path to a canonical form: absolute, no trailing slash
- * (except root), no double slashes.
- */
-function normalisePath(p: string): string {
-  return posix.resolve("/", p);
+/** Normalize a path against the provided workspace base. */
+function normalisePath(p: string, workspaceBase = "/"): string {
+  return posix.resolve(workspaceBase, p);
 }
 
 /** Return the parent directory of a normalised path ("/a/b" → "/a"). */
@@ -30,11 +27,14 @@ function parentDir(p: string): string {
  * Collect the set of implicit directory paths from a flat file list.
  * E.g. "/a/b/c.ts" contributes "/a/b", "/a", "/".
  */
-function inferDirectories(entries: { path: string }[]): Set<string> {
+function inferDirectories(
+  entries: { path: string }[],
+  workspaceBase: string,
+): Set<string> {
   const dirs = new Set<string>();
   dirs.add("/");
   for (const entry of entries) {
-    let dir = parentDir(normalisePath(entry.path));
+    let dir = parentDir(normalisePath(entry.path, workspaceBase));
     while (dir !== "/" && !dirs.has(dir)) {
       dirs.add(dir);
       dir = parentDir(dir);
@@ -56,6 +56,7 @@ export class VirtualSandboxFileSystem<
   TMeta = FileEntryMetadata,
 > implements SandboxFileSystem
 {
+  readonly workspaceBase: string;
   private entries: Map<string, FileEntry<TMeta>>;
   private directories: Set<string>;
   private mutations: TreeMutation<TMeta>[] = [];
@@ -64,11 +65,13 @@ export class VirtualSandboxFileSystem<
     tree: FileEntry<TMeta>[],
     private resolver: FileResolver<TCtx, TMeta>,
     private ctx: TCtx,
+    workspaceBase = "/",
   ) {
+    this.workspaceBase = normalisePath(workspaceBase);
     this.entries = new Map(
-      tree.map((e) => [normalisePath(e.path), e]),
+      tree.map((e) => [normalisePath(e.path, this.workspaceBase), e]),
     );
-    this.directories = inferDirectories(tree);
+    this.directories = inferDirectories(tree, this.workspaceBase);
   }
 
   /** Return all mutations accumulated during this invocation. */
@@ -78,7 +81,7 @@ export class VirtualSandboxFileSystem<
 
   /** Look up a file entry by virtual path. */
   getEntry(path: string): FileEntry<TMeta> | undefined {
-    return this.entries.get(normalisePath(path));
+    return this.entries.get(normalisePath(path, this.workspaceBase));
   }
 
   // --------------------------------------------------------------------------
@@ -86,13 +89,13 @@ export class VirtualSandboxFileSystem<
   // --------------------------------------------------------------------------
 
   async readFile(path: string): Promise<string> {
-    const entry = this.entries.get(normalisePath(path));
+    const entry = this.entries.get(normalisePath(path, this.workspaceBase));
     if (!entry) throw new Error(`ENOENT: no such file: ${path}`);
     return this.resolver.readFile(entry.id, this.ctx);
   }
 
   async readFileBuffer(path: string): Promise<Uint8Array> {
-    const entry = this.entries.get(normalisePath(path));
+    const entry = this.entries.get(normalisePath(path, this.workspaceBase));
     if (!entry) throw new Error(`ENOENT: no such file: ${path}`);
     return this.resolver.readFileBuffer(entry.id, this.ctx);
   }
@@ -102,12 +105,12 @@ export class VirtualSandboxFileSystem<
   // --------------------------------------------------------------------------
 
   async exists(path: string): Promise<boolean> {
-    const norm = normalisePath(path);
+    const norm = normalisePath(path, this.workspaceBase);
     return this.entries.has(norm) || this.directories.has(norm);
   }
 
   async stat(path: string): Promise<FileStat> {
-    const norm = normalisePath(path);
+    const norm = normalisePath(path, this.workspaceBase);
     const entry = this.entries.get(norm);
     if (entry) {
       return {
@@ -131,7 +134,7 @@ export class VirtualSandboxFileSystem<
   }
 
   async readdir(path: string): Promise<string[]> {
-    const norm = normalisePath(path);
+    const norm = normalisePath(path, this.workspaceBase);
     if (!this.directories.has(norm)) {
       throw new Error(`ENOENT: no such directory: ${path}`);
     }
@@ -157,7 +160,7 @@ export class VirtualSandboxFileSystem<
 
   async readdirWithFileTypes(path: string): Promise<DirentEntry[]> {
     const names = await this.readdir(path);
-    const norm = normalisePath(path);
+    const norm = normalisePath(path, this.workspaceBase);
     const prefix = norm === "/" ? "/" : norm + "/";
 
     return names.map((name) => {
@@ -173,7 +176,7 @@ export class VirtualSandboxFileSystem<
   // --------------------------------------------------------------------------
 
   async writeFile(path: string, content: string | Uint8Array): Promise<void> {
-    const norm = normalisePath(path);
+    const norm = normalisePath(path, this.workspaceBase);
     const existing = this.entries.get(norm);
 
     if (existing) {
@@ -199,7 +202,7 @@ export class VirtualSandboxFileSystem<
   }
 
   async appendFile(path: string, content: string | Uint8Array): Promise<void> {
-    const norm = normalisePath(path);
+    const norm = normalisePath(path, this.workspaceBase);
     const existing = this.entries.get(norm);
 
     if (!existing) {
@@ -224,7 +227,7 @@ export class VirtualSandboxFileSystem<
   }
 
   async mkdir(_path: string, _options?: { recursive?: boolean }): Promise<void> {
-    const norm = normalisePath(_path);
+    const norm = normalisePath(_path, this.workspaceBase);
     if (this.directories.has(norm)) return;
 
     if (_options?.recursive) {
@@ -243,7 +246,7 @@ export class VirtualSandboxFileSystem<
     path: string,
     options?: { recursive?: boolean; force?: boolean },
   ): Promise<void> {
-    const norm = normalisePath(path);
+    const norm = normalisePath(path, this.workspaceBase);
     const entry = this.entries.get(norm);
 
     if (entry) {
@@ -282,8 +285,8 @@ export class VirtualSandboxFileSystem<
     dest: string,
     _options?: { recursive?: boolean },
   ): Promise<void> {
-    const normSrc = normalisePath(src);
-    const normDest = normalisePath(dest);
+    const normSrc = normalisePath(src, this.workspaceBase);
+    const normDest = normalisePath(dest, this.workspaceBase);
 
     const entry = this.entries.get(normSrc);
     if (entry) {
@@ -323,7 +326,7 @@ export class VirtualSandboxFileSystem<
   }
 
   resolvePath(base: string, path: string): string {
-    return posix.resolve(normalisePath(base), path);
+    return posix.resolve(normalisePath(base, this.workspaceBase), path);
   }
 
   // --------------------------------------------------------------------------
@@ -331,7 +334,7 @@ export class VirtualSandboxFileSystem<
   // --------------------------------------------------------------------------
 
   private addParentDirectories(filePath: string): void {
-    let dir = parentDir(normalisePath(filePath));
+    let dir = parentDir(normalisePath(filePath, this.workspaceBase));
     while (!this.directories.has(dir)) {
       this.directories.add(dir);
       dir = parentDir(dir);

@@ -79,6 +79,8 @@ export interface VirtualSandboxCreateOptions<
   TCtx,
 > extends SandboxCreateOptions {
   resolverContext: TCtx;
+  /** Base path for resolving relative filesystem paths (default "/"). */
+  workspaceBase?: string;
 }
 
 // ============================================================================
@@ -97,6 +99,7 @@ export interface VirtualSandboxState<
   sandboxId: string;
   fileTree: FileEntry<TMeta>[];
   resolverContext: TCtx;
+  workspaceBase?: string;
 }
 
 // ============================================================================

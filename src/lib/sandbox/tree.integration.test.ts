@@ -6,6 +6,7 @@ function createMockFs(
   structure: Record<string, { isDir: boolean; isLink?: boolean; linkTarget?: string }>,
 ): SandboxFileSystem {
   return {
+    workspaceBase: "/",
     exists: async (path: string) => path in structure,
     stat: async (path: string) => {
       const entry = structure[path];

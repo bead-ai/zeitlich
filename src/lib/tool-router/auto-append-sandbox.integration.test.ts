@@ -136,6 +136,7 @@ describe("withSandbox", () => {
         persistence: false,
       },
       fs: {
+        workspaceBase: "/",
         exists: async () => false,
         stat: async () => ({
           isFile: false,

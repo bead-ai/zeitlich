@@ -10,6 +10,8 @@ export interface DaytonaSandboxConfig {
   apiKey?: string;
   apiUrl?: string;
   target?: string;
+  /** Default base path for resolving relative filesystem paths. */
+  workspaceBase?: string;
 }
 
 export interface DaytonaSandboxCreateOptions extends SandboxCreateOptions {
@@ -31,4 +33,6 @@ export interface DaytonaSandboxCreateOptions extends SandboxCreateOptions {
   labels?: Record<string, string>;
   /** Timeout in seconds for sandbox creation. Default 60. */
   timeout?: number;
+  /** Base path for resolving relative filesystem paths in this sandbox. */
+  workspaceBase?: string;
 }

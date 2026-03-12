@@ -24,6 +24,8 @@ export interface FileStat {
  * {@link SandboxNotSupportedError}.
  */
 export interface SandboxFileSystem {
+  /** Base directory used when resolving relative paths. */
+  readonly workspaceBase: string;
   readFile(path: string): Promise<string>;
   readFileBuffer(path: string): Promise<Uint8Array>;
   writeFile(path: string, content: string | Uint8Array): Promise<void>;

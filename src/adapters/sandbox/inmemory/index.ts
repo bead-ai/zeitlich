@@ -26,9 +26,11 @@ import { getShortId } from "../../../lib/thread/id";
 // ============================================================================
 
 function toSandboxFs(fs: IFileSystem): SandboxFileSystem {
-  const normalisePath = (path: string): string => fs.resolvePath("/", path);
+  const workspaceBase = "/";
+  const normalisePath = (path: string): string => fs.resolvePath(workspaceBase, path);
 
   return {
+    workspaceBase,
     readFile: (path) => fs.readFile(normalisePath(path)),
     readFileBuffer: (path) => fs.readFileBuffer(normalisePath(path)),
     writeFile: (path, content) => fs.writeFile(normalisePath(path), content),

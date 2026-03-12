@@ -67,7 +67,9 @@ export const createSession = async <T extends ToolMap, M = unknown>({
 }: SessionConfig<T, M>): Promise<ZeitlichSession<M>> => {
   const sourceThreadId = continueThread ? providedThreadId : undefined;
   const threadId =
-    continueThread && providedThreadId ? getShortId() : (providedThreadId ?? getShortId());
+    continueThread && providedThreadId
+      ? getShortId()
+      : (providedThreadId ?? getShortId());
 
   const {
     appendToolResult,
@@ -149,9 +151,7 @@ export const createSession = async <T extends ToolMap, M = unknown>({
         const result = await sandboxOps.createSandbox({ id: threadId });
         sandboxId = result.sandboxId;
         if (result.stateUpdate) {
-          stateManager.mergeUpdate(
-            result.stateUpdate as Partial<TState>,
-          );
+          stateManager.mergeUpdate(result.stateUpdate as Partial<TState>);
         }
       }
 
