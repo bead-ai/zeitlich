@@ -11,10 +11,7 @@ export interface WorkflowSessionInput {
   sandboxId?: string;
 }
 
-/**
- * Input shape supported by {@link defineWorkflow}.
- * You can extend this with any additional fields your workflow needs.
- */
+/** Raw workflow input fields that map into `WorkflowSessionInput`. */
 export interface WorkflowInput {
   /** When set, continue this thread instead of starting fresh */
   previousThreadId?: string;
@@ -23,24 +20,25 @@ export interface WorkflowInput {
 }
 
 /**
- * Wraps a main workflow function, translating input fields into
+ * Wraps a main workflow function, translating workflow input fields into
  * session-compatible fields that can be spread directly into `createSession`.
  *
  * The wrapper:
- * - Derives `threadId` + `continueThread` from `previousThreadId`
- * - Derives `sandboxId` from input
- * - Passes the full typed input as the first argument
+ * - Accepts a generic typed `input` as first argument
+ * - Accepts optional `workflowInput` ({ previousThreadId, sandboxId }) as second argument
+ * - Derives `threadId` + `continueThread` from `workflowInput.previousThreadId`
+ * - Derives `sandboxId` from `workflowInput.sandboxId`
  */
-export function defineWorkflow<TInput extends WorkflowInput, TResult>(
+export function defineWorkflow<TInput, TResult>(
   fn: (input: TInput, sessionInput: WorkflowSessionInput) => Promise<TResult>,
-): (input: TInput) => Promise<TResult> {
-  return async (input) => {
+): (input: TInput, workflowInput?: WorkflowInput) => Promise<TResult> {
+  return async (input, workflowInput = {}) => {
     const sessionInput: WorkflowSessionInput = {
-      ...(input.previousThreadId && {
-        threadId: input.previousThreadId,
+      ...(workflowInput.previousThreadId && {
+        threadId: workflowInput.previousThreadId,
         continueThread: true,
       }),
-      ...(input.sandboxId && { sandboxId: input.sandboxId }),
+      ...(workflowInput.sandboxId && { sandboxId: workflowInput.sandboxId }),
     };
     return fn(input, sessionInput);
   };
