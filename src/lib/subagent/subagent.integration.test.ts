@@ -6,9 +6,9 @@ vi.mock("@temporalio/workflow", () => {
   return {
     workflowInfo: () => ({ taskQueue: "default-queue" }),
     executeChild: vi.fn(async (_workflow: unknown, opts: { args: unknown[] }) => {
-      const input = (opts.args as [{ prompt: string }])[0];
+      const prompt = (opts.args as [string])[0];
       return {
-        toolResponse: `Response to: ${input.prompt}`,
+        toolResponse: `Response to: ${prompt}`,
         data: { result: "child-data" },
         threadId: "child-thread-1",
         usage: { inputTokens: 100, outputTokens: 50 },
@@ -28,7 +28,11 @@ import { createSubagentTool, SUBAGENT_TOOL_NAME } from "./tool";
 import { createSubagentHandler } from "./handler";
 import { buildSubagentRegistration } from "./register";
 import { defineSubagentWorkflow } from "./workflow";
-import type { SubagentConfig, SubagentSessionInput } from "./types";
+import type {
+  SubagentConfig,
+  SubagentSessionInput,
+  SubagentWorkflowInput,
+} from "./types";
 
 // ---------------------------------------------------------------------------
 // createSubagentTool
@@ -307,8 +311,8 @@ describe("createSubagentHandler", () => {
 
     const lastCall = execMock.mock.calls[execMock.mock.calls.length - 1];
     if (!lastCall) throw new Error("expected exec call");
-    const input = lastCall[1].args[0];
-    expect(input.sandboxId).toBe("parent-sb");
+    const workflowInput = lastCall[1].args[1] as SubagentWorkflowInput;
+    expect(workflowInput.sandboxId).toBe("parent-sb");
   });
 
   it("does not pass sandboxId when sandbox is own", async () => {
@@ -336,8 +340,8 @@ describe("createSubagentHandler", () => {
 
     const lastCall = execMock.mock.calls[execMock.mock.calls.length - 1];
     if (!lastCall) throw new Error("expected exec call");
-    const input = lastCall[1].args[0];
-    expect(input.sandboxId).toBeUndefined();
+    const workflowInput = lastCall[1].args[1] as SubagentWorkflowInput;
+    expect(workflowInput.sandboxId).toBeUndefined();
   });
 });
 
@@ -473,15 +477,18 @@ describe("buildSubagentRegistration", () => {
 
 describe("defineSubagentWorkflow", () => {
   it("maps previousThreadId to threadId + continueThread", async () => {
+    let capturedPrompt: string | undefined;
     let capturedSession: SubagentSessionInput | undefined;
 
-    const workflow = defineSubagentWorkflow(async (_input, sessionInput) => {
+    const workflow = defineSubagentWorkflow(async (prompt, sessionInput) => {
+      capturedPrompt = prompt;
       capturedSession = sessionInput;
       return { toolResponse: "ok", data: null, threadId: "t" };
     });
 
-    await workflow({ prompt: "go", previousThreadId: "prev-42" });
+    await workflow("go", { previousThreadId: "prev-42" });
 
+    expect(capturedPrompt).toBe("go");
     expect(capturedSession).toEqual({
       threadId: "prev-42",
       continueThread: true,
@@ -490,68 +497,36 @@ describe("defineSubagentWorkflow", () => {
 
   it("maps sandboxId", async () => {
     let capturedSession: SubagentSessionInput | undefined;
-
-    const workflow = defineSubagentWorkflow(async (_input, sessionInput) => {
+    const workflow = defineSubagentWorkflow(async (_prompt, sessionInput) => {
       capturedSession = sessionInput;
       return { toolResponse: "ok", data: null, threadId: "t" };
     });
 
-    await workflow({ prompt: "go", sandboxId: "sb-123" });
-
+    await workflow("go", { sandboxId: "sb-123" });
     expect(capturedSession).toEqual({ sandboxId: "sb-123" });
   });
 
-  it("maps both previousThreadId and sandboxId together", async () => {
-    let capturedSession: SubagentSessionInput | undefined;
-
-    const workflow = defineSubagentWorkflow(async (_input, sessionInput) => {
-      capturedSession = sessionInput;
+  it("passes context as optional third argument", async () => {
+    let capturedContext: Record<string, unknown> | undefined;
+    const workflow = defineSubagentWorkflow(async (_prompt, _sessionInput, context) => {
+      capturedContext = context;
       return { toolResponse: "ok", data: null, threadId: "t" };
     });
 
-    await workflow({ prompt: "go", previousThreadId: "prev-1", sandboxId: "sb-1" });
+    await workflow("go", {}, { key: "val" });
 
-    expect(capturedSession).toEqual({
-      threadId: "prev-1",
-      continueThread: true,
-      sandboxId: "sb-1",
-    });
+    expect(capturedContext).toEqual({ key: "val" });
   });
 
-  it("returns empty sessionInput when no previousThreadId or sandboxId", async () => {
-    let capturedSession: SubagentSessionInput | undefined;
-
-    const workflow = defineSubagentWorkflow(async (_input, sessionInput) => {
-      capturedSession = sessionInput;
+  it("supports omitted context", async () => {
+    let capturedContext: Record<string, unknown> | undefined;
+    const workflow = defineSubagentWorkflow(async (_prompt, _sessionInput, context) => {
+      capturedContext = context;
       return { toolResponse: "ok", data: null, threadId: "t" };
     });
 
-    await workflow({ prompt: "go" });
-
-    expect(capturedSession).toEqual({});
-  });
-
-  it("passes full SubagentInput as first argument", async () => {
-    let capturedInput: unknown;
-
-    const workflow = defineSubagentWorkflow(async (input, _sessionInput) => {
-      capturedInput = input;
-      return { toolResponse: "ok", data: null, threadId: "t" };
-    });
-
-    await workflow({
-      prompt: "research",
-      context: { key: "val" },
-      previousThreadId: "prev",
-      sandboxId: "sb",
-    });
-
-    expect(capturedInput).toEqual({
-      prompt: "research",
-      context: { key: "val" },
-      previousThreadId: "prev",
-      sandboxId: "sb",
-    });
+    await workflow("go", { sandboxId: "sb" });
+    expect(capturedContext).toBeUndefined();
   });
 
   it("returns the handler response unchanged", async () => {
@@ -561,7 +536,7 @@ describe("defineSubagentWorkflow", () => {
       threadId: "child-thread",
     }));
 
-    const result = await workflow({ prompt: "go" });
+    const result = await workflow("go", {});
 
     expect(result.toolResponse).toBe("result text");
     expect(result.data).toEqual({ count: 42 });

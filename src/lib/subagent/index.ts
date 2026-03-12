@@ -1,9 +1,9 @@
 export type {
   SubagentConfig,
   SubagentHooks,
-  SubagentInput,
   SubagentHandlerResponse,
   SubagentWorkflow,
+  SubagentWorkflowInput,
   SubagentSessionInput,
   InferSubagentResult,
 } from "./types";

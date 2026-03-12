@@ -388,9 +388,10 @@ const { runResearcherActivity } = proxyActivities<
 >({ startToCloseTimeout: "30m", heartbeatTimeout: "5m" });
 
 // Subagent workflow typed as SubagentWorkflow
-export const researcherSubagentWorkflow: SubagentWorkflow = async ({
+export const researcherSubagentWorkflow: SubagentWorkflow = async (
   prompt,
-}) => {
+  _workflowInput,
+) => {
   const { runId } = workflowInfo();
 
   const stateManager = createAgentStateManager({
@@ -461,16 +462,15 @@ When `continueThread` is true the session **forks** the provided thread — it c
 Subagents can opt in to thread continuation via `allowThreadContinuation`. When enabled, the parent agent can pass a `threadId` to resume a previous subagent conversation:
 
 ```typescript
-import { type SubagentWorkflow } from "zeitlich/workflow";
+import { defineSubagentWorkflow } from "zeitlich/workflow";
 
 // Subagent workflow that supports continuation
-export const researcherWorkflow: SubagentWorkflow = async ({
+export const researcherWorkflow = defineSubagentWorkflow(async (
   prompt,
-  previousThreadId,
-}) => {
+  sessionInput,
+) => {
   const session = await createSession({
-    threadId: previousThreadId, // undefined → fresh thread, set → fork
-    continueThread: !!previousThreadId,
+    ...sessionInput, // threadId/continueThread are provided by parent when resuming
     // ... other config
   });
 
@@ -480,7 +480,7 @@ export const researcherWorkflow: SubagentWorkflow = async ({
     data: null,
     threadId,
   };
-};
+});
 
 // Register with allowThreadContinuation
 export const researcherSubagent = {

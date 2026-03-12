@@ -3,6 +3,7 @@ import type {
   SubagentConfig,
   SubagentHandlerResponse,
   SubagentHooks,
+  SubagentWorkflowInput,
 } from "./types";
 import type { SubagentArgs } from "./tool";
 
@@ -13,11 +14,11 @@ import type { SubagentArgs } from "./tool";
  *
  * @example
  * ```ts
- * // With typed context — workflow must accept { prompt, context }
+ * // With typed context — workflow receives prompt, workflowInput, context
  * const researcher = defineSubagent({
  *   name: "researcher",
  *   description: "Researches topics",
- *   workflow: researcherWorkflow, // (input: { prompt: string; context: { apiKey: string } }) => Promise<...>
+ *   workflow: researcherWorkflow, // (prompt, workflowInput, context?: { apiKey: string }) => Promise<...>
  *   context: { apiKey: "..." },
  *   resultSchema: z.object({ findings: z.string() }),
  *   hooks: {
@@ -27,16 +28,16 @@ import type { SubagentArgs } from "./tool";
  *   },
  * });
  *
- * // Without context — workflow only needs { prompt }
+ * // Without context — workflow only needs prompt + workflowInput
  * const writer = defineSubagent({
  *   name: "writer",
  *   description: "Writes content",
- *   workflow: writerWorkflow, // (input: { prompt: string }) => Promise<...>
+ *   workflow: writerWorkflow, // (prompt, workflowInput) => Promise<...>
  *   resultSchema: z.object({ content: z.string() }),
  * });
  * ```
  */
-// With context — verifies workflow accepts { prompt, context: TContext }
+// With context — verifies workflow accepts (prompt, workflowInput, context?)
 export function defineSubagent<
   TResult extends z.ZodType = z.ZodType,
   TContext extends Record<string, unknown> = Record<string, unknown>,
@@ -44,24 +45,24 @@ export function defineSubagent<
   config: Omit<SubagentConfig<TResult>, "hooks" | "workflow" | "context"> & {
     workflow:
       | string
-      | ((input: {
-          prompt: string;
-          previousThreadId?: string;
-          context: TContext;
-        }) => Promise<SubagentHandlerResponse<z.infer<TResult> | null>>);
+      | ((
+          prompt: string,
+          workflowInput: SubagentWorkflowInput,
+          context?: TContext,
+        ) => Promise<SubagentHandlerResponse<z.infer<TResult> | null>>);
     context: TContext;
     hooks?: SubagentHooks<SubagentArgs, z.infer<TResult>>;
   }
 ): SubagentConfig<TResult>;
-// Without context — verifies workflow accepts { prompt }
+// Without context — verifies workflow accepts (prompt, workflowInput)
 export function defineSubagent<TResult extends z.ZodType = z.ZodType>(
   config: Omit<SubagentConfig<TResult>, "hooks" | "workflow"> & {
     workflow:
       | string
-      | ((input: {
-          prompt: string;
-          previousThreadId?: string;
-        }) => Promise<SubagentHandlerResponse<z.infer<TResult> | null>>);
+      | ((
+          prompt: string,
+          workflowInput: SubagentWorkflowInput,
+        ) => Promise<SubagentHandlerResponse<z.infer<TResult> | null>>);
     hooks?: SubagentHooks<SubagentArgs, z.infer<TResult>>;
   }
 ): SubagentConfig<TResult>;

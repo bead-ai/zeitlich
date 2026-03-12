@@ -1,17 +1,17 @@
 import type {
   SubagentHandlerResponse,
-  SubagentInput,
+  SubagentWorkflowInput,
   SubagentSessionInput,
 } from "./types";
 
 /**
- * Wraps a subagent workflow function, translating `SubagentInput` into
- * session-compatible fields that can be spread directly into `createSession`.
+ * Wraps a subagent workflow function and maps parent workflow input fields
+ * to session-compatible fields that can be spread into `createSession`.
  *
  * The wrapper:
  * - Derives `threadId` + `continueThread` from `previousThreadId`
- * - Derives `sandboxId` from the inherited sandbox
- * - Passes the full typed `SubagentInput` as the first argument
+ * - Derives `sandboxId` from inherited sandbox
+ * - Passes optional static context as the third argument
  *
  * @example
  * ```ts
@@ -22,7 +22,7 @@ import type {
  * } from 'zeitlich/workflow';
  *
  * export const researcherWorkflow = defineSubagentWorkflow(
- *   async (input, sessionInput) => {
+ *   async (prompt, sessionInput, context) => {
  *     const stateManager = createAgentStateManager({
  *       initialState: { systemPrompt: "You are a researcher." },
  *     });
@@ -31,7 +31,7 @@ import type {
  *       ...sessionInput,
  *       agentName: "researcher",
  *       runAgent: runAgentActivity,
- *       buildContextMessage: () => [{ type: "text", text: input.prompt }],
+ *       buildContextMessage: () => [{ type: "text", text: prompt }],
  *     });
  *
  *     const { finalMessage, threadId } = await session.runSession({ stateManager });
@@ -40,20 +40,28 @@ import type {
  * );
  * ```
  */
-export function defineSubagentWorkflow<TResult = null>(
+export function defineSubagentWorkflow<
+  TResult = null,
+  TContext extends Record<string, unknown> = Record<string, unknown>,
+>(
   fn: (
-    input: SubagentInput,
+    prompt: string,
     sessionInput: SubagentSessionInput,
+    context?: TContext,
   ) => Promise<SubagentHandlerResponse<TResult>>,
-): (input: SubagentInput) => Promise<SubagentHandlerResponse<TResult>> {
-  return async (input) => {
+): (
+  prompt: string,
+  workflowInput: SubagentWorkflowInput,
+  context?: TContext,
+) => Promise<SubagentHandlerResponse<TResult>> {
+  return async (prompt, workflowInput, context) => {
     const sessionInput: SubagentSessionInput = {
-      ...(input.previousThreadId && {
-        threadId: input.previousThreadId,
+      ...(workflowInput.previousThreadId && {
+        threadId: workflowInput.previousThreadId,
         continueThread: true,
       }),
-      ...(input.sandboxId && { sandboxId: input.sandboxId }),
+      ...(workflowInput.sandboxId && { sandboxId: workflowInput.sandboxId }),
     };
-    return fn(input, sessionInput);
+    return fn(prompt, sessionInput, context);
   };
 }

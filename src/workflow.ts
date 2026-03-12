@@ -25,6 +25,8 @@ export {
   proxySandboxOps,
 } from "./lib/session";
 export type { ZeitlichSession, ThreadOps, SessionConfig } from "./lib/session";
+export { defineWorkflow } from "./lib/workflow";
+export type { WorkflowInput, WorkflowSessionInput } from "./lib/workflow";
 
 // Thread utilities
 export { getShortId } from "./lib/thread";
@@ -131,9 +133,9 @@ export type {
 export type {
   SubagentConfig,
   SubagentHooks,
-  SubagentInput,
   SubagentHandlerResponse,
   SubagentWorkflow,
+  SubagentWorkflowInput,
   SubagentSessionInput,
 } from "./lib/subagent/types";
 // Sandbox types (workflow-safe — no activity-side code)

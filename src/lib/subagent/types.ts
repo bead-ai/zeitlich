@@ -9,8 +9,21 @@ import type {
 export type SubagentHandlerResponse<TResult = null> =
   ToolHandlerResponse<TResult> & { threadId: string };
 
+/**
+ * Raw workflow input fields passed from parent to child workflow.
+ * `defineSubagentWorkflow` maps this into `SubagentSessionInput`.
+ */
+export interface SubagentWorkflowInput {
+  /** Thread ID from parent for continuation */
+  previousThreadId?: string;
+  /** Sandbox ID inherited from parent */
+  sandboxId?: string;
+}
+
 export type SubagentWorkflow<TResult extends z.ZodType = z.ZodType> = (
-  input: SubagentInput
+  prompt: string,
+  workflowInput: SubagentWorkflowInput,
+  context?: Record<string, unknown>,
 ) => Promise<SubagentHandlerResponse<z.infer<TResult> | null>>;
 
 /** Infer the z.infer'd result type from a SubagentConfig, or null if no schema */
@@ -78,27 +91,12 @@ export interface SubagentHooks<TArgs = unknown, TResult = unknown> {
 }
 
 /**
- * Input passed to child workflows when spawned as subagents
- */
-export interface SubagentInput {
-  /** The prompt/task from the parent agent */
-  prompt: string;
-  /** Optional context parameters passed from the parent agent */
-  context?: Record<string, unknown>;
-  /** When set, the subagent should continue this thread instead of starting a new one */
-  previousThreadId?: string;
-  /** Sandbox ID inherited from the parent agent (when SubagentConfig.sandbox is 'inherit') */
-  sandboxId?: string;
-}
-
-/**
- * Session config fields derived from `SubagentInput`, ready to spread
- * into `createSession`. Produced by `defineSubagentWorkflow`.
+ * Session config fields passed from parent to child workflow.
  */
 export interface SubagentSessionInput {
-  /** Thread ID to continue (set from `SubagentInput.previousThreadId`) */
+  /** Thread ID to continue from */
   threadId?: string;
-  /** Whether to continue an existing thread (true when `previousThreadId` is present) */
+  /** Whether to continue an existing thread */
   continueThread?: boolean;
   /** Sandbox ID inherited from the parent agent */
   sandboxId?: string;

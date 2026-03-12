@@ -5,7 +5,7 @@ import type { ToolMessageContent } from "../types";
 import type {
   InferSubagentResult,
   SubagentConfig,
-  SubagentInput,
+  SubagentWorkflowInput,
 } from "./types";
 import type { SubagentArgs } from "./tool";
 import type { z } from "zod";
@@ -38,18 +38,21 @@ export function createSubagentHandler<
     const { sandboxId: parentSandboxId } = context;
     const inheritSandbox = config.sandbox !== "own" && !!parentSandboxId;
 
-    const input: SubagentInput = {
-      prompt: args.prompt,
-      ...(config.context && { context: config.context }),
+    const workflowInput: SubagentWorkflowInput = {
       ...(args.threadId &&
         args.threadId !== null &&
-        config.allowThreadContinuation && { previousThreadId: args.threadId }),
+        config.allowThreadContinuation && {
+          previousThreadId: args.threadId,
+        }),
       ...(inheritSandbox && { sandboxId: parentSandboxId }),
     };
 
     const childOpts = {
       workflowId: childWorkflowId,
-      args: [input] as const,
+      args:
+        config.context === undefined
+          ? ([args.prompt, workflowInput] as const)
+          : ([args.prompt, workflowInput, config.context] as const),
       taskQueue: config.taskQueue ?? parentTaskQueue,
     };
 
