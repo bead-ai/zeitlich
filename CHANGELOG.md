@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.16](https://github.com/bead-ai/zeitlich/compare/v0.2.15...v0.2.16) (2026-03-12)
+
+
+### Features
+
+* introduce workspaceBase for consistent path resolution in sandboxes ([5066050](https://github.com/bead-ai/zeitlich/commit/5066050b5da27b95cb066e1ff661d736f7ff510a))
+
+
+### Code Refactoring
+
+* normalize file paths in sandbox file systems ([b61921b](https://github.com/bead-ai/zeitlich/commit/b61921bb0ea1dd125cf3b865883701eefaffb1c8))
+
+
+### Miscellaneous Chores
+
+* release 0.2.16 ([f39ce8f](https://github.com/bead-ai/zeitlich/commit/f39ce8f94f8c2d07309c6429a7aeeb70c227e755))
+
 ## [0.2.15](https://github.com/bead-ai/zeitlich/compare/v0.2.14...v0.2.15) (2026-03-10)
 
 
