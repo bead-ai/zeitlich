@@ -57,7 +57,7 @@ export function createSubagentTool<T extends SubagentConfig[]>(
           .string()
           .nullable()
           .describe(
-            "Thread ID to continue an existing conversation, or null to start a new one"
+            "Thread ID to continue an existing conversation from the same subagent, or null to start a new one"
           ),
       })
     : z.object(baseFields);

@@ -89,7 +89,7 @@ export function createSubagentHandler<
     if (config.allowThreadContinuation && childThreadId) {
       finalToolResponse =
         typeof toolResponse === "string"
-          ? `${toolResponse}\n\n[Thread ID: ${childThreadId}]`
+          ? `${toolResponse}\n\n[${config.agentName} Thread ID: ${childThreadId}]`
           : toolResponse;
     }
 
