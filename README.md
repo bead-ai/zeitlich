@@ -97,7 +97,8 @@ import {
   askUserQuestionTool,
   bashTool,
   defineTool,
-  type SubagentWorkflow,
+  defineSubagentWorkflow,
+  defineSubagent,
   type ModelInvoker,
 } from "zeitlich/workflow";
 
@@ -371,59 +372,68 @@ const session = await createSession({
 
 ### Subagents
 
-Spawn child agents as Temporal child workflows. Each subagent is a workflow typed with `SubagentWorkflow` that returns `{ toolResponse, data }`:
+Spawn child agents as Temporal child workflows. Use `defineSubagentWorkflow` to define the workflow with its metadata once, then `defineSubagent` to register it in the parent:
 
 ```typescript
-import { proxyActivities, workflowInfo } from "@temporalio/workflow";
+// researcher.workflow.ts
+import { proxyActivities } from "@temporalio/workflow";
 import {
   createAgentStateManager,
   createSession,
-  type SubagentWorkflow,
+  defineSubagentWorkflow,
 } from "zeitlich/workflow";
-import { agentConfig } from "./config";
 import type { createResearcherActivities } from "./activities";
 
 const { runResearcherActivity } = proxyActivities<
   ReturnType<typeof createResearcherActivities>
 >({ startToCloseTimeout: "30m", heartbeatTimeout: "5m" });
 
-// Subagent workflow typed as SubagentWorkflow
-export const researcherSubagentWorkflow: SubagentWorkflow = async (
-  prompt,
-  _workflowInput,
-) => {
-  const { runId } = workflowInfo();
+// Define the workflow — name, description (and optional resultSchema) live here
+export const researcherWorkflow = defineSubagentWorkflow(
+  {
+    name: "Researcher",
+    description: "Researches topics and gathers information",
+  },
+  async (prompt, sessionInput) => {
+    const stateManager = createAgentStateManager({
+      initialState: { systemPrompt: "You are a researcher." },
+    });
 
-  const stateManager = createAgentStateManager({
-    initialState: { systemPrompt: agentConfig.systemPrompt },
-    agentName: agentConfig.agentName,
-  });
+    const session = await createSession({
+      ...sessionInput, // spreads agentName, threadId, continueThread, sandboxId
+      runAgent: runResearcherActivity,
+      buildContextMessage: () => [{ type: "text", text: prompt }],
+    });
 
-  const session = await createSession({
-    ...agentConfig,
-    threadId: runId,
-    runAgent: runResearcherActivity,
-    buildContextMessage: () => [{ type: "text", text: prompt }],
-  });
-
-  const { finalMessage } = await session.runSession({ stateManager });
-  return {
-    toolResponse: finalMessage ? extractText(finalMessage) : "No response",
-    data: null,
-  };
-};
-
-// Register the subagent for the parent workflow
-export const researcherSubagent = {
-  agentName: agentConfig.agentName,
-  description: agentConfig.description,
-  workflow: researcherSubagentWorkflow,
-};
+    const { finalMessage, threadId } = await session.runSession({ stateManager });
+    return {
+      toolResponse: finalMessage ? extractText(finalMessage) : "No response",
+      data: null,
+      threadId,
+    };
+  },
+);
 ```
 
-In the parent workflow, pass subagents to `createSession`:
+In the parent workflow, register it with `defineSubagent` and pass it to `createSession`:
 
 ```typescript
+// parent.workflow.ts
+import { defineSubagent } from "zeitlich/workflow";
+import { researcherWorkflow } from "./researcher.workflow";
+
+// Metadata (name, description) comes from the workflow definition
+export const researcherSubagent = defineSubagent(researcherWorkflow);
+
+// Optionally override parent-specific config
+export const researcherSubagent = defineSubagent(researcherWorkflow, {
+  allowThreadContinuation: true,
+  sandbox: "own",
+  hooks: {
+    onPostExecution: ({ result }) => console.log("researcher done", result),
+  },
+});
+
 const session = await createSession({
   // ... other config
   subagents: [researcherSubagent, codeReviewerSubagent],
@@ -462,33 +472,32 @@ When `continueThread` is true the session **forks** the provided thread — it c
 Subagents can opt in to thread continuation via `allowThreadContinuation`. When enabled, the parent agent can pass a `threadId` to resume a previous subagent conversation:
 
 ```typescript
-import { defineSubagentWorkflow } from "zeitlich/workflow";
+import { defineSubagentWorkflow, defineSubagent } from "zeitlich/workflow";
 
-// Subagent workflow that supports continuation
-export const researcherWorkflow = defineSubagentWorkflow(async (
-  prompt,
-  sessionInput,
-) => {
-  const session = await createSession({
-    ...sessionInput, // threadId/continueThread are provided by parent when resuming
-    // ... other config
-  });
+export const researcherWorkflow = defineSubagentWorkflow(
+  {
+    name: "Researcher",
+    description: "Researches topics and gathers information",
+  },
+  async (prompt, sessionInput) => {
+    const session = await createSession({
+      ...sessionInput, // threadId/continueThread are provided by parent when resuming
+      // ... other config
+    });
 
-  const { threadId, finalMessage } = await session.runSession({ stateManager });
-  return {
-    toolResponse: finalMessage ? extractText(finalMessage) : "No response",
-    data: null,
-    threadId,
-  };
-});
+    const { threadId, finalMessage } = await session.runSession({ stateManager });
+    return {
+      toolResponse: finalMessage ? extractText(finalMessage) : "No response",
+      data: null,
+      threadId,
+    };
+  },
+);
 
-// Register with allowThreadContinuation
-export const researcherSubagent = {
-  agentName: "Researcher",
-  description: "Researches topics and gathers information",
-  workflow: researcherWorkflow,
+// Enable thread continuation in the parent registration
+export const researcherSubagent = defineSubagent(researcherWorkflow, {
   allowThreadContinuation: true,
-};
+});
 ```
 
 The subagent returns its `threadId` in the response, which the handler surfaces to the parent LLM as `[Thread ID: ...]`. The parent can then pass that ID back in a subsequent `Subagent` tool call to continue the conversation.
@@ -662,11 +671,12 @@ Safe for use in Temporal workflow files:
 | `createAgentStateManager`   | Creates a state manager for workflow state with query/update handlers                                  |
 | `createToolRouter`          | Creates a tool router (used internally by session, or for advanced use)                                |
 | `defineTool`                | Identity function for type-safe tool definition with handler and hooks                                 |
-| `defineSubagent`            | Identity function for type-safe subagent configuration                                                 |
+| `defineSubagentWorkflow`    | Defines a subagent workflow with embedded name, description, and optional resultSchema                 |
+| `defineSubagent`            | Creates a `SubagentConfig` from a `SubagentDefinition` with optional parent-specific overrides         |
 | `getShortId`                | Generate a compact, workflow-deterministic identifier (base-62, 12 chars)                              |
 | Tool definitions            | `askUserQuestionTool`, `globTool`, `grepTool`, `readFileTool`, `writeFileTool`, `editTool`, `bashTool` |
 | Task tools                  | `taskCreateTool`, `taskGetTool`, `taskListTool`, `taskUpdateTool` for workflow task management         |
-| Types                       | `SubagentWorkflow`, `ToolDefinition`, `ToolWithHandler`, `RouterContext`, `SessionConfig`, etc.        |
+| Types                       | `SubagentDefinition`, `SubagentConfig`, `ToolDefinition`, `ToolWithHandler`, `RouterContext`, `SessionConfig`, etc. |
 
 ### Activity Entry Point (`zeitlich`)
 
@@ -706,7 +716,8 @@ LangChain-specific implementations:
 | `RouterContext`          | Base context every tool handler receives (`threadId`, `toolCallId`, `toolName`, `sandboxId?`) |
 | `Hooks`                 | Combined session lifecycle + tool execution hooks                            |
 | `ToolRouterHooks`       | Narrowed hook interface for tool execution only (pre/post/failure)            |
-| `SubagentConfig`        | Configuration for subagent workflows                                         |
+| `SubagentDefinition`    | Callable subagent workflow with embedded metadata (from `defineSubagentWorkflow`) |
+| `SubagentConfig`        | Resolved subagent configuration consumed by `createSession`                  |
 | `AgentState`            | Generic agent state type                                                     |
 
 ## Architecture
