@@ -40,10 +40,46 @@ export function filesWithMimeType<TMeta>(
   });
 }
 
-function buildMatcher(pattern: string): (mime: string) => boolean {
+/**
+ * Check whether the tree contains a directory whose name matches the given
+ * pattern. Directories are inferred from file paths.
+ *
+ * Patterns:
+ * - Exact: `"src"`
+ * - Glob with `*` wildcard: `"test*"`, `"*.generated"`
+ *
+ * ```ts
+ * { enabled: hasDirectory(tree, "test*") }
+ * ```
+ */
+export function hasDirectory(
+  tree: VirtualFileTree,
+  pattern: string,
+): boolean {
+  const match = buildGlobMatcher(pattern);
+  return tree.some((entry) => {
+    const segments = entry.path.split("/").filter(Boolean);
+    // Every segment except the last is a directory name
+    return segments.slice(0, -1).some(match);
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Internal matchers
+// ---------------------------------------------------------------------------
+
+function buildMatcher(pattern: string): (value: string) => boolean {
   if (pattern.endsWith("/*")) {
     const prefix = pattern.slice(0, -1);
-    return (mime) => mime.startsWith(prefix);
+    return (v) => v.startsWith(prefix);
   }
-  return (mime) => mime === pattern;
+  return (v) => v === pattern;
+}
+
+function buildGlobMatcher(pattern: string): (value: string) => boolean {
+  if (!pattern.includes("*")) return (v) => v === pattern;
+  const re = new RegExp(
+    "^" + pattern.replace(/[.+^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*") + "$",
+  );
+  return (v) => re.test(v);
 }
