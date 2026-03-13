@@ -5,11 +5,13 @@ import {
   type WorkflowSessionInput,
 } from "./workflow";
 
+const cfg = { name: "test-workflow" };
+
 describe("defineWorkflow", () => {
   it("maps previousThreadId to threadId + continueThread", async () => {
     let capturedSession: WorkflowSessionInput | undefined;
 
-    const workflow = defineWorkflow(async (_input, sessionInput) => {
+    const workflow = defineWorkflow(cfg, async (_input, sessionInput) => {
       capturedSession = sessionInput;
       return { ok: true };
     });
@@ -25,7 +27,7 @@ describe("defineWorkflow", () => {
   it("maps sandboxId", async () => {
     let capturedSession: WorkflowSessionInput | undefined;
 
-    const workflow = defineWorkflow(async (_input, sessionInput) => {
+    const workflow = defineWorkflow(cfg, async (_input, sessionInput) => {
       capturedSession = sessionInput;
       return { ok: true };
     });
@@ -38,7 +40,7 @@ describe("defineWorkflow", () => {
   it("maps both previousThreadId and sandboxId together", async () => {
     let capturedSession: WorkflowSessionInput | undefined;
 
-    const workflow = defineWorkflow(async (_input, sessionInput) => {
+    const workflow = defineWorkflow(cfg, async (_input, sessionInput) => {
       capturedSession = sessionInput;
       return { ok: true };
     });
@@ -55,7 +57,7 @@ describe("defineWorkflow", () => {
   it("returns empty sessionInput when no previousThreadId or sandboxId", async () => {
     let capturedSession: WorkflowSessionInput | undefined;
 
-    const workflow = defineWorkflow(async (_input, sessionInput) => {
+    const workflow = defineWorkflow(cfg, async (_input, sessionInput) => {
       capturedSession = sessionInput;
       return { ok: true };
     });
@@ -73,7 +75,7 @@ describe("defineWorkflow", () => {
       metadata: { key: string };
       previousThreadId?: string;
       sandboxId?: string;
-    }, { ok: boolean }>(async (input, _sessionInput) => {
+    }, { ok: boolean }>(cfg, async (input, _sessionInput) => {
       capturedInput = input;
       return { ok: true };
     });
@@ -94,6 +96,7 @@ describe("defineWorkflow", () => {
     let capturedSession: WorkflowSessionInput | undefined;
 
     const workflow = defineWorkflow<{ prompt: string }, { ok: boolean }>(
+      cfg,
       async (input, sessionInput) => {
         capturedInput = input;
         capturedSession = sessionInput;
@@ -116,7 +119,7 @@ describe("defineWorkflow", () => {
   });
 
   it("returns the handler response unchanged", async () => {
-    const workflow = defineWorkflow(async () => ({
+    const workflow = defineWorkflow(cfg, async () => ({
       finalMessage: "result text",
       threadId: "thread-123",
     }));
@@ -127,5 +130,14 @@ describe("defineWorkflow", () => {
       finalMessage: "result text",
       threadId: "thread-123",
     });
+  });
+
+  it("sets the function name from config", () => {
+    const workflow = defineWorkflow(
+      { name: "my-main-workflow" },
+      async () => ({}),
+    );
+
+    expect(workflow.name).toBe("my-main-workflow");
   });
 });

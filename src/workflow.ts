@@ -26,7 +26,7 @@ export {
 } from "./lib/session";
 export type { ZeitlichSession, ThreadOps, SessionConfig } from "./lib/session";
 export { defineWorkflow } from "./lib/workflow";
-export type { WorkflowInput, WorkflowSessionInput } from "./lib/workflow";
+export type { WorkflowConfig, WorkflowInput, WorkflowSessionInput } from "./lib/workflow";
 
 // Thread utilities
 export { getShortId } from "./lib/thread";

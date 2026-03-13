@@ -19,20 +19,26 @@ export interface WorkflowInput {
   sandboxId?: string;
 }
 
+export interface WorkflowConfig {
+  /** Workflow name — used as the Temporal workflow function name */
+  name: string;
+}
+
 /**
  * Wraps a main workflow function, translating workflow input fields into
  * session-compatible fields that can be spread directly into `createSession`.
  *
  * The wrapper:
- * - Accepts a generic typed `input` as first argument
- * - Accepts optional `workflowInput` ({ previousThreadId, sandboxId }) as second argument
+ * - Accepts a `config` with at least a `name` (used for Temporal workflow naming)
+ * - Accepts a handler `fn` receiving `(input, sessionInput)`
  * - Derives `threadId` + `continueThread` from `workflowInput.previousThreadId`
  * - Derives `sandboxId` from `workflowInput.sandboxId`
  */
 export function defineWorkflow<TInput, TResult>(
+  config: WorkflowConfig,
   fn: (input: TInput, sessionInput: WorkflowSessionInput) => Promise<TResult>,
 ): (input: TInput, workflowInput?: WorkflowInput) => Promise<TResult> {
-  return async (input, workflowInput = {}) => {
+  const workflow = async (input: TInput, workflowInput: WorkflowInput = {}) => {
     const sessionInput: WorkflowSessionInput = {
       ...(workflowInput.previousThreadId && {
         threadId: workflowInput.previousThreadId,
@@ -42,4 +48,8 @@ export function defineWorkflow<TInput, TResult>(
     };
     return fn(input, sessionInput);
   };
+
+  Object.defineProperty(workflow, "name", { value: config.name });
+
+  return workflow;
 }
