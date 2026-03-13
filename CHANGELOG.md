@@ -2,6 +2,32 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.17](https://github.com/bead-ai/zeitlich/compare/v0.2.16...v0.2.17) (2026-03-13)
+
+
+### Features
+
+* add hasDirectory util for virtual fs ([42bf635](https://github.com/bead-ai/zeitlich/commit/42bf63507a6816f7194d86f3f46f36d0e0c8c5a0))
+* add mime type util for virtual fs ([31a88a9](https://github.com/bead-ai/zeitlich/commit/31a88a91a19a9484b25bf15c644d8123d7a7c5d6))
+* **subagent:** enhance defineSubagentWorkflow with metadata support ([d207ddd](https://github.com/bead-ai/zeitlich/commit/d207ddd6e0b00b993e2ceb75ce0152e1544986de))
+* **subagent:** enhance subagent workflow definition and registration ([b32c626](https://github.com/bead-ai/zeitlich/commit/b32c626ca8e47cea1af8a96c5aeb050030bc6f90))
+
+
+### Bug Fixes
+
+* add temporal workflwo name ([3e48964](https://github.com/bead-ai/zeitlich/commit/3e48964f836a42ae63c2c38d1520a4dd897e088a))
+
+
+### Code Refactoring
+
+* **subagent:** update workflow function signature and input handling ([8a04a3f](https://github.com/bead-ai/zeitlich/commit/8a04a3f7319645b005cfcc2e908fa84745cc7725))
+* **workflow:** update input handling in defineWorkflow function ([4df94ac](https://github.com/bead-ai/zeitlich/commit/4df94accddbcfd34fbf5b4081d577557d9557874))
+
+
+### Miscellaneous Chores
+
+* release 0.2.17 ([e2f319b](https://github.com/bead-ai/zeitlich/commit/e2f319b78a7f5931b57119dd12d511c58b9f1f14))
+
 ## [0.2.16](https://github.com/bead-ai/zeitlich/compare/v0.2.15...v0.2.16) (2026-03-12)
 
 
