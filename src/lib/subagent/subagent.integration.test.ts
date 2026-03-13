@@ -493,6 +493,7 @@ describe("defineSubagentWorkflow", () => {
 
     expect(capturedPrompt).toBe("go");
     expect(capturedSession).toEqual({
+      agentName: "test",
       threadId: "prev-42",
       continueThread: true,
     });
@@ -509,7 +510,7 @@ describe("defineSubagentWorkflow", () => {
     );
 
     await workflow("go", { sandboxId: "sb-123" });
-    expect(capturedSession).toEqual({ sandboxId: "sb-123" });
+    expect(capturedSession).toEqual({ agentName: "test", sandboxId: "sb-123" });
   });
 
   it("passes context as optional third argument", async () => {

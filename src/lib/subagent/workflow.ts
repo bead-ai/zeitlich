@@ -73,6 +73,7 @@ export function defineSubagentWorkflow<
     context?: TContext,
   ): Promise<SubagentHandlerResponse<z.infer<TResult> | null>> => {
     const sessionInput: SubagentSessionInput = {
+      agentName: config.name,
       ...(workflowInput.previousThreadId && {
         threadId: workflowInput.previousThreadId,
         continueThread: true,

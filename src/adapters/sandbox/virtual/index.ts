@@ -77,6 +77,7 @@ export function createVirtualSandbox<
 export { VirtualSandboxFileSystem } from "./filesystem";
 export { VirtualSandboxProvider } from "./provider";
 export { withVirtualSandbox } from "./with-virtual-sandbox";
+export { hasFileWithMimeType, filesWithMimeType } from "./queries";
 export type {
   FileEntry,
   FileEntryMetadata,

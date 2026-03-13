@@ -111,6 +111,8 @@ export interface SubagentHooks<TArgs = unknown, TResult = unknown> {
  * Session config fields passed from parent to child workflow.
  */
 export interface SubagentSessionInput {
+  /** Agent name — spread directly into `createSession` */
+  agentName: string;
   /** Thread ID to continue from */
   threadId?: string;
   /** Whether to continue an existing thread */
