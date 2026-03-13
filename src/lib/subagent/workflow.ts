@@ -100,6 +100,9 @@ export function defineSubagentWorkflow(
     return fn(prompt, sessionInput, context ?? {});
   };
 
+  // for temporal workflow name
+  Object.defineProperty(workflow, "name", { value: config.name });
+
   return Object.assign(workflow, {
     agentName: config.name,
     description: config.description,
