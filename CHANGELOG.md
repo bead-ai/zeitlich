@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.19](https://github.com/bead-ai/zeitlich/compare/v0.2.18...v0.2.19) (2026-03-13)
+
+
+### Code Refactoring
+
+* **subagent, tool-router:** enhance dynamic evaluation for properties ([0ef7b8f](https://github.com/bead-ai/zeitlich/commit/0ef7b8f75e8b5913c08b053ef363247e07456492))
+
+
+### Miscellaneous Chores
+
+* release 0.2.19 ([84479ea](https://github.com/bead-ai/zeitlich/commit/84479eabafdffab3397a352e02754d2958fccb59))
+
 ## [0.2.18](https://github.com/bead-ai/zeitlich/compare/v0.2.17...v0.2.18) (2026-03-13)
 
 
