@@ -5,19 +5,21 @@ vi.mock("@temporalio/workflow", () => {
   let counter = 0;
   return {
     workflowInfo: () => ({ taskQueue: "default-queue" }),
-    executeChild: vi.fn(async (_workflow: unknown, opts: { args: unknown[] }) => {
-      const prompt = (opts.args as [string])[0];
-      return {
-        toolResponse: `Response to: ${prompt}`,
-        data: { result: "child-data" },
-        threadId: "child-thread-1",
-        usage: { inputTokens: 100, outputTokens: 50 },
-      };
-    }),
+    executeChild: vi.fn(
+      async (_workflow: unknown, opts: { args: unknown[] }) => {
+        const prompt = (opts.args as [string])[0];
+        return {
+          toolResponse: `Response to: ${prompt}`,
+          data: { result: "child-data" },
+          threadId: "child-thread-1",
+          usage: { inputTokens: 100, outputTokens: 50 },
+        };
+      }
+    ),
     uuid4: () => {
       counter++;
       const bytes = Array.from({ length: 16 }, (_, i) =>
-        ((counter * 31 + i * 7) & 0xff).toString(16).padStart(2, "0"),
+        ((counter * 31 + i * 7) & 0xff).toString(16).padStart(2, "0")
       ).join("");
       return `${bytes.slice(0, 8)}-${bytes.slice(8, 12)}-${bytes.slice(12, 16)}-${bytes.slice(16, 20)}-${bytes.slice(20, 32)}`;
     },
@@ -28,6 +30,7 @@ import { createSubagentTool, SUBAGENT_TOOL_NAME } from "./tool";
 import { createSubagentHandler } from "./handler";
 import { buildSubagentRegistration } from "./register";
 import { defineSubagentWorkflow } from "./workflow";
+import { defineSubagent } from "./define";
 import type {
   SubagentConfig,
   SubagentSessionInput,
@@ -146,7 +149,7 @@ describe("createSubagentTool", () => {
 
   it("throws when no subagents are provided", () => {
     expect(() => createSubagentTool([])).toThrow(
-      "createSubagentTool requires at least one subagent",
+      "createSubagentTool requires at least one subagent"
     );
   });
 
@@ -180,7 +183,7 @@ describe("createSubagentHandler", () => {
 
     const result = await handler(
       { subagent: "researcher", description: "test", prompt: "Find info" },
-      { threadId: "parent-thread", toolCallId: "tc-1", toolName: "Subagent" },
+      { threadId: "parent-thread", toolCallId: "tc-1", toolName: "Subagent" }
     );
 
     expect(result.toolResponse).toContain("Response to: Find info");
@@ -193,8 +196,8 @@ describe("createSubagentHandler", () => {
     await expect(
       handler(
         { subagent: "nonexistent", description: "test", prompt: "test" },
-        { threadId: "t", toolCallId: "tc", toolName: "Subagent" },
-      ),
+        { threadId: "t", toolCallId: "tc", toolName: "Subagent" }
+      )
     ).rejects.toThrow("Unknown subagent: nonexistent");
   });
 
@@ -211,8 +214,8 @@ describe("createSubagentHandler", () => {
     await expect(
       handler(
         { subagent: "bad", description: "test", prompt: "test" },
-        { threadId: "t", toolCallId: "tc", toolName: "Subagent" },
-      ),
+        { threadId: "t", toolCallId: "tc", toolName: "Subagent" }
+      )
     ).rejects.toThrow(/researcher.*writer/);
   });
 
@@ -235,7 +238,7 @@ describe("createSubagentHandler", () => {
 
     const result = await handler(
       { subagent: "validated", description: "test", prompt: "test" },
-      { threadId: "t", toolCallId: "tc", toolName: "Subagent" },
+      { threadId: "t", toolCallId: "tc", toolName: "Subagent" }
     );
 
     expect(result.toolResponse).toContain("invalid data");
@@ -261,7 +264,7 @@ describe("createSubagentHandler", () => {
 
     const result = await handler(
       { subagent: "cont", description: "test", prompt: "test" },
-      { threadId: "t", toolCallId: "tc", toolName: "Subagent" },
+      { threadId: "t", toolCallId: "tc", toolName: "Subagent" }
     );
 
     expect(result.toolResponse).toContain("Thread ID: child-thread-99");
@@ -279,7 +282,7 @@ describe("createSubagentHandler", () => {
 
     const result = await handler(
       { subagent: "researcher", description: "test", prompt: "test" },
-      { threadId: "t", toolCallId: "tc", toolName: "Subagent" },
+      { threadId: "t", toolCallId: "tc", toolName: "Subagent" }
     );
 
     expect(result.toolResponse).toContain("no response");
@@ -306,7 +309,12 @@ describe("createSubagentHandler", () => {
 
     await handler(
       { subagent: "inherit-agent", description: "test", prompt: "test" },
-      { threadId: "t", toolCallId: "tc", toolName: "Subagent", sandboxId: "parent-sb" },
+      {
+        threadId: "t",
+        toolCallId: "tc",
+        toolName: "Subagent",
+        sandboxId: "parent-sb",
+      }
     );
 
     const lastCall = execMock.mock.calls[execMock.mock.calls.length - 1];
@@ -335,7 +343,12 @@ describe("createSubagentHandler", () => {
 
     await handler(
       { subagent: "own-agent", description: "test", prompt: "test" },
-      { threadId: "t", toolCallId: "tc", toolName: "Subagent", sandboxId: "parent-sb" },
+      {
+        threadId: "t",
+        toolCallId: "tc",
+        toolName: "Subagent",
+        sandboxId: "parent-sb",
+      }
     );
 
     const lastCall = execMock.mock.calls[execMock.mock.calls.length - 1];
@@ -472,6 +485,48 @@ describe("buildSubagentRegistration", () => {
 });
 
 // ---------------------------------------------------------------------------
+// defineSubagent
+// ---------------------------------------------------------------------------
+
+describe("defineSubagent", () => {
+  const makeDef = (name: string) =>
+    defineSubagentWorkflow(
+      { name, description: `${name} agent` },
+      async () => ({ toolResponse: "ok", data: null, threadId: "t" })
+    );
+
+  it("preserves getter on enabled so dynamic state is re-evaluated", () => {
+    let flag = true;
+    const config = defineSubagent(makeDef("dynamic"), {
+      get enabled() {
+        return flag;
+      },
+    });
+
+    expect(config.enabled).toBe(true);
+    flag = false;
+    expect(config.enabled).toBe(false);
+  });
+
+  it("preserves getter through buildSubagentRegistration", () => {
+    let flag = true;
+    const config = defineSubagent(makeDef("dynamic"), {
+      get enabled() {
+        return flag;
+      },
+    });
+
+    const reg = buildSubagentRegistration([config]);
+    expect(reg).toBeDefined();
+    if (!reg) return;
+    expect(reg.enabled).toBe(true);
+
+    flag = false;
+    expect(reg.enabled).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // defineSubagentWorkflow
 // ---------------------------------------------------------------------------
 
@@ -486,7 +541,7 @@ describe("defineSubagentWorkflow", () => {
         capturedPrompt = prompt;
         capturedSession = sessionInput;
         return { toolResponse: "ok", data: null, threadId: "t" };
-      },
+      }
     );
 
     await workflow("go", { previousThreadId: "prev-42" });
@@ -506,7 +561,7 @@ describe("defineSubagentWorkflow", () => {
       async (_prompt, sessionInput) => {
         capturedSession = sessionInput;
         return { toolResponse: "ok", data: null, threadId: "t" };
-      },
+      }
     );
 
     await workflow("go", { sandboxId: "sb-123" });
@@ -520,7 +575,7 @@ describe("defineSubagentWorkflow", () => {
       async (_prompt, _sessionInput, context) => {
         capturedContext = context;
         return { toolResponse: "ok", data: null, threadId: "t" };
-      },
+      }
     );
 
     await workflow("go", {}, { key: "val" });
@@ -535,7 +590,7 @@ describe("defineSubagentWorkflow", () => {
       async (_prompt, _sessionInput, context) => {
         capturedContext = context;
         return { toolResponse: "ok", data: null, threadId: "t" };
-      },
+      }
     );
 
     await workflow("go", { sandboxId: "sb" });
@@ -544,12 +599,16 @@ describe("defineSubagentWorkflow", () => {
 
   it("returns the handler response unchanged", async () => {
     const workflow = defineSubagentWorkflow(
-      { name: "test", description: "test agent", resultSchema: z.object({ count: z.number() }) },
+      {
+        name: "test",
+        description: "test agent",
+        resultSchema: z.object({ count: z.number() }),
+      },
       async () => ({
         toolResponse: "result text",
         data: { count: 42 },
         threadId: "child-thread",
-      }),
+      })
     );
 
     const result = await workflow("go", {});
@@ -562,8 +621,12 @@ describe("defineSubagentWorkflow", () => {
   it("attaches metadata to the returned workflow function", () => {
     const schema = z.object({ findings: z.string() });
     const workflow = defineSubagentWorkflow(
-      { name: "researcher", description: "Researches topics", resultSchema: schema },
-      async () => ({ toolResponse: "ok", data: null, threadId: "t" }),
+      {
+        name: "researcher",
+        description: "Researches topics",
+        resultSchema: schema,
+      },
+      async () => ({ toolResponse: "ok", data: null, threadId: "t" })
     );
 
     expect(workflow.agentName).toBe("researcher");

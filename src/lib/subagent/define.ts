@@ -46,13 +46,21 @@ export function defineSubagent<
     sandbox?: "inherit" | "own";
   },
 ): SubagentConfig<TResult> {
-  return {
+  const config = {
     agentName: definition.agentName,
     description: definition.description,
     workflow: definition as SubagentWorkflow<TResult>,
     ...(definition.resultSchema !== undefined && {
       resultSchema: definition.resultSchema,
     }),
-    ...overrides,
   } as SubagentConfig<TResult>;
+
+  if (overrides) {
+    Object.defineProperties(
+      config,
+      Object.getOwnPropertyDescriptors(overrides),
+    );
+  }
+
+  return config;
 }
