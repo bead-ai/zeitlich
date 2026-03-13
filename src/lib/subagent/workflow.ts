@@ -52,26 +52,43 @@ import type {
  * });
  * ```
  */
+// Without resultSchema — data is null
 export function defineSubagentWorkflow<
-  TResult extends z.ZodType = z.ZodType,
   TContext extends Record<string, unknown> = Record<string, unknown>,
 >(
-  config: {
-    name: string;
-    description: string;
-    resultSchema?: TResult;
-  },
+  config: { name: string; description: string },
+  fn: (
+    prompt: string,
+    sessionInput: SubagentSessionInput,
+    context?: TContext,
+  ) => Promise<SubagentHandlerResponse<null>>,
+): SubagentDefinition<z.ZodNull, TContext>;
+// With resultSchema — data is inferred from the schema
+export function defineSubagentWorkflow<
+  TResult extends z.ZodType,
+  TContext extends Record<string, unknown> = Record<string, unknown>,
+>(
+  config: { name: string; description: string; resultSchema: TResult },
   fn: (
     prompt: string,
     sessionInput: SubagentSessionInput,
     context?: TContext,
   ) => Promise<SubagentHandlerResponse<z.infer<TResult> | null>>,
-): SubagentDefinition<TResult, TContext> {
+): SubagentDefinition<TResult, TContext>;
+export function defineSubagentWorkflow(
+  config: { name: string; description: string; resultSchema?: z.ZodType },
+  fn: (
+    prompt: string,
+    sessionInput: SubagentSessionInput,
+    context?: Record<string, unknown>,
+  ) => Promise<SubagentHandlerResponse<unknown>>,
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+): SubagentDefinition<any, any> {
   const workflow = async (
     prompt: string,
     workflowInput: SubagentWorkflowInput,
-    context?: TContext,
-  ): Promise<SubagentHandlerResponse<z.infer<TResult> | null>> => {
+    context?: Record<string, unknown>,
+  ): Promise<SubagentHandlerResponse<unknown>> => {
     const sessionInput: SubagentSessionInput = {
       agentName: config.name,
       ...(workflowInput.previousThreadId && {
@@ -87,5 +104,6 @@ export function defineSubagentWorkflow<
     agentName: config.name,
     description: config.description,
     ...(config.resultSchema !== undefined && { resultSchema: config.resultSchema }),
-  }) as SubagentDefinition<TResult, TContext>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  }) as SubagentDefinition<any, any>;
 }

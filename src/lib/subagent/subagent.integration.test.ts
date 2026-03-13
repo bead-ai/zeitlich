@@ -544,7 +544,7 @@ describe("defineSubagentWorkflow", () => {
 
   it("returns the handler response unchanged", async () => {
     const workflow = defineSubagentWorkflow(
-      { name: "test", description: "test agent" },
+      { name: "test", description: "test agent", resultSchema: z.object({ count: z.number() }) },
       async () => ({
         toolResponse: "result text",
         data: { count: 42 },
