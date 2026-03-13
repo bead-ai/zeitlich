@@ -63,9 +63,11 @@ export function createToolRouter<T extends ToolMap>(
     toolMap.set(tool.name, tool as T[keyof T]);
   }
 
-  /** Check if a tool is enabled (defaults to true when not specified) */
+  const resolve = <T,>(v: T | (() => T)): T =>
+    typeof v === "function" ? (v as () => T)() : v;
+
   const isEnabled = (tool: ToolMap[string]): boolean =>
-    typeof tool.enabled === "function" ? tool.enabled() : (tool.enabled ?? true);
+    resolve(tool.enabled) ?? true;
 
   if (options.plugins) {
     for (const plugin of options.plugins) {
@@ -269,7 +271,7 @@ export function createToolRouter<T extends ToolMap>(
         throw new Error(`Tool ${toolCall.name} not found`);
       }
 
-      const parsedArgs = tool.schema.parse(toolCall.args);
+      const parsedArgs = resolve(tool.schema).parse(toolCall.args);
 
       return {
         id: toolCall.id ?? "",
@@ -294,8 +296,8 @@ export function createToolRouter<T extends ToolMap>(
         .filter(([, tool]) => isEnabled(tool))
         .map(([name, tool]) => ({
           name,
-          description: tool.description,
-          schema: tool.schema,
+          description: resolve(tool.description),
+          schema: resolve(tool.schema),
           strict: tool.strict,
           max_uses: tool.max_uses,
         }));

@@ -397,10 +397,10 @@ describe("buildSubagentRegistration", () => {
 
     expect(reg).toBeDefined();
     if (!reg) return;
-    expect(reg.enabled).toBe(true);
+    expect((reg.enabled as () => boolean)()).toBe(true);
 
     flag = false;
-    expect(reg.enabled).toBe(false);
+    expect((reg.enabled as () => boolean)()).toBe(false);
   });
 
   it("disabled when all subagents are disabled", () => {
@@ -415,7 +415,7 @@ describe("buildSubagentRegistration", () => {
 
     expect(reg).toBeDefined();
     if (reg) {
-      expect(reg.enabled).toBe(false);
+      expect((reg.enabled as () => boolean)()).toBe(false);
     }
   });
 
@@ -519,10 +519,10 @@ describe("defineSubagent", () => {
     const reg = buildSubagentRegistration([config]);
     expect(reg).toBeDefined();
     if (!reg) return;
-    expect(reg.enabled).toBe(true);
+    expect((reg.enabled as () => boolean)()).toBe(true);
 
     flag = false;
-    expect(reg.enabled).toBe(false);
+    expect((reg.enabled as () => boolean)()).toBe(false);
   });
 });
 

@@ -39,15 +39,9 @@ export function buildSubagentRegistration(
 
   return {
     name: SUBAGENT_TOOL_NAME,
-    get enabled(): boolean {
-      return getEnabled().length > 0;
-    },
-    get description(): string {
-      return createSubagentTool(getEnabled()).description;
-    },
-    get schema(): z.ZodObject<z.ZodRawShape> {
-      return createSubagentTool(getEnabled()).schema;
-    },
+    enabled: (): boolean => getEnabled().length > 0,
+    description: (): string => createSubagentTool(getEnabled()).description,
+    schema: (): z.ZodObject<z.ZodRawShape> => createSubagentTool(getEnabled()).schema,
     handler: createSubagentHandler(subagents),
     ...(subagentHooksMap.size > 0 && {
       hooks: {

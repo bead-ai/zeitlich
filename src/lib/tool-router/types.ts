@@ -58,8 +58,8 @@ export type ToolMap = Record<
   string,
   {
     name: string;
-    description: string;
-    schema: z.ZodType;
+    description: string | (() => string);
+    schema: z.ZodType | (() => z.ZodType);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     handler: ToolHandler<any, any, any>;
     strict?: boolean;
