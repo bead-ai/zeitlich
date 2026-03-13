@@ -60,8 +60,8 @@ export function defineSubagentWorkflow<
   fn: (
     prompt: string,
     sessionInput: SubagentSessionInput,
-    context?: TContext,
-  ) => Promise<SubagentHandlerResponse<null>>,
+    context: TContext
+  ) => Promise<SubagentHandlerResponse<null>>
 ): SubagentDefinition<z.ZodNull, TContext>;
 // With resultSchema — data is inferred from the schema
 export function defineSubagentWorkflow<
@@ -72,22 +72,22 @@ export function defineSubagentWorkflow<
   fn: (
     prompt: string,
     sessionInput: SubagentSessionInput,
-    context?: TContext,
-  ) => Promise<SubagentHandlerResponse<z.infer<TResult> | null>>,
+    context: TContext
+  ) => Promise<SubagentHandlerResponse<z.infer<TResult> | null>>
 ): SubagentDefinition<TResult, TContext>;
 export function defineSubagentWorkflow(
   config: { name: string; description: string; resultSchema?: z.ZodType },
   fn: (
     prompt: string,
     sessionInput: SubagentSessionInput,
-    context?: Record<string, unknown>,
-  ) => Promise<SubagentHandlerResponse<unknown>>,
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+    context: Record<string, unknown>
+  ) => Promise<SubagentHandlerResponse<unknown>>
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): SubagentDefinition<any, any> {
   const workflow = async (
     prompt: string,
     workflowInput: SubagentWorkflowInput,
-    context?: Record<string, unknown>,
+    context?: Record<string, unknown>
   ): Promise<SubagentHandlerResponse<unknown>> => {
     const sessionInput: SubagentSessionInput = {
       agentName: config.name,
@@ -97,13 +97,15 @@ export function defineSubagentWorkflow(
       }),
       ...(workflowInput.sandboxId && { sandboxId: workflowInput.sandboxId }),
     };
-    return fn(prompt, sessionInput, context);
+    return fn(prompt, sessionInput, context ?? {});
   };
 
   return Object.assign(workflow, {
     agentName: config.name,
     description: config.description,
-    ...(config.resultSchema !== undefined && { resultSchema: config.resultSchema }),
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ...(config.resultSchema !== undefined && {
+      resultSchema: config.resultSchema,
+    }),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
   }) as SubagentDefinition<any, any>;
 }
