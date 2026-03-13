@@ -78,6 +78,7 @@ export { VirtualSandboxFileSystem } from "./filesystem";
 export { VirtualSandboxProvider } from "./provider";
 export { withVirtualSandbox } from "./with-virtual-sandbox";
 export { hasFileWithMimeType, filesWithMimeType, hasDirectory } from "./queries";
+export type { FileTreeAccessor } from "./queries";
 export type {
   FileEntry,
   FileEntryMetadata,

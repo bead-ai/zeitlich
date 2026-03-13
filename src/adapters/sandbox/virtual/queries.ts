@@ -1,4 +1,12 @@
-import type { FileEntry, VirtualFileTree } from "./types";
+import type { FileEntry } from "./types";
+
+/**
+ * Structural constraint: accepts any `AgentStateManager<T>` whose custom
+ * state includes `fileTree: FileEntry<TMeta>[]`.
+ */
+export interface FileTreeAccessor<TMeta> {
+  get(key: "fileTree"): FileEntry<TMeta>[];
+}
 
 /**
  * Check whether any file in the tree has a `metadata.mimeType` that matches
@@ -11,17 +19,20 @@ import type { FileEntry, VirtualFileTree } from "./types";
  * Useful for conditionally enabling tools:
  *
  * ```ts
- * { enabled: hasFileWithMimeType(tree, "image/*") }
+ * { enabled: hasFileWithMimeType(stateManager, "image/*") }
+ * { enabled: hasFileWithMimeType(stateManager, ["image/*", "application/pdf"]) }
  * ```
  */
-export function hasFileWithMimeType(
-  tree: VirtualFileTree,
-  pattern: string,
+export function hasFileWithMimeType<TMeta>(
+  stateManager: FileTreeAccessor<TMeta>,
+  pattern: string | string[],
 ): boolean {
-  const match = buildMatcher(pattern);
+  const tree = stateManager.get("fileTree");
+  const matchers = (Array.isArray(pattern) ? pattern : [pattern]).map(buildMatcher);
   return tree.some((entry) => {
-    const mime = entry.metadata?.mimeType;
-    return typeof mime === "string" && match(mime);
+    const meta = entry.metadata as Record<string, unknown> | undefined;
+    const mime = meta?.mimeType;
+    return typeof mime === "string" && matchers.some((m) => m(mime));
   });
 }
 
@@ -29,9 +40,10 @@ export function hasFileWithMimeType(
  * Return all entries whose `metadata.mimeType` matches the given pattern.
  */
 export function filesWithMimeType<TMeta>(
-  tree: FileEntry<TMeta>[],
+  stateManager: FileTreeAccessor<TMeta>,
   pattern: string,
 ): FileEntry<TMeta>[] {
+  const tree = stateManager.get("fileTree");
   const match = buildMatcher(pattern);
   return tree.filter((entry) => {
     const meta = entry.metadata as Record<string, unknown> | undefined;
@@ -49,17 +61,17 @@ export function filesWithMimeType<TMeta>(
  * - Glob with `*` wildcard: `"test*"`, `"*.generated"`
  *
  * ```ts
- * { enabled: hasDirectory(tree, "test*") }
+ * { enabled: hasDirectory(stateManager, "test*") }
  * ```
  */
-export function hasDirectory(
-  tree: VirtualFileTree,
+export function hasDirectory<TMeta>(
+  stateManager: FileTreeAccessor<TMeta>,
   pattern: string,
 ): boolean {
+  const tree = stateManager.get("fileTree");
   const match = buildGlobMatcher(pattern);
   return tree.some((entry) => {
     const segments = entry.path.split("/").filter(Boolean);
-    // Every segment except the last is a directory name
     return segments.slice(0, -1).some(match);
   });
 }

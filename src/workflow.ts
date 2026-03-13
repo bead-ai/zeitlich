@@ -163,6 +163,12 @@ export {
 // pulling activity-side code like VirtualSandboxFileSystem / Provider).
 export { applyVirtualTreeMutations } from "./adapters/sandbox/virtual/mutations";
 export { formatVirtualFileTree } from "./adapters/sandbox/virtual/tree";
+export {
+  hasFileWithMimeType,
+  filesWithMimeType,
+  hasDirectory,
+} from "./adapters/sandbox/virtual/queries";
+
 export type {
   FileEntry,
   FileEntryMetadata,
