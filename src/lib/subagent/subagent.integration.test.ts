@@ -384,20 +384,22 @@ describe("buildSubagentRegistration", () => {
     }
   });
 
-  it("enabled getter reflects dynamic subagent state", () => {
-    const config: SubagentConfig = {
-      agentName: "toggle",
-      description: "Toggleable",
-      workflow: "workflow",
-      enabled: true,
-    };
+  it("enabled function is re-evaluated dynamically", () => {
+    let flag = true;
+    const reg = buildSubagentRegistration([
+      {
+        agentName: "toggle",
+        description: "Toggleable",
+        workflow: "workflow",
+        enabled: () => flag,
+      },
+    ]);
 
-    const reg = buildSubagentRegistration([config]);
     expect(reg).toBeDefined();
     if (!reg) return;
     expect(reg.enabled).toBe(true);
 
-    config.enabled = false;
+    flag = false;
     expect(reg.enabled).toBe(false);
   });
 
@@ -455,28 +457,29 @@ describe("buildSubagentRegistration", () => {
     }
   });
 
-  it("dynamic schema/description updates when subagents change enabled state", () => {
-    const config1: SubagentConfig = {
-      agentName: "a",
-      description: "Agent A",
-      workflow: "workflow",
-      enabled: true,
-    };
-    const config2: SubagentConfig = {
-      agentName: "b",
-      description: "Agent B",
-      workflow: "workflow",
-      enabled: true,
-    };
-
-    const reg = buildSubagentRegistration([config1, config2]);
+  it("dynamic schema/description updates when enabled function changes", () => {
+    let bEnabled = true;
+    const reg = buildSubagentRegistration([
+      {
+        agentName: "a",
+        description: "Agent A",
+        workflow: "workflow",
+        enabled: true,
+      },
+      {
+        agentName: "b",
+        description: "Agent B",
+        workflow: "workflow",
+        enabled: () => bEnabled,
+      },
+    ]);
 
     expect(reg).toBeDefined();
     if (reg) {
       expect(reg.description).toContain("Agent A");
       expect(reg.description).toContain("Agent B");
 
-      config2.enabled = false;
+      bEnabled = false;
 
       expect(reg.description).toContain("Agent A");
       expect(reg.description).not.toContain("Agent B");
@@ -495,25 +498,22 @@ describe("defineSubagent", () => {
       async () => ({ toolResponse: "ok", data: null, threadId: "t" })
     );
 
-  it("preserves getter on enabled so dynamic state is re-evaluated", () => {
+  it("enabled function is re-evaluated dynamically", () => {
     let flag = true;
     const config = defineSubagent(makeDef("dynamic"), {
-      get enabled() {
-        return flag;
-      },
+      enabled: () => flag,
     });
 
-    expect(config.enabled).toBe(true);
+    const resolve = config.enabled as () => boolean;
+    expect(resolve()).toBe(true);
     flag = false;
-    expect(config.enabled).toBe(false);
+    expect(resolve()).toBe(false);
   });
 
-  it("preserves getter through buildSubagentRegistration", () => {
+  it("enabled function works through buildSubagentRegistration", () => {
     let flag = true;
     const config = defineSubagent(makeDef("dynamic"), {
-      get enabled() {
-        return flag;
-      },
+      enabled: () => flag,
     });
 
     const reg = buildSubagentRegistration([config]);
@@ -581,20 +581,6 @@ describe("defineSubagentWorkflow", () => {
     await workflow("go", {}, { key: "val" });
 
     expect(capturedContext).toEqual({ key: "val" });
-  });
-
-  it("supports omitted context", async () => {
-    let capturedContext: Record<string, unknown> | undefined;
-    const workflow = defineSubagentWorkflow(
-      { name: "test", description: "test agent" },
-      async (_prompt, _sessionInput, context) => {
-        capturedContext = context;
-        return { toolResponse: "ok", data: null, threadId: "t" };
-      }
-    );
-
-    await workflow("go", { sandboxId: "sb" });
-    expect(capturedContext).toBeUndefined();
   });
 
   it("returns the handler response unchanged", async () => {

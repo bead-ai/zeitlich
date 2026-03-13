@@ -64,7 +64,8 @@ export function createToolRouter<T extends ToolMap>(
   }
 
   /** Check if a tool is enabled (defaults to true when not specified) */
-  const isEnabled = (tool: ToolMap[string]): boolean => tool.enabled ?? true;
+  const isEnabled = (tool: ToolMap[string]): boolean =>
+    typeof tool.enabled === "function" ? tool.enabled() : (tool.enabled ?? true);
 
   if (options.plugins) {
     for (const plugin of options.plugins) {

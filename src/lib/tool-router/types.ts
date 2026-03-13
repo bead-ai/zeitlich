@@ -41,7 +41,7 @@ export interface ToolWithHandler<
   strict?: boolean;
   max_uses?: number;
   /** Whether this tool is available to the agent (default: true). Disabled tools are excluded from definitions and rejected at parse time. */
-  enabled?: boolean;
+  enabled?: boolean | (() => boolean);
   /** Per-tool lifecycle hooks (run in addition to global hooks) */
   hooks?: ToolHooks<z.infer<TSchema>, TResult>;
 }
@@ -64,7 +64,7 @@ export type ToolMap = Record<
     handler: ToolHandler<any, any, any>;
     strict?: boolean;
     max_uses?: number;
-    enabled?: boolean;
+    enabled?: boolean | (() => boolean);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     hooks?: ToolHooks<any, any>;
   }

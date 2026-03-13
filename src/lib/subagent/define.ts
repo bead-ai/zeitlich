@@ -40,27 +40,19 @@ export function defineSubagent<
   overrides?: {
     context?: TContext;
     hooks?: SubagentHooks<SubagentArgs, z.infer<TResult>>;
-    enabled?: boolean;
+    enabled?: boolean | (() => boolean);
     taskQueue?: string;
     allowThreadContinuation?: boolean;
     sandbox?: "inherit" | "own";
   },
 ): SubagentConfig<TResult> {
-  const config = {
+  return {
     agentName: definition.agentName,
     description: definition.description,
     workflow: definition as SubagentWorkflow<TResult>,
     ...(definition.resultSchema !== undefined && {
       resultSchema: definition.resultSchema,
     }),
+    ...overrides,
   } as SubagentConfig<TResult>;
-
-  if (overrides) {
-    Object.defineProperties(
-      config,
-      Object.getOwnPropertyDescriptors(overrides),
-    );
-  }
-
-  return config;
 }

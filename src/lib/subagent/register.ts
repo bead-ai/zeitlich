@@ -13,9 +13,9 @@ import { createSubagentHandler } from "./handler";
  * Builds a fully wired tool entry for the Subagent tool,
  * including per-subagent hook delegation.
  *
- * Uses getters for `enabled`, `description`, and `schema` so that
- * dynamic changes to SubagentConfig.enabled are re-evaluated each
- * time getToolDefinitions() is called.
+ * Lazily evaluates `enabled` (supports `boolean | () => boolean`)
+ * so that `description` and `schema` reflect the current set of
+ * active subagents each time getToolDefinitions() is called.
  *
  * Returns null if no subagents are configured.
  */
@@ -24,7 +24,10 @@ export function buildSubagentRegistration(
 ): ToolMap[string] | null {
   if (subagents.length === 0) return null;
 
-  const getEnabled = (): SubagentConfig[] => subagents.filter((s) => s.enabled ?? true);
+  const getEnabled = (): SubagentConfig[] =>
+    subagents.filter((s) =>
+      typeof s.enabled === "function" ? s.enabled() : (s.enabled ?? true),
+    );
 
   const subagentHooksMap = new Map<string, SubagentHooks>();
   for (const s of subagents) {
