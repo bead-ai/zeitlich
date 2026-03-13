@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.18](https://github.com/bead-ai/zeitlich/compare/v0.2.17...v0.2.18) (2026-03-13)
+
+
+### Features
+
+* **subagent:** support dynamic evaluation for enabled state ([2b5d0fa](https://github.com/bead-ai/zeitlich/commit/2b5d0faa71334fddb263d09e58d4ca6de0a3b21f))
+
+
+### Bug Fixes
+
+* getter support for enabled ([be177c2](https://github.com/bead-ai/zeitlich/commit/be177c261d87f0d05cb966140b545a6066c94bbc))
+
+
+### Miscellaneous Chores
+
+* release 0.2.18 ([c838d34](https://github.com/bead-ai/zeitlich/commit/c838d348a2c4b257be5e9dc403bc0c735fc522d8))
+
 ## [0.2.17](https://github.com/bead-ai/zeitlich/compare/v0.2.16...v0.2.17) (2026-03-13)
 
 
