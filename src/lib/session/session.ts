@@ -4,6 +4,7 @@ import {
   defineUpdate,
   setHandler,
   ApplicationFailure,
+  type ActivityInterfaceFor,
 } from "@temporalio/workflow";
 import type { SessionExitReason, MessageContent } from "../types";
 import type { ThreadOps, SessionConfig, ZeitlichSession } from "./types";
@@ -307,7 +308,7 @@ export const createSession = async <T extends ToolMap, M = unknown>({
  */
 export function proxyDefaultThreadOps(
   options?: Parameters<typeof proxyActivities>[0]
-): ThreadOps {
+): ActivityInterfaceFor<ThreadOps> {
   return proxyActivities<ThreadOps>(
     options ?? {
       startToCloseTimeout: "10s",

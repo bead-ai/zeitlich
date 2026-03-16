@@ -5,6 +5,7 @@ import type { ThreadOps } from "./types";
 import type { RunAgentActivity } from "../model/types";
 import type { RawToolCall } from "../tool-router/types";
 import type { SandboxOps } from "../sandbox/types";
+import type { ActivityInterfaceFor } from "@temporalio/workflow";
 
 let idCounter = 0;
 
@@ -51,9 +52,26 @@ type TurnScript = {
   usage?: TokenUsage;
 };
 
+/**
+ * Wraps every method on a ThreadOps object so it also has `.executeWithOptions()`,
+ * matching Temporal's `ActivityInterfaceFor<ThreadOps>` shape.
+ */
+function toActivityInterface(
+  raw: ThreadOps,
+): ActivityInterfaceFor<ThreadOps> {
+  const result = {} as Record<string, unknown>;
+  for (const [key, fn] of Object.entries(raw)) {
+    const wrapped = (...args: unknown[]) => (fn as (...a: unknown[]) => unknown)(...args);
+    wrapped.executeWithOptions = (_opts: unknown, args: unknown[]) =>
+      (fn as (...a: unknown[]) => unknown)(...args);
+    result[key] = wrapped;
+  }
+  return result as ActivityInterfaceFor<ThreadOps>;
+}
+
 function createMockThreadOps() {
   const log: { op: string; args: unknown[] }[] = [];
-  const ops: ThreadOps = {
+  const ops = toActivityInterface({
     initializeThread: async (threadId) => {
       log.push({ op: "initializeThread", args: [threadId] });
     },
@@ -71,7 +89,7 @@ function createMockThreadOps() {
     },
     saveSnapshot: async () => {},
     getSnapshot: async () => null,
-  };
+  });
   return { ops, log };
 }
 

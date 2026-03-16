@@ -15,6 +15,7 @@ import type { Skill } from "../skills/types";
 import type { SandboxOps, SandboxSnapshot } from "../sandbox/types";
 import type { RunAgentActivity } from "../model/types";
 import type { AgentStateManager, JsonSerializable } from "../state/types";
+import type { ActivityInterfaceFor } from "@temporalio/workflow";
 
 /**
  * Thread operations required by a session.
@@ -63,7 +64,7 @@ export interface SessionConfig<T extends ToolMap, M = unknown> {
   /** Workflow-specific runAgent activity (with tools pre-bound) */
   runAgent: RunAgentActivity<M>;
   /** Thread operations (initialize, append messages, parse tool calls) */
-  threadOps?: ThreadOps;
+  threadOps?: ActivityInterfaceFor<ThreadOps>;
   /** Tool router for processing tool calls (optional if agent has no tools) */
   tools?: T;
   /** Subagent configurations */

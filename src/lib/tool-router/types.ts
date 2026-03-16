@@ -4,6 +4,7 @@ import type {
   ToolResultConfig,
 } from "../types";
 import type { z } from "zod";
+import type { ActivityFunctionWithOptions } from "@temporalio/workflow";
 
 // ============================================================================
 // Tool Definition Types
@@ -114,7 +115,9 @@ export type ParsedToolCallUnion<T extends ToolMap> = {
 /**
  * Function signature for appending tool results to a thread.
  */
-export type AppendToolResultFn = (config: ToolResultConfig) => Promise<void>;
+export type AppendToolResultFn = ActivityFunctionWithOptions<
+  (config: ToolResultConfig) => Promise<void>
+>;
 
 /**
  * The response from a tool handler.
@@ -157,7 +160,11 @@ export interface RouterContext {
  * Receives the parsed args and a context that always includes {@link RouterContext}
  * fields, plus any additional properties when TContext extends RouterContext.
  */
-export type ToolHandler<TArgs, TResult, TContext extends RouterContext = RouterContext> = (
+export type ToolHandler<
+  TArgs,
+  TResult,
+  TContext extends RouterContext = RouterContext,
+> = (
   args: TArgs,
   context: TContext
 ) => ToolHandlerResponse<TResult> | Promise<ToolHandlerResponse<TResult>>;
@@ -392,7 +399,8 @@ export interface ToolRouterOptions<T extends ToolMap> {
   tools: T;
   /** Thread ID for appending tool results */
   threadId: string;
-  /** Function to append tool results to the thread (called automatically after each handler) */
+  /** Function to append tool results to the thread (called automatically after each handler).
+   *  Accepts a Temporal activity proxy with {@link ActivityFunctionWithOptions}. */
   appendToolResult: AppendToolResultFn;
   /** Whether to process tools in parallel (default: true) */
   parallel?: boolean;
@@ -445,10 +453,7 @@ export interface ToolRouter<T extends ToolMap> {
    * Process tool calls matching a specific name with a custom handler.
    * Useful for overriding the default handler for specific cases.
    */
-  processToolCallsByName<
-    TName extends ToolNames<T>,
-    TResult,
-  >(
+  processToolCallsByName<TName extends ToolNames<T>, TResult>(
     toolCalls: ParsedToolCallUnion<T>[],
     toolName: TName,
     handler: ToolHandler<ToolArgs<T, TName>, TResult>,

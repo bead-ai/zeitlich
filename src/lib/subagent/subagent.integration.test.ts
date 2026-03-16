@@ -476,13 +476,14 @@ describe("buildSubagentRegistration", () => {
 
     expect(reg).toBeDefined();
     if (reg) {
-      expect(reg.description).toContain("Agent A");
-      expect(reg.description).toContain("Agent B");
+      const desc = reg.description as () => string;
+      expect(desc()).toContain("Agent A");
+      expect(desc()).toContain("Agent B");
 
       bEnabled = false;
 
-      expect(reg.description).toContain("Agent A");
-      expect(reg.description).not.toContain("Agent B");
+      expect(desc()).toContain("Agent A");
+      expect(desc()).not.toContain("Agent B");
     }
   });
 });
