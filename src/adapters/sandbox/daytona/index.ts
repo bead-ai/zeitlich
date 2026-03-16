@@ -1,6 +1,7 @@
 import {
   Daytona,
   type Sandbox as DaytonaSdkSandbox,
+  type VolumeMount,
 } from "@daytonaio/sdk";
 import type {
   Sandbox,
@@ -13,7 +14,6 @@ import type {
 } from "../../../lib/sandbox/types";
 import {
   SandboxNotFoundError,
-  SandboxNotSupportedError,
 } from "../../../lib/sandbox/types";
 import { DaytonaSandboxFileSystem } from "./filesystem";
 import type {
@@ -30,7 +30,7 @@ class DaytonaSandboxImpl implements Sandbox {
   readonly capabilities: SandboxCapabilities = {
     filesystem: true,
     execution: true,
-    persistence: false,
+    persistence: true,
   };
 
   readonly fs: DaytonaSandboxFileSystem;
@@ -74,7 +74,7 @@ export class DaytonaSandboxProvider
   readonly capabilities: SandboxCapabilities = {
     filesystem: true,
     execution: true,
-    persistence: false,
+    persistence: true,
   };
 
   private client: Daytona;
@@ -140,16 +140,63 @@ export class DaytonaSandboxProvider
     }
   }
 
-  async snapshot(_sandboxId: string): Promise<SandboxSnapshot> {
-    throw new SandboxNotSupportedError(
-      "snapshot (use Daytona's native snapshot API directly)",
-    );
+  async snapshot(sandboxId: string): Promise<SandboxSnapshot> {
+    const workspaceBase =
+      this.workspaceBaseById.get(sandboxId) ?? this.defaultWorkspaceBase;
+
+    const volumeName = `snapshot-${sandboxId}-${Date.now()}`;
+    const volume = await this.client.volume.create(volumeName);
+
+    try {
+      const srcSandbox = await this.client.get(sandboxId);
+
+      // Pack the workspace into an archive inside the running sandbox
+      await srcSandbox.process.executeCommand(
+        `tar czf /tmp/snapshot.tar.gz -C "${workspaceBase}" .`,
+      );
+      const archive = await srcSandbox.fs.downloadFile("/tmp/snapshot.tar.gz");
+
+      // Spin up a short-lived sandbox with the volume pre-mounted, extract the
+      // archive into it, then delete the sandbox (volume retains the data)
+      const tempSandbox = await this.client.create({
+        volumes: [
+          { volumeId: volume.id, mountPath: workspaceBase } as VolumeMount,
+        ],
+        autoDeleteInterval: 10,
+      });
+      try {
+        await tempSandbox.fs.uploadFile(archive, "/tmp/snapshot.tar.gz");
+        await tempSandbox.process.executeCommand(
+          `tar xzf /tmp/snapshot.tar.gz -C "${workspaceBase}"`,
+        );
+      } finally {
+        await this.client.delete(tempSandbox);
+      }
+    } catch (err) {
+      await this.client.volume.delete(volume);
+      throw err;
+    }
+
+    return {
+      sandboxId,
+      providerId: this.id,
+      data: { volumeId: volume.id, volumeName: volume.name, workspaceBase },
+      createdAt: new Date().toISOString(),
+    };
   }
 
-  async restore(_snapshot: SandboxSnapshot): Promise<never> {
-    throw new SandboxNotSupportedError(
-      "restore (use Daytona's native snapshot API directly)",
-    );
+  async restore(snapshot: SandboxSnapshot): Promise<Sandbox> {
+    const { volumeId, workspaceBase } = snapshot.data as {
+      volumeId: string;
+      workspaceBase: string;
+    };
+
+    const sdkSandbox = await this.client.create({
+      volumes: [{ volumeId, mountPath: workspaceBase } as VolumeMount],
+    });
+
+    this.workspaceBaseById.set(sdkSandbox.id, workspaceBase);
+    return new DaytonaSandboxImpl(sdkSandbox.id, sdkSandbox, workspaceBase);
   }
 }
 
