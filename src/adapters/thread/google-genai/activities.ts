@@ -68,7 +68,7 @@ export interface GoogleGenAIAdapter {
  * ```
  */
 export function createGoogleGenAIAdapter(
-  config: GoogleGenAIAdapterConfig,
+  config: GoogleGenAIAdapterConfig
 ): GoogleGenAIAdapter {
   const { redis, client } = config;
 
@@ -80,29 +80,31 @@ export function createGoogleGenAIAdapter(
 
     async appendHumanMessage(
       threadId: string,
-      content: string | MessageContent,
+      id: string,
+      content: string | MessageContent
     ): Promise<void> {
       const thread = createGoogleGenAIThreadManager({ redis, threadId });
-      await thread.appendUserMessage(content);
+      await thread.appendUserMessage(id, content);
     },
 
     async appendSystemMessage(
       threadId: string,
-      content: string,
+      id: string,
+      content: string
     ): Promise<void> {
       const thread = createGoogleGenAIThreadManager({ redis, threadId });
-      await thread.appendSystemMessage(content);
+      await thread.appendSystemMessage(id, content);
     },
 
-    async appendToolResult(cfg: ToolResultConfig): Promise<void> {
+    async appendToolResult(id: string, cfg: ToolResultConfig): Promise<void> {
       const { threadId, toolCallId, toolName, content } = cfg;
       const thread = createGoogleGenAIThreadManager({ redis, threadId });
-      await thread.appendToolResult(toolCallId, toolName, content);
+      await thread.appendToolResult(id, toolCallId, toolName, content);
     },
 
     async forkThread(
       sourceThreadId: string,
-      targetThreadId: string,
+      targetThreadId: string
     ): Promise<void> {
       const thread = createGoogleGenAIThreadManager({
         redis,
@@ -120,7 +122,7 @@ export function createGoogleGenAIAdapter(
     : ((() => {
         throw new Error(
           "No default model provided to createGoogleGenAIAdapter. " +
-            "Either pass `model` in the config or use `createModelInvoker(model)` instead.",
+            "Either pass `model` in the config or use `createModelInvoker(model)` instead."
         );
       }) as unknown as ModelInvoker<Content>);
 

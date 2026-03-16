@@ -1,13 +1,10 @@
 import type Redis from "ioredis";
-import type {
-  GoogleGenAI,
-  Content,
-  FunctionDeclaration,
-} from "@google/genai";
+import type { GoogleGenAI, Content, FunctionDeclaration } from "@google/genai";
 import type { SerializableToolDefinition } from "../../../lib/types";
 import type { AgentResponse } from "../../../lib/model";
 import type { ModelInvokerConfig } from "../../../lib/model";
 import { createGoogleGenAIThreadManager } from "./thread-manager";
+import { v4 as uuidv4 } from "uuid";
 
 export interface GoogleGenAIModelInvokerConfig {
   redis: Redis;
@@ -16,7 +13,7 @@ export interface GoogleGenAIModelInvokerConfig {
 }
 
 function toFunctionDeclarations(
-  tools: SerializableToolDefinition[],
+  tools: SerializableToolDefinition[]
 ): FunctionDeclaration[] {
   return tools.map((t) => ({
     name: t.name,
@@ -73,7 +70,7 @@ export function createGoogleGenAIModelInvoker({
   model,
 }: GoogleGenAIModelInvokerConfig) {
   return async function invokeGoogleGenAIModel(
-    config: ModelInvokerConfig,
+    config: ModelInvokerConfig
   ): Promise<AgentResponse<Content>> {
     const { threadId, state } = config;
 
@@ -97,9 +94,7 @@ export function createGoogleGenAIModelInvoker({
 
     const functionDeclarations = toFunctionDeclarations(state.tools);
     const tools =
-      functionDeclarations.length > 0
-        ? [{ functionDeclarations }]
-        : undefined;
+      functionDeclarations.length > 0 ? [{ functionDeclarations }] : undefined;
 
     const response = await client.models.generateContent({
       model,
@@ -113,7 +108,7 @@ export function createGoogleGenAIModelInvoker({
     const responseParts = response.candidates?.[0]?.content?.parts ?? [];
     const modelContent: Content = { role: "model", parts: responseParts };
 
-    await thread.appendModelContent(responseParts);
+    await thread.appendModelContent(uuidv4(), responseParts);
 
     const functionCalls = response.functionCalls ?? [];
 

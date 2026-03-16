@@ -74,24 +74,26 @@ export function createLangChainAdapter(
 
     async appendHumanMessage(
       threadId: string,
+      id: string,
       content: string | MessageContent
     ): Promise<void> {
       const thread = createLangChainThreadManager({ redis, threadId });
-      await thread.appendHumanMessage(content);
+      await thread.appendHumanMessage(id, content);
     },
 
     async appendSystemMessage(
       threadId: string,
+      id: string,
       content: string
     ): Promise<void> {
       const thread = createLangChainThreadManager({ redis, threadId });
-      await thread.appendSystemMessage(content);
+      await thread.appendSystemMessage(id, content);
     },
 
-    async appendToolResult(cfg: ToolResultConfig): Promise<void> {
+    async appendToolResult(id: string, cfg: ToolResultConfig): Promise<void> {
       const { threadId, toolCallId, content } = cfg;
       const thread = createLangChainThreadManager({ redis, threadId });
-      await thread.appendToolMessage(content, toolCallId);
+      await thread.appendToolMessage(id, content, toolCallId);
     },
 
     async forkThread(

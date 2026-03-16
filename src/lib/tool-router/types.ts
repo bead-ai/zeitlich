@@ -116,7 +116,7 @@ export type ParsedToolCallUnion<T extends ToolMap> = {
  * Function signature for appending tool results to a thread.
  */
 export type AppendToolResultFn = ActivityFunctionWithOptions<
-  (config: ToolResultConfig) => Promise<void>
+  (id: string, config: ToolResultConfig) => Promise<void>
 >;
 
 /**

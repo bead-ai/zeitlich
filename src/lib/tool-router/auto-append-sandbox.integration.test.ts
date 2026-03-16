@@ -12,13 +12,13 @@ import type { Sandbox } from "../sandbox/types";
 describe("withAutoAppend", () => {
   it("appends tool result via threadHandler and sets resultAppended", async () => {
     const appended: ToolResultConfig[] = [];
-    const threadHandler = async (config: ToolResultConfig) => {
+    const threadHandler = async (_id: string, config: ToolResultConfig) => {
       appended.push(config);
     };
 
     const innerHandler = async (
       args: { text: string },
-      _ctx: RouterContext,
+      _ctx: RouterContext
     ): Promise<ToolHandlerResponse<{ echoed: string }>> => ({
       toolResponse: `Echo: ${args.text}`,
       data: { echoed: args.text },
@@ -32,7 +32,7 @@ describe("withAutoAppend", () => {
         threadId: "thread-1",
         toolCallId: "tc-1",
         toolName: "Echo",
-      },
+      }
     );
 
     expect(result.resultAppended).toBe(true);
@@ -62,7 +62,7 @@ describe("withAutoAppend", () => {
 
     const result = await wrapped(
       {},
-      { threadId: "t", toolCallId: "tc", toolName: "BigTool" },
+      { threadId: "t", toolCallId: "tc", toolName: "BigTool" }
     );
 
     expect(result.toolResponse).toBe("Response appended via withAutoAppend");
@@ -81,10 +81,7 @@ describe("withAutoAppend", () => {
     const wrapped = withAutoAppend(threadHandler, innerHandler);
 
     await expect(
-      wrapped(
-        {},
-        { threadId: "t", toolCallId: "tc", toolName: "Fail" },
-      ),
+      wrapped({}, { threadId: "t", toolCallId: "tc", toolName: "Fail" })
     ).rejects.toThrow("handler failed");
 
     expect(appendSpy).not.toHaveBeenCalled();
@@ -92,7 +89,7 @@ describe("withAutoAppend", () => {
 
   it("uses correct context fields for thread handler config", async () => {
     let capturedConfig: ToolResultConfig | null = null;
-    const threadHandler = async (config: ToolResultConfig) => {
+    const threadHandler = async (_id: string, config: ToolResultConfig) => {
       capturedConfig = config;
     };
 
@@ -110,7 +107,7 @@ describe("withAutoAppend", () => {
         toolCallId: "my-tc",
         toolName: "MyTool",
         sandboxId: "sb-1",
-      },
+      }
     );
 
     expect(capturedConfig).toEqual({
@@ -177,7 +174,7 @@ describe("withSandbox", () => {
 
     const handler = async (
       _args: { text: string },
-      ctx: RouterContext & { sandbox: Sandbox; sandboxId: string },
+      ctx: RouterContext & { sandbox: Sandbox; sandboxId: string }
     ): Promise<ToolHandlerResponse<null>> => {
       capturedSandbox = ctx.sandbox;
       capturedSandboxId = ctx.sandboxId;
@@ -193,7 +190,7 @@ describe("withSandbox", () => {
         toolCallId: "tc-1",
         toolName: "Test",
         sandboxId: "sb-42",
-      },
+      }
     );
 
     expect(result.toolResponse).toBe("ok");
@@ -219,7 +216,7 @@ describe("withSandbox", () => {
         threadId: "thread-1",
         toolCallId: "tc-1",
         toolName: "Bash",
-      },
+      }
     );
 
     expect(result.toolResponse).toContain("No sandbox configured");
@@ -247,7 +244,7 @@ describe("withSandbox", () => {
         toolCallId: "tc",
         toolName: "Grep",
         sandboxId: undefined,
-      },
+      }
     );
 
     expect(result.toolResponse).toContain("No sandbox configured");
@@ -276,8 +273,8 @@ describe("withSandbox", () => {
           toolCallId: "tc",
           toolName: "Test",
           sandboxId: "sb-missing",
-        },
-      ),
+        }
+      )
     ).rejects.toThrow("sandbox not found");
   });
 
@@ -285,11 +282,13 @@ describe("withSandbox", () => {
     const mockSandbox = createMockSandbox();
     const manager = { getSandbox: async () => mockSandbox };
 
-    let capturedCtx: (RouterContext & { sandbox: Sandbox; sandboxId: string }) | null = null;
+    let capturedCtx:
+      | (RouterContext & { sandbox: Sandbox; sandboxId: string })
+      | null = null;
 
     const handler = async (
       _args: unknown,
-      ctx: RouterContext & { sandbox: Sandbox; sandboxId: string },
+      ctx: RouterContext & { sandbox: Sandbox; sandboxId: string }
     ): Promise<ToolHandlerResponse<null>> => {
       capturedCtx = ctx;
       return { toolResponse: "ok", data: null };
@@ -304,7 +303,7 @@ describe("withSandbox", () => {
         toolCallId: "my-tc",
         toolName: "MyTool",
         sandboxId: "my-sandbox",
-      },
+      }
     );
 
     expect(capturedCtx).toEqual(
@@ -314,7 +313,7 @@ describe("withSandbox", () => {
         toolName: "MyTool",
         sandboxId: "my-sandbox",
         sandbox: mockSandbox,
-      }),
+      })
     );
   });
 
@@ -335,7 +334,7 @@ describe("withSandbox", () => {
         toolCallId: "tc",
         toolName: "Test",
         sandboxId: "",
-      },
+      }
     );
 
     expect(result.toolResponse).toContain("No sandbox configured");

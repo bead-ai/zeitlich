@@ -15,6 +15,7 @@ import type { ParsedToolCallUnion, ToolMap } from "../tool-router/types";
 import { getShortId } from "../thread/id";
 import { buildSubagentRegistration } from "../subagent/register";
 import { buildSkillRegistration } from "../skills/register";
+import { uuid4 } from "@temporalio/workflow";
 
 /**
  * Creates an agent session that manages the agent loop: LLM invocation,
@@ -134,7 +135,7 @@ export const createSession = async <T extends ToolMap, M = unknown>({
               threadId,
             });
           }
-          await appendHumanMessage(threadId, message);
+          await appendHumanMessage(threadId, uuid4(), message);
           if (hooks.onPostHumanMessageAppend) {
             await hooks.onPostHumanMessageAppend({
               message,
@@ -176,12 +177,12 @@ export const createSession = async <T extends ToolMap, M = unknown>({
               nonRetryable: true,
             });
           }
-          await appendSystemMessage(threadId, systemPrompt);
+          await appendSystemMessage(threadId, uuid4(), systemPrompt);
         } else {
           await initializeThread(threadId);
         }
       }
-      await appendHumanMessage(threadId, await buildContextMessage());
+      await appendHumanMessage(threadId, uuid4(), await buildContextMessage());
 
       let exitReason: SessionExitReason = "completed";
 
@@ -222,7 +223,7 @@ export const createSession = async <T extends ToolMap, M = unknown>({
             try {
               parsedToolCalls.push(toolRouter.parseToolCall(tc));
             } catch (error) {
-              await appendToolResult({
+              await appendToolResult(uuid4(), {
                 threadId,
                 toolCallId: tc.id ?? "",
                 toolName: tc.name,

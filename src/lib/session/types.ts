@@ -27,12 +27,17 @@ export interface ThreadOps {
   /** Append a human message to the thread */
   appendHumanMessage(
     threadId: string,
+    id: string,
     content: string | MessageContent
   ): Promise<void>;
   /** Append a tool result to the thread */
-  appendToolResult(config: ToolResultConfig): Promise<void>;
+  appendToolResult(id: string, config: ToolResultConfig): Promise<void>;
   /** Append a system message to the thread */
-  appendSystemMessage(threadId: string, content: string): Promise<void>;
+  appendSystemMessage(
+    threadId: string,
+    id: string,
+    content: string
+  ): Promise<void>;
   /** Copy all messages from sourceThreadId into a new thread at targetThreadId */
   forkThread(sourceThreadId: string, targetThreadId: string): Promise<void>;
 }
