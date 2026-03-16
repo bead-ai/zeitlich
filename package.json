@@ -164,6 +164,7 @@
   },
   "homepage": "https://github.com/bead-ai/zeitlich#readme",
   "dependencies": {
+    "@e2b/code-interpreter": "^2.3.3",
     "@temporalio/common": "^1.15.0",
     "@temporalio/plugin": "^1.15.0",
     "@temporalio/workflow": "^1.15.0",
