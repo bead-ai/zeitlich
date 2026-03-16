@@ -112,11 +112,13 @@ export function createGoogleGenAIAdapter(
       await thread.fork(targetThreadId);
     },
     async saveSnapshot(threadId: string, snapshot: SandboxSnapshot): Promise<void> {
-      await redis.set(`snapshot:${threadId}`, JSON.stringify(snapshot));
+      await redis.set(`snapshot:${threadId}`, JSON.stringify(snapshot), "EX", 7 * 24 * 60 * 60);
     },
     async getSnapshot(threadId: string): Promise<SandboxSnapshot | null> {
       const raw = await redis.get(`snapshot:${threadId}`);
-      return raw ? (JSON.parse(raw) as SandboxSnapshot) : null;
+      if (!raw) return null;
+      await redis.del(`snapshot:${threadId}`);
+      return JSON.parse(raw) as SandboxSnapshot;
     },
   };
 
