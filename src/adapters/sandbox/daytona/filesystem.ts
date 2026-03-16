@@ -19,7 +19,7 @@ export class DaytonaSandboxFileSystem implements SandboxFileSystem {
 
   constructor(
     private sandbox: DaytonaSdkSandbox,
-    workspaceBase = "/home/daytona",
+    workspaceBase = "/home/daytona"
   ) {
     this.workspaceBase = posix.resolve("/", workspaceBase);
   }
@@ -49,10 +49,18 @@ export class DaytonaSandboxFileSystem implements SandboxFileSystem {
     await this.sandbox.fs.uploadFile(buf, norm);
   }
 
-  async appendFile(
-    path: string,
-    content: string | Uint8Array,
+  async writeFiles(
+    files: { path: string; content: string | Uint8Array }[]
   ): Promise<void> {
+    await this.sandbox.fs.uploadFiles(
+      files.map((f) => ({
+        source: Buffer.from(f.content),
+        destination: f.path,
+      }))
+    );
+  }
+
+  async appendFile(path: string, content: string | Uint8Array): Promise<void> {
     const norm = this.normalisePath(path);
     let existing: Buffer;
     try {
@@ -89,10 +97,7 @@ export class DaytonaSandboxFileSystem implements SandboxFileSystem {
     };
   }
 
-  async mkdir(
-    path: string,
-    _options?: { recursive?: boolean },
-  ): Promise<void> {
+  async mkdir(path: string, _options?: { recursive?: boolean }): Promise<void> {
     const norm = this.normalisePath(path);
     await this.sandbox.fs.createFolder(norm, "755");
   }
@@ -116,7 +121,7 @@ export class DaytonaSandboxFileSystem implements SandboxFileSystem {
 
   async rm(
     path: string,
-    options?: { recursive?: boolean; force?: boolean },
+    options?: { recursive?: boolean; force?: boolean }
   ): Promise<void> {
     const norm = this.normalisePath(path);
     try {
@@ -129,7 +134,7 @@ export class DaytonaSandboxFileSystem implements SandboxFileSystem {
   async cp(
     src: string,
     dest: string,
-    options?: { recursive?: boolean },
+    options?: { recursive?: boolean }
   ): Promise<void> {
     const normSrc = this.normalisePath(src);
     const normDest = this.normalisePath(dest);
@@ -138,9 +143,13 @@ export class DaytonaSandboxFileSystem implements SandboxFileSystem {
       if (!options?.recursive) {
         throw new Error(`EISDIR: is a directory (use recursive): ${src}`);
       }
-      await this.sandbox.process.executeCommand(`cp -r "${normSrc}" "${normDest}"`);
+      await this.sandbox.process.executeCommand(
+        `cp -r "${normSrc}" "${normDest}"`
+      );
     } else {
-      await this.sandbox.process.executeCommand(`cp "${normSrc}" "${normDest}"`);
+      await this.sandbox.process.executeCommand(
+        `cp "${normSrc}" "${normDest}"`
+      );
     }
   }
 
