@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.21](https://github.com/bead-ai/zeitlich/compare/v0.2.20...v0.2.21) (2026-03-16)
+
+
+### Features
+
+* use stable workflow ids as message keys ([a5f3c6e](https://github.com/bead-ai/zeitlich/commit/a5f3c6eeb671d8908f42288f6a196eefaabf053c))
+
+
+### Miscellaneous Chores
+
+* release 0.2.21 ([dba1108](https://github.com/bead-ai/zeitlich/commit/dba11082f641e73e781e3aae59f8b034b19abce9))
+
 ## [0.2.20](https://github.com/bead-ai/zeitlich/compare/v0.2.19...v0.2.20) (2026-03-16)
 
 
