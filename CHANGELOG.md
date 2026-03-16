@@ -2,6 +2,26 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.20](https://github.com/bead-ai/zeitlich/compare/v0.2.19...v0.2.20) (2026-03-16)
+
+
+### Features
+
+* **session:** add activity proxy function for tool result handling ([eb66473](https://github.com/bead-ai/zeitlich/commit/eb664739fb753a7ec15ba4656846b3d420d8e8fa))
+* **workflow:** introduce configuration for workflow definition ([787d75a](https://github.com/bead-ai/zeitlich/commit/787d75a31ca6d423cef183d23936b1868ea66940))
+
+
+### Bug Fixes
+
+* minor subagent adjustments ([7947813](https://github.com/bead-ai/zeitlich/commit/79478131dabaece3fbda54a9846a5d18e0c97171))
+* remove stateful workDir implementation for daytona ([b2d4404](https://github.com/bead-ai/zeitlich/commit/b2d44046f3ab253cf9c01a136d8c298c2230a005))
+* wrong test ([26bc842](https://github.com/bead-ai/zeitlich/commit/26bc8420cbfc0d7dcc55d25018bf049043f54d09))
+
+
+### Miscellaneous Chores
+
+* release 0.2.20 ([366d695](https://github.com/bead-ai/zeitlich/commit/366d69577ea104de05cc655fb420d6a2c8e993d8))
+
 ## [0.2.19](https://github.com/bead-ai/zeitlich/compare/v0.2.18...v0.2.19) (2026-03-13)
 
 
