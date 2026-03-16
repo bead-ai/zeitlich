@@ -6,6 +6,7 @@ import type { ThreadOps } from "../../../lib/session/types";
 import type { ModelInvoker } from "../../../lib/model";
 import { createGoogleGenAIThreadManager } from "./thread-manager";
 import { createGoogleGenAIModelInvoker } from "./model-invoker";
+import type { SandboxSnapshot } from "../../../workflow";
 
 export interface GoogleGenAIAdapterConfig {
   redis: Redis;
@@ -80,7 +81,7 @@ export function createGoogleGenAIAdapter(
 
     async appendHumanMessage(
       threadId: string,
-      content: string | MessageContent,
+      content: string | MessageContent
     ): Promise<void> {
       const thread = createGoogleGenAIThreadManager({ redis, threadId });
       await thread.appendUserMessage(content);
@@ -88,7 +89,7 @@ export function createGoogleGenAIAdapter(
 
     async appendSystemMessage(
       threadId: string,
-      content: string,
+      content: string
     ): Promise<void> {
       const thread = createGoogleGenAIThreadManager({ redis, threadId });
       await thread.appendSystemMessage(content);
@@ -102,13 +103,20 @@ export function createGoogleGenAIAdapter(
 
     async forkThread(
       sourceThreadId: string,
-      targetThreadId: string,
+      targetThreadId: string
     ): Promise<void> {
       const thread = createGoogleGenAIThreadManager({
         redis,
         threadId: sourceThreadId,
       });
       await thread.fork(targetThreadId);
+    },
+    async saveSnapshot(threadId: string, snapshot: SandboxSnapshot): Promise<void> {
+      await redis.set(`snapshot:${threadId}`, JSON.stringify(snapshot));
+    },
+    async getSnapshot(threadId: string): Promise<SandboxSnapshot | null> {
+      const raw = await redis.get(`snapshot:${threadId}`);
+      return raw ? (JSON.parse(raw) as SandboxSnapshot) : null;
     },
   };
 

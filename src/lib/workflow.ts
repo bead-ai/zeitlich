@@ -1,3 +1,5 @@
+import type { SandboxSnapshot } from "./sandbox/types";
+
 /**
  * Session config fields derived from a main workflow input, ready to spread
  * into `createSession`.
@@ -9,6 +11,8 @@ export interface WorkflowSessionInput {
   continueThread?: boolean;
   /** Optional sandbox ID forwarded to the session */
   sandboxId?: string;
+  /** Snapshot to restore the sandbox from (produced by a prior run with `snapshotSandboxOnEnd: true`) */
+  sandboxSnapshot?: SandboxSnapshot;
 }
 
 /** Raw workflow input fields that map into `WorkflowSessionInput`. */
@@ -17,6 +21,8 @@ export interface WorkflowInput {
   previousThreadId?: string;
   /** Optional sandbox ID to reuse */
   sandboxId?: string;
+  /** Snapshot to restore the sandbox from (produced by a prior run with `snapshotSandboxOnEnd: true`) */
+  sandboxSnapshot?: SandboxSnapshot;
 }
 
 export interface WorkflowConfig {
@@ -45,6 +51,7 @@ export function defineWorkflow<TInput, TResult>(
         continueThread: true,
       }),
       ...(workflowInput.sandboxId && { sandboxId: workflowInput.sandboxId }),
+      ...(workflowInput.sandboxSnapshot && { sandboxSnapshot: workflowInput.sandboxSnapshot }),
     };
     return fn(input, sessionInput);
   };

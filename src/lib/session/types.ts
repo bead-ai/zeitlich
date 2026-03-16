@@ -12,7 +12,7 @@ import type {
 import type { Hooks } from "../hooks/types";
 import type { SubagentConfig } from "../subagent/types";
 import type { Skill } from "../skills/types";
-import type { SandboxOps } from "../sandbox/types";
+import type { SandboxOps, SandboxSnapshot } from "../sandbox/types";
 import type { RunAgentActivity } from "../model/types";
 import type { AgentStateManager, JsonSerializable } from "../state/types";
 
@@ -34,6 +34,16 @@ export interface ThreadOps {
   appendSystemMessage(threadId: string, content: string): Promise<void>;
   /** Copy all messages from sourceThreadId into a new thread at targetThreadId */
   forkThread(sourceThreadId: string, targetThreadId: string): Promise<void>;
+  /**
+   * Persist a sandbox snapshot associated with a thread.
+   * Used by the subagent handler to store snapshots for cross-run reuse.
+   */
+  saveSnapshot(threadId: string, snapshot: SandboxSnapshot): Promise<void>;
+  /**
+   * Retrieve a previously saved sandbox snapshot for a thread.
+   * Returns null if no snapshot exists.
+   */
+  getSnapshot(threadId: string): Promise<SandboxSnapshot | null>;
 }
 
 /**
@@ -81,6 +91,17 @@ export interface SessionConfig<T extends ToolMap, M = unknown> {
    * sandbox on exit (the owner is responsible for cleanup).
    */
   sandboxId?: string;
+  /**
+   * Snapshot to restore the sandbox from at the start of the session.
+   * When set (and no `sandboxId` is provided), the session calls
+   * `restoreSandbox` instead of `createSandbox`.
+   */
+  sandboxSnapshot?: SandboxSnapshot;
+  /**
+   * When true, take a snapshot of the sandbox before destroying it at the end
+   * of the session. The snapshot is returned in the `runSession` result.
+   */
+  snapshotSandboxOnEnd?: boolean;
 }
 
 export interface ZeitlichSession<M = unknown> {
@@ -91,5 +112,6 @@ export interface ZeitlichSession<M = unknown> {
     finalMessage: M | null;
     exitReason: SessionExitReason;
     usage: ReturnType<AgentStateManager<T>["getTotalUsage"]>;
+    sandboxSnapshot?: SandboxSnapshot;
   }>;
 }

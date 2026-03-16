@@ -5,6 +5,7 @@ import type {
   ToolMap,
 } from "../tool-router/types";
 import type { SubagentConfig, SubagentHooks } from "./types";
+import type { ThreadOps } from "../session/types";
 import type { z } from "zod";
 import { createSubagentTool, SUBAGENT_TOOL_NAME, type SubagentArgs } from "./tool";
 import { createSubagentHandler } from "./handler";
@@ -20,7 +21,8 @@ import { createSubagentHandler } from "./handler";
  * Returns null if no subagents are configured.
  */
 export function buildSubagentRegistration(
-  subagents: SubagentConfig[]
+  subagents: SubagentConfig[],
+  threadOps?: ThreadOps
 ): ToolMap[string] | null {
   if (subagents.length === 0) return null;
 
@@ -42,7 +44,7 @@ export function buildSubagentRegistration(
     enabled: (): boolean => getEnabled().length > 0,
     description: (): string => createSubagentTool(getEnabled()).description,
     schema: (): z.ZodObject<z.ZodRawShape> => createSubagentTool(getEnabled()).schema,
-    handler: createSubagentHandler(subagents),
+    handler: createSubagentHandler(subagents, threadOps),
     ...(subagentHooksMap.size > 0 && {
       hooks: {
         onPreToolUse: async (ctx): Promise<PreToolUseHookResult> => {

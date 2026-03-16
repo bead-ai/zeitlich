@@ -71,6 +71,12 @@ export class SandboxManager<
       snapshotSandbox: async (sandboxId: string): Promise<SandboxSnapshot> => {
         return this.snapshot(sandboxId);
       },
+      restoreSandbox: async (
+        snapshot: SandboxSnapshot
+      ): Promise<{ sandboxId: string; stateUpdate?: Record<string, unknown> }> => {
+        const sandboxId = await this.restore(snapshot);
+        return { sandboxId };
+      },
     };
   }
 }

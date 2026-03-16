@@ -77,6 +77,8 @@ function createMockThreadOps() {
     forkThread: async (source, target) => {
       log.push({ op: "forkThread", args: [source, target] });
     },
+    saveSnapshot: async () => {},
+    getSnapshot: async () => null,
   };
 
   return { ops, log };
@@ -493,6 +495,7 @@ describe("createSession integration", () => {
         data: null,
         createdAt: new Date().toISOString(),
       }),
+      restoreSandbox: async () => ({ sandboxId: "sb-1" }),
     };
 
     const session = await createSession({
@@ -534,6 +537,7 @@ describe("createSession integration", () => {
         data: null,
         createdAt: new Date().toISOString(),
       }),
+      restoreSandbox: async () => ({ sandboxId: "sb-1" }),
     };
 
     const session = await createSession({
@@ -784,6 +788,7 @@ describe("createSession integration", () => {
         data: null,
         createdAt: new Date().toISOString(),
       }),
+      restoreSandbox: async () => ({ sandboxId: "sb-1" }),
     };
 
     const session = await createSession({

@@ -7,6 +7,7 @@ import type { StoredMessage } from "@langchain/core/messages";
 import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
 import { createLangChainThreadManager } from "./thread-manager";
 import { createLangChainModelInvoker } from "./model-invoker";
+import type { SandboxSnapshot } from "../../../workflow";
 
 export interface LangChainAdapterConfig {
   redis: Redis;
@@ -103,6 +104,13 @@ export function createLangChainAdapter(
         threadId: sourceThreadId,
       });
       await thread.fork(targetThreadId);
+    },
+    async saveSnapshot(threadId: string, snapshot: SandboxSnapshot): Promise<void> {
+      await redis.set(`snapshot:${threadId}`, JSON.stringify(snapshot));
+    },
+    async getSnapshot(threadId: string): Promise<SandboxSnapshot | null> {
+      const raw = await redis.get(`snapshot:${threadId}`);
+      return raw ? (JSON.parse(raw) as SandboxSnapshot) : null;
     },
   };
 

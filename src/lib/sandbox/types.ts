@@ -141,6 +141,9 @@ export interface SandboxOps<
   ): Promise<{ sandboxId: string; stateUpdate?: Record<string, unknown> }>;
   destroySandbox(sandboxId: string): Promise<void>;
   snapshotSandbox(sandboxId: string): Promise<SandboxSnapshot>;
+  restoreSandbox(
+    snapshot: SandboxSnapshot,
+  ): Promise<{ sandboxId: string; stateUpdate?: Record<string, unknown> }>;
 }
 
 // ============================================================================

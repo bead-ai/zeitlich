@@ -7,7 +7,7 @@ import {
 } from "@temporalio/workflow";
 import type { SessionExitReason, MessageContent } from "../types";
 import type { ThreadOps, SessionConfig, ZeitlichSession } from "./types";
-import type { SandboxOps } from "../sandbox/types";
+import type { SandboxOps, SandboxSnapshot } from "../sandbox/types";
 import { type AgentStateManager, type JsonSerializable } from "../state/types";
 import { createToolRouter } from "../tool-router/router";
 import type { ParsedToolCallUnion, ToolMap } from "../tool-router/types";
@@ -64,6 +64,8 @@ export const createSession = async <T extends ToolMap, M = unknown>({
   waitForInputTimeout = "48h",
   sandbox: sandboxOps,
   sandboxId: inheritedSandboxId,
+  sandboxSnapshot: inputSandboxSnapshot,
+  snapshotSandboxOnEnd = false,
 }: SessionConfig<T, M>): Promise<ZeitlichSession<M>> => {
   const sourceThreadId = continueThread ? providedThreadId : undefined;
   const threadId =
@@ -71,17 +73,18 @@ export const createSession = async <T extends ToolMap, M = unknown>({
       ? getShortId()
       : (providedThreadId ?? getShortId());
 
+  const resolvedThreadOps = threadOps ?? proxyDefaultThreadOps();
   const {
     appendToolResult,
     appendHumanMessage,
     initializeThread,
     appendSystemMessage,
     forkThread,
-  } = threadOps ?? proxyDefaultThreadOps();
+  } = resolvedThreadOps;
 
   const plugins: ToolMap[string][] = [];
   if (subagents) {
-    const reg = buildSubagentRegistration(subagents);
+    const reg = buildSubagentRegistration(subagents, resolvedThreadOps);
     if (reg) plugins.push(reg);
   }
   if (skills) {
@@ -123,6 +126,7 @@ export const createSession = async <T extends ToolMap, M = unknown>({
       finalMessage: M | null;
       exitReason: SessionExitReason;
       usage: ReturnType<AgentStateManager<TState>["getTotalUsage"]>;
+      sandboxSnapshot?: SandboxSnapshot;
     }> => {
       setHandler(
         defineUpdate<unknown, [MessageContent]>(`add${agentName}Message`),
@@ -144,11 +148,13 @@ export const createSession = async <T extends ToolMap, M = unknown>({
         }
       );
 
-      // --- Sandbox lifecycle: create or inherit ---
+      // --- Sandbox lifecycle: create, restore, or inherit ---
       let sandboxId: string | undefined = inheritedSandboxId;
       const ownsSandbox = !sandboxId && !!sandboxOps;
       if (ownsSandbox) {
-        const result = await sandboxOps.createSandbox({ id: threadId });
+        const result = inputSandboxSnapshot
+          ? await sandboxOps.restoreSandbox(inputSandboxSnapshot)
+          : await sandboxOps.createSandbox({ id: threadId });
         sandboxId = result.sandboxId;
         if (result.stateUpdate) {
           stateManager.mergeUpdate(result.stateUpdate as Partial<TState>);
@@ -183,6 +189,8 @@ export const createSession = async <T extends ToolMap, M = unknown>({
       await appendHumanMessage(threadId, await buildContextMessage());
 
       let exitReason: SessionExitReason = "completed";
+      let finalSandboxSnapshot: SandboxSnapshot | undefined;
+      let finalMessage: M | null = null;
 
       try {
         while (
@@ -208,12 +216,8 @@ export const createSession = async <T extends ToolMap, M = unknown>({
           if (!toolRouter.hasTools() || rawToolCalls.length === 0) {
             stateManager.complete();
             exitReason = "completed";
-            return {
-              threadId,
-              finalMessage: message,
-              exitReason,
-              usage: stateManager.getTotalUsage(),
-            };
+            finalMessage = message;
+            break;
           }
 
           const parsedToolCalls: ParsedToolCallUnion<T>[] = [];
@@ -270,15 +274,19 @@ export const createSession = async <T extends ToolMap, M = unknown>({
         await callSessionEnd(exitReason, stateManager.getTurns());
 
         if (ownsSandbox && sandboxId && sandboxOps) {
+          if (snapshotSandboxOnEnd) {
+            finalSandboxSnapshot = await sandboxOps.snapshotSandbox(sandboxId);
+          }
           await sandboxOps.destroySandbox(sandboxId);
         }
       }
 
       return {
         threadId,
-        finalMessage: null,
+        finalMessage,
         exitReason,
         usage: stateManager.getTotalUsage(),
+        sandboxSnapshot: finalSandboxSnapshot,
       };
     },
   };

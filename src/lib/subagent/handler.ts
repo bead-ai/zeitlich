@@ -8,6 +8,7 @@ import type {
   SubagentWorkflowInput,
 } from "./types";
 import type { SubagentArgs } from "./tool";
+import type { ThreadOps } from "../session/types";
 import type { z } from "zod";
 
 /**
@@ -18,7 +19,7 @@ import type { z } from "zod";
  */
 export function createSubagentHandler<
   const T extends readonly SubagentConfig[],
->(subagents: [...T]) {
+>(subagents: [...T], threadOps?: ThreadOps) {
   const { taskQueue: parentTaskQueue } = workflowInfo();
 
   return async (
@@ -38,13 +39,20 @@ export function createSubagentHandler<
     const { sandboxId: parentSandboxId } = context;
     const inheritSandbox = config.sandbox !== "own" && !!parentSandboxId;
 
+    const previousThreadId =
+      args.threadId && args.threadId !== null && config.allowThreadContinuation
+        ? args.threadId
+        : undefined;
+
+    const restoredSnapshot =
+      previousThreadId && threadOps
+        ? await threadOps.getSnapshot(previousThreadId)
+        : null;
+
     const workflowInput: SubagentWorkflowInput = {
-      ...(args.threadId &&
-        args.threadId !== null &&
-        config.allowThreadContinuation && {
-          previousThreadId: args.threadId,
-        }),
+      ...(previousThreadId && { previousThreadId }),
       ...(inheritSandbox && { sandboxId: parentSandboxId }),
+      ...(restoredSnapshot && { sandboxSnapshot: restoredSnapshot }),
     };
 
     const childOpts = {
@@ -61,9 +69,14 @@ export function createSubagentHandler<
       data,
       usage,
       threadId: childThreadId,
+      sandboxSnapshot,
     } = typeof config.workflow === "string"
       ? await executeChild(config.workflow, childOpts)
       : await executeChild(config.workflow, childOpts);
+
+    if (sandboxSnapshot && childThreadId && threadOps) {
+      await threadOps.saveSnapshot(childThreadId, sandboxSnapshot);
+    }
 
     if (!toolResponse) {
       return {
