@@ -34,22 +34,26 @@ export interface LangChainThreadManager extends BaseThreadManager<StoredMessage>
   createSystemMessage(content: string): StoredMessage;
   createAIMessage(
     content: string | MessageContent,
-    kwargs?: { header?: string; options?: string[]; multiSelect?: boolean },
+    kwargs?: { header?: string; options?: string[]; multiSelect?: boolean }
   ): StoredMessage;
   createToolMessage(
     content: LangChainToolMessageContent,
-    toolCallId: string,
+    toolCallId: string
   ): StoredMessage;
   appendHumanMessage(content: string | MessageContent): Promise<void>;
   appendSystemMessage(content: string): Promise<void>;
   appendToolMessage(
     content: LangChainToolMessageContent,
-    toolCallId: string,
+    toolCallId: string
   ): Promise<void>;
   appendAIMessage(content: string | MessageContent): Promise<void>;
 }
 
 function storedMessageId(msg: StoredMessage): string {
+  if (msg.type === "tool") {
+    return msg.data.tool_call_id ?? "";
+  }
+
   return msg.data.id ?? "";
 }
 
@@ -59,7 +63,7 @@ function storedMessageId(msg: StoredMessage): string {
  * appending typed LangChain messages.
  */
 export function createLangChainThreadManager(
-  config: LangChainThreadManagerConfig,
+  config: LangChainThreadManagerConfig
 ): LangChainThreadManager {
   const baseConfig: ThreadManagerConfig<StoredMessage> = {
     redis: config.redis,
@@ -87,7 +91,7 @@ export function createLangChainThreadManager(
 
     createAIMessage(
       content: string,
-      kwargs?: { header?: string; options?: string[]; multiSelect?: boolean },
+      kwargs?: { header?: string; options?: string[]; multiSelect?: boolean }
     ): StoredMessage {
       return new AIMessage({
         id: uuidv4(),
@@ -104,7 +108,7 @@ export function createLangChainThreadManager(
 
     createToolMessage(
       content: LangChainToolMessageContent,
-      toolCallId: string,
+      toolCallId: string
     ): StoredMessage {
       return new ToolMessage({
         id: uuidv4(),
@@ -120,7 +124,7 @@ export function createLangChainThreadManager(
 
     async appendToolMessage(
       content: LangChainToolMessageContent,
-      toolCallId: string,
+      toolCallId: string
     ): Promise<void> {
       const message = helpers.createToolMessage(content, toolCallId);
       await base.append([message]);

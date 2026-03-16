@@ -1,11 +1,8 @@
-import type {
-  AgentStateManager,
-  JsonSerializable,
-} from "../../lib/state";
+import type { AgentStateManager, JsonSerializable } from "../../lib/state";
 import type { ToolHandler } from "../../lib/tool-router";
 import type { WorkflowTask } from "../../lib/types";
+import { getShortId } from "../../workflow";
 import type { TaskCreateArgs } from "./tool";
-import { uuid4 } from "@temporalio/workflow";
 
 /**
  * Creates a TaskCreate handler that adds tasks to the workflow state.
@@ -20,7 +17,7 @@ export function createTaskCreateHandler<
 ): ToolHandler<TaskCreateArgs, WorkflowTask> {
   return (args) => {
     const task: WorkflowTask = {
-      id: uuid4(),
+      id: getShortId(),
       subject: args.subject,
       description: args.description,
       activeForm: args.activeForm,

@@ -38,9 +38,14 @@ import type { ToolResultConfig } from "../types";
 
 function createAppendSpy() {
   const calls: ToolResultConfig[] = [];
-  const fn: AppendToolResultFn = async (config) => {
-    calls.push(config);
-  };
+  const fn = Object.assign(
+    async (config: ToolResultConfig) => { calls.push(config); },
+    { executeWithOptions: (_opts: unknown, [config]: [ToolResultConfig]) => {
+        calls.push(config);
+        return Promise.resolve();
+      },
+    },
+  ) as AppendToolResultFn;
   return { fn, calls };
 }
 

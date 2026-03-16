@@ -29,7 +29,7 @@ export { defineWorkflow } from "./lib/workflow";
 export type { WorkflowConfig, WorkflowInput, WorkflowSessionInput } from "./lib/workflow";
 
 // Thread utilities
-export { getShortId } from "./lib/thread";
+export { getShortId } from "./lib/thread/id";
 
 // State management
 export { createAgentStateManager } from "./lib/state";

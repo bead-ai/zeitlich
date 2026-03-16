@@ -63,7 +63,7 @@ export function createToolRouter<T extends ToolMap>(
     toolMap.set(tool.name, tool as T[keyof T]);
   }
 
-  const resolve = <T,>(v: T | (() => T)): T =>
+  const resolve = <T>(v: T | (() => T)): T =>
     typeof v === "function" ? (v as () => T)() : v;
 
   const isEnabled = (tool: ToolMap[string]): boolean =>
@@ -130,7 +130,10 @@ export function createToolRouter<T extends ToolMap>(
         turn,
       });
       if (r?.fallbackContent !== undefined)
-        return { content: r.fallbackContent, result: { error: errorStr, recovered: true } };
+        return {
+          content: r.fallbackContent,
+          result: { error: errorStr, recovered: true },
+        };
       if (r?.suppress)
         return {
           content: JSON.stringify({ error: errorStr, suppressed: true }),
@@ -146,7 +149,10 @@ export function createToolRouter<T extends ToolMap>(
         turn,
       });
       if (r?.fallbackContent !== undefined)
-        return { content: r.fallbackContent, result: { error: errorStr, recovered: true } };
+        return {
+          content: r.fallbackContent,
+          result: { error: errorStr, recovered: true },
+        };
       if (r?.suppress)
         return {
           content: JSON.stringify({ error: errorStr, suppressed: true }),
@@ -201,7 +207,10 @@ export function createToolRouter<T extends ToolMap>(
         threadId: options.threadId,
         toolCallId: toolCall.id,
         toolName: toolCall.name,
-        content: JSON.stringify({ skipped: true, reason: "Skipped by PreToolUse hook" }),
+        content: JSON.stringify({
+          skipped: true,
+          reason: "Skipped by PreToolUse hook",
+        }),
       });
       return null;
     }
@@ -232,19 +241,31 @@ export function createToolRouter<T extends ToolMap>(
         content = JSON.stringify(result, null, 2);
       }
     } catch (error) {
-      const recovery = await runFailureHooks(toolCall, tool, error, effectiveArgs, turn);
+      const recovery = await runFailureHooks(
+        toolCall,
+        tool,
+        error,
+        effectiveArgs,
+        turn
+      );
       result = recovery.result;
       content = recovery.content;
     }
 
     // --- Append result to thread (unless handler already did) ---
     if (!resultAppended) {
-      await appendToolResult({
+      const config = {
         threadId: options.threadId,
         toolCallId: toolCall.id,
         toolName: toolCall.name,
         content,
-      });
+      };
+      await appendToolResult.executeWithOptions(
+        {
+          summary: `Append ${toolCall.name} result`,
+        },
+        [config]
+      );
     }
 
     const toolResult = {
@@ -254,7 +275,14 @@ export function createToolRouter<T extends ToolMap>(
     } as ToolCallResultUnion<TResults>;
 
     // --- Post-hooks ---
-    await runPostHooks(toolCall, tool, toolResult, effectiveArgs, turn, Date.now() - startTime);
+    await runPostHooks(
+      toolCall,
+      tool,
+      toolResult,
+      effectiveArgs,
+      turn,
+      Date.now() - startTime
+    );
 
     return toolResult;
   }
@@ -316,9 +344,7 @@ export function createToolRouter<T extends ToolMap>(
 
       if (options.parallel) {
         const results = await Promise.all(
-          toolCalls.map((tc) =>
-            processToolCall(tc, turn, sandboxId)
-          )
+          toolCalls.map((tc) => processToolCall(tc, turn, sandboxId))
         );
         return results.filter(
           (r): r is NonNullable<typeof r> => r !== null
@@ -327,11 +353,7 @@ export function createToolRouter<T extends ToolMap>(
 
       const results: ToolCallResultUnion<TResults>[] = [];
       for (const toolCall of toolCalls) {
-        const result = await processToolCall(
-          toolCall,
-          turn,
-          sandboxId
-        );
+        const result = await processToolCall(toolCall, turn, sandboxId);
         if (result !== null) {
           results.push(result);
         }
@@ -339,10 +361,7 @@ export function createToolRouter<T extends ToolMap>(
       return results;
     },
 
-    async processToolCallsByName<
-      TName extends ToolNames<T>,
-      TResult,
-    >(
+    async processToolCallsByName<TName extends ToolNames<T>, TResult>(
       toolCalls: ParsedToolCallUnion<T>[],
       toolName: TName,
       handler: ToolHandler<ToolArgs<T, TName>, TResult>,
@@ -361,7 +380,9 @@ export function createToolRouter<T extends ToolMap>(
           threadId: options.threadId,
           toolCallId: toolCall.id,
           toolName: toolCall.name as TName,
-          ...(context?.sandboxId !== undefined && { sandboxId: context.sandboxId }),
+          ...(context?.sandboxId !== undefined && {
+            sandboxId: context.sandboxId,
+          }),
         };
         const response = await handler(
           toolCall.args as ToolArgs<T, TName>,
@@ -369,12 +390,19 @@ export function createToolRouter<T extends ToolMap>(
         );
 
         if (!response.resultAppended) {
-          await appendToolResult({
-            threadId: options.threadId,
-            toolCallId: toolCall.id,
-            toolName: toolCall.name,
-            content: response.toolResponse,
-          });
+          await appendToolResult.executeWithOptions(
+            {
+              summary: `Append ${toolCall.name} result`,
+            },
+            [
+              {
+                threadId: options.threadId,
+                toolCallId: toolCall.id,
+                toolName: toolCall.name,
+                content: response.toolResponse,
+              },
+            ]
+          );
         }
 
         return {

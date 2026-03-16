@@ -5,6 +5,7 @@ import type { ThreadOps } from "./types";
 import type { RunAgentActivity } from "../model/types";
 import type { RawToolCall } from "../tool-router/types";
 import type { SandboxOps } from "../sandbox/types";
+import type { ActivityInterfaceFor } from "@temporalio/workflow";
 
 // ---------------------------------------------------------------------------
 // Mock @temporalio/workflow
@@ -58,10 +59,23 @@ function at<T>(arr: T[], index: number): T {
   return val;
 }
 
+function toActivityInterface(
+  raw: ThreadOps,
+): ActivityInterfaceFor<ThreadOps> {
+  const result = {} as Record<string, unknown>;
+  for (const [key, fn] of Object.entries(raw)) {
+    const wrapped = (...args: unknown[]) => (fn as (...a: unknown[]) => unknown)(...args);
+    wrapped.executeWithOptions = (_opts: unknown, args: unknown[]) =>
+      (fn as (...a: unknown[]) => unknown)(...args);
+    result[key] = wrapped;
+  }
+  return result as ActivityInterfaceFor<ThreadOps>;
+}
+
 function createMockThreadOps() {
   const log: { op: string; args: unknown[] }[] = [];
 
-  const ops: ThreadOps = {
+  const ops = toActivityInterface({
     initializeThread: async (threadId) => {
       log.push({ op: "initializeThread", args: [threadId] });
     },
@@ -77,7 +91,7 @@ function createMockThreadOps() {
     forkThread: async (source, target) => {
       log.push({ op: "forkThread", args: [source, target] });
     },
-  };
+  });
 
   return { ops, log };
 }
