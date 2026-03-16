@@ -507,6 +507,7 @@ describe("createSession integration", () => {
         data: null,
         createdAt: new Date().toISOString(),
       }),
+      forkSandbox: async () => "forked-sandbox-id",
     };
 
     const session = await createSession({
@@ -548,6 +549,7 @@ describe("createSession integration", () => {
         data: null,
         createdAt: new Date().toISOString(),
       }),
+      forkSandbox: async () => "forked-sandbox-id",
     };
 
     const session = await createSession({
@@ -798,6 +800,7 @@ describe("createSession integration", () => {
         data: null,
         createdAt: new Date().toISOString(),
       }),
+      forkSandbox: async () => "forked-sandbox-id",
     };
 
     const session = await createSession({

@@ -141,6 +141,10 @@ export class DaytonaSandboxProvider implements SandboxProvider<
     }
   }
 
+  async fork(_sandboxId: string): Promise<Sandbox> {
+    throw new Error("Not implemented");
+  }
+
   async snapshot(_sandboxId: string): Promise<SandboxSnapshot> {
     throw new SandboxNotSupportedError(
       "snapshot (use Daytona's native snapshot API directly)"
