@@ -77,7 +77,6 @@ export class DaytonaSandboxProvider implements SandboxProvider<
 
   private client: Daytona;
   private readonly defaultWorkspaceBase: string;
-  private workspaceBaseById = new Map<string, string>();
 
   constructor(config?: DaytonaSandboxConfig) {
     this.client = new Daytona(config);
@@ -101,7 +100,7 @@ export class DaytonaSandboxProvider implements SandboxProvider<
     );
 
     const workspaceBase = options?.workspaceBase ?? this.defaultWorkspaceBase;
-    this.workspaceBaseById.set(sdkSandbox.id, workspaceBase);
+
     const sandbox = new DaytonaSandboxImpl(
       sdkSandbox.id,
       sdkSandbox,
@@ -123,9 +122,11 @@ export class DaytonaSandboxProvider implements SandboxProvider<
   async get(sandboxId: string): Promise<DaytonaSandbox> {
     try {
       const sdkSandbox = await this.client.get(sandboxId);
-      const workspaceBase =
-        this.workspaceBaseById.get(sandboxId) ?? this.defaultWorkspaceBase;
-      return new DaytonaSandboxImpl(sdkSandbox.id, sdkSandbox, workspaceBase);
+      return new DaytonaSandboxImpl(
+        sdkSandbox.id,
+        sdkSandbox,
+        this.defaultWorkspaceBase
+      );
     } catch {
       throw new SandboxNotFoundError(sandboxId);
     }
@@ -135,7 +136,6 @@ export class DaytonaSandboxProvider implements SandboxProvider<
     try {
       const sdkSandbox = await this.client.get(sandboxId);
       await this.client.delete(sdkSandbox);
-      this.workspaceBaseById.delete(sandboxId);
     } catch {
       // Already gone
     }
