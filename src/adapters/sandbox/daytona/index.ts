@@ -185,11 +185,18 @@ export class DaytonaSandboxProvider
     };
   }
 
-  async restore(snapshot: SandboxSnapshot): Promise<Sandbox> {
+  async restore(snapshot: SandboxSnapshot): Promise<Sandbox | null> {
     const { volumeId, workspaceBase } = snapshot.data as {
       volumeId: string;
       workspaceBase: string;
     };
+
+    try {
+      // Verify the volume still exists before creating a sandbox from it
+      await this.client.volume.get(volumeId);
+    } catch {
+      return null;
+    }
 
     const sdkSandbox = await this.client.create({
       volumes: [{ volumeId, mountPath: workspaceBase } as VolumeMount],

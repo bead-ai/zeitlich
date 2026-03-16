@@ -4,6 +4,7 @@ import {
   defineUpdate,
   setHandler,
   ApplicationFailure,
+  log,
   type ActivityInterfaceFor,
 } from "@temporalio/workflow";
 import type { SessionExitReason, MessageContent } from "../types";
@@ -153,9 +154,21 @@ export const createSession = async <T extends ToolMap, M = unknown>({
       let sandboxId: string | undefined = inheritedSandboxId;
       const ownsSandbox = !sandboxId && !!sandboxOps;
       if (ownsSandbox) {
-        const result = inputSandboxSnapshot
-          ? await sandboxOps.restoreSandbox(inputSandboxSnapshot)
-          : await sandboxOps.createSandbox({ id: threadId });
+        let result: { sandboxId: string; stateUpdate?: Record<string, unknown> };
+        if (inputSandboxSnapshot) {
+          const restored = await sandboxOps.restoreSandbox(inputSandboxSnapshot);
+          if (restored) {
+            result = restored;
+          } else {
+            log.warn("sandbox snapshot restore returned null, falling back to createSandbox", {
+              threadId,
+              snapshotSandboxId: inputSandboxSnapshot.sandboxId,
+            });
+            result = await sandboxOps.createSandbox({ id: threadId });
+          }
+        } else {
+          result = await sandboxOps.createSandbox({ id: threadId });
+        }
         sandboxId = result.sandboxId;
         if (result.stateUpdate) {
           stateManager.mergeUpdate(result.stateUpdate as Partial<TState>);

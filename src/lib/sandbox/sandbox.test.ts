@@ -61,7 +61,7 @@ describe("SandboxManager", () => {
 
     const restoredId = await manager.restore(snapshot);
     expect(restoredId).toBe(sandboxId);
-    const restored = await manager.getSandbox(restoredId);
+    const restored = await manager.getSandbox(restoredId as string);
     const content = await restored.fs.readFile("/data.txt");
     expect(content).toBe("hello");
     const extra = await restored.fs.readFile("/extra.txt");

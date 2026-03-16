@@ -46,9 +46,9 @@ export class SandboxManager<
     return this.provider.snapshot(id);
   }
 
-  async restore(snapshot: SandboxSnapshot): Promise<string> {
+  async restore(snapshot: SandboxSnapshot): Promise<string | null> {
     const sandbox = await this.provider.restore(snapshot);
-    return sandbox.id;
+    return sandbox ? sandbox.id : null;
   }
 
   /**
@@ -73,9 +73,9 @@ export class SandboxManager<
       },
       restoreSandbox: async (
         snapshot: SandboxSnapshot
-      ): Promise<{ sandboxId: string; stateUpdate?: Record<string, unknown> }> => {
+      ): Promise<{ sandboxId: string; stateUpdate?: Record<string, unknown> } | null> => {
         const sandboxId = await this.restore(snapshot);
-        return { sandboxId };
+        return sandboxId ? { sandboxId } : null;
       },
     };
   }

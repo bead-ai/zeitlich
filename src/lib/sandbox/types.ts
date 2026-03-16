@@ -126,7 +126,7 @@ export interface SandboxProvider<
   get(sandboxId: string): Promise<TSandbox>;
   destroy(sandboxId: string): Promise<void>;
   snapshot(sandboxId: string): Promise<SandboxSnapshot>;
-  restore(snapshot: SandboxSnapshot): Promise<Sandbox>;
+  restore(snapshot: SandboxSnapshot): Promise<Sandbox | null>;
 }
 
 // ============================================================================
@@ -143,7 +143,7 @@ export interface SandboxOps<
   snapshotSandbox(sandboxId: string): Promise<SandboxSnapshot>;
   restoreSandbox(
     snapshot: SandboxSnapshot,
-  ): Promise<{ sandboxId: string; stateUpdate?: Record<string, unknown> }>;
+  ): Promise<{ sandboxId: string; stateUpdate?: Record<string, unknown> } | null>;
 }
 
 // ============================================================================
