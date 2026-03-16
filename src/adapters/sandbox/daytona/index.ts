@@ -1,7 +1,4 @@
-import {
-  Daytona,
-  type Sandbox as DaytonaSdkSandbox,
-} from "@daytonaio/sdk";
+import { Daytona, type Sandbox as DaytonaSdkSandbox } from "@daytonaio/sdk";
 import type {
   Sandbox,
   SandboxCapabilities,
@@ -38,7 +35,7 @@ class DaytonaSandboxImpl implements Sandbox {
   constructor(
     readonly id: string,
     private sdkSandbox: DaytonaSdkSandbox,
-    workspaceBase = "/home/daytona",
+    workspaceBase = "/home/daytona"
   ) {
     this.fs = new DaytonaSandboxFileSystem(sdkSandbox, workspaceBase);
   }
@@ -48,7 +45,7 @@ class DaytonaSandboxImpl implements Sandbox {
       command,
       options?.cwd,
       options?.env,
-      options?.timeout,
+      options?.timeout
     );
 
     return {
@@ -67,9 +64,10 @@ class DaytonaSandboxImpl implements Sandbox {
 // DaytonaSandboxProvider
 // ============================================================================
 
-export class DaytonaSandboxProvider
-  implements SandboxProvider<DaytonaSandboxCreateOptions, DaytonaSandbox>
-{
+export class DaytonaSandboxProvider implements SandboxProvider<
+  DaytonaSandboxCreateOptions,
+  DaytonaSandbox
+> {
   readonly id = "daytona";
   readonly capabilities: SandboxCapabilities = {
     filesystem: true,
@@ -87,7 +85,7 @@ export class DaytonaSandboxProvider
   }
 
   async create(
-    options?: DaytonaSandboxCreateOptions,
+    options?: DaytonaSandboxCreateOptions
   ): Promise<SandboxCreateResult> {
     const sdkSandbox = await this.client.create(
       {
@@ -99,7 +97,7 @@ export class DaytonaSandboxProvider
         autoArchiveInterval: options?.autoArchiveInterval,
         autoDeleteInterval: options?.autoDeleteInterval,
       },
-      { timeout: options?.timeout ?? 60 },
+      { timeout: options?.timeout ?? 60 }
     );
 
     const workspaceBase = options?.workspaceBase ?? this.defaultWorkspaceBase;
@@ -107,13 +105,16 @@ export class DaytonaSandboxProvider
     const sandbox = new DaytonaSandboxImpl(
       sdkSandbox.id,
       sdkSandbox,
-      workspaceBase,
+      workspaceBase
     );
 
     if (options?.initialFiles) {
-      for (const [path, content] of Object.entries(options.initialFiles)) {
-        await sandbox.fs.writeFile(path, content);
-      }
+      await sandbox.fs.writeFiles(
+        Object.entries(options.initialFiles).map(([path, content]) => ({
+          path,
+          content,
+        }))
+      );
     }
 
     return { sandbox };
@@ -142,13 +143,13 @@ export class DaytonaSandboxProvider
 
   async snapshot(_sandboxId: string): Promise<SandboxSnapshot> {
     throw new SandboxNotSupportedError(
-      "snapshot (use Daytona's native snapshot API directly)",
+      "snapshot (use Daytona's native snapshot API directly)"
     );
   }
 
   async restore(_snapshot: SandboxSnapshot): Promise<never> {
     throw new SandboxNotSupportedError(
-      "restore (use Daytona's native snapshot API directly)",
+      "restore (use Daytona's native snapshot API directly)"
     );
   }
 }
