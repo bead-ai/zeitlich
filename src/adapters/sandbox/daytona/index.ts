@@ -191,9 +191,10 @@ export class DaytonaSandboxProvider
       workspaceBase: string;
     };
 
+    let volume;
     try {
       // Verify the volume still exists before creating a sandbox from it
-      await this.client.volume.get(volumeId);
+      volume = await this.client.volume.get(volumeId);
     } catch {
       return null;
     }
@@ -201,6 +202,9 @@ export class DaytonaSandboxProvider
     const sdkSandbox = await this.client.create({
       volumes: [{ volumeId, mountPath: workspaceBase } as VolumeMount],
     });
+
+    // Volume data is now mounted into the sandbox — free the volume
+    await this.client.volume.delete(volume);
 
     this.workspaceBaseById.set(sdkSandbox.id, workspaceBase);
     return new DaytonaSandboxImpl(sdkSandbox.id, sdkSandbox, workspaceBase);
