@@ -7,8 +7,6 @@ import type { E2bSandboxFileSystem } from "./filesystem";
 export type E2bSandbox = Sandbox & { fs: E2bSandboxFileSystem };
 
 export interface E2bSandboxConfig {
-  /** E2B API key — defaults to the `E2B_API_KEY` environment variable */
-  apiKey?: string;
   /** Sandbox template name or ID */
   template?: string;
   /** Default working directory inside the sandbox */

@@ -72,13 +72,11 @@ export class E2bSandboxProvider
     persistence: true,
   };
 
-  private readonly apiKey?: string;
   private readonly defaultTemplate?: string;
   private readonly defaultWorkspaceBase: string;
   private readonly defaultTimeoutMs?: number;
 
   constructor(config?: E2bSandboxConfig) {
-    this.apiKey = config?.apiKey;
     this.defaultTemplate = config?.template;
     this.defaultWorkspaceBase = config?.workspaceBase ?? "/home/user";
     this.defaultTimeoutMs = config?.timeoutMs;
@@ -90,7 +88,6 @@ export class E2bSandboxProvider
     const template = options?.template ?? this.defaultTemplate;
     const workspaceBase = this.defaultWorkspaceBase;
     const createOpts = {
-      apiKey: this.apiKey,
       envs: options?.env,
       timeoutMs: options?.timeoutMs ?? this.defaultTimeoutMs,
     };
@@ -118,14 +115,8 @@ export class E2bSandboxProvider
 
   async get(sandboxId: string): Promise<E2bSandbox> {
     try {
-      const sdkSandbox = await E2bSdkSandbox.connect(sandboxId, {
-        apiKey: this.apiKey,
-      });
-      return new E2bSandboxImpl(
-        sandboxId,
-        sdkSandbox,
-        this.defaultWorkspaceBase
-      );
+      const sdkSandbox = await E2bSdkSandbox.connect(sandboxId);
+      return new E2bSandboxImpl(sandboxId, sdkSandbox, this.defaultWorkspaceBase);
     } catch {
       throw new SandboxNotFoundError(sandboxId);
     }
@@ -133,9 +124,7 @@ export class E2bSandboxProvider
 
   async destroy(sandboxId: string): Promise<void> {
     try {
-      const sdkSandbox = await E2bSdkSandbox.connect(sandboxId, {
-        apiKey: this.apiKey,
-      });
+      const sdkSandbox = await E2bSdkSandbox.connect(sandboxId);
       await sdkSandbox.kill();
     } catch {
       // Already gone or not found
@@ -150,8 +139,14 @@ export class E2bSandboxProvider
     throw new SandboxNotSupportedError("restore");
   }
 
-  async fork(_sandboxId: string): Promise<Sandbox> {
-    throw new SandboxNotSupportedError("fork");
+  async fork(sandboxId: string): Promise<Sandbox> {
+    const { snapshotId } = await E2bSdkSandbox.createSnapshot(sandboxId);
+    const sdkSandbox = await E2bSdkSandbox.create(snapshotId);
+    return new E2bSandboxImpl(
+      sdkSandbox.sandboxId,
+      sdkSandbox,
+      this.defaultWorkspaceBase
+    );
   }
 }
 
