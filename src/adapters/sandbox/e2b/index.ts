@@ -145,17 +145,8 @@ export class E2bSandboxProvider
   }
 
   async fork(sandboxId: string): Promise<Sandbox> {
-    // For a running sandbox: snapshot first, then create from snapshot.
-    // For a paused sandbox: the sandboxId itself acts as a snapshot template.
-    let templateId: string;
-    try {
-      const { snapshotId } = await E2bSdkSandbox.createSnapshot(sandboxId);
-      templateId = snapshotId;
-    } catch {
-      // Sandbox is paused — use its ID directly as the template
-      templateId = sandboxId;
-    }
-    const sdkSandbox = await E2bSdkSandbox.create(templateId);
+    const { snapshotId } = await E2bSdkSandbox.createSnapshot(sandboxId);
+    const sdkSandbox = await E2bSdkSandbox.create(snapshotId);
     return new E2bSandboxImpl(
       sdkSandbox.sandboxId,
       sdkSandbox,
