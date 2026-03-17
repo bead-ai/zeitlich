@@ -131,6 +131,10 @@ export class E2bSandboxProvider
     }
   }
 
+  async pause(_sandboxId: string, _ttlSeconds?: number): Promise<void> {
+    throw new SandboxNotSupportedError("pause");
+  }
+
   async snapshot(_sandboxId: string): Promise<SandboxSnapshot> {
     throw new SandboxNotSupportedError("snapshot");
   }

@@ -141,6 +141,10 @@ export class DaytonaSandboxProvider implements SandboxProvider<
     }
   }
 
+  async pause(_sandboxId: string, _ttlSeconds?: number): Promise<void> {
+    throw new SandboxNotSupportedError("pause");
+  }
+
   async fork(_sandboxId: string): Promise<Sandbox> {
     throw new Error("Not implemented");
   }

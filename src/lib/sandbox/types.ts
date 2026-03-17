@@ -125,6 +125,7 @@ export interface SandboxProvider<
   create(options?: TOptions): Promise<SandboxCreateResult>;
   get(sandboxId: string): Promise<TSandbox>;
   destroy(sandboxId: string): Promise<void>;
+  pause(sandboxId: string, ttlSeconds?: number): Promise<void>;
   snapshot(sandboxId: string): Promise<SandboxSnapshot>;
   restore(snapshot: SandboxSnapshot): Promise<Sandbox>;
   fork(sandboxId: string): Promise<Sandbox>;

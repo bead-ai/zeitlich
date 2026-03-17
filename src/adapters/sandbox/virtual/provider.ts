@@ -90,6 +90,10 @@ export class VirtualSandboxProvider<
     // No-op — no internal state to clean up
   }
 
+  async pause(): Promise<void> {
+    // No-op — virtual sandbox state lives in workflow AgentState
+  }
+
   async fork(_sandboxId: string): Promise<never> {
     throw new Error("Not implemented");
   }
