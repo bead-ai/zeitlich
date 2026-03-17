@@ -126,7 +126,6 @@ export function createLangChainAdapter(
       });
       await thread.fork(targetThreadId);
     },
-
   };
 
   function createActivities<S extends string = "">(

@@ -133,7 +133,6 @@ export function createGoogleGenAIAdapter(
       });
       await thread.fork(targetThreadId);
     },
-
   };
 
   function createActivities<S extends string = "">(
