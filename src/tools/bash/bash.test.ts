@@ -4,11 +4,17 @@ import { withSandbox } from "../../lib/tool-router/with-sandbox";
 import { SandboxManager } from "../../lib/sandbox/manager";
 import { InMemorySandboxProvider } from "../../adapters/sandbox/inmemory/index";
 import type { RouterContext } from "../../lib/tool-router/types";
+import type { Sandbox, SandboxCreateOptions } from "../../lib/sandbox";
 
 describe("bash handler with sandbox", () => {
-  let manager: SandboxManager;
+  let manager: SandboxManager<SandboxCreateOptions, Sandbox, "inMemory">;
   let sandboxId: string;
-  let handler: ReturnType<typeof withSandbox<Parameters<typeof bashHandler>[0], Awaited<ReturnType<typeof bashHandler>>["data"]>>;
+  let handler: ReturnType<
+    typeof withSandbox<
+      Parameters<typeof bashHandler>[0],
+      Awaited<ReturnType<typeof bashHandler>>["data"]
+    >
+  >;
 
   beforeEach(async () => {
     manager = new SandboxManager(new InMemorySandboxProvider());
@@ -83,11 +89,14 @@ describe("bash handler with sandbox", () => {
   });
 
   it("returns error when no sandboxId in context", async () => {
-    const { toolResponse, data } = await handler({ command: "echo hi" }, {
-      threadId: "test-thread",
-      toolCallId: "test-call",
-      toolName: "Bash",
-    });
+    const { toolResponse, data } = await handler(
+      { command: "echo hi" },
+      {
+        threadId: "test-thread",
+        toolCallId: "test-call",
+        toolName: "Bash",
+      }
+    );
     expect(toolResponse).toContain("No sandbox configured");
     expect(data).toBeNull();
   });

@@ -1,10 +1,10 @@
 import { describe, expect, it, beforeEach } from "vitest";
 import { SandboxManager } from "./manager";
 import { InMemorySandboxProvider } from "../../adapters/sandbox/inmemory/index";
-import { SandboxNotFoundError } from "./types";
+import { SandboxNotFoundError, type Sandbox, type SandboxCreateOptions } from "./types";
 
 describe("SandboxManager", () => {
-  let manager: SandboxManager;
+  let manager: SandboxManager<SandboxCreateOptions, Sandbox, "inMemory">;
 
   beforeEach(() => {
     manager = new SandboxManager(new InMemorySandboxProvider());
@@ -54,7 +54,7 @@ describe("SandboxManager", () => {
 
     const snapshot = await manager.snapshot(sandboxId);
     expect(snapshot.sandboxId).toBe(sandboxId);
-    expect(snapshot.providerId).toBe("inmemory");
+    expect(snapshot.providerId).toBe("inMemory");
 
     await manager.destroy(sandboxId);
     await expect(manager.getSandbox(sandboxId)).rejects.toThrow(SandboxNotFoundError);
@@ -69,7 +69,8 @@ describe("SandboxManager", () => {
   });
 
   it("createActivities returns prefixed SandboxOps-shaped object", async () => {
-    const activities = manager.createActivities("inMemoryTest");
+    // provider.id is "inMemory", scope is "Test" → prefix "inMemoryTest"
+    const activities = manager.createActivities("Test");
     expect(activities.inMemoryTestCreateSandbox).toBeTypeOf("function");
     expect(activities.inMemoryTestDestroySandbox).toBeTypeOf("function");
     expect(activities.inMemoryTestSnapshotSandbox).toBeTypeOf("function");
@@ -85,7 +86,7 @@ describe("SandboxManager", () => {
 });
 
 describe("InMemorySandboxProvider", () => {
-  let manager: SandboxManager;
+  let manager: SandboxManager<SandboxCreateOptions, Sandbox, "inMemory">;
 
   beforeEach(() => {
     manager = new SandboxManager(new InMemorySandboxProvider());

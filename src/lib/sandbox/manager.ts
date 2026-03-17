@@ -17,16 +17,18 @@ import type {
  * ```typescript
  * const manager = new SandboxManager(new InMemorySandboxProvider());
  * const activities = {
- *   ...manager.createActivities("inMemoryCodingAgent"),
+ *   ...manager.createActivities("CodingAgent"),
  *   bashHandler: withSandbox(manager, bashHandler),
  * };
+ * // registers: inMemoryCodingAgentCreateSandbox, …
  * ```
  */
 export class SandboxManager<
   TOptions extends SandboxCreateOptions = SandboxCreateOptions,
   TSandbox extends Sandbox = Sandbox,
+  TId extends string = string,
 > {
-  constructor(private provider: SandboxProvider<TOptions, TSandbox>) {}
+  constructor(private provider: SandboxProvider<TOptions, TSandbox> & { readonly id: TId }) {}
 
   async create(
     options?: TOptions
@@ -59,23 +61,28 @@ export class SandboxManager<
 
   /**
    * Returns Temporal activity functions with prefixed names.
-   * Use the matching `proxy*SandboxOps()` helper from the adapter's
-   * `/workflow` entrypoint to map them back to generic {@link SandboxOps}.
    *
-   * @param prefix - Composite prefix, typically `${workflowName}${AdapterName}`
+   * The provider's `id` is automatically prepended, so you only need
+   * to pass the workflow/scope name. Use the matching `proxy*SandboxOps()`
+   * helper from the adapter's `/workflow` entrypoint on the workflow side.
+   *
+   * @param scope - Workflow name (appended to the provider id)
    *
    * @example
    * ```typescript
    * const manager = new SandboxManager(new InMemorySandboxProvider());
-   * const activities = {
-   *   ...manager.createActivities("inMemoryCodingAgent"),
-   * };
+   * manager.createActivities("CodingAgent");
    * // registers: inMemoryCodingAgentCreateSandbox, inMemoryCodingAgentDestroySandbox, …
+   *
+   * const vmgr = new SandboxManager(new VirtualSandboxProvider(resolver));
+   * vmgr.createActivities("CodingAgent");
+   * // registers: virtualCodingAgentCreateSandbox, …
    * ```
    */
-  createActivities<P extends string>(
-    prefix: P
-  ): PrefixedSandboxOps<P, TOptions> {
+  createActivities<S extends string>(
+    scope: S
+  ): PrefixedSandboxOps<`${TId}${Capitalize<S>}`, TOptions> {
+    const prefix = `${this.provider.id}${scope.charAt(0).toUpperCase()}${scope.slice(1)}`;
     const ops: SandboxOps<TOptions> = {
       createSandbox: async (
         options?: TOptions
@@ -98,6 +105,6 @@ export class SandboxManager<
     const cap = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1);
     return Object.fromEntries(
       Object.entries(ops).map(([k, v]) => [`${prefix}${cap(k)}`, v])
-    ) as PrefixedSandboxOps<P, TOptions>;
+    ) as PrefixedSandboxOps<`${TId}${Capitalize<S>}`, TOptions>;
   }
 }

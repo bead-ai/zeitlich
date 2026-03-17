@@ -16,13 +16,14 @@
  */
 import { proxyActivities, workflowInfo } from "@temporalio/workflow";
 import type { SandboxOps } from "../../../lib/sandbox/types";
+import type { VirtualSandboxCreateOptions } from "./types";
 
 const ADAPTER_PREFIX = "virtual";
 
 export function proxyVirtualSandboxOps(
   scope?: string,
   options?: Parameters<typeof proxyActivities>[0]
-): SandboxOps {
+): SandboxOps<VirtualSandboxCreateOptions<unknown>> {
   const resolvedScope = scope ?? workflowInfo().workflowType;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -38,8 +39,7 @@ export function proxyVirtualSandboxOps(
     }
   );
 
-  const prefix =
-    `${ADAPTER_PREFIX}${resolvedScope.charAt(0).toUpperCase()}${resolvedScope.slice(1)}`;
+  const prefix = `${ADAPTER_PREFIX}${resolvedScope.charAt(0).toUpperCase()}${resolvedScope.slice(1)}`;
   const p = (key: string): string =>
     `${prefix}${key.charAt(0).toUpperCase()}${key.slice(1)}`;
 
@@ -48,5 +48,5 @@ export function proxyVirtualSandboxOps(
     destroySandbox: acts[p("destroySandbox")],
     snapshotSandbox: acts[p("snapshotSandbox")],
     forkSandbox: acts[p("forkSandbox")],
-  } as SandboxOps;
+  } as SandboxOps<VirtualSandboxCreateOptions<unknown>>;
 }
