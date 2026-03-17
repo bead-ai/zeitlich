@@ -4,19 +4,23 @@
  * Import this from `zeitlich/adapters/thread/google-genai/workflow`
  * in your Temporal workflow files.
  *
+ * By default the scope is derived from `workflowInfo().workflowType`,
+ * so activities are automatically namespaced per workflow.
+ *
  * @example
  * ```typescript
  * import { proxyGoogleGenAIThreadOps } from 'zeitlich/adapters/thread/google-genai/workflow';
  *
- * // Main agent
- * const threadOps = proxyGoogleGenAIThreadOps("main");
+ * // Auto-scoped to the current workflow name
+ * const threadOps = proxyGoogleGenAIThreadOps();
  *
- * // Subagent with its own scoped activities
- * const researchThreadOps = proxyGoogleGenAIThreadOps("research");
+ * // Explicit scope override
+ * const threadOps = proxyGoogleGenAIThreadOps("customScope");
  * ```
  */
 import {
   proxyActivities,
+  workflowInfo,
   type ActivityInterfaceFor,
 } from "@temporalio/workflow";
 import type { ThreadOps } from "../../../lib/session/types";
@@ -27,6 +31,8 @@ export function proxyGoogleGenAIThreadOps(
   scope?: string,
   options?: Parameters<typeof proxyActivities>[0]
 ): ActivityInterfaceFor<ThreadOps> {
+  const resolvedScope = scope ?? workflowInfo().workflowType;
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const acts = proxyActivities<Record<string, (...args: any[]) => any>>(
     options ?? {
@@ -40,9 +46,8 @@ export function proxyGoogleGenAIThreadOps(
     }
   );
 
-  const prefix = scope
-    ? `${scope}${ADAPTER_PREFIX.charAt(0).toUpperCase()}${ADAPTER_PREFIX.slice(1)}`
-    : ADAPTER_PREFIX;
+  const prefix =
+    `${resolvedScope}${ADAPTER_PREFIX.charAt(0).toUpperCase()}${ADAPTER_PREFIX.slice(1)}`;
   const p = (key: string): string =>
     `${prefix}${key.charAt(0).toUpperCase()}${key.slice(1)}`;
 
