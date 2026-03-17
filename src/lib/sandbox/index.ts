@@ -1,6 +1,6 @@
 export { SandboxManager } from "./manager";
 export { toTree } from "./tree";
-export { defineSandboxReaper, getReaperWorkflowId } from "./reaper";
+export { defineSandboxReaper, getReaperWorkflowId, dismissReaper } from "./reaper";
 export type { SandboxReaperWorkflow } from "./reaper";
 export type {
   Sandbox,

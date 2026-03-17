@@ -16,7 +16,7 @@ import { getShortId } from "../thread/id";
 import { buildSubagentRegistration } from "../subagent/register";
 import type { ChildSandboxTrackerRef } from "../subagent/handler";
 import { buildSkillRegistration } from "../skills/register";
-import { getReaperWorkflowId } from "../sandbox/reaper";
+import { getReaperWorkflowId, dismissReaper } from "../sandbox/reaper";
 import { uuid4 } from "@temporalio/workflow";
 
 /**
@@ -183,7 +183,7 @@ export const createSession = async <T extends ToolMap, M = unknown>({
       if (previousSandboxId && sandboxOps) {
         try {
           const reaperHandle = getExternalWorkflowHandle(getReaperWorkflowId(previousSandboxId));
-          await reaperHandle.cancel();
+          await reaperHandle.signal(dismissReaper);
         } catch {
           // Reaper may have already completed or never existed
         }
