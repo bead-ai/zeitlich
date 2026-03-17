@@ -1,12 +1,14 @@
 import type Redis from "ioredis";
 import type { ToolResultConfig } from "../../../lib/types";
 import type { MessageContent } from "@langchain/core/messages";
-import type { ThreadOps } from "../../../lib/session/types";
+import type { PrefixedThreadOps } from "../../../lib/session/types";
 import type { ModelInvoker } from "../../../lib/model";
 import type { StoredMessage } from "@langchain/core/messages";
 import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
 import { createLangChainThreadManager } from "./thread-manager";
 import { createLangChainModelInvoker } from "./model-invoker";
+
+export type LangChainThreadOps = PrefixedThreadOps<"langChain">;
 
 export interface LangChainAdapterConfig {
   redis: Redis;
@@ -17,7 +19,7 @@ export interface LangChainAdapterConfig {
 
 export interface LangChainAdapter {
   /** Thread operations (register these as Temporal activities on the worker) */
-  threadOps: ThreadOps;
+  threadOps: LangChainThreadOps;
   /** Model invoker using the default model (only available when `model` was provided) */
   invoker: ModelInvoker<StoredMessage>;
   /** Create an invoker for a specific model (for multi-model setups) */
@@ -66,13 +68,13 @@ export function createLangChainAdapter(
 ): LangChainAdapter {
   const { redis } = config;
 
-  const threadOps: ThreadOps = {
-    async initializeThread(threadId: string): Promise<void> {
+  const threadOps: LangChainThreadOps = {
+    async langChainInitializeThread(threadId: string): Promise<void> {
       const thread = createLangChainThreadManager({ redis, threadId });
       await thread.initialize();
     },
 
-    async appendHumanMessage(
+    async langChainAppendHumanMessage(
       threadId: string,
       id: string,
       content: string | MessageContent
@@ -81,7 +83,7 @@ export function createLangChainAdapter(
       await thread.appendHumanMessage(id, content);
     },
 
-    async appendSystemMessage(
+    async langChainAppendSystemMessage(
       threadId: string,
       id: string,
       content: string
@@ -90,13 +92,13 @@ export function createLangChainAdapter(
       await thread.appendSystemMessage(id, content);
     },
 
-    async appendToolResult(id: string, cfg: ToolResultConfig): Promise<void> {
+    async langChainAppendToolResult(id: string, cfg: ToolResultConfig): Promise<void> {
       const { threadId, toolCallId, content } = cfg;
       const thread = createLangChainThreadManager({ redis, threadId });
       await thread.appendToolMessage(id, content, toolCallId);
     },
 
-    async forkThread(
+    async langChainForkThread(
       sourceThreadId: string,
       targetThreadId: string
     ): Promise<void> {

@@ -43,6 +43,19 @@ export interface ThreadOps {
 }
 
 /**
+ * Maps generic {@link ThreadOps} method names to adapter-prefixed names.
+ *
+ * @example
+ * ```typescript
+ * type GoogleOps = PrefixedThreadOps<"googleGenAI">;
+ * // → { googleGenAIInitializeThread, googleGenAIAppendHumanMessage, … }
+ * ```
+ */
+export type PrefixedThreadOps<TPrefix extends string> = {
+  [K in keyof ThreadOps as `${TPrefix}${Capitalize<K & string>}`]: ThreadOps[K];
+};
+
+/**
  * Configuration for a Zeitlich agent session
  */
 export interface SessionConfig<T extends ToolMap, M = unknown> {
@@ -59,7 +72,7 @@ export interface SessionConfig<T extends ToolMap, M = unknown> {
   /** Workflow-specific runAgent activity (with tools pre-bound) */
   runAgent: RunAgentActivity<M>;
   /** Thread operations (initialize, append messages, parse tool calls) */
-  threadOps?: ActivityInterfaceFor<ThreadOps>;
+  threadOps: ActivityInterfaceFor<ThreadOps>;
   /** Tool router for processing tool calls (optional if agent has no tools) */
   tools?: T;
   /** Subagent configurations */

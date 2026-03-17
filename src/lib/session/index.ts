@@ -1,11 +1,8 @@
-export {
-  createSession,
-  proxyDefaultThreadOps,
-  proxySandboxOps,
-} from "./session";
+export { createSession } from "./session";
 
 export type {
   ThreadOps,
+  PrefixedThreadOps,
   SessionConfig,
   ZeitlichSession,
 } from "./types";

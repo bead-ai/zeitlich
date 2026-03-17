@@ -1,14 +1,11 @@
 import {
-  proxyActivities,
   condition,
   defineUpdate,
   setHandler,
   ApplicationFailure,
-  type ActivityInterfaceFor,
 } from "@temporalio/workflow";
 import type { SessionExitReason, MessageContent } from "../types";
-import type { ThreadOps, SessionConfig, ZeitlichSession } from "./types";
-import type { SandboxOps } from "../sandbox/types";
+import type { SessionConfig, ZeitlichSession } from "./types";
 import { type AgentStateManager, type JsonSerializable } from "../state/types";
 import { createToolRouter } from "../tool-router/router";
 import type { ParsedToolCallUnion, ToolMap } from "../tool-router/types";
@@ -79,7 +76,7 @@ export const createSession = async <T extends ToolMap, M = unknown>({
     initializeThread,
     appendSystemMessage,
     forkThread,
-  } = threadOps ?? proxyDefaultThreadOps();
+  } = threadOps;
 
   const plugins: ToolMap[string][] = [];
   if (subagents) {
@@ -286,59 +283,3 @@ export const createSession = async <T extends ToolMap, M = unknown>({
   };
 };
 
-/**
- * Proxy the adapter's thread operations as Temporal activities.
- * Call this in workflow code to delegate thread operations to the
- * adapter-provided activities registered on the worker.
- *
- * @example
- * ```typescript
- * const session = await createSession({
- *   threadOps: proxyDefaultThreadOps(),
- *   // ...
- * });
- * ```
- */
-export function proxyDefaultThreadOps(
-  options?: Parameters<typeof proxyActivities>[0]
-): ActivityInterfaceFor<ThreadOps> {
-  return proxyActivities<ThreadOps>(
-    options ?? {
-      startToCloseTimeout: "10s",
-      retry: {
-        maximumAttempts: 6,
-        initialInterval: "5s",
-        maximumInterval: "15m",
-        backoffCoefficient: 4,
-      },
-    }
-  );
-}
-
-/**
- * Proxy sandbox lifecycle operations as Temporal activities.
- * Call this in workflow code when the agent needs a sandbox.
- *
- * @example
- * ```typescript
- * const session = await createSession({
- *   sandbox: proxySandboxOps(),
- *   // ...
- * });
- * ```
- */
-export function proxySandboxOps(
-  options?: Parameters<typeof proxyActivities>[0]
-): SandboxOps {
-  return proxyActivities<SandboxOps>(
-    options ?? {
-      startToCloseTimeout: "30s",
-      retry: {
-        maximumAttempts: 3,
-        initialInterval: "2s",
-        maximumInterval: "30s",
-        backoffCoefficient: 2,
-      },
-    }
-  );
-}
