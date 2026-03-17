@@ -127,6 +127,7 @@ export interface SandboxProvider<
   destroy(sandboxId: string): Promise<void>;
   snapshot(sandboxId: string): Promise<SandboxSnapshot>;
   restore(snapshot: SandboxSnapshot): Promise<Sandbox>;
+  fork(sandboxId: string): Promise<Sandbox>;
 }
 
 // ============================================================================
@@ -141,6 +142,7 @@ export interface SandboxOps<
   ): Promise<{ sandboxId: string; stateUpdate?: Record<string, unknown> }>;
   destroySandbox(sandboxId: string): Promise<void>;
   snapshotSandbox(sandboxId: string): Promise<SandboxSnapshot>;
+  forkSandbox(sandboxId: string): Promise<string>;
 }
 
 // ============================================================================

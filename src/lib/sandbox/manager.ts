@@ -51,6 +51,11 @@ export class SandboxManager<
     return sandbox.id;
   }
 
+  async fork(sandboxId: string): Promise<string> {
+    const sandbox = await this.provider.fork(sandboxId);
+    return sandbox.id;
+  }
+
   /**
    * Returns Temporal activity functions matching {@link SandboxOps}.
    * Spread these into your worker's activity map.
@@ -70,6 +75,9 @@ export class SandboxManager<
       },
       snapshotSandbox: async (sandboxId: string): Promise<SandboxSnapshot> => {
         return this.snapshot(sandboxId);
+      },
+      forkSandbox: async (sandboxId: string): Promise<string> => {
+        return this.fork(sandboxId);
       },
     };
   }

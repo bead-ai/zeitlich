@@ -422,6 +422,7 @@ describe("createSession edge cases", () => {
         data: null,
         createdAt: new Date().toISOString(),
       }),
+      forkSandbox: async () => "forked-sandbox-id",
     };
 
     const session = await createSession({
@@ -462,6 +463,7 @@ describe("createSession edge cases", () => {
         data: null,
         createdAt: new Date().toISOString(),
       }),
+      forkSandbox: async () => "forked-sandbox-id",
     };
 
     const session = await createSession({
@@ -897,6 +899,7 @@ describe("createSession edge cases", () => {
       createSandbox: async () => ({ sandboxId: "sb-test" }),
       destroySandbox: async () => {},
       snapshotSandbox: snapshotSpy,
+      forkSandbox: async () => "forked-sandbox-id",
     };
 
     const session = await createSession({

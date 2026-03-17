@@ -90,6 +90,10 @@ export class VirtualSandboxProvider<
     // No-op — no internal state to clean up
   }
 
+  async fork(_sandboxId: string): Promise<never> {
+    throw new Error("Not implemented");
+  }
+
   async snapshot(): Promise<never> {
     throw new SandboxNotSupportedError(
       "snapshot (virtual sandbox state lives in workflow AgentState)"

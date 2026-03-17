@@ -200,6 +200,10 @@ export class InMemorySandboxProvider implements SandboxProvider {
     };
   }
 
+  async fork(_sandboxId: string): Promise<Sandbox> {
+    throw new Error("Not implemented");
+  }
+
   async restore(snapshot: SandboxSnapshot): Promise<Sandbox> {
     const { files } = snapshot.data as { files: Record<string, string> };
     const initialFiles: InitialFiles = {};
