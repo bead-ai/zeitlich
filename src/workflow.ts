@@ -155,6 +155,8 @@ export {
   SandboxNotFoundError,
   SandboxNotSupportedError,
 } from "./lib/sandbox/types";
+export { defineSandboxReaper, getReaperWorkflowId } from "./lib/sandbox/reaper";
+export type { SandboxReaperWorkflow } from "./lib/sandbox/reaper";
 
 // Virtual sandbox (workflow-safe — imported from leaf modules to avoid
 // pulling activity-side code like VirtualSandboxFileSystem / Provider).

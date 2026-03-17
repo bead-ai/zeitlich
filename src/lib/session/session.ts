@@ -2,7 +2,10 @@ import {
   condition,
   defineUpdate,
   setHandler,
+  startChild,
+  getExternalWorkflowHandle,
   ApplicationFailure,
+  ParentClosePolicy,
 } from "@temporalio/workflow";
 import type { SessionExitReason, MessageContent } from "../types";
 import type { SessionConfig, ZeitlichSession } from "./types";
@@ -13,6 +16,7 @@ import { getShortId } from "../thread/id";
 import { buildSubagentRegistration } from "../subagent/register";
 import type { ChildSandboxTrackerRef } from "../subagent/handler";
 import { buildSkillRegistration } from "../skills/register";
+import { getReaperWorkflowId } from "../sandbox/reaper";
 import { uuid4 } from "@temporalio/workflow";
 
 /**
@@ -66,6 +70,7 @@ export const createSession = async <T extends ToolMap, M = unknown>({
   sandboxId: inheritedSandboxId,
   previousSandboxId,
   pauseSandboxOnExit = false,
+  sandboxReaper,
 }: SessionConfig<T, M>): Promise<ZeitlichSession<M>> => {
   const sourceThreadId = continueThread ? providedThreadId : undefined;
   const threadId =
@@ -176,6 +181,12 @@ export const createSession = async <T extends ToolMap, M = unknown>({
       }
       let ownsSandbox = !sandboxId && !!sandboxOps;
       if (previousSandboxId && sandboxOps) {
+        try {
+          const reaperHandle = getExternalWorkflowHandle(getReaperWorkflowId(previousSandboxId));
+          await reaperHandle.cancel();
+        } catch {
+          // Reaper may have already completed or never existed
+        }
         sandboxId = await sandboxOps.forkSandbox(previousSandboxId);
         ownsSandbox = true;
       } else if (ownsSandbox && sandboxOps) {
@@ -300,6 +311,18 @@ export const createSession = async <T extends ToolMap, M = unknown>({
           if (pauseSandboxOnExit) {
             const ttl = typeof pauseSandboxOnExit === "object" ? pauseSandboxOnExit.ttlSeconds : undefined;
             await sandboxOps.pauseSandbox(sandboxId, ttl);
+            if (sandboxReaper) {
+              const reaperOpts = {
+                workflowId: getReaperWorkflowId(sandboxId),
+                args: [sandboxId, sandboxReaper.ttlMs] as const,
+                parentClosePolicy: ParentClosePolicy.ABANDON,
+              };
+              if (typeof sandboxReaper.workflow === "string") {
+                await startChild(sandboxReaper.workflow, reaperOpts);
+              } else {
+                await startChild(sandboxReaper.workflow, reaperOpts);
+              }
+            }
           } else {
             await sandboxOps.destroySandbox(sandboxId);
           }

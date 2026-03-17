@@ -13,6 +13,7 @@ import type { Hooks } from "../hooks/types";
 import type { SubagentConfig } from "../subagent/types";
 import type { Skill } from "../skills/types";
 import type { SandboxOps } from "../sandbox/types";
+import type { SandboxReaperWorkflow } from "../sandbox/reaper";
 import type { RunAgentActivity } from "../model/types";
 import type { AgentStateManager, JsonSerializable } from "../state/types";
 import type { ActivityInterfaceFor } from "@temporalio/workflow";
@@ -137,6 +138,18 @@ export interface SessionConfig<T extends ToolMap, M = unknown> {
    * was provided by the caller).
    */
   pauseSandboxOnExit?: boolean | { ttlSeconds: number };
+  /**
+   * When set, a reaper workflow is started after pausing the owned sandbox.
+   * The reaper sleeps for `ttlMs` then destroys the sandbox. On continuation
+   * (fork from `previousSandboxId`), the existing reaper is cancelled before
+   * forking so the sandbox survives.
+   *
+   * Define a reaper with {@link defineSandboxReaper} in your workflow file.
+   */
+  sandboxReaper?: {
+    workflow: string | SandboxReaperWorkflow;
+    ttlMs: number;
+  };
 }
 
 export interface ZeitlichSession<M = unknown> {
