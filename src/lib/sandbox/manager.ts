@@ -17,7 +17,7 @@ import type {
  * ```typescript
  * const manager = new SandboxManager(new InMemorySandboxProvider());
  * const activities = {
- *   ...manager.createActivities(),
+ *   ...manager.createActivities("codingAgentInMemory"),
  *   bashHandler: withSandbox(manager, bashHandler),
  * };
  * ```
@@ -58,14 +58,25 @@ export class SandboxManager<
   }
 
   /**
-   * Returns Temporal activity functions matching {@link SandboxOps}.
-   * Spread these into your worker's activity map.
+   * Returns Temporal activity functions with prefixed names.
+   * Use the matching `proxy*SandboxOps()` helper from the adapter's
+   * `/workflow` entrypoint to map them back to generic {@link SandboxOps}.
    *
-   * @deprecated Use {@link createPrefixedActivities} to register
-   * adapter-specific activity names and avoid collisions.
+   * @param prefix - Composite prefix, typically `${workflowName}${AdapterName}`
+   *
+   * @example
+   * ```typescript
+   * const manager = new SandboxManager(new InMemorySandboxProvider());
+   * const activities = {
+   *   ...manager.createActivities("codingAgentInMemory"),
+   * };
+   * // registers: codingAgentInMemoryCreateSandbox, codingAgentInMemoryDestroySandbox, …
+   * ```
    */
-  createActivities(): SandboxOps<TOptions> {
-    return {
+  createActivities<P extends string>(
+    prefix: P
+  ): PrefixedSandboxOps<P, TOptions> {
+    const ops: SandboxOps<TOptions> = {
       createSandbox: async (
         options?: TOptions
       ): Promise<{
@@ -84,26 +95,6 @@ export class SandboxManager<
         return this.fork(sandboxId);
       },
     };
-  }
-
-  /**
-   * Returns Temporal activity functions with adapter-prefixed names.
-   * Use the matching `proxy*SandboxOps()` helper from the adapter's
-   * `/workflow` entrypoint to map them back to generic {@link SandboxOps}.
-   *
-   * @example
-   * ```typescript
-   * const manager = new SandboxManager(new InMemorySandboxProvider());
-   * const activities = {
-   *   ...manager.createPrefixedActivities("inMemory"),
-   * };
-   * // registers: inMemoryCreateSandbox, inMemoryDestroySandbox, inMemorySnapshotSandbox
-   * ```
-   */
-  createPrefixedActivities<P extends string>(
-    prefix: P
-  ): PrefixedSandboxOps<P, TOptions> {
-    const ops = this.createActivities();
     const cap = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1);
     return Object.fromEntries(
       Object.entries(ops).map(([k, v]) => [`${prefix}${cap(k)}`, v])
