@@ -91,8 +91,6 @@ function createMockThreadOps() {
     forkThread: async (source, target) => {
       log.push({ op: "forkThread", args: [source, target] });
     },
-    storeSandboxId: async () => {},
-    getSandboxId: async () => undefined,
   });
 
   return { ops, log };

@@ -134,22 +134,6 @@ export function createGoogleGenAIAdapter(
       await thread.fork(targetThreadId);
     },
 
-    async storeSandboxId(
-      threadId: string,
-      sandboxId: string,
-      ttlSeconds?: number
-    ): Promise<void> {
-      if (ttlSeconds) {
-        await redis.set(`sandbox:${threadId}`, sandboxId, "EX", ttlSeconds);
-      } else {
-        await redis.set(`sandbox:${threadId}`, sandboxId);
-      }
-    },
-
-    async getSandboxId(threadId: string): Promise<string | undefined> {
-      const value = await redis.get(`sandbox:${threadId}`);
-      return value ?? undefined;
-    },
   };
 
   function createActivities<S extends string = "">(

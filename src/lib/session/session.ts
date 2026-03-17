@@ -3,7 +3,6 @@ import {
   defineUpdate,
   setHandler,
   ApplicationFailure,
-  log,
 } from "@temporalio/workflow";
 import type { SessionExitReason, MessageContent } from "../types";
 import type { SessionConfig, ZeitlichSession } from "./types";
@@ -65,6 +64,7 @@ export const createSession = async <T extends ToolMap, M = unknown>({
   waitForInputTimeout = "48h",
   sandbox: sandboxOps,
   sandboxId: inheritedSandboxId,
+  previousSandboxId,
   pauseSandboxOnExit = false,
 }: SessionConfig<T, M>): Promise<ZeitlichSession<M>> => {
   const sourceThreadId = continueThread ? providedThreadId : undefined;
@@ -164,38 +164,22 @@ export const createSession = async <T extends ToolMap, M = unknown>({
       let sandboxId: string | undefined = inheritedSandboxId;
       if (sandboxId && !sandboxOps) {
         throw ApplicationFailure.create({
-          message: "sandboxId provided but no sandbox ops — cannot fork or manage sandbox lifecycle",
+          message: "sandboxId provided but no sandboxOps — cannot manage sandbox lifecycle",
+          nonRetryable: true,
+        });
+      }
+      if (previousSandboxId && !sandboxOps) {
+        throw ApplicationFailure.create({
+          message: "previousSandboxId provided but no sandboxOps — cannot fork sandbox",
           nonRetryable: true,
         });
       }
       let ownsSandbox = !sandboxId && !!sandboxOps;
-      if (continueThread && sandboxOps) {
-        const sandboxToFork =
-          (sourceThreadId ? await threadOps.getSandboxId(sourceThreadId) : undefined)
-          ?? inheritedSandboxId;
-        if (sandboxToFork) {
-          try {
-            sandboxId = await sandboxOps.forkSandbox(sandboxToFork);
-            ownsSandbox = true;
-          } catch (err) {
-            log.warn("Failed to fork sandbox, falling back to creating a new one", {
-              sandboxId: sandboxToFork,
-              error: err instanceof Error ? err.message : String(err),
-            });
-            await createOwnedSandbox(sandboxOps);
-          }
-        } else if (ownsSandbox) {
-          await createOwnedSandbox(sandboxOps);
-        }
+      if (previousSandboxId && sandboxOps) {
+        sandboxId = await sandboxOps.forkSandbox(previousSandboxId);
+        ownsSandbox = true;
       } else if (ownsSandbox && sandboxOps) {
         await createOwnedSandbox(sandboxOps);
-      }
-
-      // Proactively register threadId → sandboxId in Redis with TTL so
-      // external systems and cleanup jobs can locate the sandbox by thread.
-      if (pauseSandboxOnExit && ownsSandbox && sandboxId) {
-        const ttl = typeof pauseSandboxOnExit === "object" ? pauseSandboxOnExit.ttlSeconds : undefined;
-        await threadOps.storeSandboxId(threadId, sandboxId, ttl);
       }
 
       if (hooks.onSessionStart) {

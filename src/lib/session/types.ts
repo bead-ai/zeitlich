@@ -40,16 +40,6 @@ export interface ThreadOps {
   ): Promise<void>;
   /** Copy all messages from sourceThreadId into a new thread at targetThreadId */
   forkThread(sourceThreadId: string, targetThreadId: string): Promise<void>;
-  /**
-   * Store a `threadId → sandboxId` mapping with an optional TTL.
-   * Call after creating or forking a sandbox when it will be paused on exit.
-   */
-  storeSandboxId(threadId: string, sandboxId: string, ttlSeconds?: number): Promise<void>;
-  /**
-   * Retrieve a sandbox ID previously stored against a thread ID.
-   * Returns `undefined` if no entry exists (e.g. TTL expired or never stored).
-   */
-  getSandboxId(threadId: string): Promise<string | undefined>;
 }
 
 /**
@@ -128,6 +118,12 @@ export interface SessionConfig<T extends ToolMap, M = unknown> {
    * sandbox on exit (the owner is responsible for cleanup).
    */
   sandboxId?: string;
+  /**
+   * The child's own previously-paused sandbox ID to fork from at the start of
+   * a continued session. Takes precedence over `sandboxId` for the fork path.
+   * Populated automatically by the subagent handler when `continueSandbox` is set.
+   */
+  previousSandboxId?: string;
   /**
    * When true (or an object with `ttlSeconds`), pause the owned sandbox on
    * session exit instead of destroying it. Useful when the sandbox will be

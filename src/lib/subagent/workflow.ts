@@ -107,8 +107,8 @@ export function defineSubagentWorkflow(
         threadId: workflowInput.previousThreadId,
         continueThread: true,
       }),
-      // previousSandboxId (child's own paused sandbox) takes priority over sandboxId (parent's)
-      sandboxId: workflowInput.previousSandboxId ?? workflowInput.sandboxId,
+      ...(workflowInput.sandboxId && { sandboxId: workflowInput.sandboxId }),
+      ...(workflowInput.previousSandboxId && { previousSandboxId: workflowInput.previousSandboxId }),
     };
     return fn(prompt, sessionInput, context ?? {});
   };
