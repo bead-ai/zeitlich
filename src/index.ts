@@ -63,3 +63,9 @@ export { readFileHandler } from "./tools/read-file/handler";
 export { writeFileHandler } from "./tools/write-file/handler";
 
 export { toTree } from "./lib/sandbox";
+export { createDatadogSubagentSinks } from "./lib/subagent/datadog-worker";
+export type {
+  CreateDatadogSubagentSinksOptions,
+  DatadogLoggerLike,
+  DatadogStatsDLike,
+} from "./lib/subagent/datadog-worker";

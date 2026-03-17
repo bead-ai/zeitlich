@@ -135,6 +135,19 @@ export type {
   SubagentWorkflowInput,
   SubagentSessionInput,
 } from "./lib/subagent/types";
+export type {
+  SubagentMetadata,
+  SubagentMetadataValue,
+  SubagentPlugin,
+  SubagentPluginError,
+  SubagentPluginEvent,
+} from "./lib/subagent";
+export { createDatadogSubagentPlugin, getExecutionGroupId } from "./lib/subagent";
+export type {
+  CreateDatadogSubagentPluginOptions,
+  DatadogSubagentEvent,
+  DatadogSubagentSinks,
+} from "./lib/subagent";
 // Sandbox types (workflow-safe — no activity-side code)
 export type {
   Sandbox,
