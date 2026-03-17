@@ -34,10 +34,24 @@ vi.mock("@temporalio/workflow", () => {
     condition: async (fn: () => boolean) => fn(),
     defineUpdate: (name: string) => ({ __type: "update", name }),
     defineQuery: (name: string) => ({ __type: "query", name }),
+    defineSignal: (name: string) => ({ __type: "signal", name }),
     setHandler: (_def: unknown, _handler: unknown) => {},
     uuid4: () =>
       `00000000-0000-0000-0000-${String(++idCounter).padStart(12, "0")}`,
     ApplicationFailure: MockApplicationFailure,
+    ParentClosePolicy: {
+      ABANDON: "ABANDON",
+      TERMINATE: "TERMINATE",
+      REQUEST_CANCEL: "REQUEST_CANCEL",
+      PARENT_CLOSE_POLICY_ABANDON: "ABANDON",
+      PARENT_CLOSE_POLICY_TERMINATE: "TERMINATE",
+      PARENT_CLOSE_POLICY_REQUEST_CANCEL: "REQUEST_CANCEL",
+    },
+    startChild: async () => ({}),
+    getExternalWorkflowHandle: () => ({
+      signal: async () => {},
+      cancel: async () => {},
+    }),
   };
 });
 

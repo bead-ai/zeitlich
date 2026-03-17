@@ -13,6 +13,10 @@ import type { ActivityInterfaceFor } from "@temporalio/workflow";
 
 let idCounter = 0;
 
+const startChildLog: { workflow: unknown; options: unknown }[] = [];
+const signalLog: { workflowId: string; signal: unknown }[] = [];
+let getExternalWorkflowHandleShouldThrow = false;
+
 vi.mock("@temporalio/workflow", () => {
   class MockApplicationFailure extends Error {
     nonRetryable?: boolean;
@@ -38,9 +42,33 @@ vi.mock("@temporalio/workflow", () => {
     condition: async (fn: () => boolean) => fn(),
     defineUpdate: (name: string) => ({ __type: "update", name }),
     defineQuery: (name: string) => ({ __type: "query", name }),
+    defineSignal: (name: string) => ({ __type: "signal", name }),
     setHandler: (_def: unknown, _handler: unknown) => {},
     uuid4: () => `00000000-0000-0000-0000-${String(++idCounter).padStart(12, "0")}`,
     ApplicationFailure: MockApplicationFailure,
+    ParentClosePolicy: {
+      ABANDON: "ABANDON",
+      TERMINATE: "TERMINATE",
+      REQUEST_CANCEL: "REQUEST_CANCEL",
+      PARENT_CLOSE_POLICY_ABANDON: "ABANDON",
+      PARENT_CLOSE_POLICY_TERMINATE: "TERMINATE",
+      PARENT_CLOSE_POLICY_REQUEST_CANCEL: "REQUEST_CANCEL",
+    },
+    startChild: async (workflow: unknown, options: unknown) => {
+      startChildLog.push({ workflow, options });
+      return { workflowId: (options as { workflowId?: string })?.workflowId };
+    },
+    getExternalWorkflowHandle: (workflowId: string) => {
+      if (getExternalWorkflowHandleShouldThrow) {
+        throw new Error("Workflow not found");
+      }
+      return {
+        signal: async (signalDef: unknown) => {
+          signalLog.push({ workflowId, signal: signalDef });
+        },
+        cancel: async () => {},
+      };
+    },
   };
 });
 
@@ -139,6 +167,9 @@ function createEchoTool() {
 describe("createSession integration", () => {
   beforeEach(() => {
     idCounter = 0;
+    startChildLog.length = 0;
+    signalLog.length = 0;
+    getExternalWorkflowHandleShouldThrow = false;
   });
 
   // --- Basic completion ---
@@ -868,6 +899,199 @@ describe("createSession integration", () => {
     // Note: handler-level usage is not forwarded through router results
     expect(result.usage.totalInputTokens).toBe(180);
     expect(result.usage.totalOutputTokens).toBe(90);
+  });
+
+  // --- Sandbox reaper lifecycle ---
+
+  it("starts a reaper workflow when pauseSandboxOnExit and sandboxReaper are set", async () => {
+    const { ops } = createMockThreadOps();
+    const sandboxLog: string[] = [];
+
+    const sandboxOps: SandboxOps = {
+      createSandbox: async (options) => {
+        sandboxLog.push(`create:${options?.id ?? "unknown"}`);
+        return { sandboxId: `sb-${options?.id ?? "unknown"}` };
+      },
+      destroySandbox: async (id) => { sandboxLog.push(`destroy:${id}`); },
+      pauseSandbox: async (id, ttl) => { sandboxLog.push(`pause:${id}:${ttl}`); },
+      snapshotSandbox: async () => ({
+        sandboxId: "sb-1", providerId: "test", data: null,
+        createdAt: new Date().toISOString(),
+      }),
+      forkSandbox: async () => "forked-sandbox-id",
+    };
+
+    const fakeReaper = async () => {};
+
+    const session = await createSession({
+      agentName: "TestAgent",
+      threadId: "thread-1",
+      runAgent: createScriptedRunAgent([
+        { message: "done", toolCalls: [] },
+      ]),
+      threadOps: ops,
+      buildContextMessage: () => "go",
+      sandbox: sandboxOps,
+      pauseSandboxOnExit: { ttlSeconds: 120 },
+      sandboxReaper: { workflow: fakeReaper, ttlMs: 120_000 },
+    });
+
+    const stateManager = createAgentStateManager({
+      initialState: { systemPrompt: "test" },
+    });
+
+    await session.runSession({ stateManager });
+
+    expect(sandboxLog).toContain("pause:sb-thread-1:120");
+    expect(sandboxLog).not.toContain("destroy:sb-thread-1");
+
+    expect(startChildLog).toHaveLength(1);
+    const reaperCall = at(startChildLog, 0);
+    expect(reaperCall.workflow).toBe(fakeReaper);
+    const reaperOpts = reaperCall.options as {
+      workflowId: string;
+      args: [string, number];
+      parentClosePolicy: string;
+    };
+    expect(reaperOpts.workflowId).toBe("sandbox-reaper-sb-thread-1");
+    expect(reaperOpts.args).toEqual(["sb-thread-1", 120_000]);
+    expect(reaperOpts.parentClosePolicy).toBe("ABANDON");
+  });
+
+  it("does not start a reaper when pauseSandboxOnExit is false", async () => {
+    const { ops } = createMockThreadOps();
+    const sandboxLog: string[] = [];
+
+    const sandboxOps: SandboxOps = {
+      createSandbox: async (options) => {
+        return { sandboxId: `sb-${options?.id ?? "unknown"}` };
+      },
+      destroySandbox: async (id) => { sandboxLog.push(`destroy:${id}`); },
+      pauseSandbox: async (id) => { sandboxLog.push(`pause:${id}`); },
+      snapshotSandbox: async () => ({
+        sandboxId: "sb-1", providerId: "test", data: null,
+        createdAt: new Date().toISOString(),
+      }),
+      forkSandbox: async () => "forked-sandbox-id",
+    };
+
+    const session = await createSession({
+      agentName: "TestAgent",
+      threadId: "thread-1",
+      runAgent: createScriptedRunAgent([
+        { message: "done", toolCalls: [] },
+      ]),
+      threadOps: ops,
+      buildContextMessage: () => "go",
+      sandbox: sandboxOps,
+      sandboxReaper: { workflow: async () => {}, ttlMs: 60_000 },
+    });
+
+    const stateManager = createAgentStateManager({
+      initialState: { systemPrompt: "test" },
+    });
+
+    await session.runSession({ stateManager });
+
+    expect(sandboxLog).toContain("destroy:sb-thread-1");
+    expect(startChildLog).toHaveLength(0);
+  });
+
+  it("dismisses existing reaper before forking and starts new reaper on pause", async () => {
+    const { ops } = createMockThreadOps();
+    const sandboxLog: string[] = [];
+
+    const sandboxOps: SandboxOps = {
+      createSandbox: async () => ({ sandboxId: "sb-new" }),
+      destroySandbox: async (id) => { sandboxLog.push(`destroy:${id}`); },
+      pauseSandbox: async (id, ttl) => { sandboxLog.push(`pause:${id}:${ttl}`); },
+      snapshotSandbox: async () => ({
+        sandboxId: "sb-1", providerId: "test", data: null,
+        createdAt: new Date().toISOString(),
+      }),
+      forkSandbox: async (id) => {
+        sandboxLog.push(`fork:${id}`);
+        return `forked-${id}`;
+      },
+    };
+
+    const fakeReaper = async () => {};
+
+    const session = await createSession({
+      agentName: "TestAgent",
+      threadId: "thread-1",
+      runAgent: createScriptedRunAgent([
+        { message: "done", toolCalls: [] },
+      ]),
+      threadOps: ops,
+      buildContextMessage: () => "go",
+      sandbox: sandboxOps,
+      previousSandboxId: "sb-prev",
+      pauseSandboxOnExit: { ttlSeconds: 60 },
+      sandboxReaper: { workflow: fakeReaper, ttlMs: 60_000 },
+    });
+
+    const stateManager = createAgentStateManager({
+      initialState: { systemPrompt: "test" },
+    });
+
+    await session.runSession({ stateManager });
+
+    // Dismissed the old reaper before forking
+    expect(signalLog).toHaveLength(1);
+    expect(at(signalLog, 0).workflowId).toBe("sandbox-reaper-sb-prev");
+
+    // Forked the previous sandbox
+    expect(sandboxLog).toContain("fork:sb-prev");
+
+    // Paused the forked sandbox on exit (not destroyed)
+    expect(sandboxLog).toContain("pause:forked-sb-prev:60");
+    expect(sandboxLog).not.toContain("destroy:forked-sb-prev");
+
+    // Started a new reaper for the forked sandbox
+    expect(startChildLog).toHaveLength(1);
+    const reaperOpts = at(startChildLog, 0).options as {
+      workflowId: string;
+      args: [string, number];
+    };
+    expect(reaperOpts.workflowId).toBe("sandbox-reaper-forked-sb-prev");
+    expect(reaperOpts.args).toEqual(["forked-sb-prev", 60_000]);
+  });
+
+  it("tolerates missing reaper when forking from previousSandboxId", async () => {
+    const { ops } = createMockThreadOps();
+
+    getExternalWorkflowHandleShouldThrow = true;
+
+    const sandboxOps: SandboxOps = {
+      createSandbox: async () => ({ sandboxId: "sb-new" }),
+      destroySandbox: async () => {},
+      pauseSandbox: async () => {},
+      snapshotSandbox: async () => ({
+        sandboxId: "sb-1", providerId: "test", data: null,
+        createdAt: new Date().toISOString(),
+      }),
+      forkSandbox: async (id) => `forked-${id}`,
+    };
+
+    const session = await createSession({
+      agentName: "TestAgent",
+      threadId: "thread-1",
+      runAgent: createScriptedRunAgent([
+        { message: "done", toolCalls: [] },
+      ]),
+      threadOps: ops,
+      buildContextMessage: () => "go",
+      sandbox: sandboxOps,
+      previousSandboxId: "sb-old",
+    });
+
+    const stateManager = createAgentStateManager({
+      initialState: { systemPrompt: "test" },
+    });
+
+    const result = await session.runSession({ stateManager });
+    expect(result.exitReason).toBe("completed");
   });
 });
 
