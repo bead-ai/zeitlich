@@ -35,6 +35,7 @@ export interface BaseAgentState {
   turns: number;
   tasks: Map<string, WorkflowTask>;
   systemPrompt?: string;
+  childSandboxes?: Map<string, string>;
   totalInputTokens: number;
   totalOutputTokens: number;
   cachedWriteTokens: number;

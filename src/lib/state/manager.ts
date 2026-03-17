@@ -61,6 +61,7 @@ export function createAgentStateManager<
   let systemPrompt = initialState?.systemPrompt;
 
   const tasks = new Map<string, WorkflowTask>(initialState?.tasks);
+  const childSandboxes = new Map<string, string>(initialState?.childSandboxes);
 
   const {
     status: _,
@@ -204,6 +205,18 @@ export function createAgentStateManager<
 
     setSystemPrompt(newSystemPrompt: string): void {
       systemPrompt = newSystemPrompt;
+    },
+
+    getChildSandboxId(childThreadId: string): string | undefined {
+      return childSandboxes.get(childThreadId);
+    },
+
+    setChildSandboxId(childThreadId: string, sandboxId: string): void {
+      childSandboxes.set(childThreadId, sandboxId);
+    },
+
+    deleteChildSandboxId(childThreadId: string): void {
+      childSandboxes.delete(childThreadId);
     },
 
     deleteTask(id: string): boolean {

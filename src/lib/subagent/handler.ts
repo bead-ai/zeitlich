@@ -10,6 +10,18 @@ import type {
 import type { SubagentArgs } from "./tool";
 import type { z } from "zod";
 
+/** Minimal interface needed by the subagent handler for child-sandbox tracking */
+export interface ChildSandboxTracker {
+  getChildSandboxId(childThreadId: string): string | undefined;
+  setChildSandboxId(childThreadId: string, sandboxId: string): void;
+  deleteChildSandboxId(childThreadId: string): void;
+}
+
+/** Mutable ref — populated by runSession before the first tool call */
+export interface ChildSandboxTrackerRef {
+  current: ChildSandboxTracker | null;
+}
+
 /**
  * Creates a Subagent tool handler that spawns child workflows for configured subagents.
  *
@@ -18,7 +30,7 @@ import type { z } from "zod";
  */
 export function createSubagentHandler<
   const T extends readonly SubagentConfig[],
->(subagents: [...T]) {
+>(subagents: [...T], trackerRef?: ChildSandboxTrackerRef) {
   const { taskQueue: parentTaskQueue } = workflowInfo();
 
   return async (
@@ -37,14 +49,20 @@ export function createSubagentHandler<
 
     const { sandboxId: parentSandboxId } = context;
     const inheritSandbox = config.sandbox !== "own" && !!parentSandboxId;
+    const previousThreadId =
+      args.threadId && args.threadId !== null && config.allowThreadContinuation
+        ? args.threadId
+        : undefined;
+
+    const previousSandboxId =
+      config.continueSandbox && previousThreadId
+        ? trackerRef?.current?.getChildSandboxId(previousThreadId)
+        : undefined;
 
     const workflowInput: SubagentWorkflowInput = {
-      ...(args.threadId &&
-        args.threadId !== null &&
-        config.allowThreadContinuation && {
-          previousThreadId: args.threadId,
-        }),
+      ...(previousThreadId && { previousThreadId }),
       ...(inheritSandbox && { sandboxId: parentSandboxId }),
+      ...(previousSandboxId !== undefined && { previousSandboxId }),
     };
 
     const resolvedContext =
@@ -68,9 +86,18 @@ export function createSubagentHandler<
       data,
       usage,
       threadId: childThreadId,
+      sandboxId: childSandboxId,
     } = typeof config.workflow === "string"
       ? await executeChild(config.workflow, childOpts)
       : await executeChild(config.workflow, childOpts);
+
+    if (config.continueSandbox && childSandboxId && trackerRef?.current) {
+      trackerRef.current.setChildSandboxId(childThreadId, childSandboxId);
+      // Remove the old mapping once the continuation has been established so
+      // stale entries don't accumulate. Commented out for now: a race between
+      // parallel child runs could delete a key another invocation is about to read.
+      // trackerRef.current.deleteChildSandboxId(previousThreadId ?? "");
+    }
 
     if (!toolResponse) {
       return {

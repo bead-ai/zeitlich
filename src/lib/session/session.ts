@@ -12,6 +12,7 @@ import { createToolRouter } from "../tool-router/router";
 import type { ParsedToolCallUnion, ToolMap } from "../tool-router/types";
 import { getShortId } from "../thread/id";
 import { buildSubagentRegistration } from "../subagent/register";
+import type { ChildSandboxTrackerRef } from "../subagent/handler";
 import { buildSkillRegistration } from "../skills/register";
 import { uuid4 } from "@temporalio/workflow";
 
@@ -80,9 +81,11 @@ export const createSession = async <T extends ToolMap, M = unknown>({
     forkThread,
   } = threadOps;
 
+  const trackerRef: ChildSandboxTrackerRef = { current: null };
+
   const plugins: ToolMap[string][] = [];
   if (subagents) {
-    const reg = buildSubagentRegistration(subagents);
+    const reg = buildSubagentRegistration(subagents, trackerRef);
     if (reg) plugins.push(reg);
   }
   if (skills) {
@@ -124,7 +127,10 @@ export const createSession = async <T extends ToolMap, M = unknown>({
       finalMessage: M | null;
       exitReason: SessionExitReason;
       usage: ReturnType<AgentStateManager<TState>["getTotalUsage"]>;
+      sandboxId?: string;
     }> => {
+      trackerRef.current = stateManager;
+
       setHandler(
         defineUpdate<unknown, [MessageContent]>(`add${agentName}Message`),
         async (message: MessageContent) => {
@@ -321,6 +327,7 @@ export const createSession = async <T extends ToolMap, M = unknown>({
         finalMessage: null,
         exitReason,
         usage: stateManager.getTotalUsage(),
+        ...(pauseSandboxOnExit && sandboxId && { sandboxId }),
       };
     },
   };

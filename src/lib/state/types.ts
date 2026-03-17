@@ -92,6 +92,15 @@ export interface AgentStateManager<TCustom extends JsonSerializable<TCustom>> {
   /** Set the system prompt */
   setSystemPrompt(newSystemPrompt: string): void;
 
+  /** Get the sandbox ID for a child thread (set by the subagent handler after each run) */
+  getChildSandboxId(childThreadId: string): string | undefined;
+
+  /** Store a child thread's sandbox ID so it can be resumed on next continuation */
+  setChildSandboxId(childThreadId: string, sandboxId: string): void;
+
+  /** Remove a child thread's sandbox ID entry (e.g. after a continuation is established) */
+  deleteChildSandboxId(childThreadId: string): void;
+
   /** Get a custom state value by key */
   get<K extends keyof TCustom>(key: K): TCustom[K];
 

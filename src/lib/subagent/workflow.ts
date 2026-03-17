@@ -52,11 +52,23 @@ import type {
  * });
  * ```
  */
+type WorkflowConfig<TResult extends z.ZodType | undefined = undefined> = {
+  name: string;
+  description: string;
+  resultSchema?: TResult;
+  /**
+   * When true, the parent tracks this subagent's sandbox across thread continuations.
+   * On re-invocation with the same thread, the child's own paused sandbox is forked
+   * rather than the parent's current sandbox.
+   */
+  continueSandbox?: boolean;
+};
+
 // Without resultSchema — data is null
 export function defineSubagentWorkflow<
   TContext extends Record<string, unknown> = Record<string, unknown>,
 >(
-  config: { name: string; description: string },
+  config: WorkflowConfig,
   fn: (
     prompt: string,
     sessionInput: SubagentSessionInput,
@@ -68,7 +80,7 @@ export function defineSubagentWorkflow<
   TResult extends z.ZodType,
   TContext extends Record<string, unknown> = Record<string, unknown>,
 >(
-  config: { name: string; description: string; resultSchema: TResult },
+  config: WorkflowConfig<TResult>,
   fn: (
     prompt: string,
     sessionInput: SubagentSessionInput,
@@ -76,7 +88,7 @@ export function defineSubagentWorkflow<
   ) => Promise<SubagentHandlerResponse<z.infer<TResult> | null>>
 ): SubagentDefinition<TResult, TContext>;
 export function defineSubagentWorkflow(
-  config: { name: string; description: string; resultSchema?: z.ZodType },
+  config: WorkflowConfig<z.ZodType | undefined>,
   fn: (
     prompt: string,
     sessionInput: SubagentSessionInput,
@@ -95,7 +107,8 @@ export function defineSubagentWorkflow(
         threadId: workflowInput.previousThreadId,
         continueThread: true,
       }),
-      ...(workflowInput.sandboxId && { sandboxId: workflowInput.sandboxId }),
+      // previousSandboxId (child's own paused sandbox) takes priority over sandboxId (parent's)
+      sandboxId: workflowInput.previousSandboxId ?? workflowInput.sandboxId,
     };
     return fn(prompt, sessionInput, context ?? {});
   };
@@ -109,6 +122,7 @@ export function defineSubagentWorkflow(
     ...(config.resultSchema !== undefined && {
       resultSchema: config.resultSchema,
     }),
+    ...(config.continueSandbox && { continueSandbox: true }),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
   }) as SubagentDefinition<any, any>;
 }

@@ -7,7 +7,11 @@ import type {
 
 /** ToolHandlerResponse with threadId required (subagents must always surface their thread) */
 export type SubagentHandlerResponse<TResult = null> =
-  ToolHandlerResponse<TResult> & { threadId: string };
+  ToolHandlerResponse<TResult> & {
+    threadId: string;
+    /** Sandbox ID owned by this subagent after the run — set when pauseSandboxOnExit is active */
+    sandboxId?: string;
+  };
 
 /**
  * Raw workflow input fields passed from parent to child workflow.
@@ -16,8 +20,10 @@ export type SubagentHandlerResponse<TResult = null> =
 export interface SubagentWorkflowInput {
   /** Thread ID from parent for continuation */
   previousThreadId?: string;
-  /** Sandbox ID inherited from parent */
+  /** Sandbox ID inherited from parent (shared, no fork) */
   sandboxId?: string;
+  /** Child's own previously-paused sandbox ID to fork from on continuation */
+  previousSandboxId?: string;
 }
 
 export type SubagentWorkflow<TResult extends z.ZodType = z.ZodType> = (
@@ -41,6 +47,8 @@ export type SubagentDefinition<
   readonly agentName: string;
   readonly description: string;
   readonly resultSchema?: TResult;
+  /** When true the parent handler tracks this subagent's sandbox across continuations */
+  readonly continueSandbox?: boolean;
 };
 
 /** Context value or factory — resolved at invocation time when a function is provided */
@@ -82,6 +90,12 @@ export interface SubagentConfig<TResult extends z.ZodType = z.ZodType> {
    * - `'own'`: the child creates and owns its own sandbox.
    */
   sandbox?: "inherit" | "own";
+  /**
+   * When true, the parent tracks this subagent's sandbox ID across thread continuations.
+   * On re-invocation with the same thread, the child's own paused sandbox is forked
+   * rather than inheriting the parent's current sandbox.
+   */
+  continueSandbox?: boolean;
 }
 
 /**
