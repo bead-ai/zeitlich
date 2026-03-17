@@ -43,6 +43,11 @@ export type SubagentDefinition<
   readonly resultSchema?: TResult;
 };
 
+/** Context value or factory — resolved at invocation time when a function is provided */
+export type SubagentContext =
+  | Record<string, unknown>
+  | (() => Record<string, unknown>);
+
 /** Infer the z.infer'd result type from a SubagentConfig, or null if no schema */
 export type InferSubagentResult<T extends SubagentConfig> =
   T extends SubagentConfig<infer S> ? z.infer<S> : null;
@@ -65,8 +70,8 @@ export interface SubagentConfig<TResult extends z.ZodType = z.ZodType> {
   taskQueue?: string;
   /** Optional Zod schema to validate the child workflow's result. If omitted, result is passed through as-is. */
   resultSchema?: TResult;
-  /** Optional static context passed to the subagent on every invocation */
-  context?: Record<string, unknown>;
+  /** Optional context passed to the subagent — a static object or a function evaluated at invocation time */
+  context?: SubagentContext;
   /** Allow the parent agent to pass a threadId for this subagent to continue (default: false) */
   allowThreadContinuation?: boolean;
   /** Per-subagent lifecycle hooks */

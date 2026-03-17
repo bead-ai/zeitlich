@@ -47,12 +47,19 @@ export function createSubagentHandler<
       ...(inheritSandbox && { sandboxId: parentSandboxId }),
     };
 
+    const resolvedContext =
+      config.context === undefined
+        ? undefined
+        : typeof config.context === "function"
+          ? config.context()
+          : config.context;
+
     const childOpts = {
       workflowId: childWorkflowId,
       args:
-        config.context === undefined
+        resolvedContext === undefined
           ? ([args.prompt, workflowInput] as const)
-          : ([args.prompt, workflowInput, config.context] as const),
+          : ([args.prompt, workflowInput, resolvedContext] as const),
       taskQueue: config.taskQueue ?? parentTaskQueue,
     };
 

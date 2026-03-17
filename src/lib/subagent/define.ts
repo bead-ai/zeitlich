@@ -38,7 +38,7 @@ export function defineSubagent<
 >(
   definition: SubagentDefinition<TResult, TContext>,
   overrides?: {
-    context?: TContext;
+    context?: TContext | (() => TContext);
     hooks?: SubagentHooks<SubagentArgs, z.infer<TResult>>;
     enabled?: boolean | (() => boolean);
     taskQueue?: string;
