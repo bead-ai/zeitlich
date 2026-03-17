@@ -5,11 +5,17 @@ export default defineConfig({
     index: "src/index.ts",
     workflow: "src/workflow.ts",
     "adapters/thread/langchain/index": "src/adapters/thread/langchain/index.ts",
+    "adapters/thread/langchain/workflow": "src/adapters/thread/langchain/proxy.ts",
     "adapters/thread/google-genai/index":
       "src/adapters/thread/google-genai/index.ts",
+    "adapters/thread/google-genai/workflow":
+      "src/adapters/thread/google-genai/proxy.ts",
     "adapters/sandbox/inmemory/index": "src/adapters/sandbox/inmemory/index.ts",
+    "adapters/sandbox/inmemory/workflow": "src/adapters/sandbox/inmemory/proxy.ts",
     "adapters/sandbox/daytona/index": "src/adapters/sandbox/daytona/index.ts",
+    "adapters/sandbox/daytona/workflow": "src/adapters/sandbox/daytona/proxy.ts",
     "adapters/sandbox/virtual/index": "src/adapters/sandbox/virtual/index.ts",
+    "adapters/sandbox/virtual/workflow": "src/adapters/sandbox/virtual/proxy.ts",
   },
   format: ["esm", "cjs"],
   dts: true,

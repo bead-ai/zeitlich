@@ -2,10 +2,19 @@ import type Redis from "ioredis";
 import type { GoogleGenAI, Content } from "@google/genai";
 import type { ToolResultConfig } from "../../../lib/types";
 import type { MessageContent } from "../../../lib/types";
-import type { ThreadOps } from "../../../lib/session/types";
+import type {
+  ThreadOps,
+  PrefixedThreadOps,
+  ScopedPrefix,
+} from "../../../lib/session/types";
 import type { ModelInvoker } from "../../../lib/model";
 import { createGoogleGenAIThreadManager } from "./thread-manager";
 import { createGoogleGenAIModelInvoker } from "./model-invoker";
+
+const ADAPTER_PREFIX = "googleGenAI" as const;
+
+export type GoogleGenAIThreadOps<TScope extends string = ""> =
+  PrefixedThreadOps<ScopedPrefix<TScope, typeof ADAPTER_PREFIX>>;
 
 export interface GoogleGenAIAdapterConfig {
   redis: Redis;
@@ -15,21 +24,37 @@ export interface GoogleGenAIAdapterConfig {
 }
 
 export interface GoogleGenAIAdapter {
-  /** Thread operations (register these as Temporal activities on the worker) */
-  threadOps: ThreadOps;
   /** Model invoker using the default model (only available when `model` was provided) */
   invoker: ModelInvoker<Content>;
   /** Create an invoker for a specific model name (for multi-model setups) */
   createModelInvoker(model: string): ModelInvoker<Content>;
+  /**
+   * Create prefixed thread activities for registration on the worker.
+   *
+   * @param scope - Workflow name appended to the adapter prefix.
+   *   Use different scopes for the main agent vs subagents to avoid collisions.
+   *
+   * @example
+   * ```typescript
+   * adapter.createActivities("codingAgent")
+   * // → { googleGenAICodingAgentInitializeThread, googleGenAICodingAgentAppendHumanMessage, … }
+   *
+   * adapter.createActivities("researchAgent")
+   * // → { googleGenAIResearchAgentInitializeThread, … }
+   * ```
+   */
+  createActivities<S extends string = "">(
+    scope?: S
+  ): GoogleGenAIThreadOps<S>;
 }
 
 /**
  * Creates a Google GenAI adapter that bundles thread operations and model
  * invocation using the `@google/genai` SDK.
  *
- * The returned `threadOps` should be registered as Temporal activities on
- * the worker. The `invoker` (or invokers created via `createModelInvoker`)
- * should be wrapped with `createRunAgentActivity` for per-agent activities.
+ * Use `createActivities(scope)` to register scoped thread operations as
+ * Temporal activities on the worker. The `invoker` (or invokers created via
+ * `createModelInvoker`) should be wrapped with `createRunAgentActivity`.
  *
  * @example
  * ```typescript
@@ -42,33 +67,29 @@ export interface GoogleGenAIAdapter {
  *
  * export function createActivities(temporalClient: WorkflowClient) {
  *   return {
- *     ...adapter.threadOps,
- *     runAgent: createRunAgentActivity(temporalClient, adapter.invoker),
+ *     ...adapter.createActivities("codingAgent"),
+ *     runCodingAgent: createRunAgentActivity(temporalClient, adapter.invoker),
  *   };
  * }
  * ```
  *
- * @example Multi-model setup
+ * @example Multi-agent worker (main + subagent share the adapter)
  * ```typescript
- * const adapter = createGoogleGenAIAdapter({ redis, client });
- *
  * export function createActivities(temporalClient: WorkflowClient) {
  *   return {
- *     ...adapter.threadOps,
+ *     ...adapter.createActivities("codingAgent"),
+ *     ...adapter.createActivities("researchAgent"),
+ *     runCodingAgent: createRunAgentActivity(temporalClient, adapter.invoker),
  *     runResearchAgent: createRunAgentActivity(
  *       temporalClient,
  *       adapter.createModelInvoker('gemini-2.5-pro'),
- *     ),
- *     runFastAgent: createRunAgentActivity(
- *       temporalClient,
- *       adapter.createModelInvoker('gemini-2.5-flash'),
  *     ),
  *   };
  * }
  * ```
  */
 export function createGoogleGenAIAdapter(
-  config: GoogleGenAIAdapterConfig,
+  config: GoogleGenAIAdapterConfig
 ): GoogleGenAIAdapter {
   const { redis, client } = config;
 
@@ -80,29 +101,31 @@ export function createGoogleGenAIAdapter(
 
     async appendHumanMessage(
       threadId: string,
-      content: string | MessageContent,
+      id: string,
+      content: string | MessageContent
     ): Promise<void> {
       const thread = createGoogleGenAIThreadManager({ redis, threadId });
-      await thread.appendUserMessage(content);
+      await thread.appendUserMessage(id, content);
     },
 
     async appendSystemMessage(
       threadId: string,
-      content: string,
+      id: string,
+      content: string
     ): Promise<void> {
       const thread = createGoogleGenAIThreadManager({ redis, threadId });
-      await thread.appendSystemMessage(content);
+      await thread.appendSystemMessage(id, content);
     },
 
-    async appendToolResult(cfg: ToolResultConfig): Promise<void> {
+    async appendToolResult(id: string, cfg: ToolResultConfig): Promise<void> {
       const { threadId, toolCallId, toolName, content } = cfg;
       const thread = createGoogleGenAIThreadManager({ redis, threadId });
-      await thread.appendToolResult(toolCallId, toolName, content);
+      await thread.appendToolResult(id, toolCallId, toolName, content);
     },
 
     async forkThread(
       sourceThreadId: string,
-      targetThreadId: string,
+      targetThreadId: string
     ): Promise<void> {
       const thread = createGoogleGenAIThreadManager({
         redis,
@@ -112,6 +135,19 @@ export function createGoogleGenAIAdapter(
     },
   };
 
+  function createActivities<S extends string = "">(
+    scope?: S
+  ): GoogleGenAIThreadOps<S> {
+    const prefix = scope
+      ? `${ADAPTER_PREFIX}${scope.charAt(0).toUpperCase()}${scope.slice(1)}`
+      : ADAPTER_PREFIX;
+    const cap = (s: string): string =>
+      s.charAt(0).toUpperCase() + s.slice(1);
+    return Object.fromEntries(
+      Object.entries(threadOps).map(([k, v]) => [`${prefix}${cap(k)}`, v])
+    ) as GoogleGenAIThreadOps<S>;
+  }
+
   const makeInvoker = (model: string): ModelInvoker<Content> =>
     createGoogleGenAIModelInvoker({ redis, client, model });
 
@@ -120,12 +156,12 @@ export function createGoogleGenAIAdapter(
     : ((() => {
         throw new Error(
           "No default model provided to createGoogleGenAIAdapter. " +
-            "Either pass `model` in the config or use `createModelInvoker(model)` instead.",
+            "Either pass `model` in the config or use `createModelInvoker(model)` instead."
         );
       }) as unknown as ModelInvoker<Content>);
 
   return {
-    threadOps,
+    createActivities,
     invoker,
     createModelInvoker: makeInvoker,
   };

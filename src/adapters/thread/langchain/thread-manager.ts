@@ -9,7 +9,6 @@ import {
   SystemMessage,
   ToolMessage,
 } from "@langchain/core/messages";
-import { v4 as uuidv4 } from "uuid";
 import {
   createThreadManager,
   type BaseThreadManager,
@@ -30,31 +29,44 @@ export interface LangChainThreadManagerConfig {
 
 /** Thread manager with LangChain StoredMessage convenience helpers */
 export interface LangChainThreadManager extends BaseThreadManager<StoredMessage> {
-  createHumanMessage(content: string | MessageContent): StoredMessage;
-  createSystemMessage(content: string): StoredMessage;
+  createHumanMessage(
+    id: string,
+    content: string | MessageContent
+  ): StoredMessage;
+  createSystemMessage(id: string, content: string): StoredMessage;
   createAIMessage(
+    id: string,
     content: string | MessageContent,
     kwargs?: { header?: string; options?: string[]; multiSelect?: boolean }
   ): StoredMessage;
   createToolMessage(
+    id: string,
     content: LangChainToolMessageContent,
     toolCallId: string
   ): StoredMessage;
-  appendHumanMessage(content: string | MessageContent): Promise<void>;
-  appendSystemMessage(content: string): Promise<void>;
+  appendHumanMessage(
+    id: string,
+    content: string | MessageContent
+  ): Promise<void>;
+  appendSystemMessage(id: string, content: string): Promise<void>;
   appendToolMessage(
+    id: string,
     content: LangChainToolMessageContent,
     toolCallId: string
   ): Promise<void>;
-  appendAIMessage(content: string | MessageContent): Promise<void>;
+  appendAIMessage(id: string, content: string | MessageContent): Promise<void>;
 }
 
 function storedMessageId(msg: StoredMessage): string {
-  if (msg.type === "tool") {
-    return msg.data.tool_call_id ?? "";
+  if (msg.type === "tool" && msg.data.tool_call_id) {
+    return msg.data.tool_call_id;
   }
 
-  return msg.data.id ?? "";
+  if (msg.data.id) {
+    return msg.data.id;
+  }
+
+  throw new Error("No id found for message");
 }
 
 /**
@@ -75,26 +87,30 @@ export function createLangChainThreadManager(
   const base = createThreadManager(baseConfig);
 
   const helpers = {
-    createHumanMessage(content: string | MessageContent): StoredMessage {
+    createHumanMessage(
+      id: string,
+      content: string | MessageContent
+    ): StoredMessage {
       return new HumanMessage({
-        id: uuidv4(),
+        id,
         content: content as string,
       }).toDict();
     },
 
-    createSystemMessage(content: string): StoredMessage {
+    createSystemMessage(id: string, content: string): StoredMessage {
       return new SystemMessage({
-        id: uuidv4(),
+        id,
         content: content as string,
       }).toDict();
     },
 
     createAIMessage(
+      id: string,
       content: string,
       kwargs?: { header?: string; options?: string[]; multiSelect?: boolean }
     ): StoredMessage {
       return new AIMessage({
-        id: uuidv4(),
+        id,
         content,
         additional_kwargs: kwargs
           ? {
@@ -107,36 +123,44 @@ export function createLangChainThreadManager(
     },
 
     createToolMessage(
+      id: string,
       content: LangChainToolMessageContent,
       toolCallId: string
     ): StoredMessage {
       return new ToolMessage({
-        id: uuidv4(),
+        id,
         content: content as MessageContent,
         tool_call_id: toolCallId,
       }).toDict();
     },
 
-    async appendHumanMessage(content: string | MessageContent): Promise<void> {
-      const message = helpers.createHumanMessage(content);
+    async appendHumanMessage(
+      id: string,
+      content: string | MessageContent
+    ): Promise<void> {
+      const message = helpers.createHumanMessage(id, content);
       await base.append([message]);
     },
 
     async appendToolMessage(
+      id: string,
       content: LangChainToolMessageContent,
       toolCallId: string
     ): Promise<void> {
-      const message = helpers.createToolMessage(content, toolCallId);
+      const message = helpers.createToolMessage(id, content, toolCallId);
       await base.append([message]);
     },
 
-    async appendAIMessage(content: string | MessageContent): Promise<void> {
-      const message = helpers.createAIMessage(content as string);
+    async appendAIMessage(
+      id: string,
+      content: string | MessageContent
+    ): Promise<void> {
+      const message = helpers.createAIMessage(id, content as string);
       await base.append([message]);
     },
 
-    async appendSystemMessage(content: string): Promise<void> {
-      const message = helpers.createSystemMessage(content);
+    async appendSystemMessage(id: string, content: string): Promise<void> {
+      const message = helpers.createSystemMessage(id, content);
       await base.initialize();
       await base.append([message]);
     },

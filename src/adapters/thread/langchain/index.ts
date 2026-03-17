@@ -20,6 +20,7 @@ export {
   createLangChainAdapter,
   type LangChainAdapter,
   type LangChainAdapterConfig,
+  type LangChainThreadOps,
 } from "./activities";
 
 // Thread manager
