@@ -686,6 +686,7 @@ Framework-agnostic utilities for activities, worker setup, and Node.js code:
 | ------------------------- | --------------------------------------------------------------------------------------------- |
 | `createRunAgentActivity`  | Wraps a handler into a `RunAgentActivity` with auto-fetched parent workflow state             |
 | `withParentWorkflowState`  | Wraps a tool handler into an `ActivityToolHandler` with auto-fetched parent workflow state    |
+| `withToolCallCache`       | Wraps a tool handler with Redis-backed caching scoped to workflow ID + tool input             |
 | `createThreadManager`     | Generic Redis-backed thread manager factory                                                   |
 | `toTree`                  | Generate file tree string from an `IFileSystem` instance                                      |
 | `withSandbox`             | Wraps a handler to auto-resolve sandbox from context (pairs with `withAutoAppend`)            |
