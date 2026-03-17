@@ -7,14 +7,9 @@
  * @example
  * ```typescript
  * // In your workflow file
- * import {
- *   createSession,
- *   createAgentStateManager,
- *   askUserQuestionTool,
- *   bashTool,
- *   defineTool,
- *   type SubagentWorkflow,
- * } from 'zeitlich/workflow';
+ * import { createSession, defineWorkflow, defineTool, bashTool } from 'zeitlich/workflow';
+ * import { proxyLangChainThreadOps } from 'zeitlich/adapters/thread/langchain/workflow';
+ * import { proxyVirtualSandboxOps } from 'zeitlich/adapters/sandbox/virtual/workflow';
  * ```
  */
 

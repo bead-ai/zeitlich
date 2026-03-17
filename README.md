@@ -153,10 +153,12 @@ import { proxyActivities, workflowInfo } from "@temporalio/workflow";
 import {
   createAgentStateManager,
   createSession,
+  defineWorkflow,
   askUserQuestionTool,
   bashTool,
   defineTool,
 } from "zeitlich/workflow";
+import { proxyLangChainThreadOps } from "zeitlich/adapters/thread/langchain/workflow";
 import { searchTool } from "./tools";
 import type { MyActivities } from "./activities";
 
@@ -176,46 +178,52 @@ const {
   heartbeatTimeout: "5m",
 });
 
-export async function myAgentWorkflow({ prompt }: { prompt: string }) {
-  const { runId } = workflowInfo();
+export const myAgentWorkflow = defineWorkflow(
+  { name: "myAgentWorkflow" },
+  async ({ prompt }: { prompt: string }, sessionInput) => {
+    const { runId } = workflowInfo();
 
-  const stateManager = createAgentStateManager({
-    initialState: {
-      systemPrompt: "You are a helpful assistant.",
-    },
-    agentName: "my-agent",
-  });
+    const stateManager = createAgentStateManager({
+      initialState: {
+        systemPrompt: "You are a helpful assistant.",
+      },
+      agentName: "my-agent",
+    });
 
-  const session = await createSession({
-    agentName: "my-agent",
-    maxTurns: 20,
-    threadId: runId,
-    runAgent: runAgentActivity,
-    buildContextMessage: () => [{ type: "text", text: prompt }],
-    tools: {
-      Search: defineTool({
-        ...searchTool,
-        handler: searchHandlerActivity,
-      }),
-      AskUserQuestion: defineTool({
-        ...askUserQuestionTool,
-        handler: askUserQuestionHandlerActivity,
-        hooks: {
-          onPostToolUse: () => {
-            stateManager.waitForInput();
+    // threadOps auto-scopes to "myAgentWorkflow" via workflowInfo().workflowType
+    const session = await createSession({
+      agentName: "my-agent",
+      maxTurns: 20,
+      threadId: runId,
+      threadOps: proxyLangChainThreadOps(),
+      runAgent: runAgentActivity,
+      buildContextMessage: () => [{ type: "text", text: prompt }],
+      tools: {
+        Search: defineTool({
+          ...searchTool,
+          handler: searchHandlerActivity,
+        }),
+        AskUserQuestion: defineTool({
+          ...askUserQuestionTool,
+          handler: askUserQuestionHandlerActivity,
+          hooks: {
+            onPostToolUse: () => {
+              stateManager.waitForInput();
+            },
           },
-        },
-      }),
-      Bash: defineTool({
-        ...bashTool,
-        handler: bashHandlerActivity,
-      }),
-    },
-  });
+        }),
+        Bash: defineTool({
+          ...bashTool,
+          handler: bashHandlerActivity,
+        }),
+      },
+      ...sessionInput,
+    });
 
-  const result = await session.runSession({ stateManager });
-  return result;
-}
+    const result = await session.runSession({ stateManager });
+    return result;
+  }
+);
 ```
 
 ### 3. Create Activities
@@ -241,7 +249,7 @@ export const createActivities = ({
   redis: Redis;
   client: WorkflowClient;
 }) => {
-  const { threadOps, invoker } = createLangChainAdapter({
+  const adapter = createLangChainAdapter({
     redis,
     model: new ChatAnthropic({
       model: "claude-sonnet-4-20250514",
@@ -250,8 +258,9 @@ export const createActivities = ({
   });
 
   return {
-    ...threadOps,
-    runAgentActivity: createRunAgentActivity(client, invoker),
+    // "myAgentWorkflow" must match the workflow name in defineWorkflow()
+    ...adapter.createActivities("myAgentWorkflow"),
+    runAgentActivity: createRunAgentActivity(client, adapter.invoker),
     searchHandlerActivity: async (args: { query: string }) => ({
       toolResponse: JSON.stringify(await performSearch(args.query)),
       data: null,
@@ -383,6 +392,7 @@ import {
   createSession,
   defineSubagentWorkflow,
 } from "zeitlich/workflow";
+import { proxyLangChainThreadOps } from "zeitlich/adapters/thread/langchain/workflow";
 import type { createResearcherActivities } from "./activities";
 
 const { runResearcherActivity } = proxyActivities<
@@ -402,6 +412,7 @@ export const researcherWorkflow = defineSubagentWorkflow(
 
     const session = await createSession({
       ...sessionInput, // spreads agentName, threadId, continueThread, sandboxId
+      threadOps: proxyLangChainThreadOps(), // auto-scoped to "Researcher"
       runAgent: runResearcherActivity,
       buildContextMessage: () => [{ type: "text", text: prompt }],
     });
@@ -473,7 +484,8 @@ When `continueThread` is true the session **forks** the provided thread — it c
 Subagents can opt in to thread continuation via `allowThreadContinuation`. When enabled, the parent agent can pass a `threadId` to resume a previous subagent conversation:
 
 ```typescript
-import { defineSubagentWorkflow, defineSubagent } from "zeitlich/workflow";
+import { defineSubagentWorkflow, defineSubagent, createSession } from "zeitlich/workflow";
+import { proxyLangChainThreadOps } from "zeitlich/adapters/thread/langchain/workflow";
 
 export const researcherWorkflow = defineSubagentWorkflow(
   {
@@ -483,6 +495,7 @@ export const researcherWorkflow = defineSubagentWorkflow(
   async (prompt, sessionInput) => {
     const session = await createSession({
       ...sessionInput, // threadId/continueThread are provided by parent when resuming
+      threadOps: proxyLangChainThreadOps(),
       // ... other config
     });
 
@@ -548,7 +561,8 @@ import {
 const sandboxManager = new SandboxManager(provider);
 
 export const createActivities = ({ redis, client }) => ({
-  ...sandboxManager.createActivities(),
+  // scope auto-prepends the provider id (e.g. "inMemory", "virtual")
+  ...sandboxManager.createActivities("MyAgentWorkflow"),
   globHandlerActivity: withSandbox(sandboxManager, globHandler),
   editHandlerActivity: withSandbox(sandboxManager, editHandler),
   bashHandlerActivity: withSandbox(sandboxManager, bashHandler),
@@ -698,7 +712,7 @@ LangChain-specific implementations:
 
 | Export                              | Description                                                            |
 | ----------------------------------- | ---------------------------------------------------------------------- |
-| `createLangChainAdapter`            | Unified adapter returning `threadOps`, `invoker`, `createModelInvoker` |
+| `createLangChainAdapter`            | Unified adapter returning `createActivities`, `invoker`, `createModelInvoker` |
 | `createLangChainModelInvoker`       | Factory that returns a `ModelInvoker` backed by a LangChain chat model |
 | `invokeLangChainModel`              | One-shot model invocation convenience function                         |
 | `createLangChainThreadManager`      | Thread manager with LangChain `StoredMessage` helpers                  |

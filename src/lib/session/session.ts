@@ -24,16 +24,13 @@ import { uuid4 } from "@temporalio/workflow";
  * @example
  * ```typescript
  * import { createSession, createAgentStateManager, defineTool, bashTool } from 'zeitlich/workflow';
- *
- * const stateManager = createAgentStateManager({
- *   initialState: { systemPrompt: "You are a helpful assistant." },
- *   agentName: "my-agent",
- * });
+ * import { proxyGoogleGenAIThreadOps } from 'zeitlich/adapters/thread/google-genai/workflow';
  *
  * const session = await createSession({
  *   agentName: "my-agent",
  *   maxTurns: 20,
  *   threadId: runId,
+ *   threadOps: proxyGoogleGenAIThreadOps(), // auto-scoped to current workflow
  *   runAgent: runAgentActivity,
  *   buildContextMessage: () => [{ type: "text", text: prompt }],
  *   subagents: [researcherSubagent],
