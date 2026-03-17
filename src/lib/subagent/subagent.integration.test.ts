@@ -323,6 +323,68 @@ describe("createSubagentHandler", () => {
     expect(workflowInput.sandboxId).toBe("parent-sb");
   });
 
+  it("resolves context function at invocation time", async () => {
+    const { executeChild } = await import("@temporalio/workflow");
+    const execMock = executeChild as ReturnType<typeof vi.fn>;
+    execMock.mockResolvedValueOnce({
+      toolResponse: "ok",
+      data: null,
+      threadId: "child-t",
+    });
+
+    let counter = 0;
+    const dynamicSubagent: SubagentConfig = {
+      agentName: "dynamic-ctx",
+      description: "Dynamic context",
+      workflow: "workflow",
+      context: () => {
+        counter++;
+        return { invocation: counter };
+      },
+    };
+
+    const handler = createSubagentHandler([dynamicSubagent]);
+
+    await handler(
+      { subagent: "dynamic-ctx", description: "test", prompt: "test" },
+      { threadId: "t", toolCallId: "tc", toolName: "Subagent" }
+    );
+
+    const lastCall = execMock.mock.calls[execMock.mock.calls.length - 1];
+    if (!lastCall) throw new Error("expected exec call");
+    const context = lastCall[1].args[2] as Record<string, unknown>;
+    expect(context).toEqual({ invocation: 1 });
+  });
+
+  it("passes static context unchanged", async () => {
+    const { executeChild } = await import("@temporalio/workflow");
+    const execMock = executeChild as ReturnType<typeof vi.fn>;
+    execMock.mockResolvedValueOnce({
+      toolResponse: "ok",
+      data: null,
+      threadId: "child-t",
+    });
+
+    const staticSubagent: SubagentConfig = {
+      agentName: "static-ctx",
+      description: "Static context",
+      workflow: "workflow",
+      context: { key: "value" },
+    };
+
+    const handler = createSubagentHandler([staticSubagent]);
+
+    await handler(
+      { subagent: "static-ctx", description: "test", prompt: "test" },
+      { threadId: "t", toolCallId: "tc", toolName: "Subagent" }
+    );
+
+    const lastCall = execMock.mock.calls[execMock.mock.calls.length - 1];
+    if (!lastCall) throw new Error("expected exec call");
+    const context = lastCall[1].args[2] as Record<string, unknown>;
+    expect(context).toEqual({ key: "value" });
+  });
+
   it("does not pass sandboxId when sandbox is own", async () => {
     const { executeChild } = await import("@temporalio/workflow");
     const execMock = executeChild as ReturnType<typeof vi.fn>;
