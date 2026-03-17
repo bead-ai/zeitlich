@@ -20,7 +20,7 @@ import type {
 } from "./types";
 
 import type { z } from "zod";
-import { ApplicationFailure } from "@temporalio/workflow";
+import { ApplicationFailure, uuid4 } from "@temporalio/workflow";
 
 /**
  * Creates a tool router for declarative tool call processing.
@@ -203,7 +203,7 @@ export function createToolRouter<T extends ToolMap>(
     // --- Pre-hooks: may skip or modify args ---
     const preResult = await runPreHooks(toolCall, tool, turn);
     if (preResult.skip) {
-      await appendToolResult({
+      await appendToolResult(uuid4(), {
         threadId: options.threadId,
         toolCallId: toolCall.id,
         toolName: toolCall.name,
@@ -264,7 +264,7 @@ export function createToolRouter<T extends ToolMap>(
         {
           summary: `Append ${toolCall.name} result`,
         },
-        [config]
+        [uuid4(), config]
       );
     }
 
@@ -395,6 +395,7 @@ export function createToolRouter<T extends ToolMap>(
               summary: `Append ${toolCall.name} result`,
             },
             [
+              uuid4(),
               {
                 threadId: options.threadId,
                 toolCallId: toolCall.id,

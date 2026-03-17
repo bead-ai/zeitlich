@@ -2,6 +2,7 @@ import type {
   Sandbox,
   SandboxCreateOptions,
   SandboxOps,
+  PrefixedSandboxOps,
   SandboxProvider,
   SandboxSnapshot,
 } from "./types";
@@ -16,7 +17,7 @@ import type {
  * ```typescript
  * const manager = new SandboxManager(new InMemorySandboxProvider());
  * const activities = {
- *   ...manager.createActivities(),
+ *   ...manager.createActivities("inMemoryCodingAgent"),
  *   bashHandler: withSandbox(manager, bashHandler),
  * };
  * ```
@@ -57,11 +58,25 @@ export class SandboxManager<
   }
 
   /**
-   * Returns Temporal activity functions matching {@link SandboxOps}.
-   * Spread these into your worker's activity map.
+   * Returns Temporal activity functions with prefixed names.
+   * Use the matching `proxy*SandboxOps()` helper from the adapter's
+   * `/workflow` entrypoint to map them back to generic {@link SandboxOps}.
+   *
+   * @param prefix - Composite prefix, typically `${workflowName}${AdapterName}`
+   *
+   * @example
+   * ```typescript
+   * const manager = new SandboxManager(new InMemorySandboxProvider());
+   * const activities = {
+   *   ...manager.createActivities("inMemoryCodingAgent"),
+   * };
+   * // registers: inMemoryCodingAgentCreateSandbox, inMemoryCodingAgentDestroySandbox, …
+   * ```
    */
-  createActivities(): SandboxOps<TOptions> {
-    return {
+  createActivities<P extends string>(
+    prefix: P
+  ): PrefixedSandboxOps<P, TOptions> {
+    const ops: SandboxOps<TOptions> = {
       createSandbox: async (
         options?: TOptions
       ): Promise<{
@@ -80,5 +95,9 @@ export class SandboxManager<
         return this.fork(sandboxId);
       },
     };
+    const cap = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1);
+    return Object.fromEntries(
+      Object.entries(ops).map(([k, v]) => [`${prefix}${cap(k)}`, v])
+    ) as PrefixedSandboxOps<P, TOptions>;
   }
 }

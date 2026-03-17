@@ -1,6 +1,6 @@
 {
   "name": "zeitlich",
-  "version": "0.2.20",
+  "version": "0.2.21",
   "description": "[EXPERIMENTAL] An opinionated AI agent implementation for Temporal",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
@@ -37,6 +37,16 @@
         "default": "./dist/adapters/thread/langchain/index.js"
       }
     },
+    "./adapters/thread/langchain/workflow": {
+      "import": {
+        "types": "./dist/adapters/thread/langchain/workflow.d.ts",
+        "default": "./dist/adapters/thread/langchain/workflow.js"
+      },
+      "require": {
+        "types": "./dist/adapters/thread/langchain/workflow.d.ts",
+        "default": "./dist/adapters/thread/langchain/workflow.js"
+      }
+    },
     "./adapters/thread/google-genai": {
       "import": {
         "types": "./dist/adapters/thread/google-genai/index.d.ts",
@@ -45,6 +55,16 @@
       "require": {
         "types": "./dist/adapters/thread/google-genai/index.d.ts",
         "default": "./dist/adapters/thread/google-genai/index.js"
+      }
+    },
+    "./adapters/thread/google-genai/workflow": {
+      "import": {
+        "types": "./dist/adapters/thread/google-genai/workflow.d.ts",
+        "default": "./dist/adapters/thread/google-genai/workflow.js"
+      },
+      "require": {
+        "types": "./dist/adapters/thread/google-genai/workflow.d.ts",
+        "default": "./dist/adapters/thread/google-genai/workflow.js"
       }
     },
     "./adapters/sandbox/inmemory": {
@@ -57,6 +77,16 @@
         "default": "./dist/adapters/sandbox/inmemory/index.js"
       }
     },
+    "./adapters/sandbox/inmemory/workflow": {
+      "import": {
+        "types": "./dist/adapters/sandbox/inmemory/workflow.d.ts",
+        "default": "./dist/adapters/sandbox/inmemory/workflow.js"
+      },
+      "require": {
+        "types": "./dist/adapters/sandbox/inmemory/workflow.d.ts",
+        "default": "./dist/adapters/sandbox/inmemory/workflow.js"
+      }
+    },
     "./adapters/sandbox/virtual": {
       "import": {
         "types": "./dist/adapters/sandbox/virtual/index.d.ts",
@@ -67,6 +97,16 @@
         "default": "./dist/adapters/sandbox/virtual/index.js"
       }
     },
+    "./adapters/sandbox/virtual/workflow": {
+      "import": {
+        "types": "./dist/adapters/sandbox/virtual/workflow.d.ts",
+        "default": "./dist/adapters/sandbox/virtual/workflow.js"
+      },
+      "require": {
+        "types": "./dist/adapters/sandbox/virtual/workflow.d.ts",
+        "default": "./dist/adapters/sandbox/virtual/workflow.js"
+      }
+    },
     "./adapters/sandbox/daytona": {
       "import": {
         "types": "./dist/adapters/sandbox/daytona/index.d.ts",
@@ -75,6 +115,16 @@
       "require": {
         "types": "./dist/adapters/sandbox/daytona/index.d.ts",
         "default": "./dist/adapters/sandbox/daytona/index.js"
+      }
+    },
+    "./adapters/sandbox/daytona/workflow": {
+      "import": {
+        "types": "./dist/adapters/sandbox/daytona/workflow.d.ts",
+        "default": "./dist/adapters/sandbox/daytona/workflow.js"
+      },
+      "require": {
+        "types": "./dist/adapters/sandbox/daytona/workflow.d.ts",
+        "default": "./dist/adapters/sandbox/daytona/workflow.js"
       }
     }
   },

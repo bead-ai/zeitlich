@@ -15,10 +15,7 @@ vi.mock("@temporalio/workflow", () => {
       err.nonRetryable = nonRetryable;
       return err;
     }
-    static fromError(
-      error: unknown,
-      options?: { nonRetryable?: boolean },
-    ) {
+    static fromError(error: unknown, options?: { nonRetryable?: boolean }) {
       const src = error instanceof Error ? error : new Error(String(error));
       const err = new MockApplicationFailure(src.message);
       err.nonRetryable = options?.nonRetryable;
@@ -45,7 +42,9 @@ const echoTool = defineTool({
   name: "Echo" as const,
   description: "Echoes back the input",
   schema: z.object({ text: z.string() }),
-  handler: async (args: { text: string }): Promise<ToolHandlerResponse<{ echoed: string }>> => ({
+  handler: async (args: {
+    text: string;
+  }): Promise<ToolHandlerResponse<{ echoed: string }>> => ({
     toolResponse: `Echo: ${args.text}`,
     data: { echoed: args.text },
   }),
@@ -55,7 +54,10 @@ const mathTool = defineTool({
   name: "Add" as const,
   description: "Adds two numbers",
   schema: z.object({ a: z.number(), b: z.number() }),
-  handler: async (args: { a: number; b: number }): Promise<ToolHandlerResponse<{ sum: number }>> => ({
+  handler: async (args: {
+    a: number;
+    b: number;
+  }): Promise<ToolHandlerResponse<{ sum: number }>> => ({
     toolResponse: `Sum: ${args.a + args.b}`,
     data: { sum: args.a + args.b },
   }),
@@ -65,7 +67,9 @@ const failingTool = defineTool({
   name: "Fail" as const,
   description: "Always fails",
   schema: z.object({ reason: z.string() }),
-  handler: async (args: { reason: string }): Promise<ToolHandlerResponse<null>> => {
+  handler: async (args: {
+    reason: string;
+  }): Promise<ToolHandlerResponse<null>> => {
     throw new Error(args.reason);
   },
 });
@@ -87,12 +91,18 @@ function createTools() {
 function createAppendSpy() {
   const calls: ToolResultConfig[] = [];
   const fn = Object.assign(
-    async (config: ToolResultConfig) => { calls.push(config); },
-    { executeWithOptions: (_opts: unknown, [config]: [ToolResultConfig]) => {
+    async (_id: string, config: ToolResultConfig) => {
+      calls.push(config);
+    },
+    {
+      executeWithOptions: (
+        _opts: unknown,
+        [, config]: [string, ToolResultConfig]
+      ) => {
         calls.push(config);
         return Promise.resolve();
       },
-    },
+    }
   ) as AppendToolResultFn;
   return { fn, calls };
 }
@@ -168,7 +178,7 @@ describe("createToolRouter integration", () => {
     });
 
     expect(() =>
-      router.parseToolCall({ id: "tc-1", name: "Unknown", args: {} }),
+      router.parseToolCall({ id: "tc-1", name: "Unknown", args: {} })
     ).toThrow("Tool Unknown not found");
   });
 
@@ -180,7 +190,7 @@ describe("createToolRouter integration", () => {
     });
 
     expect(() =>
-      router.parseToolCall({ id: "tc-1", name: "Echo", args: { text: 123 } }),
+      router.parseToolCall({ id: "tc-1", name: "Echo", args: { text: 123 } })
     ).toThrow();
   });
 
@@ -329,7 +339,7 @@ describe("createToolRouter integration", () => {
         toolCallId: "tc-99",
         toolName: "Spy",
         sandboxId: "sandbox-1",
-      }),
+      })
     );
   });
 
@@ -357,12 +367,18 @@ describe("createToolRouter integration", () => {
       },
     });
 
-    const parsed = router.parseToolCall({ id: "tc-1", name: "Skippable", args: {} });
+    const parsed = router.parseToolCall({
+      id: "tc-1",
+      name: "Skippable",
+      args: {},
+    });
     const results = await router.processToolCalls([parsed], { turn: 1 });
 
     expect(handlerSpy).not.toHaveBeenCalled();
     expect(results).toHaveLength(0);
-    expect(at(appendSpy.calls, 0).content).toContain("Skipped by PreToolUse hook");
+    expect(at(appendSpy.calls, 0).content).toContain(
+      "Skipped by PreToolUse hook"
+    );
   });
 
   it("pre-hook can modify arguments", async () => {
@@ -421,7 +437,11 @@ describe("createToolRouter integration", () => {
       appendToolResult: appendSpy.fn,
     });
 
-    const parsed = router.parseToolCall({ id: "tc-1", name: "Hooked", args: {} });
+    const parsed = router.parseToolCall({
+      id: "tc-1",
+      name: "Hooked",
+      args: {},
+    });
     const results = await router.processToolCalls([parsed], { turn: 1 });
 
     expect(handlerSpy).not.toHaveBeenCalled();
@@ -450,7 +470,10 @@ describe("createToolRouter integration", () => {
     await router.processToolCalls([parsed], { turn: 1 });
 
     expect(hookData).not.toBeNull();
-    const data = hookData as unknown as { result: { data: unknown }; durationMs: number };
+    const data = hookData as unknown as {
+      result: { data: unknown };
+      durationMs: number;
+    };
     expect(data.result.data).toEqual({ sum: 7 });
     expect(data.durationMs).toBeGreaterThanOrEqual(0);
   });
@@ -511,7 +534,10 @@ describe("createToolRouter integration", () => {
     const results = await router.processToolCalls([parsed], { turn: 1 });
 
     expect(results).toHaveLength(1);
-    expect(at(results, 0).data).toEqual({ error: "Error: boom", recovered: true });
+    expect(at(results, 0).data).toEqual({
+      error: "Error: boom",
+      recovered: true,
+    });
     expect(at(appendSpy.calls, 0).content).toBe("recovered gracefully");
   });
 
@@ -520,7 +546,9 @@ describe("createToolRouter integration", () => {
       name: "Fail" as const,
       description: "fails but suppresses",
       schema: z.object({ reason: z.string() }),
-      handler: async (args: { reason: string }): Promise<ToolHandlerResponse<null>> => {
+      handler: async (args: {
+        reason: string;
+      }): Promise<ToolHandlerResponse<null>> => {
         throw new Error(args.reason);
       },
       hooks: {
@@ -562,7 +590,7 @@ describe("createToolRouter integration", () => {
     });
 
     await expect(
-      router.processToolCalls([parsed], { turn: 1 }),
+      router.processToolCalls([parsed], { turn: 1 })
     ).rejects.toThrow("unrecoverable");
   });
 
@@ -586,7 +614,7 @@ describe("createToolRouter integration", () => {
     expect(router.hasTool("Disabled")).toBe(false);
     expect(router.getToolNames()).not.toContain("Disabled");
     expect(() =>
-      router.parseToolCall({ id: "tc-1", name: "Disabled", args: {} }),
+      router.parseToolCall({ id: "tc-1", name: "Disabled", args: {} })
     ).toThrow("Tool Disabled not found");
   });
 
@@ -643,7 +671,7 @@ describe("createToolRouter integration", () => {
       async (args: { text: string }) => ({
         toolResponse: `custom: ${args.text}`,
         data: { custom: args.text },
-      }),
+      })
     );
 
     expect(results).toHaveLength(2);
@@ -696,7 +724,11 @@ describe("createToolRouter integration", () => {
       appendToolResult: appendSpy.fn,
     });
 
-    const parsed = router.parseToolCall({ id: "tc-1", name: "SelfAppend", args: {} });
+    const parsed = router.parseToolCall({
+      id: "tc-1",
+      name: "SelfAppend",
+      args: {},
+    });
     await router.processToolCalls([parsed]);
 
     expect(appendSpy.calls).toHaveLength(0);

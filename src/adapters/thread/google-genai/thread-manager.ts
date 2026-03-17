@@ -21,23 +21,30 @@ export interface GoogleGenAIThreadManagerConfig {
 }
 
 /** Thread manager with Google GenAI Content convenience helpers */
-export interface GoogleGenAIThreadManager
-  extends BaseThreadManager<StoredContent> {
-  createUserContent(content: string | MessageContent): StoredContent;
-  createSystemContent(content: string): StoredContent;
-  createModelContent(parts: Part[]): StoredContent;
-  createToolResponseContent(
-    toolCallId: string,
-    toolName: string,
-    content: ToolMessageContent,
+export interface GoogleGenAIThreadManager extends BaseThreadManager<StoredContent> {
+  createUserContent(
+    id: string,
+    content: string | MessageContent
   ): StoredContent;
-  appendUserMessage(content: string | MessageContent): Promise<void>;
-  appendSystemMessage(content: string): Promise<void>;
-  appendModelContent(parts: Part[]): Promise<void>;
-  appendToolResult(
+  createSystemContent(id: string, content: string): StoredContent;
+  createModelContent(id: string, parts: Part[]): StoredContent;
+  createToolResponseContent(
+    id: string,
     toolCallId: string,
     toolName: string,
-    content: ToolMessageContent,
+    content: ToolMessageContent
+  ): StoredContent;
+  appendUserMessage(
+    id: string,
+    content: string | MessageContent
+  ): Promise<void>;
+  appendSystemMessage(id: string, content: string): Promise<void>;
+  appendModelContent(id: string, parts: Part[]): Promise<void>;
+  appendToolResult(
+    id: string,
+    toolCallId: string,
+    toolName: string,
+    content: ToolMessageContent
   ): Promise<void>;
 }
 
@@ -47,7 +54,7 @@ function storedContentId(msg: StoredContent): string {
 
 /** Convert zeitlich MessageContent to Google GenAI Part[] */
 export function messageContentToParts(
-  content: string | MessageContent,
+  content: string | MessageContent
 ): Part[] {
   if (typeof content === "string") {
     return [{ text: content }];
@@ -65,7 +72,7 @@ export function messageContentToParts(
 
 /** Parse ToolMessageContent into a Record suitable for functionResponse */
 function parseToolResponse(
-  content: ToolMessageContent,
+  content: ToolMessageContent
 ): Record<string, unknown> {
   if (typeof content === "string") {
     try {
@@ -86,7 +93,7 @@ function parseToolResponse(
  * appending typed Content messages.
  */
 export function createGoogleGenAIThreadManager(
-  config: GoogleGenAIThreadManagerConfig,
+  config: GoogleGenAIThreadManagerConfig
 ): GoogleGenAIThreadManager {
   const baseConfig: ThreadManagerConfig<StoredContent> = {
     redis: config.redis,
@@ -98,34 +105,38 @@ export function createGoogleGenAIThreadManager(
   const base = createThreadManager(baseConfig);
 
   const helpers = {
-    createUserContent(content: string | MessageContent): StoredContent {
+    createUserContent(
+      id: string,
+      content: string | MessageContent
+    ): StoredContent {
       return {
-        id: crypto.randomUUID(),
+        id,
         content: { role: "user", parts: messageContentToParts(content) },
       };
     },
 
-    createSystemContent(content: string): StoredContent {
+    createSystemContent(id: string, content: string): StoredContent {
       return {
-        id: crypto.randomUUID(),
+        id,
         content: { role: "system", parts: [{ text: content }] },
       };
     },
 
-    createModelContent(parts: Part[]): StoredContent {
+    createModelContent(id: string, parts: Part[]): StoredContent {
       return {
-        id: crypto.randomUUID(),
+        id,
         content: { role: "model", parts },
       };
     },
 
     createToolResponseContent(
+      id: string,
       toolCallId: string,
       toolName: string,
-      content: ToolMessageContent,
+      content: ToolMessageContent
     ): StoredContent {
       return {
-        id: crypto.randomUUID(),
+        id,
         content: {
           role: "user",
           parts: [
@@ -141,26 +152,30 @@ export function createGoogleGenAIThreadManager(
       };
     },
 
-    async appendUserMessage(content: string | MessageContent): Promise<void> {
-      await base.append([helpers.createUserContent(content)]);
+    async appendUserMessage(
+      id: string,
+      content: string | MessageContent
+    ): Promise<void> {
+      await base.append([helpers.createUserContent(id, content)]);
     },
 
-    async appendSystemMessage(content: string): Promise<void> {
+    async appendSystemMessage(id: string, content: string): Promise<void> {
       await base.initialize();
-      await base.append([helpers.createSystemContent(content)]);
+      await base.append([helpers.createSystemContent(id, content)]);
     },
 
-    async appendModelContent(parts: Part[]): Promise<void> {
-      await base.append([helpers.createModelContent(parts)]);
+    async appendModelContent(id: string, parts: Part[]): Promise<void> {
+      await base.append([helpers.createModelContent(id, parts)]);
     },
 
     async appendToolResult(
+      id: string,
       toolCallId: string,
       toolName: string,
-      content: ToolMessageContent,
+      content: ToolMessageContent
     ): Promise<void> {
       await base.append([
-        helpers.createToolResponseContent(toolCallId, toolName, content),
+        helpers.createToolResponseContent(id, toolCallId, toolName, content),
       ]);
     },
   };

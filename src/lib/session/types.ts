@@ -27,15 +27,51 @@ export interface ThreadOps {
   /** Append a human message to the thread */
   appendHumanMessage(
     threadId: string,
+    id: string,
     content: string | MessageContent
   ): Promise<void>;
   /** Append a tool result to the thread */
-  appendToolResult(config: ToolResultConfig): Promise<void>;
+  appendToolResult(id: string, config: ToolResultConfig): Promise<void>;
   /** Append a system message to the thread */
-  appendSystemMessage(threadId: string, content: string): Promise<void>;
+  appendSystemMessage(
+    threadId: string,
+    id: string,
+    content: string
+  ): Promise<void>;
   /** Copy all messages from sourceThreadId into a new thread at targetThreadId */
   forkThread(sourceThreadId: string, targetThreadId: string): Promise<void>;
 }
+
+/**
+ * Composes an adapter prefix + workflow scope for activity naming.
+ *
+ * The adapter prefix stays first (camelCase); the workflow scope is
+ * capitalised and appended. When `TScope` is empty the adapter prefix
+ * is used as-is.
+ *
+ * @example
+ * ```typescript
+ * ScopedPrefix<"codingAgent", "googleGenAI"> // "googleGenAICodingAgent"
+ * ScopedPrefix<"", "googleGenAI">            // "googleGenAI"
+ * ```
+ */
+export type ScopedPrefix<
+  TScope extends string,
+  TAdapter extends string,
+> = TScope extends "" ? TAdapter : `${TAdapter}${Capitalize<TScope>}`;
+
+/**
+ * Maps generic {@link ThreadOps} method names to adapter-prefixed names.
+ *
+ * @example
+ * ```typescript
+ * type GoogleOps = PrefixedThreadOps<"googleGenAI">;
+ * // → { googleGenAIInitializeThread, googleGenAIAppendHumanMessage, … }
+ * ```
+ */
+export type PrefixedThreadOps<TPrefix extends string> = {
+  [K in keyof ThreadOps as `${TPrefix}${Capitalize<K & string>}`]: ThreadOps[K];
+};
 
 /**
  * Configuration for a Zeitlich agent session
@@ -54,7 +90,7 @@ export interface SessionConfig<T extends ToolMap, M = unknown> {
   /** Workflow-specific runAgent activity (with tools pre-bound) */
   runAgent: RunAgentActivity<M>;
   /** Thread operations (initialize, append messages, parse tool calls) */
-  threadOps?: ActivityInterfaceFor<ThreadOps>;
+  threadOps: ActivityInterfaceFor<ThreadOps>;
   /** Tool router for processing tool calls (optional if agent has no tools) */
   tools?: T;
   /** Subagent configurations */
