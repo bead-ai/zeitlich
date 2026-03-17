@@ -19,12 +19,8 @@
  */
 
 // Session
-export {
-  createSession,
-  proxyDefaultThreadOps,
-  proxySandboxOps,
-} from "./lib/session";
-export type { ZeitlichSession, ThreadOps, SessionConfig } from "./lib/session";
+export { createSession } from "./lib/session";
+export type { ZeitlichSession, ThreadOps, PrefixedThreadOps, SessionConfig } from "./lib/session";
 export { defineWorkflow } from "./lib/workflow";
 export type { WorkflowConfig, WorkflowInput, WorkflowSessionInput } from "./lib/workflow";
 

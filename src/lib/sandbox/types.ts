@@ -143,6 +143,22 @@ export interface SandboxOps<
   snapshotSandbox(sandboxId: string): Promise<SandboxSnapshot>;
 }
 
+/**
+ * Maps generic {@link SandboxOps} method names to adapter-prefixed names.
+ *
+ * @example
+ * ```typescript
+ * type InMemOps = PrefixedSandboxOps<"inMemory">;
+ * // → { inMemoryCreateSandbox, inMemoryDestroySandbox, inMemorySnapshotSandbox }
+ * ```
+ */
+export type PrefixedSandboxOps<
+  TPrefix extends string,
+  TOptions extends SandboxCreateOptions = SandboxCreateOptions,
+> = {
+  [K in keyof SandboxOps<TOptions> as `${TPrefix}${Capitalize<K & string>}`]: SandboxOps<TOptions>[K];
+};
+
 // ============================================================================
 // Errors
 // ============================================================================

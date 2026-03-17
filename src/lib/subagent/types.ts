@@ -23,7 +23,7 @@ export interface SubagentWorkflowInput {
 export type SubagentWorkflow<TResult extends z.ZodType = z.ZodType> = (
   prompt: string,
   workflowInput: SubagentWorkflowInput,
-  context?: Record<string, unknown>,
+  context?: Record<string, unknown>
 ) => Promise<SubagentHandlerResponse<z.infer<TResult> | null>>;
 
 /**
@@ -36,7 +36,7 @@ export type SubagentDefinition<
 > = ((
   prompt: string,
   workflowInput: SubagentWorkflowInput,
-  context?: TContext,
+  context?: TContext
 ) => Promise<SubagentHandlerResponse<z.infer<TResult> | null>>) & {
   readonly agentName: string;
   readonly description: string;

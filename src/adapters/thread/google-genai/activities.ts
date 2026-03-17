@@ -2,10 +2,12 @@ import type Redis from "ioredis";
 import type { GoogleGenAI, Content } from "@google/genai";
 import type { ToolResultConfig } from "../../../lib/types";
 import type { MessageContent } from "../../../lib/types";
-import type { ThreadOps } from "../../../lib/session/types";
+import type { PrefixedThreadOps } from "../../../lib/session/types";
 import type { ModelInvoker } from "../../../lib/model";
 import { createGoogleGenAIThreadManager } from "./thread-manager";
 import { createGoogleGenAIModelInvoker } from "./model-invoker";
+
+export type GoogleGenAIThreadOps = PrefixedThreadOps<"googleGenAI">;
 
 export interface GoogleGenAIAdapterConfig {
   redis: Redis;
@@ -16,7 +18,7 @@ export interface GoogleGenAIAdapterConfig {
 
 export interface GoogleGenAIAdapter {
   /** Thread operations (register these as Temporal activities on the worker) */
-  threadOps: ThreadOps;
+  threadOps: GoogleGenAIThreadOps;
   /** Model invoker using the default model (only available when `model` was provided) */
   invoker: ModelInvoker<Content>;
   /** Create an invoker for a specific model name (for multi-model setups) */
@@ -72,13 +74,13 @@ export function createGoogleGenAIAdapter(
 ): GoogleGenAIAdapter {
   const { redis, client } = config;
 
-  const threadOps: ThreadOps = {
-    async initializeThread(threadId: string): Promise<void> {
+  const threadOps: GoogleGenAIThreadOps = {
+    async googleGenAIInitializeThread(threadId: string): Promise<void> {
       const thread = createGoogleGenAIThreadManager({ redis, threadId });
       await thread.initialize();
     },
 
-    async appendHumanMessage(
+    async googleGenAIAppendHumanMessage(
       threadId: string,
       id: string,
       content: string | MessageContent
@@ -87,7 +89,7 @@ export function createGoogleGenAIAdapter(
       await thread.appendUserMessage(id, content);
     },
 
-    async appendSystemMessage(
+    async googleGenAIAppendSystemMessage(
       threadId: string,
       id: string,
       content: string
@@ -96,13 +98,13 @@ export function createGoogleGenAIAdapter(
       await thread.appendSystemMessage(id, content);
     },
 
-    async appendToolResult(id: string, cfg: ToolResultConfig): Promise<void> {
+    async googleGenAIAppendToolResult(id: string, cfg: ToolResultConfig): Promise<void> {
       const { threadId, toolCallId, toolName, content } = cfg;
       const thread = createGoogleGenAIThreadManager({ redis, threadId });
       await thread.appendToolResult(id, toolCallId, toolName, content);
     },
 
-    async forkThread(
+    async googleGenAIForkThread(
       sourceThreadId: string,
       targetThreadId: string
     ): Promise<void> {
