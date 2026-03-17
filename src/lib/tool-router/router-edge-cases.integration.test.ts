@@ -22,7 +22,10 @@ vi.mock("@temporalio/workflow", () => {
       return err;
     }
   }
-  return { ApplicationFailure: MockApplicationFailure };
+  return {
+    ApplicationFailure: MockApplicationFailure,
+    uuid4: () => "00000000-0000-0000-0000-000000000000",
+  };
 });
 
 import { createToolRouter, defineTool, hasNoOtherToolCalls } from "./router";
