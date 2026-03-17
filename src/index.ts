@@ -40,8 +40,8 @@ export type { BaseThreadManager, ThreadManagerConfig } from "./lib/thread";
 export type { ModelInvoker, ModelInvokerConfig } from "./lib/model";
 
 // Activity-side handler wrappers
-export { withAutoAppend, withSandbox } from "./lib/tool-router";
-export type { SandboxContext } from "./lib/tool-router";
+export { withAutoAppend, withCache, withSandbox } from "./lib/tool-router";
+export type { ToolCallCacheOptions, SandboxContext } from "./lib/tool-router";
 
 // Activity-side wrappers (requires Temporal client)
 export {

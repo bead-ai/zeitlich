@@ -4,6 +4,8 @@ export {
   hasNoOtherToolCalls,
 } from "./router";
 export { withAutoAppend } from "./auto-append";
+export { withCache } from "./with-cache";
+export type { ToolCallCacheOptions } from "./with-cache";
 export { withSandbox } from "./with-sandbox";
 export type { SandboxContext } from "./with-sandbox";
 
