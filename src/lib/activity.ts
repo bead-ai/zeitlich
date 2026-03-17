@@ -161,8 +161,10 @@ export function withToolCallCache<
   const {
     keyPrefix = TOOL_CALL_CACHE_KEY_PREFIX,
     ttlSeconds = TOOL_CALL_CACHE_TTL_SECONDS,
-    serialize = (response) => JSON.stringify(response),
-    deserialize = (raw) => JSON.parse(raw) as ToolHandlerResponse<TResult>,
+    serialize = (response: ToolHandlerResponse<TResult>): string =>
+      JSON.stringify(response),
+    deserialize = (raw: string): ToolHandlerResponse<TResult> =>
+      JSON.parse(raw) as ToolHandlerResponse<TResult>,
   } = options;
 
   return async (args, context) => {

@@ -7,7 +7,14 @@ let currentWorkflowId = "workflow-1";
 
 vi.mock("@temporalio/activity", () => ({
   Context: {
-    current: () => ({
+    current: (): {
+      info: {
+        workflowExecution: {
+          workflowId: string;
+          runId: string;
+        };
+      };
+    } => ({
       info: {
         workflowExecution: {
           workflowId: currentWorkflowId,
