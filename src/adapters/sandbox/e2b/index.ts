@@ -131,8 +131,9 @@ export class E2bSandboxProvider
     }
   }
 
-  async pause(_sandboxId: string, _ttlSeconds?: number): Promise<void> {
-    throw new SandboxNotSupportedError("pause");
+  async pause(sandboxId: string, _ttlSeconds?: number): Promise<void> {
+    const sdkSandbox = await E2bSdkSandbox.connect(sandboxId);
+    await sdkSandbox.pause();
   }
 
   async snapshot(_sandboxId: string): Promise<SandboxSnapshot> {
@@ -144,8 +145,17 @@ export class E2bSandboxProvider
   }
 
   async fork(sandboxId: string): Promise<Sandbox> {
-    const { snapshotId } = await E2bSdkSandbox.createSnapshot(sandboxId);
-    const sdkSandbox = await E2bSdkSandbox.create(snapshotId);
+    // For a running sandbox: snapshot first, then create from snapshot.
+    // For a paused sandbox: the sandboxId itself acts as a snapshot template.
+    let templateId: string;
+    try {
+      const { snapshotId } = await E2bSdkSandbox.createSnapshot(sandboxId);
+      templateId = snapshotId;
+    } catch {
+      // Sandbox is paused — use its ID directly as the template
+      templateId = sandboxId;
+    }
+    const sdkSandbox = await E2bSdkSandbox.create(templateId);
     return new E2bSandboxImpl(
       sdkSandbox.sandboxId,
       sdkSandbox,
