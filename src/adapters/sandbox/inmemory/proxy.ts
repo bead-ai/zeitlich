@@ -8,19 +8,24 @@
  * ```typescript
  * import { proxyInMemorySandboxOps } from 'zeitlich/adapters/sandbox/inmemory/workflow';
  *
- * const session = await createSession({
- *   sandbox: proxyInMemorySandboxOps(),
- *   // ...
- * });
+ * // Main agent sandbox
+ * const sandbox = proxyInMemorySandboxOps("main");
+ *
+ * // Subagent with its own sandbox
+ * const researchSandbox = proxyInMemorySandboxOps("research");
  * ```
  */
 import { proxyActivities } from "@temporalio/workflow";
-import type { SandboxOps, PrefixedSandboxOps } from "../../../lib/sandbox/types";
+import type { SandboxOps } from "../../../lib/sandbox/types";
+
+const ADAPTER_PREFIX = "inMemory";
 
 export function proxyInMemorySandboxOps(
+  scope?: string,
   options?: Parameters<typeof proxyActivities>[0]
 ): SandboxOps {
-  const acts = proxyActivities<PrefixedSandboxOps<"inMemory">>(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const acts = proxyActivities<Record<string, (...args: any[]) => any>>(
     options ?? {
       startToCloseTimeout: "30s",
       retry: {
@@ -32,9 +37,15 @@ export function proxyInMemorySandboxOps(
     }
   );
 
+  const prefix = scope
+    ? `${scope}${ADAPTER_PREFIX.charAt(0).toUpperCase()}${ADAPTER_PREFIX.slice(1)}`
+    : ADAPTER_PREFIX;
+  const p = (key: string): string =>
+    `${prefix}${key.charAt(0).toUpperCase()}${key.slice(1)}`;
+
   return {
-    createSandbox: acts.inMemoryCreateSandbox,
-    destroySandbox: acts.inMemoryDestroySandbox,
-    snapshotSandbox: acts.inMemorySnapshotSandbox,
-  };
+    createSandbox: acts[p("createSandbox")],
+    destroySandbox: acts[p("destroySandbox")],
+    snapshotSandbox: acts[p("snapshotSandbox")],
+  } as SandboxOps;
 }

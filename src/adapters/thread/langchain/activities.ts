@@ -1,14 +1,21 @@
 import type Redis from "ioredis";
 import type { ToolResultConfig } from "../../../lib/types";
 import type { MessageContent } from "@langchain/core/messages";
-import type { PrefixedThreadOps } from "../../../lib/session/types";
+import type {
+  ThreadOps,
+  PrefixedThreadOps,
+  ScopedPrefix,
+} from "../../../lib/session/types";
 import type { ModelInvoker } from "../../../lib/model";
 import type { StoredMessage } from "@langchain/core/messages";
 import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
 import { createLangChainThreadManager } from "./thread-manager";
 import { createLangChainModelInvoker } from "./model-invoker";
 
-export type LangChainThreadOps = PrefixedThreadOps<"langChain">;
+const ADAPTER_PREFIX = "langChain" as const;
+
+export type LangChainThreadOps<TScope extends string = ""> =
+  PrefixedThreadOps<ScopedPrefix<TScope, typeof ADAPTER_PREFIX>>;
 
 export interface LangChainAdapterConfig {
   redis: Redis;
@@ -18,22 +25,34 @@ export interface LangChainAdapterConfig {
 }
 
 export interface LangChainAdapter {
-  /** Thread operations (register these as Temporal activities on the worker) */
-  threadOps: LangChainThreadOps;
   /** Model invoker using the default model (only available when `model` was provided) */
   invoker: ModelInvoker<StoredMessage>;
   /** Create an invoker for a specific model (for multi-model setups) */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   createModelInvoker(model: BaseChatModel<any>): ModelInvoker<StoredMessage>;
+  /**
+   * Create prefixed thread activities for registration on the worker.
+   *
+   * @param scope - Agent-level namespace prepended to the adapter prefix.
+   *
+   * @example
+   * ```typescript
+   * adapter.createActivities("main")
+   * // → { mainLangChainInitializeThread, mainLangChainAppendHumanMessage, … }
+   * ```
+   */
+  createActivities<S extends string = "">(
+    scope?: S
+  ): LangChainThreadOps<S>;
 }
 
 /**
  * Creates a LangChain adapter that bundles thread operations and model
  * invocation using a consistent message format (StoredMessage).
  *
- * The returned `threadOps` should be registered as Temporal activities on
- * the worker. The `invoker` (or invokers created via `createModelInvoker`)
- * should be wrapped with `createRunAgentActivity` for per-agent activities.
+ * Use `createActivities(scope)` to register scoped thread operations as
+ * Temporal activities on the worker. The `invoker` (or invokers created via
+ * `createModelInvoker`) should be wrapped with `createRunAgentActivity`.
  *
  * @example
  * ```typescript
@@ -44,21 +63,20 @@ export interface LangChainAdapter {
  *
  * export function createActivities(client: WorkflowClient) {
  *   return {
- *     ...adapter.threadOps,
+ *     ...adapter.createActivities("main"),
  *     runAgent: createRunAgentActivity(client, adapter.invoker),
  *   };
  * }
  * ```
  *
- * @example Multi-model setup
+ * @example Multi-agent worker
  * ```typescript
- * const adapter = createLangChainAdapter({ redis });
- *
  * export function createActivities(client: WorkflowClient) {
  *   return {
- *     ...adapter.threadOps,
+ *     ...adapter.createActivities("main"),
+ *     ...adapter.createActivities("research"),
+ *     runMainAgent: createRunAgentActivity(client, adapter.invoker),
  *     runResearchAgent: createRunAgentActivity(client, adapter.createModelInvoker(claude)),
- *     runWriterAgent: createRunAgentActivity(client, adapter.createModelInvoker(gpt4)),
  *   };
  * }
  * ```
@@ -68,13 +86,13 @@ export function createLangChainAdapter(
 ): LangChainAdapter {
   const { redis } = config;
 
-  const threadOps: LangChainThreadOps = {
-    async langChainInitializeThread(threadId: string): Promise<void> {
+  const threadOps: ThreadOps = {
+    async initializeThread(threadId: string): Promise<void> {
       const thread = createLangChainThreadManager({ redis, threadId });
       await thread.initialize();
     },
 
-    async langChainAppendHumanMessage(
+    async appendHumanMessage(
       threadId: string,
       id: string,
       content: string | MessageContent
@@ -83,7 +101,7 @@ export function createLangChainAdapter(
       await thread.appendHumanMessage(id, content);
     },
 
-    async langChainAppendSystemMessage(
+    async appendSystemMessage(
       threadId: string,
       id: string,
       content: string
@@ -92,13 +110,13 @@ export function createLangChainAdapter(
       await thread.appendSystemMessage(id, content);
     },
 
-    async langChainAppendToolResult(id: string, cfg: ToolResultConfig): Promise<void> {
+    async appendToolResult(id: string, cfg: ToolResultConfig): Promise<void> {
       const { threadId, toolCallId, content } = cfg;
       const thread = createLangChainThreadManager({ redis, threadId });
       await thread.appendToolMessage(id, content, toolCallId);
     },
 
-    async langChainForkThread(
+    async forkThread(
       sourceThreadId: string,
       targetThreadId: string
     ): Promise<void> {
@@ -109,6 +127,19 @@ export function createLangChainAdapter(
       await thread.fork(targetThreadId);
     },
   };
+
+  function createActivities<S extends string = "">(
+    scope?: S
+  ): LangChainThreadOps<S> {
+    const prefix = scope
+      ? `${scope}${ADAPTER_PREFIX.charAt(0).toUpperCase()}${ADAPTER_PREFIX.slice(1)}`
+      : ADAPTER_PREFIX;
+    const cap = (s: string): string =>
+      s.charAt(0).toUpperCase() + s.slice(1);
+    return Object.fromEntries(
+      Object.entries(threadOps).map(([k, v]) => [`${prefix}${cap(k)}`, v])
+    ) as LangChainThreadOps<S>;
+  }
 
   const makeInvoker = (
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -126,7 +157,7 @@ export function createLangChainAdapter(
       };
 
   return {
-    threadOps,
+    createActivities,
     invoker,
     createModelInvoker: makeInvoker,
   };

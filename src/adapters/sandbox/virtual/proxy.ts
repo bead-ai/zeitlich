@@ -8,19 +8,20 @@
  * ```typescript
  * import { proxyVirtualSandboxOps } from 'zeitlich/adapters/sandbox/virtual/workflow';
  *
- * const session = await createSession({
- *   sandbox: proxyVirtualSandboxOps(),
- *   // ...
- * });
+ * const sandbox = proxyVirtualSandboxOps("main");
  * ```
  */
 import { proxyActivities } from "@temporalio/workflow";
-import type { SandboxOps, PrefixedSandboxOps } from "../../../lib/sandbox/types";
+import type { SandboxOps } from "../../../lib/sandbox/types";
+
+const ADAPTER_PREFIX = "virtual";
 
 export function proxyVirtualSandboxOps(
+  scope?: string,
   options?: Parameters<typeof proxyActivities>[0]
 ): SandboxOps {
-  const acts = proxyActivities<PrefixedSandboxOps<"virtual">>(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const acts = proxyActivities<Record<string, (...args: any[]) => any>>(
     options ?? {
       startToCloseTimeout: "30s",
       retry: {
@@ -32,9 +33,15 @@ export function proxyVirtualSandboxOps(
     }
   );
 
+  const prefix = scope
+    ? `${scope}${ADAPTER_PREFIX.charAt(0).toUpperCase()}${ADAPTER_PREFIX.slice(1)}`
+    : ADAPTER_PREFIX;
+  const p = (key: string): string =>
+    `${prefix}${key.charAt(0).toUpperCase()}${key.slice(1)}`;
+
   return {
-    createSandbox: acts.virtualCreateSandbox,
-    destroySandbox: acts.virtualDestroySandbox,
-    snapshotSandbox: acts.virtualSnapshotSandbox,
-  };
+    createSandbox: acts[p("createSandbox")],
+    destroySandbox: acts[p("destroySandbox")],
+    snapshotSandbox: acts[p("snapshotSandbox")],
+  } as SandboxOps;
 }

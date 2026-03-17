@@ -43,6 +43,23 @@ export interface ThreadOps {
 }
 
 /**
+ * Composes a scope + adapter prefix for activity naming.
+ *
+ * When `TScope` is empty the adapter prefix is used as-is;
+ * otherwise the adapter prefix is capitalised and appended.
+ *
+ * @example
+ * ```typescript
+ * ScopedPrefix<"main", "googleGenAI"> // "mainGoogleGenAI"
+ * ScopedPrefix<"", "googleGenAI">     // "googleGenAI"
+ * ```
+ */
+export type ScopedPrefix<
+  TScope extends string,
+  TAdapter extends string,
+> = TScope extends "" ? TAdapter : `${TScope}${Capitalize<TAdapter>}`;
+
+/**
  * Maps generic {@link ThreadOps} method names to adapter-prefixed names.
  *
  * @example

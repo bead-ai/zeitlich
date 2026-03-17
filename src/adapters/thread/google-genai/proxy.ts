@@ -8,22 +8,27 @@
  * ```typescript
  * import { proxyGoogleGenAIThreadOps } from 'zeitlich/adapters/thread/google-genai/workflow';
  *
- * const session = await createSession({
- *   threadOps: proxyGoogleGenAIThreadOps(),
- *   // ...
- * });
+ * // Main agent
+ * const threadOps = proxyGoogleGenAIThreadOps("main");
+ *
+ * // Subagent with its own scoped activities
+ * const researchThreadOps = proxyGoogleGenAIThreadOps("research");
  * ```
  */
 import {
   proxyActivities,
   type ActivityInterfaceFor,
 } from "@temporalio/workflow";
-import type { ThreadOps, PrefixedThreadOps } from "../../../lib/session/types";
+import type { ThreadOps } from "../../../lib/session/types";
+
+const ADAPTER_PREFIX = "googleGenAI";
 
 export function proxyGoogleGenAIThreadOps(
+  scope?: string,
   options?: Parameters<typeof proxyActivities>[0]
 ): ActivityInterfaceFor<ThreadOps> {
-  const acts = proxyActivities<PrefixedThreadOps<"googleGenAI">>(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const acts = proxyActivities<Record<string, (...args: any[]) => any>>(
     options ?? {
       startToCloseTimeout: "10s",
       retry: {
@@ -35,11 +40,17 @@ export function proxyGoogleGenAIThreadOps(
     }
   );
 
+  const prefix = scope
+    ? `${scope}${ADAPTER_PREFIX.charAt(0).toUpperCase()}${ADAPTER_PREFIX.slice(1)}`
+    : ADAPTER_PREFIX;
+  const p = (key: string): string =>
+    `${prefix}${key.charAt(0).toUpperCase()}${key.slice(1)}`;
+
   return {
-    initializeThread: acts.googleGenAIInitializeThread,
-    appendHumanMessage: acts.googleGenAIAppendHumanMessage,
-    appendToolResult: acts.googleGenAIAppendToolResult,
-    appendSystemMessage: acts.googleGenAIAppendSystemMessage,
-    forkThread: acts.googleGenAIForkThread,
-  };
+    initializeThread: acts[p("initializeThread")],
+    appendHumanMessage: acts[p("appendHumanMessage")],
+    appendToolResult: acts[p("appendToolResult")],
+    appendSystemMessage: acts[p("appendSystemMessage")],
+    forkThread: acts[p("forkThread")],
+  } as ActivityInterfaceFor<ThreadOps>;
 }

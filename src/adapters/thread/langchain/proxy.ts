@@ -8,22 +8,27 @@
  * ```typescript
  * import { proxyLangChainThreadOps } from 'zeitlich/adapters/thread/langchain/workflow';
  *
- * const session = await createSession({
- *   threadOps: proxyLangChainThreadOps(),
- *   // ...
- * });
+ * // Main agent
+ * const threadOps = proxyLangChainThreadOps("main");
+ *
+ * // Subagent with its own scoped activities
+ * const researchThreadOps = proxyLangChainThreadOps("research");
  * ```
  */
 import {
   proxyActivities,
   type ActivityInterfaceFor,
 } from "@temporalio/workflow";
-import type { ThreadOps, PrefixedThreadOps } from "../../../lib/session/types";
+import type { ThreadOps } from "../../../lib/session/types";
+
+const ADAPTER_PREFIX = "langChain";
 
 export function proxyLangChainThreadOps(
+  scope?: string,
   options?: Parameters<typeof proxyActivities>[0]
 ): ActivityInterfaceFor<ThreadOps> {
-  const acts = proxyActivities<PrefixedThreadOps<"langChain">>(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const acts = proxyActivities<Record<string, (...args: any[]) => any>>(
     options ?? {
       startToCloseTimeout: "10s",
       retry: {
@@ -35,11 +40,17 @@ export function proxyLangChainThreadOps(
     }
   );
 
+  const prefix = scope
+    ? `${scope}${ADAPTER_PREFIX.charAt(0).toUpperCase()}${ADAPTER_PREFIX.slice(1)}`
+    : ADAPTER_PREFIX;
+  const p = (key: string): string =>
+    `${prefix}${key.charAt(0).toUpperCase()}${key.slice(1)}`;
+
   return {
-    initializeThread: acts.langChainInitializeThread,
-    appendHumanMessage: acts.langChainAppendHumanMessage,
-    appendToolResult: acts.langChainAppendToolResult,
-    appendSystemMessage: acts.langChainAppendSystemMessage,
-    forkThread: acts.langChainForkThread,
-  };
+    initializeThread: acts[p("initializeThread")],
+    appendHumanMessage: acts[p("appendHumanMessage")],
+    appendToolResult: acts[p("appendToolResult")],
+    appendSystemMessage: acts[p("appendSystemMessage")],
+    forkThread: acts[p("forkThread")],
+  } as ActivityInterfaceFor<ThreadOps>;
 }
