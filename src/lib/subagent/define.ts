@@ -26,9 +26,12 @@ import type { SubagentArgs } from "./tool";
  *   },
  * });
  *
- * // With typed context
+ * // With typed context (static or dynamic)
  * export const researcher = defineSubagent(researcherWorkflow, {
  *   context: { apiKey: "..." },
+ * });
+ * export const researcher = defineSubagent(researcherWorkflow, {
+ *   context: () => ({ apiKey: getKey() }),
  * });
  * ```
  */
@@ -38,7 +41,7 @@ export function defineSubagent<
 >(
   definition: SubagentDefinition<TResult, TContext>,
   overrides?: {
-    context?: TContext;
+    context?: TContext | (() => TContext);
     hooks?: SubagentHooks<SubagentArgs, z.infer<TResult>>;
     enabled?: boolean | (() => boolean);
     taskQueue?: string;

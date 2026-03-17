@@ -323,6 +323,50 @@ describe("createSubagentHandler", () => {
     expect(workflowInput.sandboxId).toBe("parent-sb");
   });
 
+  it("resolves context function at invocation time", async () => {
+    const { executeChild } = await import("@temporalio/workflow");
+    const execMock = executeChild as ReturnType<typeof vi.fn>;
+    execMock.mockResolvedValueOnce({
+      toolResponse: "ok",
+      data: null,
+      threadId: "child-t",
+    });
+
+    let counter = 0;
+    const dynamicCtx: SubagentConfig = {
+      agentName: "dynamic-ctx",
+      description: "Dynamic context",
+      workflow: "workflow",
+      context: () => ({ invocation: ++counter }),
+    };
+
+    const handler = createSubagentHandler([dynamicCtx]);
+
+    await handler(
+      { subagent: "dynamic-ctx", description: "test", prompt: "test" },
+      { threadId: "t", toolCallId: "tc", toolName: "Subagent" }
+    );
+
+    const lastCall = execMock.mock.calls[execMock.mock.calls.length - 1];
+    if (!lastCall) throw new Error("expected exec call");
+    expect(lastCall[1].args[2]).toEqual({ invocation: 1 });
+
+    execMock.mockResolvedValueOnce({
+      toolResponse: "ok",
+      data: null,
+      threadId: "child-t",
+    });
+
+    await handler(
+      { subagent: "dynamic-ctx", description: "test", prompt: "test2" },
+      { threadId: "t", toolCallId: "tc2", toolName: "Subagent" }
+    );
+
+    const secondCall = execMock.mock.calls[execMock.mock.calls.length - 1];
+    if (!secondCall) throw new Error("expected second exec call");
+    expect(secondCall[1].args[2]).toEqual({ invocation: 2 });
+  });
+
   it("does not pass sandboxId when sandbox is own", async () => {
     const { executeChild } = await import("@temporalio/workflow");
     const execMock = executeChild as ReturnType<typeof vi.fn>;
