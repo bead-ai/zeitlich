@@ -40,6 +40,16 @@ export interface ThreadOps {
   ): Promise<void>;
   /** Copy all messages from sourceThreadId into a new thread at targetThreadId */
   forkThread(sourceThreadId: string, targetThreadId: string): Promise<void>;
+  /**
+   * Store a `threadId → sandboxId` mapping with an optional TTL.
+   * Call after creating or forking a sandbox when it will be paused on exit.
+   */
+  storeSandboxId(threadId: string, sandboxId: string, ttlSeconds?: number): Promise<void>;
+  /**
+   * Retrieve a sandbox ID previously stored against a thread ID.
+   * Returns `undefined` if no entry exists (e.g. TTL expired or never stored).
+   */
+  getSandboxId(threadId: string): Promise<string | undefined>;
 }
 
 /**
@@ -118,6 +128,19 @@ export interface SessionConfig<T extends ToolMap, M = unknown> {
    * sandbox on exit (the owner is responsible for cleanup).
    */
   sandboxId?: string;
+  /**
+   * When true (or an object with `ttlSeconds`), pause the owned sandbox on
+   * session exit instead of destroying it. Useful when the sandbox will be
+   * forked by a subagent after this session ends.
+   *
+   * Pass `{ ttlSeconds }` to hint a TTL to the adapter; adapters that don't
+   * support TTL can ignore it. The adapter is responsible for arranging
+   * cleanup after the TTL (provider-native timeout or a scheduled workflow).
+   *
+   * Has no effect if the session does not own the sandbox (i.e. `sandboxId`
+   * was provided by the caller).
+   */
+  pauseSandboxOnExit?: boolean | { ttlSeconds: number };
 }
 
 export interface ZeitlichSession<M = unknown> {

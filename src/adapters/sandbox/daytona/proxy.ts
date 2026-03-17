@@ -49,6 +49,7 @@ export function proxyDaytonaSandboxOps(
   return {
     createSandbox: acts[p("createSandbox")],
     destroySandbox: acts[p("destroySandbox")],
+    pauseSandbox: acts[p("pauseSandbox")],
     snapshotSandbox: acts[p("snapshotSandbox")],
     forkSandbox: acts[p("forkSandbox")],
   } as SandboxOps;

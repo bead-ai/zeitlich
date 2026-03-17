@@ -91,6 +91,8 @@ function createMockThreadOps() {
     forkThread: async (source, target) => {
       log.push({ op: "forkThread", args: [source, target] });
     },
+    storeSandboxId: async () => {},
+    getSandboxId: async () => undefined,
   });
 
   return { ops, log };
@@ -501,6 +503,7 @@ describe("createSession integration", () => {
       destroySandbox: async (sandboxId: string) => {
         sandboxLog.push(`destroy:${sandboxId}`);
       },
+      pauseSandbox: async () => {},
       snapshotSandbox: async () => ({
         sandboxId: "sb-1",
         providerId: "test",
@@ -543,6 +546,7 @@ describe("createSession integration", () => {
       destroySandbox: async () => {
         sandboxLog.push("destroy");
       },
+      pauseSandbox: async () => {},
       snapshotSandbox: async () => ({
         sandboxId: "sb-1",
         providerId: "test",
@@ -794,6 +798,7 @@ describe("createSession integration", () => {
         stateUpdate: { customField: "from-sandbox" },
       }),
       destroySandbox: async () => {},
+      pauseSandbox: async () => {},
       snapshotSandbox: async () => ({
         sandboxId: "sb-1",
         providerId: "test",

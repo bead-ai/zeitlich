@@ -87,6 +87,8 @@ function createMockThreadOps() {
     forkThread: async (source, target) => {
       log.push({ op: "forkThread", args: [source, target] });
     },
+    storeSandboxId: async () => {},
+    getSandboxId: async () => undefined,
   });
   return { ops, log };
 }
@@ -416,6 +418,7 @@ describe("createSession edge cases", () => {
         throw new Error("sandbox creation failed");
       },
       destroySandbox: async () => {},
+      pauseSandbox: async () => {},
       snapshotSandbox: async () => ({
         sandboxId: "sb-1",
         providerId: "test",
@@ -457,6 +460,7 @@ describe("createSession edge cases", () => {
       destroySandbox: async (id: string) => {
         sandboxLog.push(`destroy:${id}`);
       },
+      pauseSandbox: async () => {},
       snapshotSandbox: async () => ({
         sandboxId: "sb-1",
         providerId: "test",
@@ -898,6 +902,7 @@ describe("createSession edge cases", () => {
     const sandboxOps: SandboxOps = {
       createSandbox: async () => ({ sandboxId: "sb-test" }),
       destroySandbox: async () => {},
+      pauseSandbox: async () => {},
       snapshotSandbox: snapshotSpy,
       forkSandbox: async () => "forked-sandbox-id",
     };

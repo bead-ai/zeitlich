@@ -141,6 +141,7 @@ export interface SandboxOps<
     options?: TOptions,
   ): Promise<{ sandboxId: string; stateUpdate?: Record<string, unknown> }>;
   destroySandbox(sandboxId: string): Promise<void>;
+  pauseSandbox(sandboxId: string, ttlSeconds?: number): Promise<void>;
   snapshotSandbox(sandboxId: string): Promise<SandboxSnapshot>;
   forkSandbox(sandboxId: string): Promise<string>;
 }

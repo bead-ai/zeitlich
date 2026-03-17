@@ -6,6 +6,7 @@ import type {
   SandboxProvider,
   SandboxSnapshot,
 } from "./types";
+import { SandboxNotSupportedError } from "./types";
 
 /**
  * Stateless facade over a {@link SandboxProvider}.
@@ -87,6 +88,9 @@ export class SandboxManager<
       },
       destroySandbox: async (sandboxId: string): Promise<void> => {
         await this.destroy(sandboxId);
+      },
+      pauseSandbox: async (_sandboxId: string, _ttlSeconds?: number): Promise<void> => {
+        throw new SandboxNotSupportedError("pauseSandbox");
       },
       snapshotSandbox: async (sandboxId: string): Promise<SandboxSnapshot> => {
         return this.snapshot(sandboxId);
