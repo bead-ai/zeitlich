@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.23](https://github.com/bead-ai/zeitlich/compare/v0.2.22...v0.2.23) (2026-03-17)
+
+
+### Bug Fixes
+
+* update test cases to handle additional parameters in append functions ([e0bfa68](https://github.com/bead-ai/zeitlich/commit/e0bfa6837e67d93be8b7f22e02d3bb85fa36a592))
+* update test cases to handle additional parameters in append functions ([ae73102](https://github.com/bead-ai/zeitlich/commit/ae73102ca1dfd8401e66b5598a9b01158daea589))
+
+
+### Code Refactoring
+
+* enhance myAgentWorkflow with thread operations and session management ([1a7af4b](https://github.com/bead-ai/zeitlich/commit/1a7af4b6ae3523e4b76228ba3478b77301741e3a))
+
 ## [0.2.22](https://github.com/bead-ai/zeitlich/compare/v0.2.21...v0.2.22) (2026-03-17)
 
 
