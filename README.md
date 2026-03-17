@@ -55,7 +55,8 @@ const adapter = createLangChainAdapter({
 
 export function createActivities(client: WorkflowClient) {
   return {
-    ...adapter.threadOps,
+    // scope must match the workflow name (used by the proxy to resolve activity names)
+    ...adapter.createActivities("myAgentWorkflow"),
     runAgent: createRunAgentActivity(client, adapter.invoker),
   };
 }
@@ -87,40 +88,40 @@ npm install zeitlich ioredis
 
 ## Import Paths
 
-Zeitlich provides three entry points:
+Zeitlich uses separate entry points for workflow-side and activity-side code:
 
 ```typescript
 // In workflow files — no external dependencies (Redis, LangChain, etc.)
 import {
   createSession,
   createAgentStateManager,
-  askUserQuestionTool,
-  bashTool,
   defineTool,
-  defineSubagentWorkflow,
-  defineSubagent,
-  type ModelInvoker,
+  bashTool,
 } from "zeitlich/workflow";
+
+// Adapter-specific workflow proxies (auto-scoped to current workflow)
+import { proxyLangChainThreadOps } from "zeitlich/adapters/thread/langchain/workflow";
+import { proxyInMemorySandboxOps } from "zeitlich/adapters/sandbox/inmemory/workflow";
 
 // In activity files and worker setup — framework-agnostic core
 import {
   createRunAgentActivity,
-  withParentWorkflowState,
+  SandboxManager,
   withSandbox,
   bashHandler,
-  createAskUserQuestionHandler,
-  toTree,
 } from "zeitlich";
 
-// LangChain adapter — unified adapter for LLM invocation and thread management
+// LangChain adapter — activity-side (thread management + model invocation)
 import { createLangChainAdapter } from "zeitlich/adapters/thread/langchain";
 ```
 
-**Why three entry points?**
+**Entry points:**
 
 - `zeitlich/workflow` — Pure TypeScript, safe for Temporal's V8 sandbox
+- `zeitlich/adapters/*/workflow` — Workflow-side proxies that auto-scope activities to the current workflow
 - `zeitlich` — Activity-side utilities (Redis, filesystem), framework-agnostic
-- `zeitlich/adapters/thread/langchain` — LangChain-specific adapter (model invocation + thread management)
+- `zeitlich/adapters/thread/*` — Activity-side adapters (thread management + model invocation)
+- `zeitlich/adapters/sandbox/*` — Activity-side sandbox providers
 
 ## Examples
 
