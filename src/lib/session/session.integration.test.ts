@@ -209,7 +209,7 @@ describe("createSession integration", () => {
 
     const toolResults = log.filter((l) => l.op === "appendToolResult");
     expect(toolResults).toHaveLength(1);
-    const resultConfig = at(toolResults, 0).args[0] as ToolResultConfig;
+    const resultConfig = at(toolResults, 0).args[1] as ToolResultConfig;
     expect(resultConfig.toolName).toBe("Echo");
     expect(resultConfig.content).toBe("Echo: hello");
   });
@@ -447,7 +447,7 @@ describe("createSession integration", () => {
       return config.toolCallId === "tc-bad";
     });
     expect(errorResult).toBeDefined();
-    const errorConfig = errorResult?.args[0] as ToolResultConfig | undefined;
+    const errorConfig = errorResult?.args[1] as ToolResultConfig | undefined;
     expect(errorConfig?.content).toContain("Invalid tool call");
   });
 

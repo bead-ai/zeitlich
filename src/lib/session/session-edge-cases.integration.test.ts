@@ -74,14 +74,14 @@ function createMockThreadOps() {
     initializeThread: async (threadId) => {
       log.push({ op: "initializeThread", args: [threadId] });
     },
-    appendHumanMessage: async (threadId, content) => {
-      log.push({ op: "appendHumanMessage", args: [threadId, content] });
+    appendHumanMessage: async (threadId, id, content) => {
+      log.push({ op: "appendHumanMessage", args: [threadId, id, content] });
     },
-    appendToolResult: async (config) => {
-      log.push({ op: "appendToolResult", args: [config] });
+    appendToolResult: async (id, config) => {
+      log.push({ op: "appendToolResult", args: [id, config] });
     },
-    appendSystemMessage: async (threadId, content) => {
-      log.push({ op: "appendSystemMessage", args: [threadId, content] });
+    appendSystemMessage: async (threadId, id, content) => {
+      log.push({ op: "appendSystemMessage", args: [threadId, id, content] });
     },
     forkThread: async (source, target) => {
       log.push({ op: "forkThread", args: [source, target] });
@@ -217,7 +217,7 @@ describe("createSession edge cases", () => {
 
     const errorResults = log.filter((l) => {
       if (l.op !== "appendToolResult") return false;
-      const config = l.args[0] as ToolResultConfig;
+      const config = l.args[1] as ToolResultConfig;
       return (
         typeof config.content === "string" &&
         config.content.includes("Invalid tool call")
@@ -704,23 +704,23 @@ describe("createSession edge cases", () => {
 
     const toolResults = log.filter((l) => l.op === "appendToolResult");
     const echoResult = toolResults.find((l) => {
-      const config = l.args[0] as ToolResultConfig;
+      const config = l.args[1] as ToolResultConfig;
       return config.toolName === "Echo";
     });
     expect(echoResult).toBeDefined();
     if (echoResult) {
-      expect((echoResult.args[0] as ToolResultConfig).content).toBe(
+      expect((echoResult.args[1] as ToolResultConfig).content).toBe(
         "Echo: valid"
       );
     }
 
     const unknownResult = toolResults.find((l) => {
-      const config = l.args[0] as ToolResultConfig;
+      const config = l.args[1] as ToolResultConfig;
       return config.toolName === "Unknown";
     });
     expect(unknownResult).toBeDefined();
     const unknownContent = unknownResult
-      ? (unknownResult.args[0] as ToolResultConfig).content
+      ? (unknownResult.args[1] as ToolResultConfig).content
       : undefined;
     expect(
       typeof unknownContent === "string" &&
@@ -839,7 +839,7 @@ describe("createSession edge cases", () => {
 
     const toolResults = log.filter((l) => {
       if (l.op !== "appendToolResult") return false;
-      const config = l.args[0] as ToolResultConfig;
+      const config = l.args[1] as ToolResultConfig;
       return config.toolName === "SelfAppend";
     });
     expect(toolResults).toHaveLength(0);
@@ -886,7 +886,7 @@ describe("createSession edge cases", () => {
     expect(toolResults).toHaveLength(1);
     const toolResult = toolResults[0];
     if (!toolResult) throw new Error("expected tool result");
-    const content = (toolResult.args[0] as ToolResultConfig).content;
+    const content = (toolResult.args[1] as ToolResultConfig).content;
     expect(typeof content === "string" && content.includes("Skipped")).toBe(
       true
     );
