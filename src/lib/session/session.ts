@@ -156,6 +156,12 @@ export const createSession = async <T extends ToolMap, M = unknown>({
       };
 
       let sandboxId: string | undefined = inheritedSandboxId;
+      if (sandboxId && !sandboxOps) {
+        throw ApplicationFailure.create({
+          message: "sandboxId provided but no sandbox ops — cannot fork or manage sandbox lifecycle",
+          nonRetryable: true,
+        });
+      }
       let ownsSandbox = !sandboxId && !!sandboxOps;
       if (continueThread && sandboxOps) {
         const sandboxToFork =
@@ -172,6 +178,8 @@ export const createSession = async <T extends ToolMap, M = unknown>({
             });
             await createOwnedSandbox(sandboxOps);
           }
+        } else if (ownsSandbox) {
+          await createOwnedSandbox(sandboxOps);
         }
       } else if (ownsSandbox && sandboxOps) {
         await createOwnedSandbox(sandboxOps);
