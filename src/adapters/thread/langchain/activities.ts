@@ -33,12 +33,12 @@ export interface LangChainAdapter {
   /**
    * Create prefixed thread activities for registration on the worker.
    *
-   * @param scope - Agent-level namespace prepended to the adapter prefix.
+   * @param scope - Workflow name appended to the adapter prefix.
    *
    * @example
    * ```typescript
-   * adapter.createActivities("main")
-   * // → { mainLangChainInitializeThread, mainLangChainAppendHumanMessage, … }
+   * adapter.createActivities("codingAgent")
+   * // → { langChainCodingAgentInitializeThread, langChainCodingAgentAppendHumanMessage, … }
    * ```
    */
   createActivities<S extends string = "">(
@@ -63,8 +63,8 @@ export interface LangChainAdapter {
  *
  * export function createActivities(client: WorkflowClient) {
  *   return {
- *     ...adapter.createActivities("main"),
- *     runAgent: createRunAgentActivity(client, adapter.invoker),
+ *     ...adapter.createActivities("codingAgent"),
+ *     runCodingAgent: createRunAgentActivity(client, adapter.invoker),
  *   };
  * }
  * ```
@@ -73,9 +73,9 @@ export interface LangChainAdapter {
  * ```typescript
  * export function createActivities(client: WorkflowClient) {
  *   return {
- *     ...adapter.createActivities("main"),
- *     ...adapter.createActivities("research"),
- *     runMainAgent: createRunAgentActivity(client, adapter.invoker),
+ *     ...adapter.createActivities("codingAgent"),
+ *     ...adapter.createActivities("researchAgent"),
+ *     runCodingAgent: createRunAgentActivity(client, adapter.invoker),
  *     runResearchAgent: createRunAgentActivity(client, adapter.createModelInvoker(claude)),
  *   };
  * }
@@ -132,7 +132,7 @@ export function createLangChainAdapter(
     scope?: S
   ): LangChainThreadOps<S> {
     const prefix = scope
-      ? `${scope}${ADAPTER_PREFIX.charAt(0).toUpperCase()}${ADAPTER_PREFIX.slice(1)}`
+      ? `${ADAPTER_PREFIX}${scope.charAt(0).toUpperCase()}${scope.slice(1)}`
       : ADAPTER_PREFIX;
     const cap = (s: string): string =>
       s.charAt(0).toUpperCase() + s.slice(1);

@@ -17,7 +17,7 @@ import type {
  * ```typescript
  * const manager = new SandboxManager(new InMemorySandboxProvider());
  * const activities = {
- *   ...manager.createActivities("codingAgentInMemory"),
+ *   ...manager.createActivities("inMemoryCodingAgent"),
  *   bashHandler: withSandbox(manager, bashHandler),
  * };
  * ```
@@ -68,9 +68,9 @@ export class SandboxManager<
    * ```typescript
    * const manager = new SandboxManager(new InMemorySandboxProvider());
    * const activities = {
-   *   ...manager.createActivities("codingAgentInMemory"),
+   *   ...manager.createActivities("inMemoryCodingAgent"),
    * };
-   * // registers: codingAgentInMemoryCreateSandbox, codingAgentInMemoryDestroySandbox, …
+   * // registers: inMemoryCodingAgentCreateSandbox, inMemoryCodingAgentDestroySandbox, …
    * ```
    */
   createActivities<P extends string>(

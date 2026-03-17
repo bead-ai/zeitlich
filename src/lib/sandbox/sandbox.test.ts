@@ -69,15 +69,15 @@ describe("SandboxManager", () => {
   });
 
   it("createActivities returns prefixed SandboxOps-shaped object", async () => {
-    const activities = manager.createActivities("testInMemory");
-    expect(activities.testInMemoryCreateSandbox).toBeTypeOf("function");
-    expect(activities.testInMemoryDestroySandbox).toBeTypeOf("function");
-    expect(activities.testInMemorySnapshotSandbox).toBeTypeOf("function");
+    const activities = manager.createActivities("inMemoryTest");
+    expect(activities.inMemoryTestCreateSandbox).toBeTypeOf("function");
+    expect(activities.inMemoryTestDestroySandbox).toBeTypeOf("function");
+    expect(activities.inMemoryTestSnapshotSandbox).toBeTypeOf("function");
 
-    const { sandboxId } = await activities.testInMemoryCreateSandbox();
+    const { sandboxId } = await activities.inMemoryTestCreateSandbox();
     await expect(manager.getSandbox(sandboxId)).resolves.toBeTruthy();
 
-    await activities.testInMemoryDestroySandbox(sandboxId);
+    await activities.inMemoryTestDestroySandbox(sandboxId);
     await expect(manager.getSandbox(sandboxId)).rejects.toThrow(
       SandboxNotFoundError,
     );

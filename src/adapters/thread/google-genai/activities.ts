@@ -31,16 +31,16 @@ export interface GoogleGenAIAdapter {
   /**
    * Create prefixed thread activities for registration on the worker.
    *
-   * @param scope - Agent-level namespace prepended to the adapter prefix.
+   * @param scope - Workflow name appended to the adapter prefix.
    *   Use different scopes for the main agent vs subagents to avoid collisions.
    *
    * @example
    * ```typescript
-   * adapter.createActivities("main")
-   * // → { mainGoogleGenAIInitializeThread, mainGoogleGenAIAppendHumanMessage, … }
+   * adapter.createActivities("codingAgent")
+   * // → { googleGenAICodingAgentInitializeThread, googleGenAICodingAgentAppendHumanMessage, … }
    *
-   * adapter.createActivities("research")
-   * // → { researchGoogleGenAIInitializeThread, … }
+   * adapter.createActivities("researchAgent")
+   * // → { googleGenAIResearchAgentInitializeThread, … }
    * ```
    */
   createActivities<S extends string = "">(
@@ -67,8 +67,8 @@ export interface GoogleGenAIAdapter {
  *
  * export function createActivities(temporalClient: WorkflowClient) {
  *   return {
- *     ...adapter.createActivities("main"),
- *     runAgent: createRunAgentActivity(temporalClient, adapter.invoker),
+ *     ...adapter.createActivities("codingAgent"),
+ *     runCodingAgent: createRunAgentActivity(temporalClient, adapter.invoker),
  *   };
  * }
  * ```
@@ -77,9 +77,9 @@ export interface GoogleGenAIAdapter {
  * ```typescript
  * export function createActivities(temporalClient: WorkflowClient) {
  *   return {
- *     ...adapter.createActivities("main"),
- *     ...adapter.createActivities("research"),
- *     runMainAgent: createRunAgentActivity(temporalClient, adapter.invoker),
+ *     ...adapter.createActivities("codingAgent"),
+ *     ...adapter.createActivities("researchAgent"),
+ *     runCodingAgent: createRunAgentActivity(temporalClient, adapter.invoker),
  *     runResearchAgent: createRunAgentActivity(
  *       temporalClient,
  *       adapter.createModelInvoker('gemini-2.5-pro'),
@@ -139,7 +139,7 @@ export function createGoogleGenAIAdapter(
     scope?: S
   ): GoogleGenAIThreadOps<S> {
     const prefix = scope
-      ? `${scope}${ADAPTER_PREFIX.charAt(0).toUpperCase()}${ADAPTER_PREFIX.slice(1)}`
+      ? `${ADAPTER_PREFIX}${scope.charAt(0).toUpperCase()}${scope.slice(1)}`
       : ADAPTER_PREFIX;
     const cap = (s: string): string =>
       s.charAt(0).toUpperCase() + s.slice(1);
