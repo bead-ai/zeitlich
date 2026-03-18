@@ -29,19 +29,39 @@ Temporal solves these problems for workflows. Zeitlich brings these guarantees t
 - **Lifecycle hooks** — Pre/post tool execution, session start/end
 - **Subagent support** — Spawn child agents as Temporal child workflows
 - **Filesystem utilities** — In-memory or custom providers for file operations
-- **Model flexibility** — Framework-agnostic model invocation with adapters for LangChain (and more coming)
+- **Model flexibility** — Framework-agnostic model invocation with adapters for LangChain, Vercel AI SDK, or provider-specific SDKs
 
 ## LLM Integration
 
-Zeitlich's core is framework-agnostic — it defines generic interfaces (`ModelInvoker`, `ThreadOps`, `MessageContent`) that work with any LLM SDK. Concrete implementations are provided via adapter packages.
+Zeitlich's core is framework-agnostic — it defines generic interfaces (`ModelInvoker`, `ThreadOps`, `MessageContent`) that work with any LLM SDK. You choose a **thread adapter** (for conversation storage and model invocation) and a **sandbox adapter** (for filesystem operations), then wire them together.
 
-### LangChain Adapter (`zeitlich/adapters/thread/langchain`)
+### Thread Adapters
 
-The built-in LangChain adapter gives you:
+A thread adapter bundles two concerns:
+1. **Thread management** — Storing and retrieving conversation messages in Redis
+2. **Model invocation** — Calling the LLM with the conversation history and tools
 
-- **Provider flexibility** — Use Anthropic, OpenAI, Google, Azure, AWS Bedrock, or any LangChain-supported provider
-- **Consistent interface** — Same tool calling and message format regardless of provider
-- **Easy model swapping** — Change models without rewriting agent logic
+Each adapter exposes the same shape: `createActivities(scope)` for Temporal worker registration, and an `invoker` for model calls. Pick the one matching your preferred SDK:
+
+| Adapter | Import | SDK |
+|---------|--------|-----|
+| LangChain | `zeitlich/adapters/thread/langchain` | `@langchain/core` + any provider package |
+| Google GenAI | `zeitlich/adapters/thread/google-genai` | `@google/genai` |
+
+Vercel AI SDK and other provider-specific adapters can be built by implementing the `ThreadOps` and `ModelInvoker` interfaces.
+
+### Sandbox Adapters
+
+A sandbox adapter provides filesystem access for tools like `Bash`, `Read`, `Write`, and `Edit`:
+
+| Adapter | Import | Use case |
+|---------|--------|----------|
+| In-memory | `zeitlich/adapters/sandbox/inmemory` | Tests and lightweight agents |
+| Virtual | `zeitlich/adapters/sandbox/virtual` | Custom resolvers with path-only ops |
+| Daytona | `zeitlich/adapters/sandbox/daytona` | Remote Daytona workspaces |
+| E2B | `zeitlich/adapters/sandbox/e2b` | E2B cloud sandboxes |
+
+### Example: LangChain Adapter
 
 ```typescript
 import { ChatAnthropic } from "@langchain/anthropic";
@@ -55,20 +75,13 @@ const adapter = createLangChainAdapter({
 
 export function createActivities(client: WorkflowClient) {
   return {
-    // scope must match the workflow name (used by the proxy to resolve activity names)
     ...adapter.createActivities("myAgentWorkflow"),
     runAgent: createRunAgentActivity(client, adapter.invoker),
   };
 }
 ```
 
-Install the LangChain package for your chosen provider:
-
-```bash
-npm install @langchain/core @langchain/anthropic  # Anthropic
-npm install @langchain/core @langchain/openai     # OpenAI
-npm install @langchain/core @langchain/google-genai # Google
-```
+All adapters follow the same pattern — `createActivities(scope)` for worker registration and `invoker` for model calls.
 
 ## Installation
 
@@ -79,7 +92,8 @@ npm install zeitlich ioredis
 **Peer dependencies:**
 
 - `ioredis` >= 5.0.0
-- `@langchain/core` >= 1.0.0 (optional — only needed when using `zeitlich/adapters/thread/langchain`)
+- `@langchain/core` >= 1.0.0 (optional — only when using the LangChain adapter)
+- `@google/genai` >= 1.0.0 (optional — only when using the Google GenAI adapter)
 
 **Required infrastructure:**
 
@@ -91,7 +105,7 @@ npm install zeitlich ioredis
 Zeitlich uses separate entry points for workflow-side and activity-side code:
 
 ```typescript
-// In workflow files — no external dependencies (Redis, LangChain, etc.)
+// In workflow files — no external dependencies (Redis, LLM SDKs, etc.)
 import {
   createSession,
   createAgentStateManager,
@@ -99,7 +113,7 @@ import {
   bashTool,
 } from "zeitlich/workflow";
 
-// Adapter-specific workflow proxies (auto-scoped to current workflow)
+// Adapter workflow proxies (auto-scoped to current workflow)
 import { proxyLangChainThreadOps } from "zeitlich/adapters/thread/langchain/workflow";
 import { proxyInMemorySandboxOps } from "zeitlich/adapters/sandbox/inmemory/workflow";
 
@@ -111,7 +125,7 @@ import {
   bashHandler,
 } from "zeitlich";
 
-// LangChain adapter — activity-side (thread management + model invocation)
+// Thread adapter — activity-side
 import { createLangChainAdapter } from "zeitlich/adapters/thread/langchain";
 ```
 
@@ -146,7 +160,7 @@ export const searchTool: ToolDefinition<"Search", typeof searchSchema> = {
 
 ### 2. Create the Workflow
 
-The system prompt is set via `createAgentStateManager`'s `initialState`, and agent config fields (`agentName`, `maxTurns`, etc.) are spread into `createSession`.
+The workflow wires together a **thread adapter** (for conversation storage / model calls) and a **sandbox adapter** (for filesystem tools). Both are pluggable — swap the proxy import to switch providers.
 
 ```typescript
 import { proxyActivities, workflowInfo } from "@temporalio/workflow";
@@ -158,9 +172,11 @@ import {
   bashTool,
   defineTool,
 } from "zeitlich/workflow";
-import { proxyLangChainThreadOps } from "zeitlich/adapters/thread/langchain/workflow";
 import { searchTool } from "./tools";
 import type { MyActivities } from "./activities";
+
+import { proxyLangChainThreadOps } from "zeitlich/adapters/thread/langchain/workflow";
+import { proxyInMemorySandboxOps } from "zeitlich/adapters/sandbox/inmemory/workflow";
 
 const {
   runAgentActivity,
@@ -190,12 +206,12 @@ export const myAgentWorkflow = defineWorkflow(
       agentName: "my-agent",
     });
 
-    // threadOps auto-scopes to "myAgentWorkflow" via workflowInfo().workflowType
     const session = await createSession({
       agentName: "my-agent",
       maxTurns: 20,
       threadId: runId,
       threadOps: proxyLangChainThreadOps(),
+      sandboxOps: proxyInMemorySandboxOps(),
       runAgent: runAgentActivity,
       buildContextMessage: () => [{ type: "text", text: prompt }],
       tools: {
@@ -228,19 +244,25 @@ export const myAgentWorkflow = defineWorkflow(
 
 ### 3. Create Activities
 
-Activities are factory functions that receive infrastructure dependencies (`redis`, `client`). Each returns an object of activity functions registered with the Temporal worker.
+Activities are factory functions that receive infrastructure dependencies (`redis`, `client`). The thread adapter and sandbox provider are configured here — swap imports to change LLM or sandbox backend.
 
 ```typescript
 import type Redis from "ioredis";
 import type { WorkflowClient } from "@temporalio/client";
 import { ChatAnthropic } from "@langchain/anthropic";
 import {
+  SandboxManager,
   withSandbox,
   bashHandler,
   createAskUserQuestionHandler,
   createRunAgentActivity,
 } from "zeitlich";
+import { InMemorySandboxProvider } from "zeitlich/adapters/sandbox/inmemory";
+
 import { createLangChainAdapter } from "zeitlich/adapters/thread/langchain";
+
+const sandboxProvider = new InMemorySandboxProvider();
+const sandboxManager = new SandboxManager(sandboxProvider);
 
 export const createActivities = ({
   redis,
@@ -258,8 +280,8 @@ export const createActivities = ({
   });
 
   return {
-    // "myAgentWorkflow" must match the workflow name in defineWorkflow()
     ...adapter.createActivities("myAgentWorkflow"),
+    ...sandboxManager.createActivities("myAgentWorkflow"),
     runAgentActivity: createRunAgentActivity(client, adapter.invoker),
     searchHandlerActivity: async (args: { query: string }) => ({
       toolResponse: JSON.stringify(await performSearch(args.query)),
@@ -706,9 +728,9 @@ Framework-agnostic utilities for activities, worker setup, and Node.js code:
 | `withSandbox`             | Wraps a handler to auto-resolve sandbox from context (pairs with `withAutoAppend`)            |
 | Tool handlers             | `bashHandler`, `editHandler`, `globHandler`, `readFileHandler`, `writeFileHandler`, `createAskUserQuestionHandler` |
 
-### LangChain Adapter Entry Point (`zeitlich/adapters/thread/langchain`)
+### Thread Adapter Entry Points
 
-LangChain-specific implementations:
+**LangChain** (`zeitlich/adapters/thread/langchain`):
 
 | Export                              | Description                                                            |
 | ----------------------------------- | ---------------------------------------------------------------------- |
@@ -716,6 +738,15 @@ LangChain-specific implementations:
 | `createLangChainModelInvoker`       | Factory that returns a `ModelInvoker` backed by a LangChain chat model |
 | `invokeLangChainModel`              | One-shot model invocation convenience function                         |
 | `createLangChainThreadManager`      | Thread manager with LangChain `StoredMessage` helpers                  |
+
+**Google GenAI** (`zeitlich/adapters/thread/google-genai`):
+
+| Export                              | Description                                                            |
+| ----------------------------------- | ---------------------------------------------------------------------- |
+| `createGoogleGenAIAdapter`          | Unified adapter returning `createActivities`, `invoker`, `createModelInvoker` |
+| `createGoogleGenAIModelInvoker`     | Factory that returns a `ModelInvoker` backed by the `@google/genai` SDK |
+| `invokeGoogleGenAIModel`            | One-shot model invocation convenience function                         |
+| `createGoogleGenAIThreadManager`    | Thread manager with Google GenAI `Content` helpers                     |
 
 ### Types
 
@@ -758,9 +789,14 @@ LangChain-specific implementations:
 │  └──────────────────────────────────────────────────────────┘  │
 │                              │                                  │
 │  ┌──────────────────────────────────────────────────────────┐  │
-│  │       LLM Adapter (zeitlich/adapters/thread/langchain)           │  │
-│  │  • createLangChainAdapter (thread ops + model invoker)    │  │
-│  │  • createLangChainThreadManager (message helpers)         │  │
+│  │          Thread Adapter (zeitlich/adapters/thread/*)       │  │
+│  │  • LangChain, Google GenAI, or custom                     │  │
+│  │  • Thread ops (message storage) + model invoker            │  │
+│  └──────────────────────────────────────────────────────────┘  │
+│  ┌──────────────────────────────────────────────────────────┐  │
+│  │         Sandbox Adapter (zeitlich/adapters/sandbox/*)      │  │
+│  │  • In-memory, Virtual, Daytona, E2B, or custom            │  │
+│  │  • Filesystem ops for agent tools                          │  │
 │  └──────────────────────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────────────┘
                               │
