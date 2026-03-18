@@ -3,6 +3,8 @@
  * into `createSession`.
  */
 export interface WorkflowSessionInput {
+  /** Agent name — spread directly into `createSession` */
+  agentName: string;
   /** Thread ID to continue (set from `input.previousThreadId`) */
   threadId?: string;
   /** Whether to continue an existing thread (true when `previousThreadId` is present) */
@@ -36,10 +38,11 @@ export interface WorkflowConfig {
  */
 export function defineWorkflow<TInput, TResult>(
   config: WorkflowConfig,
-  fn: (input: TInput, sessionInput: WorkflowSessionInput) => Promise<TResult>,
+  fn: (input: TInput, sessionInput: WorkflowSessionInput) => Promise<TResult>
 ): (input: TInput, workflowInput?: WorkflowInput) => Promise<TResult> {
   const workflow = async (input: TInput, workflowInput: WorkflowInput = {}) => {
     const sessionInput: WorkflowSessionInput = {
+      agentName: config.name,
       ...(workflowInput.previousThreadId && {
         threadId: workflowInput.previousThreadId,
         continueThread: true,

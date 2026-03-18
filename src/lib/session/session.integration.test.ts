@@ -51,7 +51,8 @@ vi.mock("@temporalio/workflow", () => {
     defineSignal: (name: string) => ({ __type: "signal", name }),
     isCancellation: () => false,
     setHandler: (_def: unknown, _handler: unknown) => {},
-    uuid4: () => `00000000-0000-0000-0000-${String(++idCounter).padStart(12, "0")}`,
+    uuid4: () =>
+      `00000000-0000-0000-0000-${String(++idCounter).padStart(12, "0")}`,
     ApplicationFailure: MockApplicationFailure,
     ParentClosePolicy: {
       ABANDON: "ABANDON",
@@ -94,12 +95,11 @@ function at<T>(arr: T[], index: number): T {
   return val;
 }
 
-function toActivityInterface(
-  raw: ThreadOps,
-): ActivityInterfaceFor<ThreadOps> {
+function toActivityInterface(raw: ThreadOps): ActivityInterfaceFor<ThreadOps> {
   const result = {} as Record<string, unknown>;
   for (const [key, fn] of Object.entries(raw)) {
-    const wrapped = (...args: unknown[]) => (fn as (...a: unknown[]) => unknown)(...args);
+    const wrapped = (...args: unknown[]) =>
+      (fn as (...a: unknown[]) => unknown)(...args);
     wrapped.executeWithOptions = (_opts: unknown, args: unknown[]) =>
       (fn as (...a: unknown[]) => unknown)(...args);
     result[key] = wrapped;
@@ -114,14 +114,14 @@ function createMockThreadOps() {
     initializeThread: async (threadId) => {
       log.push({ op: "initializeThread", args: [threadId] });
     },
-    appendHumanMessage: async (threadId, content) => {
-      log.push({ op: "appendHumanMessage", args: [threadId, content] });
+    appendHumanMessage: async (threadId, id, content) => {
+      log.push({ op: "appendHumanMessage", args: [threadId, id, content] });
     },
-    appendToolResult: async (config) => {
-      log.push({ op: "appendToolResult", args: [config] });
+    appendToolResult: async (id, config) => {
+      log.push({ op: "appendToolResult", args: [id, config] });
     },
-    appendSystemMessage: async (threadId, content) => {
-      log.push({ op: "appendSystemMessage", args: [threadId, content] });
+    appendSystemMessage: async (threadId, id, content) => {
+      log.push({ op: "appendSystemMessage", args: [threadId, id, content] });
     },
     forkThread: async (source, target) => {
       log.push({ op: "forkThread", args: [source, target] });
@@ -137,7 +137,9 @@ type TurnScript = {
   usage?: TokenUsage;
 };
 
-function createScriptedRunAgent(turns: TurnScript[]): RunAgentActivity<unknown> {
+function createScriptedRunAgent(
+  turns: TurnScript[]
+): RunAgentActivity<unknown> {
   let call = 0;
   return async () => {
     const turn = turns[call++];
@@ -159,7 +161,7 @@ function createEchoTool() {
     schema: z.object({ text: z.string() }),
     handler: async (
       args: { text: string },
-      _ctx: RouterContext,
+      _ctx: RouterContext
     ): Promise<ToolHandlerResponse<{ echoed: string }>> => ({
       toolResponse: `Echo: ${args.text}`,
       data: { echoed: args.text },
@@ -187,9 +189,7 @@ describe("createSession integration", () => {
     const session = await createSession({
       agentName: "TestAgent",
       threadId: "thread-1",
-      runAgent: createScriptedRunAgent([
-        { message: "Hello!", toolCalls: [] },
-      ]),
+      runAgent: createScriptedRunAgent([{ message: "Hello!", toolCalls: [] }]),
       threadOps: ops,
       buildContextMessage: () => "What is 2+2?",
     });
@@ -206,11 +206,11 @@ describe("createSession integration", () => {
 
     const systemOps = log.filter((l) => l.op === "appendSystemMessage");
     expect(systemOps).toHaveLength(1);
-    expect(at(systemOps, 0).args[1]).toBe("You are a test assistant.");
+    expect(at(systemOps, 0).args[2]).toBe("You are a test assistant.");
 
     const humanOps = log.filter((l) => l.op === "appendHumanMessage");
     expect(humanOps).toHaveLength(1);
-    expect(at(humanOps, 0).args[1]).toBe("What is 2+2?");
+    expect(at(humanOps, 0).args[2]).toBe("What is 2+2?");
   });
 
   // --- Tool execution ---
@@ -247,7 +247,7 @@ describe("createSession integration", () => {
 
     const toolResults = log.filter((l) => l.op === "appendToolResult");
     expect(toolResults).toHaveLength(1);
-    const resultConfig = at(toolResults, 0).args[0] as ToolResultConfig;
+    const resultConfig = at(toolResults, 0).args[1] as ToolResultConfig;
     expect(resultConfig.toolName).toBe("Echo");
     expect(resultConfig.content).toBe("Echo: hello");
   });
@@ -303,7 +303,7 @@ describe("createSession integration", () => {
       Array.from({ length: 10 }, (_, i) => ({
         message: `turn ${i + 1}`,
         toolCalls: [{ id: `tc-${i}`, name: "Echo", args: { text: `${i}` } }],
-      })),
+      }))
     );
 
     const session = await createSession({
@@ -336,9 +336,7 @@ describe("createSession integration", () => {
     const session = await createSession({
       agentName: "TestAgent",
       threadId: "thread-1",
-      runAgent: createScriptedRunAgent([
-        { message: "done", toolCalls: [] },
-      ]),
+      runAgent: createScriptedRunAgent([{ message: "done", toolCalls: [] }]),
       threadOps: ops,
       buildContextMessage: () => "hi",
       hooks: {
@@ -381,7 +379,7 @@ describe("createSession integration", () => {
     });
 
     await expect(session.runSession({ stateManager })).rejects.toThrow(
-      "No system prompt in state",
+      "No system prompt in state"
     );
   });
 
@@ -392,9 +390,7 @@ describe("createSession integration", () => {
       agentName: "TestAgent",
       threadId: "thread-1",
       appendSystemPrompt: false,
-      runAgent: createScriptedRunAgent([
-        { message: "ok", toolCalls: [] },
-      ]),
+      runAgent: createScriptedRunAgent([{ message: "ok", toolCalls: [] }]),
       threadOps: ops,
       buildContextMessage: () => "hi",
     });
@@ -485,11 +481,11 @@ describe("createSession integration", () => {
     // One error result for bad call + one success result for good call
     expect(toolResults.length).toBeGreaterThanOrEqual(2);
     const errorResult = toolResults.find((l) => {
-      const config = l.args[0] as ToolResultConfig;
+      const config = l.args[1] as ToolResultConfig;
       return config.toolCallId === "tc-bad";
     });
     expect(errorResult).toBeDefined();
-    const errorConfig = errorResult?.args[0] as ToolResultConfig | undefined;
+    const errorConfig = errorResult?.args[1] as ToolResultConfig | undefined;
     expect(errorConfig?.content).toContain("Invalid tool call");
   });
 
@@ -552,9 +548,7 @@ describe("createSession integration", () => {
     const session = await createSession({
       agentName: "TestAgent",
       threadId: "thread-1",
-      runAgent: createScriptedRunAgent([
-        { message: "done", toolCalls: [] },
-      ]),
+      runAgent: createScriptedRunAgent([{ message: "done", toolCalls: [] }]),
       threadOps: ops,
       buildContextMessage: () => "go",
       sandbox: sandboxOps,
@@ -595,9 +589,7 @@ describe("createSession integration", () => {
     const session = await createSession({
       agentName: "TestAgent",
       threadId: "thread-1",
-      runAgent: createScriptedRunAgent([
-        { message: "done", toolCalls: [] },
-      ]),
+      runAgent: createScriptedRunAgent([{ message: "done", toolCalls: [] }]),
       threadOps: ops,
       buildContextMessage: () => "go",
       sandbox: sandboxOps,
@@ -680,7 +672,7 @@ describe("createSession integration", () => {
     });
 
     await expect(session.runSession({ stateManager })).rejects.toThrow(
-      "LLM went down",
+      "LLM went down"
     );
 
     expect(endReason).toBe("failed");
@@ -732,9 +724,7 @@ describe("createSession integration", () => {
 
     const session = await createSession({
       agentName: "TestAgent",
-      runAgent: createScriptedRunAgent([
-        { message: "done", toolCalls: [] },
-      ]),
+      runAgent: createScriptedRunAgent([{ message: "done", toolCalls: [] }]),
       threadOps: ops,
       buildContextMessage: () => "go",
     });
@@ -803,9 +793,7 @@ describe("createSession integration", () => {
     const session = await createSession({
       agentName: "TestAgent",
       threadId: "thread-1",
-      runAgent: createScriptedRunAgent([
-        { message: "done", toolCalls: [] },
-      ]),
+      runAgent: createScriptedRunAgent([{ message: "done", toolCalls: [] }]),
       threadOps: ops,
       buildContextMessage: async () => {
         await new Promise((r) => setTimeout(r, 5));
@@ -820,7 +808,7 @@ describe("createSession integration", () => {
     await session.runSession({ stateManager });
 
     const humanOps = log.filter((l) => l.op === "appendHumanMessage");
-    expect(at(humanOps, 0).args[1]).toBe("async context");
+    expect(at(humanOps, 0).args[2]).toBe("async context");
   });
 
   // --- Sandbox stateUpdate merge ---
@@ -847,9 +835,7 @@ describe("createSession integration", () => {
     const session = await createSession({
       agentName: "TestAgent",
       threadId: "thread-1",
-      runAgent: createScriptedRunAgent([
-        { message: "done", toolCalls: [] },
-      ]),
+      runAgent: createScriptedRunAgent([{ message: "done", toolCalls: [] }]),
       threadOps: ops,
       buildContextMessage: () => "go",
       sandbox: sandboxOps,
@@ -889,7 +875,11 @@ describe("createSession integration", () => {
           toolCalls: [{ id: "tc-1", name: "UsageTool", args: {} }],
           usage: { inputTokens: 100, outputTokens: 50 },
         },
-        { message: "done", toolCalls: [], usage: { inputTokens: 80, outputTokens: 40 } },
+        {
+          message: "done",
+          toolCalls: [],
+          usage: { inputTokens: 80, outputTokens: 40 },
+        },
       ]),
       threadOps: ops,
       tools: { UsageTool: usageTool },

@@ -77,12 +77,11 @@ type TurnScript = {
  * Wraps every method on a ThreadOps object so it also has `.executeWithOptions()`,
  * matching Temporal's `ActivityInterfaceFor<ThreadOps>` shape.
  */
-function toActivityInterface(
-  raw: ThreadOps,
-): ActivityInterfaceFor<ThreadOps> {
+function toActivityInterface(raw: ThreadOps): ActivityInterfaceFor<ThreadOps> {
   const result = {} as Record<string, unknown>;
   for (const [key, fn] of Object.entries(raw)) {
-    const wrapped = (...args: unknown[]) => (fn as (...a: unknown[]) => unknown)(...args);
+    const wrapped = (...args: unknown[]) =>
+      (fn as (...a: unknown[]) => unknown)(...args);
     wrapped.executeWithOptions = (_opts: unknown, args: unknown[]) =>
       (fn as (...a: unknown[]) => unknown)(...args);
     result[key] = wrapped;
@@ -96,14 +95,14 @@ function createMockThreadOps() {
     initializeThread: async (threadId) => {
       log.push({ op: "initializeThread", args: [threadId] });
     },
-    appendHumanMessage: async (threadId, content) => {
-      log.push({ op: "appendHumanMessage", args: [threadId, content] });
+    appendHumanMessage: async (threadId, id, content) => {
+      log.push({ op: "appendHumanMessage", args: [threadId, id, content] });
     },
-    appendToolResult: async (config) => {
-      log.push({ op: "appendToolResult", args: [config] });
+    appendToolResult: async (id, config) => {
+      log.push({ op: "appendToolResult", args: [id, config] });
     },
-    appendSystemMessage: async (threadId, content) => {
-      log.push({ op: "appendSystemMessage", args: [threadId, content] });
+    appendSystemMessage: async (threadId, id, content) => {
+      log.push({ op: "appendSystemMessage", args: [threadId, id, content] });
     },
     forkThread: async (source, target) => {
       log.push({ op: "forkThread", args: [source, target] });
@@ -112,7 +111,9 @@ function createMockThreadOps() {
   return { ops, log };
 }
 
-function createScriptedRunAgent(turns: TurnScript[]): RunAgentActivity<unknown> {
+function createScriptedRunAgent(
+  turns: TurnScript[]
+): RunAgentActivity<unknown> {
   let call = 0;
   return async () => {
     const turn = turns[call++];
@@ -134,7 +135,7 @@ function createEchoTool() {
     schema: z.object({ text: z.string() }),
     handler: async (
       args: { text: string },
-      _ctx: RouterContext,
+      _ctx: RouterContext
     ): Promise<ToolHandlerResponse<{ echoed: string }>> => ({
       toolResponse: `Echo: ${args.text}`,
       data: { echoed: args.text },
@@ -237,8 +238,11 @@ describe("createSession edge cases", () => {
 
     const errorResults = log.filter((l) => {
       if (l.op !== "appendToolResult") return false;
-      const config = l.args[0] as ToolResultConfig;
-      return typeof config.content === "string" && config.content.includes("Invalid tool call");
+      const config = l.args[1] as ToolResultConfig;
+      return (
+        typeof config.content === "string" &&
+        config.content.includes("Invalid tool call")
+      );
     });
     expect(errorResults).toHaveLength(2);
   });
@@ -386,7 +390,7 @@ describe("createSession edge cases", () => {
     });
 
     await expect(session.runSession({ stateManager })).rejects.toThrow(
-      "unrecoverable tool",
+      "unrecoverable tool"
     );
     expect(endReason).toBe("failed");
   });
@@ -402,9 +406,7 @@ describe("createSession edge cases", () => {
       agentName: "TestAgent",
       threadId: "thread-1",
       metadata: { env: "test", version: 42 },
-      runAgent: createScriptedRunAgent([
-        { message: "done", toolCalls: [] },
-      ]),
+      runAgent: createScriptedRunAgent([{ message: "done", toolCalls: [] }]),
       threadOps: ops,
       buildContextMessage: () => "go",
       hooks: {
@@ -461,7 +463,7 @@ describe("createSession edge cases", () => {
     });
 
     await expect(session.runSession({ stateManager })).rejects.toThrow(
-      "sandbox creation failed",
+      "sandbox creation failed"
     );
   });
 
@@ -505,7 +507,7 @@ describe("createSession edge cases", () => {
     });
 
     await expect(session.runSession({ stateManager })).rejects.toThrow(
-      "LLM crash",
+      "LLM crash"
     );
 
     expect(sandboxLog).toContain("create");
@@ -530,7 +532,7 @@ describe("createSession edge cases", () => {
     });
 
     await expect(session.runSession({ stateManager })).rejects.toThrow(
-      "No system prompt in state",
+      "No system prompt in state"
     );
   });
 
@@ -725,24 +727,27 @@ describe("createSession edge cases", () => {
 
     const toolResults = log.filter((l) => l.op === "appendToolResult");
     const echoResult = toolResults.find((l) => {
-      const config = l.args[0] as ToolResultConfig;
+      const config = l.args[1] as ToolResultConfig;
       return config.toolName === "Echo";
     });
     expect(echoResult).toBeDefined();
     if (echoResult) {
-      expect((echoResult.args[0] as ToolResultConfig).content).toBe("Echo: valid");
+      expect((echoResult.args[1] as ToolResultConfig).content).toBe(
+        "Echo: valid"
+      );
     }
 
     const unknownResult = toolResults.find((l) => {
-      const config = l.args[0] as ToolResultConfig;
+      const config = l.args[1] as ToolResultConfig;
       return config.toolName === "Unknown";
     });
     expect(unknownResult).toBeDefined();
     const unknownContent = unknownResult
-      ? (unknownResult.args[0] as ToolResultConfig).content
+      ? (unknownResult.args[1] as ToolResultConfig).content
       : undefined;
     expect(
-      typeof unknownContent === "string" && unknownContent.includes("Invalid tool call"),
+      typeof unknownContent === "string" &&
+        unknownContent.includes("Invalid tool call")
     ).toBe(true);
   });
 
@@ -754,9 +759,7 @@ describe("createSession edge cases", () => {
     const session = await createSession({
       agentName: "TestAgent",
       threadId: "thread-1",
-      runAgent: createScriptedRunAgent([
-        { message: "done", toolCalls: [] },
-      ]),
+      runAgent: createScriptedRunAgent([{ message: "done", toolCalls: [] }]),
       threadOps: ops,
       buildContextMessage: () => [
         { type: "text", text: "Hello" },
@@ -774,7 +777,7 @@ describe("createSession edge cases", () => {
     expect(humanOps).toHaveLength(1);
     const humanOp = humanOps[0];
     if (!humanOp) throw new Error("expected human op");
-    const content = humanOp.args[1];
+    const content = humanOp.args[2];
     expect(Array.isArray(content)).toBe(true);
     const firstContent = (content as { type: string }[])[0];
     if (!firstContent) throw new Error("expected content item");
@@ -859,7 +862,7 @@ describe("createSession edge cases", () => {
 
     const toolResults = log.filter((l) => {
       if (l.op !== "appendToolResult") return false;
-      const config = l.args[0] as ToolResultConfig;
+      const config = l.args[1] as ToolResultConfig;
       return config.toolName === "SelfAppend";
     });
     expect(toolResults).toHaveLength(0);
@@ -885,7 +888,10 @@ describe("createSession edge cases", () => {
       buildContextMessage: () => "go",
       hooks: {
         onPreToolUse: async ({ toolCall }) => {
-          if (toolCall.args && (toolCall.args as { text: string }).text === "skip-me") {
+          if (
+            toolCall.args &&
+            (toolCall.args as { text: string }).text === "skip-me"
+          ) {
             return { skip: true };
           }
           return {};
@@ -903,8 +909,10 @@ describe("createSession edge cases", () => {
     expect(toolResults).toHaveLength(1);
     const toolResult = toolResults[0];
     if (!toolResult) throw new Error("expected tool result");
-    const content = (toolResult.args[0] as ToolResultConfig).content;
-    expect(typeof content === "string" && content.includes("Skipped")).toBe(true);
+    const content = (toolResult.args[1] as ToolResultConfig).content;
+    expect(typeof content === "string" && content.includes("Skipped")).toBe(
+      true
+    );
   });
 
   // --- Sandbox snapshot is not called on normal flow ---

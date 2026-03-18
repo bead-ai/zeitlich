@@ -2,6 +2,34 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.22](https://github.com/bead-ai/zeitlich/compare/v0.2.21...v0.2.22) (2026-03-17)
+
+
+### Features
+
+* add `fork` method into Sandbox interface ([#42](https://github.com/bead-ai/zeitlich/issues/42)) ([0713daa](https://github.com/bead-ai/zeitlich/commit/0713daafaa1b14c01d2b2d4c24bf317fa4a1693e))
+* add adapter-prefixed thread and sandbox operations for Google GenAI and LangChain ([423862e](https://github.com/bead-ai/zeitlich/commit/423862eab734e002b5c97f883c177b9e1c888d89))
+* **sandbox:** update createActivities to support prefixed names for activity functions ([b08acf2](https://github.com/bead-ai/zeitlich/commit/b08acf2f4ae433f523c91c181c10e60141a5d82a))
+* **session:** introduce ScopedPrefix type and enhance thread operations for Google GenAI and LangChain adapters ([98c3f12](https://github.com/bead-ai/zeitlich/commit/98c3f12cf937796d7dcbe8cd262a053da62d25a6))
+* **subagent:** support function context in SubagentConfig ([#46](https://github.com/bead-ai/zeitlich/issues/46)) ([238826c](https://github.com/bead-ai/zeitlich/commit/238826c3db92deb02b479c4933c6b402b475d0d0))
+* update sandbox and thread proxy operations to derive scope from workflow context ([28bc655](https://github.com/bead-ai/zeitlich/commit/28bc655f9bc4a8ac01429dd45224eed58af1b0f3))
+
+
+### Bug Fixes
+
+* add acts for fork sandboxes ([6c1a606](https://github.com/bead-ai/zeitlich/commit/6c1a6068b4602c14c30b8ac9ceef4aff68544c90))
+* tests ([1c86976](https://github.com/bead-ai/zeitlich/commit/1c869767eaa9caab8aef7015ee1dcb75cd2a624f))
+
+
+### Code Refactoring
+
+* update activity naming convention to prepend adapter prefix and append workflow scope ([1297a8f](https://github.com/bead-ai/zeitlich/commit/1297a8f91f584272e8929072090dfdf8331cd7aa))
+
+
+### Miscellaneous Chores
+
+* release 0.2.22 ([0dde565](https://github.com/bead-ai/zeitlich/commit/0dde565c9cd3acb8173484313b7a07cc54554607))
+
 ## [0.2.21](https://github.com/bead-ai/zeitlich/compare/v0.2.20...v0.2.21) (2026-03-16)
 
 

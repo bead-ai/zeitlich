@@ -19,6 +19,7 @@ describe("defineWorkflow", () => {
     await workflow({}, { previousThreadId: "prev-42" });
 
     expect(capturedSession).toEqual({
+      agentName: "test-workflow",
       threadId: "prev-42",
       continueThread: true,
     });
@@ -34,7 +35,10 @@ describe("defineWorkflow", () => {
 
     await workflow({}, { sandboxId: "sb-123" });
 
-    expect(capturedSession).toEqual({ sandboxId: "sb-123" });
+    expect(capturedSession).toEqual({
+      agentName: "test-workflow",
+      sandboxId: "sb-123",
+    });
   });
 
   it("maps both previousThreadId and sandboxId together", async () => {
@@ -48,6 +52,7 @@ describe("defineWorkflow", () => {
     await workflow({}, { previousThreadId: "prev-1", sandboxId: "sb-1" });
 
     expect(capturedSession).toEqual({
+      agentName: "test-workflow",
       threadId: "prev-1",
       continueThread: true,
       sandboxId: "sb-1",
@@ -64,18 +69,21 @@ describe("defineWorkflow", () => {
 
     await workflow({});
 
-    expect(capturedSession).toEqual({});
+    expect(capturedSession).toEqual({ agentName: "test-workflow" });
   });
 
   it("passes full input as first argument", async () => {
     let capturedInput: unknown;
 
-    const workflow = defineWorkflow<{
-      prompt: string;
-      metadata: { key: string };
-      previousThreadId?: string;
-      sandboxId?: string;
-    }, { ok: boolean }>(cfg, async (input, _sessionInput) => {
+    const workflow = defineWorkflow<
+      {
+        prompt: string;
+        metadata: { key: string };
+        previousThreadId?: string;
+        sandboxId?: string;
+      },
+      { ok: boolean }
+    >(cfg, async (input, _sessionInput) => {
       capturedInput = input;
       return { ok: true };
     });
@@ -101,7 +109,7 @@ describe("defineWorkflow", () => {
         capturedInput = input;
         capturedSession = sessionInput;
         return { ok: true };
-      },
+      }
     );
 
     const workflowInput: WorkflowInput = {
@@ -112,6 +120,7 @@ describe("defineWorkflow", () => {
 
     expect(capturedInput).toEqual({ prompt: "go" });
     expect(capturedSession).toEqual({
+      agentName: "test-workflow",
       threadId: "prev",
       continueThread: true,
       sandboxId: "sb",
@@ -135,7 +144,7 @@ describe("defineWorkflow", () => {
   it("sets the function name from config", () => {
     const workflow = defineWorkflow(
       { name: "my-main-workflow" },
-      async () => ({}),
+      async () => ({})
     );
 
     expect(workflow.name).toBe("my-main-workflow");

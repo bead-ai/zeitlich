@@ -132,7 +132,7 @@ class InMemorySandboxImpl implements Sandbox {
 // ============================================================================
 
 export class InMemorySandboxProvider implements SandboxProvider {
-  readonly id = "inmemory";
+  readonly id = "inMemory";
   readonly capabilities: SandboxCapabilities = {
     filesystem: true,
     execution: true,

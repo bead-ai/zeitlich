@@ -26,7 +26,7 @@ import type {
  * const manager = new SandboxManager(provider);
  *
  * export const activities = {
- *   ...manager.createActivities("virtualCodingAgent"),
+ *   ...manager.createActivities("CodingAgent"),
  *   readFile: withVirtualSandbox(client, provider, readHandler),
  * };
  * ```
