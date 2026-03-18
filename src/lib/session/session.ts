@@ -69,8 +69,7 @@ export const createSession = async <T extends ToolMap, M = unknown>({
   sandbox: sandboxOps,
   sandboxId: inheritedSandboxId,
   previousSandboxId,
-  pauseSandboxOnExit = false,
-  sandboxReaper,
+  sandboxOnExit = { kind: "destroy" },
 }: SessionConfig<T, M>): Promise<ZeitlichSession<M>> => {
   const sourceThreadId = continueThread ? providedThreadId : undefined;
   const threadId =
@@ -308,23 +307,17 @@ export const createSession = async <T extends ToolMap, M = unknown>({
         await callSessionEnd(exitReason, stateManager.getTurns());
 
         if (ownsSandbox && sandboxId && sandboxOps) {
-          if (pauseSandboxOnExit) {
-            const ttl = typeof pauseSandboxOnExit === "object" ? pauseSandboxOnExit.ttlSeconds : undefined;
-            await sandboxOps.pauseSandbox(sandboxId, ttl);
-            if (sandboxReaper) {
-              const reaperOpts = {
-                workflowId: getReaperWorkflowId(sandboxId),
-                args: [sandboxId, sandboxReaper.ttlMs] as const,
-                parentClosePolicy: ParentClosePolicy.ABANDON,
-              };
-              if (typeof sandboxReaper.workflow === "string") {
-                await startChild(sandboxReaper.workflow, reaperOpts);
-              } else {
-                await startChild(sandboxReaper.workflow, reaperOpts);
-              }
-            }
-          } else {
+          if (sandboxOnExit.kind === "destroy") {
             await sandboxOps.destroySandbox(sandboxId);
+          } else {
+            await sandboxOps.pauseSandbox(sandboxId);
+            if (sandboxOnExit.kind === "pause-until-parent-close") {
+              await startChild(sandboxOnExit.reaperWorkflow, {
+                workflowId: getReaperWorkflowId(sandboxId),
+                args: [sandboxId] as const,
+                parentClosePolicy: ParentClosePolicy.REQUEST_CANCEL,
+              });
+            }
           }
         }
       }
@@ -334,9 +327,8 @@ export const createSession = async <T extends ToolMap, M = unknown>({
         finalMessage: null,
         exitReason,
         usage: stateManager.getTotalUsage(),
-        ...(pauseSandboxOnExit && sandboxId && { sandboxId }),
+        ...(sandboxOnExit.kind !== "destroy" && sandboxId && { sandboxId }),
       };
     },
   };
 };
-

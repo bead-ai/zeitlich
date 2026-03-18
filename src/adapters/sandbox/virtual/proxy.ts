@@ -15,7 +15,10 @@
  * ```
  */
 import { proxyActivities, workflowInfo } from "@temporalio/workflow";
-import type { SandboxOps } from "../../../lib/sandbox/types";
+import type {
+  DestroySandboxActivity,
+  SandboxOps,
+} from "../../../lib/sandbox/types";
 
 const ADAPTER_PREFIX = "virtual";
 
@@ -45,7 +48,7 @@ export function proxyVirtualSandboxOps(
 
   return {
     createSandbox: acts[p("createSandbox")],
-    destroySandbox: acts[p("destroySandbox")],
+    destroySandbox: acts[p("destroySandbox")] as unknown as DestroySandboxActivity,
     pauseSandbox: acts[p("pauseSandbox")],
     snapshotSandbox: acts[p("snapshotSandbox")],
     forkSandbox: acts[p("forkSandbox")],

@@ -144,6 +144,7 @@ export type {
   SandboxFileSystem,
   SandboxOps,
   PrefixedSandboxOps,
+  DestroySandboxActivity,
   SandboxProvider,
   SandboxSnapshot,
   ExecOptions,
@@ -155,8 +156,14 @@ export {
   SandboxNotFoundError,
   SandboxNotSupportedError,
 } from "./lib/sandbox/types";
-export { defineSandboxReaper, getReaperWorkflowId, dismissReaper } from "./lib/sandbox/reaper";
-export type { SandboxReaperWorkflow } from "./lib/sandbox/reaper";
+export {
+  defineParentCloseSandboxReaper,
+  getReaperWorkflowId,
+  dismissReaper,
+} from "./lib/sandbox/reaper";
+export type {
+  ParentCloseSandboxReaperWorkflow,
+} from "./lib/sandbox/reaper";
 
 // Virtual sandbox (workflow-safe — imported from leaf modules to avoid
 // pulling activity-side code like VirtualSandboxFileSystem / Provider).

@@ -1,12 +1,14 @@
 import {
+  CancellationScope,
   condition,
   defineSignal,
+  isCancellation,
   setHandler,
 } from "@temporalio/workflow";
+import type { DestroySandboxActivity } from "./types";
 
-export type SandboxReaperWorkflow = (
-  sandboxId: string,
-  ttlMs: number
+export type ParentCloseSandboxReaperWorkflow = (
+  sandboxId: string
 ) => Promise<void>;
 
 export const dismissReaper = defineSignal("dismissSandboxReaper");
@@ -21,41 +23,41 @@ export function getReaperWorkflowId(sandboxId: string): string {
 }
 
 /**
- * Creates a sandbox reaper workflow that destroys a paused sandbox after a TTL.
- * If the reaper receives a {@link dismissReaper} signal before the TTL expires
- * (e.g. because the sandbox was forked for a continuation), it exits cleanly
- * without destroying anything — showing as "Completed" in Temporal's UI.
+ * Creates a sandbox reaper workflow that waits for its parent workflow to
+ * close, then destroys the paused sandbox unless it was explicitly dismissed.
  *
- * Call this at module level in your workflow file, passing the activity stub
- * for your sandbox provider's destroy operation:
- *
- * @example
- * ```typescript
- * import { proxyActivities } from '@temporalio/workflow';
- * import { defineSandboxReaper } from 'zeitlich/workflow';
- *
- * const { e2bDestroySandbox } = proxyActivities<PrefixedSandboxOps<'e2b'>>({
- *   startToCloseTimeout: '30s',
- * });
- *
- * export const e2bSandboxReaper = defineSandboxReaper(e2bDestroySandbox);
- * ```
+ * Call this at module level in your workflow file, passing
+ * `sandboxOps.destroySandbox` from one of Zeitlich's sandbox workflow proxies.
  */
-export function defineSandboxReaper(
-  destroySandbox: (sandboxId: string) => Promise<void>
-): SandboxReaperWorkflow {
-  const reaper: SandboxReaperWorkflow = async (
-    sandboxId: string,
-    ttlMs: number
+export function defineParentCloseSandboxReaper(
+  destroySandbox: DestroySandboxActivity
+): ParentCloseSandboxReaperWorkflow {
+  const reaper: ParentCloseSandboxReaperWorkflow = async (
+    sandboxId: string
   ) => {
     let dismissed = false;
     setHandler(dismissReaper, () => { dismissed = true; });
 
-    const wasDismissed = await condition(() => dismissed, ttlMs);
-    if (wasDismissed) return;
+    try {
+      await Promise.race([
+        condition(() => dismissed),
+        CancellationScope.current().cancelRequested,
+      ]);
+      if (dismissed) return;
+    } catch (error) {
+      if (!isCancellation(error)) {
+        throw error;
+      }
+    }
 
-    await destroySandbox(sandboxId);
+    if (dismissed) return;
+
+    await CancellationScope.nonCancellable(async () => {
+      await destroySandbox(sandboxId);
+    });
   };
-  Object.defineProperty(reaper, "name", { value: "sandboxReaper" });
+  Object.defineProperty(reaper, "name", {
+    value: "parentCloseSandboxReaper",
+  });
   return reaper;
 }

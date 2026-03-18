@@ -40,9 +40,16 @@ vi.mock("@temporalio/workflow", () => {
   return {
     proxyActivities: <T>() => ({}) as T,
     condition: async (fn: () => boolean) => fn(),
+    CancellationScope: {
+      current: () => ({
+        cancelRequested: new Promise<never>(() => {}),
+      }),
+      nonCancellable: async <T>(fn: () => Promise<T>) => fn(),
+    },
     defineUpdate: (name: string) => ({ __type: "update", name }),
     defineQuery: (name: string) => ({ __type: "query", name }),
     defineSignal: (name: string) => ({ __type: "signal", name }),
+    isCancellation: () => false,
     setHandler: (_def: unknown, _handler: unknown) => {},
     uuid4: () => `00000000-0000-0000-0000-${String(++idCounter).padStart(12, "0")}`,
     ApplicationFailure: MockApplicationFailure,
@@ -524,8 +531,8 @@ describe("createSession integration", () => {
     const { ops } = createMockThreadOps();
     const sandboxLog: string[] = [];
 
-    const sandboxOps: SandboxOps = {
-      createSandbox: async (options) => {
+    const sandboxOps = {
+      createSandbox: async (options: { id?: string } | undefined) => {
         sandboxLog.push(`create:${options?.id ?? "unknown"}`);
         return { sandboxId: `sb-${options?.id ?? "unknown"}` };
       },
@@ -540,7 +547,7 @@ describe("createSession integration", () => {
         createdAt: new Date().toISOString(),
       }),
       forkSandbox: async () => "forked-sandbox-id",
-    };
+    } as unknown as SandboxOps;
 
     const session = await createSession({
       agentName: "TestAgent",
@@ -567,7 +574,7 @@ describe("createSession integration", () => {
     const { ops } = createMockThreadOps();
     const sandboxLog: string[] = [];
 
-    const sandboxOps: SandboxOps = {
+    const sandboxOps = {
       createSandbox: async () => {
         sandboxLog.push("create");
         return { sandboxId: "sb-new" };
@@ -583,7 +590,7 @@ describe("createSession integration", () => {
         createdAt: new Date().toISOString(),
       }),
       forkSandbox: async () => "forked-sandbox-id",
-    };
+    } as unknown as SandboxOps;
 
     const session = await createSession({
       agentName: "TestAgent",
@@ -821,7 +828,7 @@ describe("createSession integration", () => {
   it("merges sandbox stateUpdate into state manager", async () => {
     const { ops } = createMockThreadOps();
 
-    const sandboxOps: SandboxOps = {
+    const sandboxOps = {
       createSandbox: async () => ({
         sandboxId: "sb-1",
         stateUpdate: { customField: "from-sandbox" },
@@ -835,7 +842,7 @@ describe("createSession integration", () => {
         createdAt: new Date().toISOString(),
       }),
       forkSandbox: async () => "forked-sandbox-id",
-    };
+    } as unknown as SandboxOps;
 
     const session = await createSession({
       agentName: "TestAgent",
@@ -903,25 +910,25 @@ describe("createSession integration", () => {
 
   // --- Sandbox reaper lifecycle ---
 
-  it("starts a reaper workflow when pauseSandboxOnExit and sandboxReaper are set", async () => {
+  it("starts a reaper workflow when sandboxOnExit pauses until parent close", async () => {
     const { ops } = createMockThreadOps();
     const sandboxLog: string[] = [];
 
-    const sandboxOps: SandboxOps = {
-      createSandbox: async (options) => {
+    const sandboxOps = {
+      createSandbox: async (options: { id?: string } | undefined) => {
         sandboxLog.push(`create:${options?.id ?? "unknown"}`);
         return { sandboxId: `sb-${options?.id ?? "unknown"}` };
       },
-      destroySandbox: async (id) => { sandboxLog.push(`destroy:${id}`); },
-      pauseSandbox: async (id, ttl) => { sandboxLog.push(`pause:${id}:${ttl}`); },
+      destroySandbox: async (id: string) => { sandboxLog.push(`destroy:${id}`); },
+      pauseSandbox: async (id: string, ttl: number | undefined) => { sandboxLog.push(`pause:${id}:${ttl}`); },
       snapshotSandbox: async () => ({
         sandboxId: "sb-1", providerId: "test", data: null,
         createdAt: new Date().toISOString(),
       }),
       forkSandbox: async () => "forked-sandbox-id",
-    };
+    } as unknown as SandboxOps;
 
-    const fakeReaper = async () => {};
+    const fakeReaper = async (_sandboxId: string) => {};
 
     const session = await createSession({
       agentName: "TestAgent",
@@ -932,8 +939,10 @@ describe("createSession integration", () => {
       threadOps: ops,
       buildContextMessage: () => "go",
       sandbox: sandboxOps,
-      pauseSandboxOnExit: { ttlSeconds: 120 },
-      sandboxReaper: { workflow: fakeReaper, ttlMs: 120_000 },
+      sandboxOnExit: {
+        kind: "pause-until-parent-close",
+        reaperWorkflow: fakeReaper,
+      },
     });
 
     const stateManager = createAgentStateManager({
@@ -942,7 +951,7 @@ describe("createSession integration", () => {
 
     await session.runSession({ stateManager });
 
-    expect(sandboxLog).toContain("pause:sb-thread-1:120");
+    expect(sandboxLog).toContain("pause:sb-thread-1:undefined");
     expect(sandboxLog).not.toContain("destroy:sb-thread-1");
 
     expect(startChildLog).toHaveLength(1);
@@ -950,30 +959,30 @@ describe("createSession integration", () => {
     expect(reaperCall.workflow).toBe(fakeReaper);
     const reaperOpts = reaperCall.options as {
       workflowId: string;
-      args: [string, number];
+      args: [string];
       parentClosePolicy: string;
     };
     expect(reaperOpts.workflowId).toBe("sandbox-reaper-sb-thread-1");
-    expect(reaperOpts.args).toEqual(["sb-thread-1", 120_000]);
-    expect(reaperOpts.parentClosePolicy).toBe("ABANDON");
+    expect(reaperOpts.args).toEqual(["sb-thread-1"]);
+    expect(reaperOpts.parentClosePolicy).toBe("REQUEST_CANCEL");
   });
 
-  it("does not start a reaper when pauseSandboxOnExit is false", async () => {
+  it("destroys the sandbox by default when sandboxOnExit is omitted", async () => {
     const { ops } = createMockThreadOps();
     const sandboxLog: string[] = [];
 
-    const sandboxOps: SandboxOps = {
-      createSandbox: async (options) => {
+    const sandboxOps = {
+      createSandbox: async (options: { id?: string } | undefined) => {
         return { sandboxId: `sb-${options?.id ?? "unknown"}` };
       },
-      destroySandbox: async (id) => { sandboxLog.push(`destroy:${id}`); },
-      pauseSandbox: async (id) => { sandboxLog.push(`pause:${id}`); },
+      destroySandbox: async (id: string) => { sandboxLog.push(`destroy:${id}`); },
+      pauseSandbox: async (id: string) => { sandboxLog.push(`pause:${id}`); },
       snapshotSandbox: async () => ({
         sandboxId: "sb-1", providerId: "test", data: null,
         createdAt: new Date().toISOString(),
       }),
       forkSandbox: async () => "forked-sandbox-id",
-    };
+    } as unknown as SandboxOps;
 
     const session = await createSession({
       agentName: "TestAgent",
@@ -984,7 +993,6 @@ describe("createSession integration", () => {
       threadOps: ops,
       buildContextMessage: () => "go",
       sandbox: sandboxOps,
-      sandboxReaper: { workflow: async () => {}, ttlMs: 60_000 },
     });
 
     const stateManager = createAgentStateManager({
@@ -997,25 +1005,65 @@ describe("createSession integration", () => {
     expect(startChildLog).toHaveLength(0);
   });
 
-  it("dismisses existing reaper before forking and starts new reaper on pause", async () => {
+  it("pauses without reaper when sandboxOnExit is pause", async () => {
     const { ops } = createMockThreadOps();
     const sandboxLog: string[] = [];
 
-    const sandboxOps: SandboxOps = {
-      createSandbox: async () => ({ sandboxId: "sb-new" }),
-      destroySandbox: async (id) => { sandboxLog.push(`destroy:${id}`); },
-      pauseSandbox: async (id, ttl) => { sandboxLog.push(`pause:${id}:${ttl}`); },
+    const sandboxOps = {
+      createSandbox: async (options: { id?: string } | undefined) => {
+        return { sandboxId: `sb-${options?.id ?? "unknown"}` };
+      },
+      destroySandbox: async (id: string) => { sandboxLog.push(`destroy:${id}`); },
+      pauseSandbox: async (id: string, ttl: number | undefined) => { sandboxLog.push(`pause:${id}:${ttl}`); },
       snapshotSandbox: async () => ({
         sandboxId: "sb-1", providerId: "test", data: null,
         createdAt: new Date().toISOString(),
       }),
-      forkSandbox: async (id) => {
+      forkSandbox: async () => "forked-sandbox-id",
+    } as unknown as SandboxOps;
+
+    const session = await createSession({
+      agentName: "TestAgent",
+      threadId: "thread-1",
+      runAgent: createScriptedRunAgent([
+        { message: "done", toolCalls: [] },
+      ]),
+      threadOps: ops,
+      buildContextMessage: () => "go",
+      sandbox: sandboxOps,
+      sandboxOnExit: { kind: "pause" },
+    });
+
+    const stateManager = createAgentStateManager({
+      initialState: { systemPrompt: "test" },
+    });
+
+    await session.runSession({ stateManager });
+
+    expect(sandboxLog).toContain("pause:sb-thread-1:undefined");
+    expect(sandboxLog).not.toContain("destroy:sb-thread-1");
+    expect(startChildLog).toHaveLength(0);
+  });
+
+  it("dismisses existing reaper before forking and starts new reaper on pause", async () => {
+    const { ops } = createMockThreadOps();
+    const sandboxLog: string[] = [];
+
+    const sandboxOps = {
+      createSandbox: async () => ({ sandboxId: "sb-new" }),
+      destroySandbox: async (id: string) => { sandboxLog.push(`destroy:${id}`); },
+      pauseSandbox: async (id: string, ttl: number | undefined) => { sandboxLog.push(`pause:${id}:${ttl}`); },
+      snapshotSandbox: async () => ({
+        sandboxId: "sb-1", providerId: "test", data: null,
+        createdAt: new Date().toISOString(),
+      }),
+      forkSandbox: async (id: string) => {
         sandboxLog.push(`fork:${id}`);
         return `forked-${id}`;
       },
-    };
+    } as unknown as SandboxOps;
 
-    const fakeReaper = async () => {};
+    const fakeReaper = async (_sandboxId: string) => {};
 
     const session = await createSession({
       agentName: "TestAgent",
@@ -1027,8 +1075,10 @@ describe("createSession integration", () => {
       buildContextMessage: () => "go",
       sandbox: sandboxOps,
       previousSandboxId: "sb-prev",
-      pauseSandboxOnExit: { ttlSeconds: 60 },
-      sandboxReaper: { workflow: fakeReaper, ttlMs: 60_000 },
+      sandboxOnExit: {
+        kind: "pause-until-parent-close",
+        reaperWorkflow: fakeReaper,
+      },
     });
 
     const stateManager = createAgentStateManager({
@@ -1045,17 +1095,19 @@ describe("createSession integration", () => {
     expect(sandboxLog).toContain("fork:sb-prev");
 
     // Paused the forked sandbox on exit (not destroyed)
-    expect(sandboxLog).toContain("pause:forked-sb-prev:60");
+    expect(sandboxLog).toContain("pause:forked-sb-prev:undefined");
     expect(sandboxLog).not.toContain("destroy:forked-sb-prev");
 
     // Started a new reaper for the forked sandbox
     expect(startChildLog).toHaveLength(1);
     const reaperOpts = at(startChildLog, 0).options as {
       workflowId: string;
-      args: [string, number];
+      args: [string];
+      parentClosePolicy: string;
     };
     expect(reaperOpts.workflowId).toBe("sandbox-reaper-forked-sb-prev");
-    expect(reaperOpts.args).toEqual(["forked-sb-prev", 60_000]);
+    expect(reaperOpts.args).toEqual(["forked-sb-prev"]);
+    expect(reaperOpts.parentClosePolicy).toBe("REQUEST_CANCEL");
   });
 
   it("tolerates missing reaper when forking from previousSandboxId", async () => {
@@ -1063,7 +1115,7 @@ describe("createSession integration", () => {
 
     getExternalWorkflowHandleShouldThrow = true;
 
-    const sandboxOps: SandboxOps = {
+    const sandboxOps = {
       createSandbox: async () => ({ sandboxId: "sb-new" }),
       destroySandbox: async () => {},
       pauseSandbox: async () => {},
@@ -1071,8 +1123,8 @@ describe("createSession integration", () => {
         sandboxId: "sb-1", providerId: "test", data: null,
         createdAt: new Date().toISOString(),
       }),
-      forkSandbox: async (id) => `forked-${id}`,
-    };
+      forkSandbox: async (id: string) => `forked-${id}`,
+    } as unknown as SandboxOps;
 
     const session = await createSession({
       agentName: "TestAgent",
@@ -1094,4 +1146,3 @@ describe("createSession integration", () => {
     expect(result.exitReason).toBe("completed");
   });
 });
-

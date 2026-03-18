@@ -9,7 +9,7 @@ import type {
 export type SubagentHandlerResponse<TResult = null> =
   ToolHandlerResponse<TResult> & {
     threadId: string;
-    /** Sandbox ID owned by this subagent after the run — set when pauseSandboxOnExit is active */
+    /** Sandbox ID owned by this subagent after the run — set when sandboxOnExit is non-destroy */
     sandboxId?: string;
   };
 

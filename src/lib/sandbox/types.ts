@@ -135,13 +135,21 @@ export interface SandboxProvider<
 // SandboxOps — workflow-side activity interface (like ThreadOps)
 // ============================================================================
 
+declare const destroySandboxActivityBrand: unique symbol;
+
+export type DestroySandboxActivity = ((
+  sandboxId: string
+) => Promise<void>) & {
+  readonly [destroySandboxActivityBrand]: true;
+};
+
 export interface SandboxOps<
   TOptions extends SandboxCreateOptions = SandboxCreateOptions,
 > {
   createSandbox(
     options?: TOptions,
   ): Promise<{ sandboxId: string; stateUpdate?: Record<string, unknown> }>;
-  destroySandbox(sandboxId: string): Promise<void>;
+  destroySandbox: DestroySandboxActivity;
   pauseSandbox(sandboxId: string, ttlSeconds?: number): Promise<void>;
   snapshotSandbox(sandboxId: string): Promise<SandboxSnapshot>;
   forkSandbox(sandboxId: string): Promise<string>;

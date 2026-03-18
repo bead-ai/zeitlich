@@ -13,7 +13,7 @@ import type { Hooks } from "../hooks/types";
 import type { SubagentConfig } from "../subagent/types";
 import type { Skill } from "../skills/types";
 import type { SandboxOps } from "../sandbox/types";
-import type { SandboxReaperWorkflow } from "../sandbox/reaper";
+import type { ParentCloseSandboxReaperWorkflow } from "../sandbox/reaper";
 import type { RunAgentActivity } from "../model/types";
 import type { AgentStateManager, JsonSerializable } from "../state/types";
 import type { ActivityInterfaceFor } from "@temporalio/workflow";
@@ -126,30 +126,20 @@ export interface SessionConfig<T extends ToolMap, M = unknown> {
    */
   previousSandboxId?: string;
   /**
-   * When true (or an object with `ttlSeconds`), pause the owned sandbox on
-   * session exit instead of destroying it. Useful when the sandbox will be
-   * forked by a subagent after this session ends.
+   * Sandbox lifecycle policy applied when this session exits.
    *
-   * Pass `{ ttlSeconds }` to hint a TTL to the adapter; adapters that don't
-   * support TTL can ignore it. The adapter is responsible for arranging
-   * cleanup after the TTL (provider-native timeout or a scheduled workflow).
+   * Defaults to `{ kind: "destroy" }` when omitted.
    *
    * Has no effect if the session does not own the sandbox (i.e. `sandboxId`
    * was provided by the caller).
    */
-  pauseSandboxOnExit?: boolean | { ttlSeconds: number };
-  /**
-   * When set, a reaper workflow is started after pausing the owned sandbox.
-   * The reaper sleeps for `ttlMs` then destroys the sandbox. On continuation
-   * (fork from `previousSandboxId`), the existing reaper is cancelled before
-   * forking so the sandbox survives.
-   *
-   * Define a reaper with {@link defineSandboxReaper} in your workflow file.
-   */
-  sandboxReaper?: {
-    workflow: string | SandboxReaperWorkflow;
-    ttlMs: number;
-  };
+  sandboxOnExit?:
+    | { kind: "destroy" }
+    | { kind: "pause" }
+    | {
+      kind: "pause-until-parent-close";
+      reaperWorkflow: ParentCloseSandboxReaperWorkflow;
+    };
 }
 
 export interface ZeitlichSession<M = unknown> {

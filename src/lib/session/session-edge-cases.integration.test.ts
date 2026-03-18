@@ -32,9 +32,16 @@ vi.mock("@temporalio/workflow", () => {
   return {
     proxyActivities: <T>() => ({}) as T,
     condition: async (fn: () => boolean) => fn(),
+    CancellationScope: {
+      current: () => ({
+        cancelRequested: new Promise<never>(() => {}),
+      }),
+      nonCancellable: async <T>(fn: () => Promise<T>) => fn(),
+    },
     defineUpdate: (name: string) => ({ __type: "update", name }),
     defineQuery: (name: string) => ({ __type: "query", name }),
     defineSignal: (name: string) => ({ __type: "signal", name }),
+    isCancellation: () => false,
     setHandler: (_def: unknown, _handler: unknown) => {},
     uuid4: () =>
       `00000000-0000-0000-0000-${String(++idCounter).padStart(12, "0")}`,
@@ -425,7 +432,7 @@ describe("createSession edge cases", () => {
   it("propagates sandbox creation error", async () => {
     const { ops } = createMockThreadOps();
 
-    const sandboxOps: SandboxOps = {
+    const sandboxOps = {
       createSandbox: async () => {
         throw new Error("sandbox creation failed");
       },
@@ -438,7 +445,7 @@ describe("createSession edge cases", () => {
         createdAt: new Date().toISOString(),
       }),
       forkSandbox: async () => "forked-sandbox-id",
-    };
+    } as unknown as SandboxOps;
 
     const session = await createSession({
       agentName: "TestAgent",
@@ -464,7 +471,7 @@ describe("createSession edge cases", () => {
     const { ops } = createMockThreadOps();
     const sandboxLog: string[] = [];
 
-    const sandboxOps: SandboxOps = {
+    const sandboxOps = {
       createSandbox: async () => {
         sandboxLog.push("create");
         return { sandboxId: "sb-cleanup" };
@@ -480,7 +487,7 @@ describe("createSession edge cases", () => {
         createdAt: new Date().toISOString(),
       }),
       forkSandbox: async () => "forked-sandbox-id",
-    };
+    } as unknown as SandboxOps;
 
     const session = await createSession({
       agentName: "TestAgent",
@@ -911,13 +918,13 @@ describe("createSession edge cases", () => {
       createdAt: new Date().toISOString(),
     }));
 
-    const sandboxOps: SandboxOps = {
+    const sandboxOps = {
       createSandbox: async () => ({ sandboxId: "sb-test" }),
       destroySandbox: async () => {},
       pauseSandbox: async () => {},
       snapshotSandbox: snapshotSpy,
       forkSandbox: async () => "forked-sandbox-id",
-    };
+    } as unknown as SandboxOps;
 
     const session = await createSession({
       agentName: "TestAgent",
