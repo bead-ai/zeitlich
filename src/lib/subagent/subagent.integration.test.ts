@@ -433,6 +433,90 @@ describe("createSubagentHandler", () => {
     expect(context).toEqual({ key: "value" });
   });
 
+  it("emits child lifecycle events through the Datadog plugin", async () => {
+    temporalTestDoubles.recordSubagentEventMock.mockClear();
+
+    const plugin = createDatadogSubagentPlugin({
+      getMetricTags: () => ({ input_bucket: "small" }),
+      getMetadata: (event) => ({
+        prompt_words: event.args.prompt.split(/\s+/).length,
+      }),
+    });
+
+    const handler = createSubagentHandler([basicSubagent], [plugin]);
+
+    await handler(
+      { subagent: "researcher", description: "test", prompt: "Find info" },
+      { threadId: "parent-thread", toolCallId: "tc-1", toolName: "Subagent" }
+    );
+
+    expect(temporalTestDoubles.recordSubagentEventMock).toHaveBeenCalledTimes(
+      2
+    );
+    expect(
+      temporalTestDoubles.recordSubagentEventMock
+    ).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        name: "subagent.child.start",
+        groupId: "root-workflow",
+        subagent: "researcher",
+        metricTags: expect.objectContaining({
+          phase: "child",
+          status: "start",
+          input_bucket: "small",
+        }),
+        metadata: { prompt_words: 2 },
+      })
+    );
+    expect(
+      temporalTestDoubles.recordSubagentEventMock
+    ).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        name: "subagent.child.success",
+        groupId: "root-workflow",
+        subagent: "researcher",
+        usage: { inputTokens: 100, outputTokens: 50 },
+        metadata: { prompt_words: 2 },
+      })
+    );
+  });
+
+  it("emits classified child failure events through the Datadog plugin", async () => {
+    temporalTestDoubles.recordSubagentEventMock.mockClear();
+
+    const { executeChild, TimeoutFailure } = await import("@temporalio/workflow");
+    (executeChild as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
+      new TimeoutFailure("subagent timed out", null, "START_TO_CLOSE")
+    );
+
+    const plugin = createDatadogSubagentPlugin();
+    const handler = createSubagentHandler([basicSubagent], [plugin]);
+
+    await expect(
+      handler(
+        { subagent: "researcher", description: "test", prompt: "test" },
+        { threadId: "t", toolCallId: "tc", toolName: "Subagent" }
+      )
+    ).rejects.toThrow("subagent timed out");
+
+    expect(temporalTestDoubles.recordSubagentEventMock).toHaveBeenCalledTimes(
+      2
+    );
+    expect(
+      temporalTestDoubles.recordSubagentEventMock
+    ).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        name: "subagent.child.failure",
+        error: expect.objectContaining({
+          category: "timeout",
+          timeoutType: "START_TO_CLOSE",
+        }),
+      })
+    );
+  });
+
   it("does not pass sandboxId when sandbox is own", async () => {
     const { executeChild } = await import("@temporalio/workflow");
     const execMock = executeChild as ReturnType<typeof vi.fn>;

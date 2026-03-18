@@ -9,6 +9,12 @@ import type {
 } from "./types";
 import type { SubagentArgs } from "./tool";
 import type { z } from "zod";
+import type { SubagentPlugin } from "./plugin";
+import {
+  createSubagentEventBase,
+  emitSubagentPluginEvent,
+  serializeSubagentPluginError,
+} from "./plugin";
 
 /**
  * Creates a Subagent tool handler that spawns child workflows for configured subagents.
@@ -18,7 +24,7 @@ import type { z } from "zod";
  */
 export function createSubagentHandler<
   const T extends readonly SubagentConfig[],
->(subagents: [...T]) {
+>(subagents: [...T], subagentPlugins: readonly SubagentPlugin[] = []) {
   const { taskQueue: parentTaskQueue } = workflowInfo();
 
   return async (
@@ -63,14 +69,69 @@ export function createSubagentHandler<
       taskQueue: config.taskQueue ?? parentTaskQueue,
     };
 
+    const eventBase = createSubagentEventBase({
+      subagentArgs: args,
+      context,
+      config,
+    });
+    const startedAt = Date.now();
+
+    await emitSubagentPluginEvent(subagentPlugins, {
+      ...eventBase,
+      phase: "child",
+      status: "start",
+      timestampMs: startedAt,
+      childWorkflowId,
+    });
+
+    let childResult:
+      | {
+          toolResponse: ToolMessageContent | null;
+          data: unknown;
+          usage?: ToolHandlerResponse["usage"];
+          threadId: string;
+        }
+      | undefined;
+
+    try {
+      childResult =
+        typeof config.workflow === "string"
+          ? await executeChild(config.workflow, childOpts)
+          : await executeChild(config.workflow, childOpts);
+    } catch (error) {
+      await emitSubagentPluginEvent(subagentPlugins, {
+        ...eventBase,
+        phase: "child",
+        status: "failure",
+        timestampMs: Date.now(),
+        childWorkflowId,
+        durationMs: Date.now() - startedAt,
+        error: serializeSubagentPluginError(error),
+      });
+      throw error;
+    }
+
+    if (!childResult) {
+      throw new Error("Subagent workflow returned no result");
+    }
+
     const {
       toolResponse,
       data,
       usage,
       threadId: childThreadId,
-    } = typeof config.workflow === "string"
-      ? await executeChild(config.workflow, childOpts)
-      : await executeChild(config.workflow, childOpts);
+    } = childResult;
+
+    await emitSubagentPluginEvent(subagentPlugins, {
+      ...eventBase,
+      phase: "child",
+      status: "success",
+      timestampMs: Date.now(),
+      childWorkflowId,
+      childThreadId,
+      durationMs: Date.now() - startedAt,
+      ...(usage && { usage }),
+    });
 
     if (!toolResponse) {
       return {
@@ -102,7 +163,9 @@ export function createSubagentHandler<
 
     return {
       toolResponse: finalToolResponse,
-      data: validated ? validated.data : data,
+      data: validated
+        ? validated.data
+        : (data as InferSubagentResult<T[number]> | null),
       ...(usage && { usage }),
     };
   };

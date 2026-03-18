@@ -52,7 +52,7 @@ export function buildSubagentRegistration(
     enabled: (): boolean => getEnabled().length > 0,
     description: (): string => createSubagentTool(getEnabled()).description,
     schema: (): z.ZodObject<z.ZodRawShape> => createSubagentTool(getEnabled()).schema,
-    handler: createSubagentHandler(subagents),
+    handler: createSubagentHandler(subagents, subagentPlugins),
     ...((subagentHooksMap.size > 0 || subagentPlugins.length > 0) && {
       hooks: {
         onPreToolUse: async (ctx): Promise<PreToolUseHookResult> => {
