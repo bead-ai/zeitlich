@@ -211,7 +211,7 @@ export const myAgentWorkflow = defineWorkflow(
       maxTurns: 20,
       threadId: runId,
       threadOps: proxyLangChainThreadOps(),
-      sandboxOps: proxyInMemorySandboxOps(),
+      sandbox: proxyInMemorySandboxOps(),
       runAgent: runAgentActivity,
       buildContextMessage: () => [{ type: "text", text: prompt }],
       tools: {
@@ -475,6 +475,48 @@ const session = await createSession({
 ```
 
 The `Subagent` tool is automatically added when subagents are configured, allowing the LLM to spawn child workflows.
+
+### Sandbox Exit Lifecycle
+
+Sandbox cleanup is configured with `sandboxOnExit`.
+
+Owned sandboxes are destroyed by default:
+
+```typescript
+const session = await createSession({
+  // ... other config
+  sandbox: proxyInMemorySandboxOps(),
+});
+```
+
+To keep a sandbox paused after the session exits:
+
+```typescript
+const session = await createSession({
+  // ... other config
+  sandbox: proxyInMemorySandboxOps(),
+  sandboxOnExit: { kind: "pause" },
+});
+```
+
+To pause a sandbox and destroy it when the parent workflow closes, define a reaper once at module scope and pass it into `sandboxOnExit`:
+
+```typescript
+import { defineParentCloseSandboxReaper } from "zeitlich/workflow";
+import { proxyInMemorySandboxOps } from "zeitlich/adapters/sandbox/inmemory/workflow";
+
+const sandbox = proxyInMemorySandboxOps();
+const reaperWorkflow = defineParentCloseSandboxReaper(sandbox.destroySandbox);
+
+const session = await createSession({
+  // ... other config
+  sandbox,
+  sandboxOnExit: {
+    kind: "pause-until-parent-close",
+    reaperWorkflow,
+  },
+});
+```
 
 ### Thread Continuation
 
