@@ -1,10 +1,26 @@
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
+const temporalTestDoubles = vi.hoisted(() => ({
+  recordSubagentEventMock: vi.fn(),
+}));
+
 vi.mock("@temporalio/workflow", () => {
   let counter = 0;
   return {
-    workflowInfo: () => ({ taskQueue: "default-queue" }),
+    workflowInfo: (): {
+      taskQueue: string;
+      workflowId: string;
+      runId: string;
+      root: { workflowId: string };
+      parent: { workflowId: string };
+    } => ({
+      taskQueue: "default-queue",
+      workflowId: "child-workflow",
+      runId: "run-1",
+      root: { workflowId: "root-workflow" },
+      parent: { workflowId: "parent-workflow" },
+    }),
     executeChild: vi.fn(
       async (_workflow: unknown, opts: { args: unknown[] }) => {
         const prompt = (opts.args as [string])[0];
@@ -16,12 +32,43 @@ vi.mock("@temporalio/workflow", () => {
         };
       }
     ),
-    uuid4: () => {
+    uuid4: (): string => {
       counter++;
       const bytes = Array.from({ length: 16 }, (_, i) =>
         ((counter * 31 + i * 7) & 0xff).toString(16).padStart(2, "0")
       ).join("");
       return `${bytes.slice(0, 8)}-${bytes.slice(8, 12)}-${bytes.slice(12, 16)}-${bytes.slice(16, 20)}-${bytes.slice(20, 32)}`;
+    },
+    proxySinks: (): {
+      zeitlichDatadog: {
+        recordSubagentEvent: typeof temporalTestDoubles.recordSubagentEventMock;
+      };
+    } => ({
+      zeitlichDatadog: {
+        recordSubagentEvent: temporalTestDoubles.recordSubagentEventMock,
+      },
+    }),
+    rootCause: (error: Error): Error => error,
+    TimeoutFailure: class TimeoutFailure extends Error {
+      constructor(
+        message: string | undefined,
+        _lastHeartbeatDetails: unknown,
+        public readonly timeoutType: string
+      ) {
+        super(message);
+        this.name = "TimeoutFailure";
+      }
+    },
+    CancelledFailure: class CancelledFailure extends Error {
+      constructor(message = "cancelled") {
+        super(message);
+        this.name = "CancelledFailure";
+      }
+    },
+    log: {
+      warn: vi.fn(),
+      info: vi.fn(),
+      error: vi.fn(),
     },
   };
 });
@@ -31,6 +78,7 @@ import { createSubagentHandler } from "./handler";
 import { buildSubagentRegistration } from "./register";
 import { defineSubagentWorkflow } from "./workflow";
 import { defineSubagent } from "./define";
+import { createDatadogSubagentPlugin } from "./datadog";
 import type {
   SubagentConfig,
   SubagentSessionInput,
@@ -425,6 +473,12 @@ describe("createSubagentHandler", () => {
 // ---------------------------------------------------------------------------
 
 describe("buildSubagentRegistration", () => {
+  const basicSubagent: SubagentConfig = {
+    agentName: "researcher",
+    description: "Researches topics",
+    workflow: "researcherWorkflow",
+  };
+
   it("returns null for empty array", () => {
     expect(buildSubagentRegistration([])).toBeNull();
   });
@@ -453,7 +507,7 @@ describe("buildSubagentRegistration", () => {
         agentName: "toggle",
         description: "Toggleable",
         workflow: "workflow",
-        enabled: () => flag,
+        enabled: (): boolean => flag,
       },
     ]);
 
@@ -532,7 +586,7 @@ describe("buildSubagentRegistration", () => {
         agentName: "b",
         description: "Agent B",
         workflow: "workflow",
-        enabled: () => bEnabled,
+        enabled: (): boolean => bEnabled,
       },
     ]);
 
@@ -548,6 +602,69 @@ describe("buildSubagentRegistration", () => {
       expect(desc()).not.toContain("Agent B");
     }
   });
+
+  it("emits tool lifecycle events through the Datadog plugin hooks", async () => {
+    temporalTestDoubles.recordSubagentEventMock.mockClear();
+
+    const plugin = createDatadogSubagentPlugin({
+      getMetricTags: () => ({ workload_bucket: "100kb_1mb" }),
+    });
+
+    const reg = buildSubagentRegistration([basicSubagent], [plugin]);
+    expect(reg?.hooks?.onPreToolUse).toBeDefined();
+    expect(reg?.hooks?.onPostToolUse).toBeDefined();
+    if (!reg?.hooks?.onPreToolUse || !reg.hooks.onPostToolUse) {
+      return;
+    }
+
+    const args = {
+      subagent: "researcher",
+      description: "test",
+      prompt: "Find info",
+    };
+
+    await reg.hooks.onPreToolUse({
+      args,
+      threadId: "parent-thread",
+      turn: 3,
+    });
+    await reg.hooks.onPostToolUse({
+      args,
+      result: { answer: "ok" },
+      threadId: "parent-thread",
+      turn: 3,
+      durationMs: 42,
+    });
+
+    expect(temporalTestDoubles.recordSubagentEventMock).toHaveBeenCalledTimes(
+      2
+    );
+    expect(
+      temporalTestDoubles.recordSubagentEventMock
+    ).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        name: "subagent.tool.start",
+        threadId: "parent-thread",
+        turn: 3,
+        metricTags: expect.objectContaining({
+          phase: "tool",
+          status: "start",
+          workload_bucket: "100kb_1mb",
+        }),
+      })
+    );
+    expect(
+      temporalTestDoubles.recordSubagentEventMock
+    ).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        name: "subagent.tool.success",
+        durationMs: 42,
+        turn: 3,
+      })
+    );
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -555,7 +672,7 @@ describe("buildSubagentRegistration", () => {
 // ---------------------------------------------------------------------------
 
 describe("defineSubagent", () => {
-  const makeDef = (name: string) =>
+  const makeDef = (name: string): ReturnType<typeof defineSubagentWorkflow> =>
     defineSubagentWorkflow(
       { name, description: `${name} agent` },
       async () => ({ toolResponse: "ok", data: null, threadId: "t" })

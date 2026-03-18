@@ -11,6 +11,7 @@ import type {
 } from "../tool-router/types";
 import type { Hooks } from "../hooks/types";
 import type { SubagentConfig } from "../subagent/types";
+import type { SubagentPlugin } from "../subagent/plugin";
 import type { Skill } from "../skills/types";
 import type { SandboxOps } from "../sandbox/types";
 import type { RunAgentActivity } from "../model/types";
@@ -95,6 +96,8 @@ export interface SessionConfig<T extends ToolMap, M = unknown> {
   tools?: T;
   /** Subagent configurations */
   subagents?: SubagentConfig[];
+  /** Optional subagent plugins for observability and cross-cutting behavior */
+  subagentPlugins?: SubagentPlugin[];
   /** Skills available to this agent (metadata + instructions, loaded activity-side) */
   skills?: Skill[];
   /** Session lifecycle hooks */
