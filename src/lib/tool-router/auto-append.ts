@@ -1,6 +1,6 @@
+import { v4 as uuidv4 } from "uuid";
 import type { ToolResultConfig } from "../types";
 import type { ActivityToolHandler, RouterContext } from "./types";
-import { v4 as uuidv4 } from "uuid";
 
 /**
  * Wraps a tool handler to automatically append its result directly to the
@@ -35,7 +35,7 @@ export function withAutoAppend<
   TContext extends RouterContext = RouterContext,
 >(
   threadHandler: (id: string, config: ToolResultConfig) => Promise<void>,
-  handler: ActivityToolHandler<TArgs, TResult, TContext>
+  handler: ActivityToolHandler<TArgs, TResult, TContext>,
 ): ActivityToolHandler<TArgs, TResult, TContext> {
   return async (args: TArgs, context: TContext) => {
     const response = await handler(args, context);

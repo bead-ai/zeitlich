@@ -1,11 +1,11 @@
 import type { z } from "zod";
+import type { SubagentArgs } from "./tool";
 import type {
   SubagentConfig,
   SubagentDefinition,
   SubagentHooks,
   SubagentWorkflow,
 } from "./types";
-import type { SubagentArgs } from "./tool";
 
 /**
  * Creates a `SubagentConfig` from a `SubagentDefinition` (returned by `defineSubagentWorkflow`).

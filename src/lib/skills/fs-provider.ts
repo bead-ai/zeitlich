@@ -1,7 +1,7 @@
 import { join } from "node:path";
 import type { SandboxFileSystem } from "../sandbox/types";
-import type { Skill, SkillMetadata, SkillProvider } from "./types";
 import { parseSkillFile } from "./parse";
+import type { Skill, SkillMetadata, SkillProvider } from "./types";
 
 /**
  * Loads skills from a directory following the agentskills.io layout:
@@ -37,9 +37,7 @@ export class FileSystemSkillProvider implements SkillProvider {
   }
 
   async getSkill(name: string): Promise<Skill> {
-    const raw = await this.fs.readFile(
-      join(this.baseDir, name, "SKILL.md"),
-    );
+    const raw = await this.fs.readFile(join(this.baseDir, name, "SKILL.md"));
     const { frontmatter, body } = parseSkillFile(raw);
 
     if (frontmatter.name !== name) {

@@ -1,9 +1,9 @@
 export { createAgentStateManager } from "./manager";
 
 export type {
-  JsonPrimitive,
-  JsonValue,
-  JsonSerializable,
   AgentState,
   AgentStateManager,
+  JsonPrimitive,
+  JsonSerializable,
+  JsonValue,
 } from "./types";

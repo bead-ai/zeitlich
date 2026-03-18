@@ -1,10 +1,9 @@
+import type { Content, FunctionDeclaration, GoogleGenAI } from "@google/genai";
 import type Redis from "ioredis";
-import type { GoogleGenAI, Content, FunctionDeclaration } from "@google/genai";
-import type { SerializableToolDefinition } from "../../../lib/types";
-import type { AgentResponse } from "../../../lib/model";
-import type { ModelInvokerConfig } from "../../../lib/model";
-import { createGoogleGenAIThreadManager } from "./thread-manager";
 import { v4 as uuidv4 } from "uuid";
+import type { AgentResponse, ModelInvokerConfig } from "../../../lib/model";
+import type { SerializableToolDefinition } from "../../../lib/types";
+import { createGoogleGenAIThreadManager } from "./thread-manager";
 
 export interface GoogleGenAIModelInvokerConfig {
   redis: Redis;
@@ -13,7 +12,7 @@ export interface GoogleGenAIModelInvokerConfig {
 }
 
 function toFunctionDeclarations(
-  tools: SerializableToolDefinition[]
+  tools: SerializableToolDefinition[],
 ): FunctionDeclaration[] {
   return tools.map((t) => ({
     name: t.name,
@@ -70,7 +69,7 @@ export function createGoogleGenAIModelInvoker({
   model,
 }: GoogleGenAIModelInvokerConfig) {
   return async function invokeGoogleGenAIModel(
-    config: ModelInvokerConfig
+    config: ModelInvokerConfig,
   ): Promise<AgentResponse<Content>> {
     const { threadId, state } = config;
 

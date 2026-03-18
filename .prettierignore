@@ -1,6 +1,0 @@
-dist
-node_modules
-coverage
-*.tgz
-pnpm-lock.yaml
-package-lock.json

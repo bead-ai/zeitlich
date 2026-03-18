@@ -1,8 +1,8 @@
 import type { z } from "zod";
 import type {
-  ToolHandlerResponse,
-  PreToolUseHookResult,
   PostToolUseFailureHookResult,
+  PreToolUseHookResult,
+  ToolHandlerResponse,
 } from "../tool-router/types";
 
 /** ToolHandlerResponse with threadId required (subagents must always surface their thread) */

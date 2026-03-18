@@ -62,7 +62,7 @@ export interface FileResolver<TCtx = unknown, TMeta = FileEntryMetadata> {
   createFile(
     path: string,
     content: string | Uint8Array,
-    ctx: TCtx
+    ctx: TCtx,
   ): Promise<FileEntry<TMeta>>;
   deleteFile(id: string, ctx: TCtx): Promise<void>;
 }
@@ -75,9 +75,8 @@ export interface FileResolver<TCtx = unknown, TMeta = FileEntryMetadata> {
  * Options for {@link VirtualSandboxProvider.create}.
  * Extends base options with resolver context.
  */
-export interface VirtualSandboxCreateOptions<
-  TCtx,
-> extends SandboxCreateOptions {
+export interface VirtualSandboxCreateOptions<TCtx>
+  extends SandboxCreateOptions {
   resolverContext: TCtx;
   /** Base path for resolving relative filesystem paths (default "/"). */
   workspaceBase?: string;

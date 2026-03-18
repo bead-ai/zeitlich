@@ -38,7 +38,7 @@ export interface WorkflowConfig {
  */
 export function defineWorkflow<TInput, TResult>(
   config: WorkflowConfig,
-  fn: (input: TInput, sessionInput: WorkflowSessionInput) => Promise<TResult>
+  fn: (input: TInput, sessionInput: WorkflowSessionInput) => Promise<TResult>,
 ): (input: TInput, workflowInput?: WorkflowInput) => Promise<TResult> {
   const workflow = async (input: TInput, workflowInput: WorkflowInput = {}) => {
     const sessionInput: WorkflowSessionInput = {

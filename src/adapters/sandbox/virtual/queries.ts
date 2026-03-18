@@ -28,7 +28,9 @@ export function hasFileWithMimeType<TMeta>(
   pattern: string | string[],
 ): boolean {
   const tree = stateManager.get("fileTree");
-  const matchers = (Array.isArray(pattern) ? pattern : [pattern]).map(buildMatcher);
+  const matchers = (Array.isArray(pattern) ? pattern : [pattern]).map(
+    buildMatcher,
+  );
   return tree.some((entry) => {
     const meta = entry.metadata as Record<string, unknown> | undefined;
     const mime = meta?.mimeType;
@@ -91,7 +93,9 @@ function buildMatcher(pattern: string): (value: string) => boolean {
 function buildGlobMatcher(pattern: string): (value: string) => boolean {
   if (!pattern.includes("*")) return (v) => v === pattern;
   const re = new RegExp(
-    "^" + pattern.replace(/[.+^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*") + "$",
+    "^" +
+      pattern.replace(/[.+^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*") +
+      "$",
   );
   return (v) => re.test(v);
 }

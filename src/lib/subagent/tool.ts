@@ -27,7 +27,7 @@ ${subagentList}
  * @returns A tool definition with dynamic schema based on available subagents
  */
 export function createSubagentTool<T extends SubagentConfig[]>(
-  subagents: T
+  subagents: T,
 ): {
   readonly name: typeof SUBAGENT_TOOL_NAME;
   readonly description: string;
@@ -39,7 +39,7 @@ export function createSubagentTool<T extends SubagentConfig[]>(
 
   const names = subagents.map((s) => s.agentName);
   const hasThreadContinuation = subagents.some(
-    (s) => s.allowThreadContinuation
+    (s) => s.allowThreadContinuation,
   );
 
   const baseFields = {
@@ -57,7 +57,7 @@ export function createSubagentTool<T extends SubagentConfig[]>(
           .string()
           .nullable()
           .describe(
-            "Thread ID to continue an existing conversation from the same subagent, or null to start a new one"
+            "Thread ID to continue an existing conversation from the same subagent, or null to start a new one",
           ),
       })
     : z.object(baseFields);

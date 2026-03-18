@@ -28,7 +28,7 @@ Usage notes:
             z.object({
               label: z.string(),
               description: z.string(),
-            })
+            }),
           )
           .min(0)
           .max(4)
@@ -36,12 +36,10 @@ Usage notes:
         multiSelect: z
           .boolean()
           .describe("If true, users can select multiple options"),
-      })
+      }),
     ),
   }),
   strict: true,
 } satisfies ToolDefinition;
 
-export type AskUserQuestionArgs = z.infer<
-  typeof askUserQuestionTool.schema
->;
+export type AskUserQuestionArgs = z.infer<typeof askUserQuestionTool.schema>;

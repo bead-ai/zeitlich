@@ -2,8 +2,8 @@ import type { z } from "zod";
 import type {
   SubagentDefinition,
   SubagentHandlerResponse,
-  SubagentWorkflowInput,
   SubagentSessionInput,
+  SubagentWorkflowInput,
 } from "./types";
 
 /**
@@ -60,8 +60,8 @@ export function defineSubagentWorkflow<
   fn: (
     prompt: string,
     sessionInput: SubagentSessionInput,
-    context: TContext
-  ) => Promise<SubagentHandlerResponse<null>>
+    context: TContext,
+  ) => Promise<SubagentHandlerResponse<null>>,
 ): SubagentDefinition<z.ZodNull, TContext>;
 // With resultSchema — data is inferred from the schema
 export function defineSubagentWorkflow<
@@ -72,22 +72,22 @@ export function defineSubagentWorkflow<
   fn: (
     prompt: string,
     sessionInput: SubagentSessionInput,
-    context: TContext
-  ) => Promise<SubagentHandlerResponse<z.infer<TResult> | null>>
+    context: TContext,
+  ) => Promise<SubagentHandlerResponse<z.infer<TResult> | null>>,
 ): SubagentDefinition<TResult, TContext>;
 export function defineSubagentWorkflow(
   config: { name: string; description: string; resultSchema?: z.ZodType },
   fn: (
     prompt: string,
     sessionInput: SubagentSessionInput,
-    context: Record<string, unknown>
-  ) => Promise<SubagentHandlerResponse<unknown>>
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    context: Record<string, unknown>,
+  ) => Promise<SubagentHandlerResponse<unknown>>,
+  // biome-ignore lint/suspicious/noExplicitAny: overload implementation signature
 ): SubagentDefinition<any, any> {
   const workflow = async (
     prompt: string,
     workflowInput: SubagentWorkflowInput,
-    context?: Record<string, unknown>
+    context?: Record<string, unknown>,
   ): Promise<SubagentHandlerResponse<unknown>> => {
     const sessionInput: SubagentSessionInput = {
       agentName: config.name,
@@ -109,6 +109,6 @@ export function defineSubagentWorkflow(
     ...(config.resultSchema !== undefined && {
       resultSchema: config.resultSchema,
     }),
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // biome-ignore lint/suspicious/noExplicitAny: overload implementation signature
   }) as SubagentDefinition<any, any>;
 }

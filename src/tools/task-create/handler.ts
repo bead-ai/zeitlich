@@ -13,7 +13,7 @@ import type { TaskCreateArgs } from "./tool";
 export function createTaskCreateHandler<
   TCustom extends JsonSerializable<TCustom>,
 >(
-  stateManager: AgentStateManager<TCustom>
+  stateManager: AgentStateManager<TCustom>,
 ): ToolHandler<TaskCreateArgs, WorkflowTask> {
   return (args) => {
     const task: WorkflowTask = {

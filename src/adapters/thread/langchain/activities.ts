@@ -1,26 +1,26 @@
+import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
+import type { MessageContent, StoredMessage } from "@langchain/core/messages";
 import type Redis from "ioredis";
-import type { ToolResultConfig } from "../../../lib/types";
-import type { MessageContent } from "@langchain/core/messages";
+import type { ModelInvoker } from "../../../lib/model";
 import type {
-  ThreadOps,
   PrefixedThreadOps,
   ScopedPrefix,
+  ThreadOps,
 } from "../../../lib/session/types";
-import type { ModelInvoker } from "../../../lib/model";
-import type { StoredMessage } from "@langchain/core/messages";
-import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
-import { createLangChainThreadManager } from "./thread-manager";
+import type { ToolResultConfig } from "../../../lib/types";
 import { createLangChainModelInvoker } from "./model-invoker";
+import { createLangChainThreadManager } from "./thread-manager";
 
 const ADAPTER_PREFIX = "langChain" as const;
 
-export type LangChainThreadOps<TScope extends string = ""> =
-  PrefixedThreadOps<ScopedPrefix<TScope, typeof ADAPTER_PREFIX>>;
+export type LangChainThreadOps<TScope extends string = ""> = PrefixedThreadOps<
+  ScopedPrefix<TScope, typeof ADAPTER_PREFIX>
+>;
 
 export interface LangChainAdapterConfig {
   redis: Redis;
   /** Optional default model — if omitted, use `createModelInvoker()` to create invokers later */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // biome-ignore lint/suspicious/noExplicitAny: LangChain generic parameter
   model?: BaseChatModel<any>;
 }
 
@@ -28,7 +28,7 @@ export interface LangChainAdapter {
   /** Model invoker using the default model (only available when `model` was provided) */
   invoker: ModelInvoker<StoredMessage>;
   /** Create an invoker for a specific model (for multi-model setups) */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // biome-ignore lint/suspicious/noExplicitAny: LangChain generic parameter
   createModelInvoker(model: BaseChatModel<any>): ModelInvoker<StoredMessage>;
   /**
    * Create prefixed thread activities for registration on the worker.
@@ -41,9 +41,7 @@ export interface LangChainAdapter {
    * // → { langChainCodingAgentInitializeThread, langChainCodingAgentAppendHumanMessage, … }
    * ```
    */
-  createActivities<S extends string = "">(
-    scope?: S
-  ): LangChainThreadOps<S>;
+  createActivities<S extends string = "">(scope?: S): LangChainThreadOps<S>;
 }
 
 /**
@@ -82,7 +80,7 @@ export interface LangChainAdapter {
  * ```
  */
 export function createLangChainAdapter(
-  config: LangChainAdapterConfig
+  config: LangChainAdapterConfig,
 ): LangChainAdapter {
   const { redis } = config;
 
@@ -95,7 +93,7 @@ export function createLangChainAdapter(
     async appendHumanMessage(
       threadId: string,
       id: string,
-      content: string | MessageContent
+      content: string | MessageContent,
     ): Promise<void> {
       const thread = createLangChainThreadManager({ redis, threadId });
       await thread.appendHumanMessage(id, content);
@@ -104,7 +102,7 @@ export function createLangChainAdapter(
     async appendSystemMessage(
       threadId: string,
       id: string,
-      content: string
+      content: string,
     ): Promise<void> {
       const thread = createLangChainThreadManager({ redis, threadId });
       await thread.appendSystemMessage(id, content);
@@ -118,7 +116,7 @@ export function createLangChainAdapter(
 
     async forkThread(
       sourceThreadId: string,
-      targetThreadId: string
+      targetThreadId: string,
     ): Promise<void> {
       const thread = createLangChainThreadManager({
         redis,
@@ -129,21 +127,20 @@ export function createLangChainAdapter(
   };
 
   function createActivities<S extends string = "">(
-    scope?: S
+    scope?: S,
   ): LangChainThreadOps<S> {
     const prefix = scope
       ? `${ADAPTER_PREFIX}${scope.charAt(0).toUpperCase()}${scope.slice(1)}`
       : ADAPTER_PREFIX;
-    const cap = (s: string): string =>
-      s.charAt(0).toUpperCase() + s.slice(1);
+    const cap = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1);
     return Object.fromEntries(
-      Object.entries(threadOps).map(([k, v]) => [`${prefix}${cap(k)}`, v])
+      Object.entries(threadOps).map(([k, v]) => [`${prefix}${cap(k)}`, v]),
     ) as LangChainThreadOps<S>;
   }
 
   const makeInvoker = (
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    model: BaseChatModel<any>
+    // biome-ignore lint/suspicious/noExplicitAny: LangChain generic parameter
+    model: BaseChatModel<any>,
   ): ModelInvoker<StoredMessage> =>
     createLangChainModelInvoker({ redis, model });
 
@@ -152,7 +149,7 @@ export function createLangChainAdapter(
     : () => {
         throw new Error(
           "No default model provided to createLangChainAdapter. " +
-            "Either pass `model` in the config or use `createModelInvoker(model)` instead."
+            "Either pass `model` in the config or use `createModelInvoker(model)` instead.",
         );
       };
 

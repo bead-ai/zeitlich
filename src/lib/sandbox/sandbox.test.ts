@@ -1,7 +1,11 @@
-import { describe, expect, it, beforeEach } from "vitest";
-import { SandboxManager } from "./manager";
+import { beforeEach, describe, expect, it } from "vitest";
 import { InMemorySandboxProvider } from "../../adapters/sandbox/inmemory/index";
-import { SandboxNotFoundError, type Sandbox, type SandboxCreateOptions } from "./types";
+import { SandboxManager } from "./manager";
+import {
+  type Sandbox,
+  type SandboxCreateOptions,
+  SandboxNotFoundError,
+} from "./types";
 
 describe("SandboxManager", () => {
   let manager: SandboxManager<SandboxCreateOptions, Sandbox, "inMemory">;
@@ -38,7 +42,9 @@ describe("SandboxManager", () => {
     const { sandboxId } = await manager.create();
     await manager.getSandbox(sandboxId);
     await manager.destroy(sandboxId);
-    await expect(manager.getSandbox(sandboxId)).rejects.toThrow(SandboxNotFoundError);
+    await expect(manager.getSandbox(sandboxId)).rejects.toThrow(
+      SandboxNotFoundError,
+    );
   });
 
   it("destroy is idempotent for unknown ids", async () => {
@@ -57,7 +63,9 @@ describe("SandboxManager", () => {
     expect(snapshot.providerId).toBe("inMemory");
 
     await manager.destroy(sandboxId);
-    await expect(manager.getSandbox(sandboxId)).rejects.toThrow(SandboxNotFoundError);
+    await expect(manager.getSandbox(sandboxId)).rejects.toThrow(
+      SandboxNotFoundError,
+    );
 
     const restoredId = await manager.restore(snapshot);
     expect(restoredId).toBe(sandboxId);

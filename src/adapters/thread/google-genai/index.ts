@@ -24,19 +24,17 @@ export {
   type GoogleGenAIAdapterConfig,
   type GoogleGenAIThreadOps,
 } from "./activities";
-
-// Thread manager
-export {
-  createGoogleGenAIThreadManager,
-  messageContentToParts,
-  type GoogleGenAIThreadManager,
-  type GoogleGenAIThreadManagerConfig,
-  type StoredContent,
-} from "./thread-manager";
-
 // Model invoker (for advanced use — prefer adapter.createModelInvoker)
 export {
   createGoogleGenAIModelInvoker,
-  invokeGoogleGenAIModel,
   type GoogleGenAIModelInvokerConfig,
+  invokeGoogleGenAIModel,
 } from "./model-invoker";
+// Thread manager
+export {
+  createGoogleGenAIThreadManager,
+  type GoogleGenAIThreadManager,
+  type GoogleGenAIThreadManagerConfig,
+  messageContentToParts,
+  type StoredContent,
+} from "./thread-manager";

@@ -1,10 +1,10 @@
+import type { ActivityFunctionWithOptions } from "@temporalio/workflow";
+import type { z } from "zod";
 import type {
-  ToolMessageContent,
   TokenUsage,
+  ToolMessageContent,
   ToolResultConfig,
 } from "../types";
-import type { z } from "zod";
-import type { ActivityFunctionWithOptions } from "@temporalio/workflow";
 
 // ============================================================================
 // Tool Definition Types
@@ -61,12 +61,12 @@ export type ToolMap = Record<
     name: string;
     description: string | (() => string);
     schema: z.ZodType | (() => z.ZodType);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // biome-ignore lint/suspicious/noExplicitAny: generic tool map entry
     handler: ToolHandler<any, any, any>;
     strict?: boolean;
     max_uses?: number;
     enabled?: boolean | (() => boolean);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // biome-ignore lint/suspicious/noExplicitAny: generic tool map entry
     hooks?: ToolHooks<any, any>;
   }
 >;
@@ -166,7 +166,7 @@ export type ToolHandler<
   TContext extends RouterContext = RouterContext,
 > = (
   args: TArgs,
-  context: TContext
+  context: TContext,
 ) => ToolHandlerResponse<TResult> | Promise<ToolHandlerResponse<TResult>>;
 
 /**
@@ -231,14 +231,13 @@ export interface ToolCallResult<
  * Infer result types from a tool map based on handler return types.
  */
 export type InferToolResults<T extends ToolMap> = {
-  /* eslint-disable @typescript-eslint/no-explicit-any */
   [K in keyof T as T[K]["name"]]: T[K]["handler"] extends ToolHandler<
+    // biome-ignore lint/suspicious/noExplicitAny: type-level inference requires any
     any,
     infer R,
     any
   >
-    ? /* eslint-enable @typescript-eslint/no-explicit-any */
-      Awaited<R>
+    ? Awaited<R>
     : never;
 };
 
@@ -327,7 +326,7 @@ export interface PreToolUseHookContext<T extends ToolMap> {
  * PreToolUse hook - called before tool execution, can block or modify
  */
 export type PreToolUseHook<T extends ToolMap> = (
-  ctx: PreToolUseHookContext<T>
+  ctx: PreToolUseHookContext<T>,
 ) => PreToolUseHookResult | Promise<PreToolUseHookResult>;
 
 /**
@@ -350,7 +349,7 @@ export interface PostToolUseHookContext<T extends ToolMap, TResult = unknown> {
  * PostToolUse hook - called after successful tool execution
  */
 export type PostToolUseHook<T extends ToolMap, TResult = unknown> = (
-  ctx: PostToolUseHookContext<T, TResult>
+  ctx: PostToolUseHookContext<T, TResult>,
 ) => void | Promise<void>;
 
 /**
@@ -371,7 +370,7 @@ export interface PostToolUseFailureHookContext<T extends ToolMap> {
  * PostToolUseFailure hook - called when tool execution fails
  */
 export type PostToolUseFailureHook<T extends ToolMap> = (
-  ctx: PostToolUseFailureHookContext<T>
+  ctx: PostToolUseFailureHookContext<T>,
 ) => PostToolUseFailureHookResult | Promise<PostToolUseFailureHookResult>;
 
 /**
@@ -446,7 +445,7 @@ export interface ToolRouter<T extends ToolMap> {
    */
   processToolCalls(
     toolCalls: ParsedToolCallUnion<T>[],
-    context?: ProcessToolCallsContext
+    context?: ProcessToolCallsContext,
   ): Promise<ToolCallResultUnion<InferToolResults<T>>[]>;
 
   /**
@@ -457,7 +456,7 @@ export interface ToolRouter<T extends ToolMap> {
     toolCalls: ParsedToolCallUnion<T>[],
     toolName: TName,
     handler: ToolHandler<ToolArgs<T, TName>, TResult>,
-    context?: ProcessToolCallsContext
+    context?: ProcessToolCallsContext,
   ): Promise<ToolCallResult<TName, TResult>[]>;
 
   /**
@@ -465,7 +464,7 @@ export interface ToolRouter<T extends ToolMap> {
    */
   filterByName<TName extends ToolNames<T>>(
     toolCalls: ParsedToolCallUnion<T>[],
-    name: TName
+    name: TName,
   ): ParsedToolCall<TName, ToolArgs<T, TName>>[];
 
   /**
@@ -478,6 +477,6 @@ export interface ToolRouter<T extends ToolMap> {
    */
   getResultsByName<TName extends ToolNames<T>>(
     results: ToolCallResultUnion<InferToolResults<T>>[],
-    name: TName
+    name: TName,
   ): ToolCallResult<TName, ToolResult<T, TName>>[];
 }

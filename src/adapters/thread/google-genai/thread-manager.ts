@@ -1,8 +1,8 @@
-import type Redis from "ioredis";
 import type { Content, Part } from "@google/genai";
+import type Redis from "ioredis";
 import {
-  createThreadManager,
   type BaseThreadManager,
+  createThreadManager,
   type ThreadManagerConfig,
 } from "../../../lib/thread";
 import type { MessageContent, ToolMessageContent } from "../../../lib/types";
@@ -21,10 +21,11 @@ export interface GoogleGenAIThreadManagerConfig {
 }
 
 /** Thread manager with Google GenAI Content convenience helpers */
-export interface GoogleGenAIThreadManager extends BaseThreadManager<StoredContent> {
+export interface GoogleGenAIThreadManager
+  extends BaseThreadManager<StoredContent> {
   createUserContent(
     id: string,
-    content: string | MessageContent
+    content: string | MessageContent,
   ): StoredContent;
   createSystemContent(id: string, content: string): StoredContent;
   createModelContent(id: string, parts: Part[]): StoredContent;
@@ -32,11 +33,11 @@ export interface GoogleGenAIThreadManager extends BaseThreadManager<StoredConten
     id: string,
     toolCallId: string,
     toolName: string,
-    content: ToolMessageContent
+    content: ToolMessageContent,
   ): StoredContent;
   appendUserMessage(
     id: string,
-    content: string | MessageContent
+    content: string | MessageContent,
   ): Promise<void>;
   appendSystemMessage(id: string, content: string): Promise<void>;
   appendModelContent(id: string, parts: Part[]): Promise<void>;
@@ -44,7 +45,7 @@ export interface GoogleGenAIThreadManager extends BaseThreadManager<StoredConten
     id: string,
     toolCallId: string,
     toolName: string,
-    content: ToolMessageContent
+    content: ToolMessageContent,
   ): Promise<void>;
 }
 
@@ -54,7 +55,7 @@ function storedContentId(msg: StoredContent): string {
 
 /** Convert zeitlich MessageContent to Google GenAI Part[] */
 export function messageContentToParts(
-  content: string | MessageContent
+  content: string | MessageContent,
 ): Part[] {
   if (typeof content === "string") {
     return [{ text: content }];
@@ -72,7 +73,7 @@ export function messageContentToParts(
 
 /** Parse ToolMessageContent into a Record suitable for functionResponse */
 function parseToolResponse(
-  content: ToolMessageContent
+  content: ToolMessageContent,
 ): Record<string, unknown> {
   if (typeof content === "string") {
     try {
@@ -93,7 +94,7 @@ function parseToolResponse(
  * appending typed Content messages.
  */
 export function createGoogleGenAIThreadManager(
-  config: GoogleGenAIThreadManagerConfig
+  config: GoogleGenAIThreadManagerConfig,
 ): GoogleGenAIThreadManager {
   const baseConfig: ThreadManagerConfig<StoredContent> = {
     redis: config.redis,
@@ -107,7 +108,7 @@ export function createGoogleGenAIThreadManager(
   const helpers = {
     createUserContent(
       id: string,
-      content: string | MessageContent
+      content: string | MessageContent,
     ): StoredContent {
       return {
         id,
@@ -133,7 +134,7 @@ export function createGoogleGenAIThreadManager(
       id: string,
       toolCallId: string,
       toolName: string,
-      content: ToolMessageContent
+      content: ToolMessageContent,
     ): StoredContent {
       return {
         id,
@@ -154,7 +155,7 @@ export function createGoogleGenAIThreadManager(
 
     async appendUserMessage(
       id: string,
-      content: string | MessageContent
+      content: string | MessageContent,
     ): Promise<void> {
       await base.append([helpers.createUserContent(id, content)]);
     },
@@ -172,7 +173,7 @@ export function createGoogleGenAIThreadManager(
       id: string,
       toolCallId: string,
       toolName: string,
-      content: ToolMessageContent
+      content: ToolMessageContent,
     ): Promise<void> {
       await base.append([
         helpers.createToolResponseContent(id, toolCallId, toolName, content),

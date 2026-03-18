@@ -22,11 +22,11 @@ const ADAPTER_PREFIX = "inMemory";
 
 export function proxyInMemorySandboxOps(
   scope?: string,
-  options?: Parameters<typeof proxyActivities>[0]
+  options?: Parameters<typeof proxyActivities>[0],
 ): SandboxOps {
   const resolvedScope = scope ?? workflowInfo().workflowType;
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // biome-ignore lint/suspicious/noExplicitAny: Temporal proxyActivities requires any
   const acts = proxyActivities<Record<string, (...args: any[]) => any>>(
     options ?? {
       startToCloseTimeout: "30s",
@@ -36,11 +36,10 @@ export function proxyInMemorySandboxOps(
         maximumInterval: "30s",
         backoffCoefficient: 2,
       },
-    }
+    },
   );
 
-  const prefix =
-    `${ADAPTER_PREFIX}${resolvedScope.charAt(0).toUpperCase()}${resolvedScope.slice(1)}`;
+  const prefix = `${ADAPTER_PREFIX}${resolvedScope.charAt(0).toUpperCase()}${resolvedScope.slice(1)}`;
   const p = (key: string): string =>
     `${prefix}${key.charAt(0).toUpperCase()}${key.slice(1)}`;
 

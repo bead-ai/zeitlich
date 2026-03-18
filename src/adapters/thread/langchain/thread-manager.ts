@@ -1,4 +1,3 @@
-import type Redis from "ioredis";
 import {
   type $InferMessageContent,
   AIMessage,
@@ -9,9 +8,10 @@ import {
   SystemMessage,
   ToolMessage,
 } from "@langchain/core/messages";
+import type Redis from "ioredis";
 import {
-  createThreadManager,
   type BaseThreadManager,
+  createThreadManager,
   type ThreadManagerConfig,
 } from "../../../lib/thread";
 
@@ -28,31 +28,32 @@ export interface LangChainThreadManagerConfig {
 }
 
 /** Thread manager with LangChain StoredMessage convenience helpers */
-export interface LangChainThreadManager extends BaseThreadManager<StoredMessage> {
+export interface LangChainThreadManager
+  extends BaseThreadManager<StoredMessage> {
   createHumanMessage(
     id: string,
-    content: string | MessageContent
+    content: string | MessageContent,
   ): StoredMessage;
   createSystemMessage(id: string, content: string): StoredMessage;
   createAIMessage(
     id: string,
     content: string | MessageContent,
-    kwargs?: { header?: string; options?: string[]; multiSelect?: boolean }
+    kwargs?: { header?: string; options?: string[]; multiSelect?: boolean },
   ): StoredMessage;
   createToolMessage(
     id: string,
     content: LangChainToolMessageContent,
-    toolCallId: string
+    toolCallId: string,
   ): StoredMessage;
   appendHumanMessage(
     id: string,
-    content: string | MessageContent
+    content: string | MessageContent,
   ): Promise<void>;
   appendSystemMessage(id: string, content: string): Promise<void>;
   appendToolMessage(
     id: string,
     content: LangChainToolMessageContent,
-    toolCallId: string
+    toolCallId: string,
   ): Promise<void>;
   appendAIMessage(id: string, content: string | MessageContent): Promise<void>;
 }
@@ -75,7 +76,7 @@ function storedMessageId(msg: StoredMessage): string {
  * appending typed LangChain messages.
  */
 export function createLangChainThreadManager(
-  config: LangChainThreadManagerConfig
+  config: LangChainThreadManagerConfig,
 ): LangChainThreadManager {
   const baseConfig: ThreadManagerConfig<StoredMessage> = {
     redis: config.redis,
@@ -89,7 +90,7 @@ export function createLangChainThreadManager(
   const helpers = {
     createHumanMessage(
       id: string,
-      content: string | MessageContent
+      content: string | MessageContent,
     ): StoredMessage {
       return new HumanMessage({
         id,
@@ -107,7 +108,7 @@ export function createLangChainThreadManager(
     createAIMessage(
       id: string,
       content: string,
-      kwargs?: { header?: string; options?: string[]; multiSelect?: boolean }
+      kwargs?: { header?: string; options?: string[]; multiSelect?: boolean },
     ): StoredMessage {
       return new AIMessage({
         id,
@@ -125,7 +126,7 @@ export function createLangChainThreadManager(
     createToolMessage(
       id: string,
       content: LangChainToolMessageContent,
-      toolCallId: string
+      toolCallId: string,
     ): StoredMessage {
       return new ToolMessage({
         id,
@@ -136,7 +137,7 @@ export function createLangChainThreadManager(
 
     async appendHumanMessage(
       id: string,
-      content: string | MessageContent
+      content: string | MessageContent,
     ): Promise<void> {
       const message = helpers.createHumanMessage(id, content);
       await base.append([message]);
@@ -145,7 +146,7 @@ export function createLangChainThreadManager(
     async appendToolMessage(
       id: string,
       content: LangChainToolMessageContent,
-      toolCallId: string
+      toolCallId: string,
     ): Promise<void> {
       const message = helpers.createToolMessage(id, content, toolCallId);
       await base.append([message]);
@@ -153,7 +154,7 @@ export function createLangChainThreadManager(
 
     async appendAIMessage(
       id: string,
-      content: string | MessageContent
+      content: string | MessageContent,
     ): Promise<void> {
       const message = helpers.createAIMessage(id, content as string);
       await base.append([message]);

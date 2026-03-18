@@ -19,9 +19,9 @@
  * ```
  */
 import {
+  type ActivityInterfaceFor,
   proxyActivities,
   workflowInfo,
-  type ActivityInterfaceFor,
 } from "@temporalio/workflow";
 import type { ThreadOps } from "../../../lib/session/types";
 
@@ -29,11 +29,11 @@ const ADAPTER_PREFIX = "langChain";
 
 export function proxyLangChainThreadOps(
   scope?: string,
-  options?: Parameters<typeof proxyActivities>[0]
+  options?: Parameters<typeof proxyActivities>[0],
 ): ActivityInterfaceFor<ThreadOps> {
   const resolvedScope = scope ?? workflowInfo().workflowType;
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // biome-ignore lint/suspicious/noExplicitAny: Temporal proxyActivities requires any
   const acts = proxyActivities<Record<string, (...args: any[]) => any>>(
     options ?? {
       startToCloseTimeout: "10s",
@@ -43,11 +43,10 @@ export function proxyLangChainThreadOps(
         maximumInterval: "15m",
         backoffCoefficient: 4,
       },
-    }
+    },
   );
 
-  const prefix =
-    `${ADAPTER_PREFIX}${resolvedScope.charAt(0).toUpperCase()}${resolvedScope.slice(1)}`;
+  const prefix = `${ADAPTER_PREFIX}${resolvedScope.charAt(0).toUpperCase()}${resolvedScope.slice(1)}`;
   const p = (key: string): string =>
     `${prefix}${key.charAt(0).toUpperCase()}${key.slice(1)}`;
 

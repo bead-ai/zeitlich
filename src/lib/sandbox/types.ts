@@ -35,8 +35,15 @@ export interface SandboxFileSystem {
   mkdir(path: string, options?: { recursive?: boolean }): Promise<void>;
   readdir(path: string): Promise<string[]>;
   readdirWithFileTypes(path: string): Promise<DirentEntry[]>;
-  rm(path: string, options?: { recursive?: boolean; force?: boolean }): Promise<void>;
-  cp(src: string, dest: string, options?: { recursive?: boolean }): Promise<void>;
+  rm(
+    path: string,
+    options?: { recursive?: boolean; force?: boolean },
+  ): Promise<void>;
+  cp(
+    src: string,
+    dest: string,
+    options?: { recursive?: boolean },
+  ): Promise<void>;
   mv(src: string, dest: string): Promise<void>;
   readlink(path: string): Promise<string>;
   resolvePath(base: string, path: string): string;

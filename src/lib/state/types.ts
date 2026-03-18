@@ -1,9 +1,12 @@
-import type {
-  QueryDefinition,
-} from "@temporalio/workflow";
 import type { UpdateDefinition } from "@temporalio/common/lib/interfaces";
-import type { AgentStatus, BaseAgentState, TokenUsage, WorkflowTask } from "../types";
+import type { QueryDefinition } from "@temporalio/workflow";
 import type { ToolDefinition } from "../tool-router/types";
+import type {
+  AgentStatus,
+  BaseAgentState,
+  TokenUsage,
+  WorkflowTask,
+} from "../types";
 
 /**
  * JSON primitive types that Temporal can serialize

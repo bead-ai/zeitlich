@@ -1,10 +1,10 @@
-import { describe, expect, it, beforeEach } from "vitest";
-import { bashHandler } from "./handler";
-import { withSandbox } from "../../lib/tool-router/with-sandbox";
-import { SandboxManager } from "../../lib/sandbox/manager";
+import { beforeEach, describe, expect, it } from "vitest";
 import { InMemorySandboxProvider } from "../../adapters/sandbox/inmemory/index";
-import type { RouterContext } from "../../lib/tool-router/types";
 import type { Sandbox, SandboxCreateOptions } from "../../lib/sandbox";
+import { SandboxManager } from "../../lib/sandbox/manager";
+import type { RouterContext } from "../../lib/tool-router/types";
+import { withSandbox } from "../../lib/tool-router/with-sandbox";
+import { bashHandler } from "./handler";
 
 describe("bash handler with sandbox", () => {
   let manager: SandboxManager<SandboxCreateOptions, Sandbox, "inMemory">;
@@ -35,7 +35,7 @@ describe("bash handler with sandbox", () => {
   it("executes echo and captures stdout", async () => {
     const { data } = await handler(
       { command: "echo 'hello world'" },
-      ctx(sandboxId)
+      ctx(sandboxId),
     );
     expect(data).not.toBeNull();
     expect(data?.stdout.trim()).toBe("hello world");
@@ -55,7 +55,7 @@ describe("bash handler with sandbox", () => {
   it("captures stderr output", async () => {
     const { data } = await handler(
       { command: "echo 'error message' >&2" },
-      ctx(sandboxId)
+      ctx(sandboxId),
     );
     expect(data?.stderr.trim()).toBe("error message");
     expect(data?.stdout.trim()).toBe("");
@@ -64,7 +64,7 @@ describe("bash handler with sandbox", () => {
   it("supports piping between commands", async () => {
     const { data } = await handler(
       { command: "echo 'hello world' | tr 'a-z' 'A-Z'" },
-      ctx(sandboxId)
+      ctx(sandboxId),
     );
     expect(data?.stdout.trim()).toBe("HELLO WORLD");
   });
@@ -72,7 +72,7 @@ describe("bash handler with sandbox", () => {
   it("supports command chaining with &&", async () => {
     const { data } = await handler(
       { command: "echo 'first' && echo 'second'" },
-      ctx(sandboxId)
+      ctx(sandboxId),
     );
     expect(data?.stdout).toContain("first");
     expect(data?.stdout).toContain("second");
@@ -81,7 +81,7 @@ describe("bash handler with sandbox", () => {
   it("returns toolResponse string with formatted output", async () => {
     const { toolResponse } = await handler(
       { command: "echo 'test'" },
-      ctx(sandboxId)
+      ctx(sandboxId),
     );
     expect(toolResponse).toContain("Exit code: 0");
     expect(toolResponse).toContain("stdout:");
@@ -95,7 +95,7 @@ describe("bash handler with sandbox", () => {
         threadId: "test-thread",
         toolCallId: "test-call",
         toolName: "Bash",
-      }
+      },
     );
     expect(toolResponse).toContain("No sandbox configured");
     expect(data).toBeNull();
@@ -104,7 +104,7 @@ describe("bash handler with sandbox", () => {
   it("can read files from the sandbox filesystem", async () => {
     const { data } = await handler(
       { command: "cat /home/user/hello.txt" },
-      ctx(sandboxId)
+      ctx(sandboxId),
     );
     expect(data?.stdout).toBe("world");
   });

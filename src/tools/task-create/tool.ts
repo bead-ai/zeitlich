@@ -46,17 +46,17 @@ export const taskCreateTool = {
     subject: z
       .string()
       .describe(
-        'A brief, actionable title in imperative form (e.g., "Fix authentication bug in login flow")'
+        'A brief, actionable title in imperative form (e.g., "Fix authentication bug in login flow")',
       ),
     description: z
       .string()
       .describe(
-        "Detailed description of what needs to be done, including context and acceptance criteria"
+        "Detailed description of what needs to be done, including context and acceptance criteria",
       ),
     activeForm: z
       .string()
       .describe(
-        'Present continuous form shown in spinner when task is in_progress (e.g., "Fixing authentication bug"). This is displayed to the user while you work on the task.'
+        'Present continuous form shown in spinner when task is in_progress (e.g., "Fixing authentication bug"). This is displayed to the user while you work on the task.',
       ),
     metadata: z
       .record(z.string(), z.string())

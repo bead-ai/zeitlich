@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
 vi.mock("@temporalio/workflow", () => {
@@ -28,9 +28,9 @@ vi.mock("@temporalio/workflow", () => {
   };
 });
 
-import { createToolRouter, defineTool, hasNoOtherToolCalls } from "./router";
-import type { ToolMap, ToolHandlerResponse, AppendToolResultFn } from "./types";
 import type { ToolResultConfig } from "../types";
+import { createToolRouter, defineTool, hasNoOtherToolCalls } from "./router";
+import type { AppendToolResultFn, ToolHandlerResponse, ToolMap } from "./types";
 
 function createAppendSpy() {
   const calls: ToolResultConfig[] = [];
@@ -41,12 +41,12 @@ function createAppendSpy() {
     {
       executeWithOptions: (
         _opts: unknown,
-        [, config]: [string, ToolResultConfig]
+        [, config]: [string, ToolResultConfig],
       ) => {
         calls.push(config);
         return Promise.resolve();
       },
-    }
+    },
   ) as AppendToolResultFn;
   return { fn, calls };
 }
@@ -346,7 +346,6 @@ describe("createToolRouter edge cases", () => {
       parallel: true,
     });
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const results = await router.processToolCalls([
       { id: "tc-1", name: "Unknown1", args: {} },
       { id: "tc-2", name: "Unknown2", args: {} },
@@ -419,7 +418,7 @@ describe("createToolRouter edge cases", () => {
     const results = await router.processToolCallsByName(
       [],
       "Echo",
-      async () => ({ toolResponse: "ok", data: null })
+      async () => ({ toolResponse: "ok", data: null }),
     );
 
     expect(results).toEqual([]);

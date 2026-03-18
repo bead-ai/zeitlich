@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { toTree } from "./tree";
-import type { SandboxFileSystem, DirentEntry } from "./types";
+import type { DirentEntry, SandboxFileSystem } from "./types";
 
 function createMockFs(
-  structure: Record<string, { isDir: boolean; isLink?: boolean; linkTarget?: string }>,
+  structure: Record<
+    string,
+    { isDir: boolean; isLink?: boolean; linkTarget?: string }
+  >,
 ): SandboxFileSystem {
   return {
     workspaceBase: "/",
@@ -19,15 +22,20 @@ function createMockFs(
       };
     },
     readdir: async (dir: string) => {
-      const prefix = dir.endsWith("/") ? dir : dir + "/";
+      const prefix = dir.endsWith("/") ? dir : `${dir}/`;
       return Object.keys(structure)
-        .filter((p) => p.startsWith(prefix) && !p.slice(prefix.length).includes("/"))
+        .filter(
+          (p) => p.startsWith(prefix) && !p.slice(prefix.length).includes("/"),
+        )
         .map((p) => p.slice(prefix.length));
     },
     readdirWithFileTypes: async (dir: string): Promise<DirentEntry[]> => {
-      const prefix = dir.endsWith("/") ? dir : dir + "/";
+      const prefix = dir.endsWith("/") ? dir : `${dir}/`;
       return Object.entries(structure)
-        .filter(([p]) => p.startsWith(prefix) && !p.slice(prefix.length).includes("/"))
+        .filter(
+          ([p]) =>
+            p.startsWith(prefix) && !p.slice(prefix.length).includes("/"),
+        )
         .map(([p, meta]) => ({
           name: p.slice(prefix.length),
           isFile: !meta.isDir && !meta.isLink,
@@ -44,7 +52,7 @@ function createMockFs(
     cp: async () => {},
     mv: async () => {},
     readlink: async (path: string) => structure[path]?.linkTarget ?? "",
-    resolvePath: (base: string, path: string) => base + "/" + path,
+    resolvePath: (base: string, path: string) => `${base}/${path}`,
   };
 }
 

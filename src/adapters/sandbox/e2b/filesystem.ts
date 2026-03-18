@@ -1,13 +1,16 @@
-import { FileType, type Sandbox as E2bSdkSandbox } from "@e2b/code-interpreter";
+import { posix } from "node:path";
+import { type Sandbox as E2bSdkSandbox, FileType } from "@e2b/code-interpreter";
 import type {
-  SandboxFileSystem,
   DirentEntry,
   FileStat,
+  SandboxFileSystem,
 } from "../../../lib/sandbox/types";
-import { posix } from "node:path";
 
 function toArrayBuffer(u8: Uint8Array): ArrayBuffer {
-  return u8.buffer.slice(u8.byteOffset, u8.byteOffset + u8.byteLength) as ArrayBuffer;
+  return u8.buffer.slice(
+    u8.byteOffset,
+    u8.byteOffset + u8.byteLength,
+  ) as ArrayBuffer;
 }
 
 /**
@@ -22,7 +25,7 @@ export class E2bSandboxFileSystem implements SandboxFileSystem {
 
   constructor(
     private sandbox: E2bSdkSandbox,
-    workspaceBase = "/home/user"
+    workspaceBase = "/home/user",
   ) {
     this.workspaceBase = posix.resolve("/", workspaceBase);
   }
@@ -59,9 +62,7 @@ export class E2bSandboxFileSystem implements SandboxFileSystem {
       // file doesn't exist yet — write from scratch
     }
     const addition =
-      typeof content === "string"
-        ? content
-        : new TextDecoder().decode(content);
+      typeof content === "string" ? content : new TextDecoder().decode(content);
     await this.sandbox.files.write(norm, existing + addition);
   }
 
@@ -106,7 +107,7 @@ export class E2bSandboxFileSystem implements SandboxFileSystem {
 
   async rm(
     path: string,
-    options?: { recursive?: boolean; force?: boolean }
+    options?: { recursive?: boolean; force?: boolean },
   ): Promise<void> {
     const norm = this.normalisePath(path);
     try {
@@ -119,7 +120,7 @@ export class E2bSandboxFileSystem implements SandboxFileSystem {
   async cp(
     src: string,
     dest: string,
-    _options?: { recursive?: boolean }
+    _options?: { recursive?: boolean },
   ): Promise<void> {
     const normSrc = this.normalisePath(src);
     const normDest = this.normalisePath(dest);

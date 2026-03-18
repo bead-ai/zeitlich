@@ -109,7 +109,7 @@ describe("defineWorkflow", () => {
         capturedInput = input;
         capturedSession = sessionInput;
         return { ok: true };
-      }
+      },
     );
 
     const workflowInput: WorkflowInput = {
@@ -144,7 +144,7 @@ describe("defineWorkflow", () => {
   it("sets the function name from config", () => {
     const workflow = defineWorkflow(
       { name: "my-main-workflow" },
-      async () => ({})
+      async () => ({}),
     );
 
     expect(workflow.name).toBe("my-main-workflow");

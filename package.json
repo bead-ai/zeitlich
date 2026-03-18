@@ -136,10 +136,10 @@
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
-    "lint": "eslint .",
-    "lint:fix": "eslint . --fix",
-    "format": "prettier --write .",
-    "format:check": "prettier --check .",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "format": "biome format --write .",
+    "format:check": "biome format .",
     "typecheck": "tsc --noEmit",
     "prepublishOnly": "npm run build",
     "test": "vitest run",
@@ -170,22 +170,19 @@
     "node": ">=18"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.4.7",
     "@daytonaio/sdk": "^0.149.0",
     "@e2b/code-interpreter": "^2.3.3",
-    "@eslint/js": "^10.0.1",
     "@google/genai": "^1.44.0",
     "@langchain/core": "^1.1.30",
     "@temporalio/envconfig": "^1.15.0",
     "@temporalio/worker": "^1.15.0",
     "@types/node": "^25.3.3",
-    "eslint": "^10.0.2",
     "husky": "^9.1.7",
     "just-bash": "^2.12.8",
-    "prettier": "^3.8.1",
     "release-please": "^17.3.0",
     "tsup": "^8.5.1",
     "typescript": "^5.9.3",
-    "typescript-eslint": "^8.56.1",
     "vitest": "^4.0.18"
   },
   "peerDependencies": {

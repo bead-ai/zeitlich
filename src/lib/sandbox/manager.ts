@@ -1,8 +1,8 @@
 import type {
+  PrefixedSandboxOps,
   Sandbox,
   SandboxCreateOptions,
   SandboxOps,
-  PrefixedSandboxOps,
   SandboxProvider,
   SandboxSnapshot,
 } from "./types";
@@ -28,10 +28,14 @@ export class SandboxManager<
   TSandbox extends Sandbox = Sandbox,
   TId extends string = string,
 > {
-  constructor(private provider: SandboxProvider<TOptions, TSandbox> & { readonly id: TId }) {}
+  constructor(
+    private provider: SandboxProvider<TOptions, TSandbox> & {
+      readonly id: TId;
+    },
+  ) {}
 
   async create(
-    options?: TOptions
+    options?: TOptions,
   ): Promise<{ sandboxId: string; stateUpdate?: Record<string, unknown> }> {
     const { sandbox, stateUpdate } = await this.provider.create(options);
     return { sandboxId: sandbox.id, ...(stateUpdate && { stateUpdate }) };
@@ -80,12 +84,12 @@ export class SandboxManager<
    * ```
    */
   createActivities<S extends string>(
-    scope: S
+    scope: S,
   ): PrefixedSandboxOps<`${TId}${Capitalize<S>}`, TOptions> {
     const prefix = `${this.provider.id}${scope.charAt(0).toUpperCase()}${scope.slice(1)}`;
     const ops: SandboxOps<TOptions> = {
       createSandbox: async (
-        options?: TOptions
+        options?: TOptions,
       ): Promise<{
         sandboxId: string;
         stateUpdate?: Record<string, unknown>;
@@ -104,7 +108,7 @@ export class SandboxManager<
     };
     const cap = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1);
     return Object.fromEntries(
-      Object.entries(ops).map(([k, v]) => [`${prefix}${cap(k)}`, v])
+      Object.entries(ops).map(([k, v]) => [`${prefix}${cap(k)}`, v]),
     ) as PrefixedSandboxOps<`${TId}${Capitalize<S>}`, TOptions>;
   }
 }

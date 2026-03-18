@@ -1,21 +1,21 @@
 import type { Duration } from "@temporalio/common";
+import type { ActivityInterfaceFor } from "@temporalio/workflow";
+import type { Hooks } from "../hooks/types";
+import type { RunAgentActivity } from "../model/types";
+import type { SandboxOps } from "../sandbox/types";
+import type { Skill } from "../skills/types";
+import type { AgentStateManager, JsonSerializable } from "../state/types";
+import type { SubagentConfig } from "../subagent/types";
+import type {
+  InferToolResults,
+  ToolCallResultUnion,
+  ToolMap,
+} from "../tool-router/types";
 import type {
   MessageContent,
-  ToolResultConfig,
   SessionExitReason,
+  ToolResultConfig,
 } from "../types";
-import type {
-  ToolMap,
-  ToolCallResultUnion,
-  InferToolResults,
-} from "../tool-router/types";
-import type { Hooks } from "../hooks/types";
-import type { SubagentConfig } from "../subagent/types";
-import type { Skill } from "../skills/types";
-import type { SandboxOps } from "../sandbox/types";
-import type { RunAgentActivity } from "../model/types";
-import type { AgentStateManager, JsonSerializable } from "../state/types";
-import type { ActivityInterfaceFor } from "@temporalio/workflow";
 
 /**
  * Thread operations required by a session.
@@ -28,7 +28,7 @@ export interface ThreadOps {
   appendHumanMessage(
     threadId: string,
     id: string,
-    content: string | MessageContent
+    content: string | MessageContent,
   ): Promise<void>;
   /** Append a tool result to the thread */
   appendToolResult(id: string, config: ToolResultConfig): Promise<void>;
@@ -36,7 +36,7 @@ export interface ThreadOps {
   appendSystemMessage(
     threadId: string,
     id: string,
-    content: string
+    content: string,
   ): Promise<void>;
   /** Copy all messages from sourceThreadId into a new thread at targetThreadId */
   forkThread(sourceThreadId: string, targetThreadId: string): Promise<void>;

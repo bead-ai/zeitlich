@@ -25,34 +25,26 @@
  * ```
  */
 
-// Re-export all workflow-safe exports for convenience
-// (Activities can use these too)
-export * from "./workflow";
-
-// Skills (activity-side: filesystem provider uses node:path)
-export { FileSystemSkillProvider } from "./lib/skills/fs-provider";
-
-// Thread manager (generic, framework-agnostic)
-export { createThreadManager } from "./lib/thread";
-export type { BaseThreadManager, ThreadManagerConfig } from "./lib/thread";
-
-// Model invoker contract (framework-agnostic)
-export type { ModelInvoker, ModelInvokerConfig } from "./lib/model";
-
-// Activity-side handler wrappers
-export { withAutoAppend, withSandbox } from "./lib/tool-router";
-export type { SandboxContext } from "./lib/tool-router";
-
+export type { AgentStateContext } from "./lib/activity";
 // Activity-side wrappers (requires Temporal client)
 export {
-  queryParentWorkflowState,
   createRunAgentActivity,
+  queryParentWorkflowState,
   withParentWorkflowState,
 } from "./lib/activity";
-export type { AgentStateContext } from "./lib/activity";
-
+// Model invoker contract (framework-agnostic)
+export type { ModelInvoker, ModelInvokerConfig } from "./lib/model";
+export { toTree } from "./lib/sandbox";
 // Sandbox (activity-side: manager)
 export { SandboxManager } from "./lib/sandbox/manager";
+// Skills (activity-side: filesystem provider uses node:path)
+export { FileSystemSkillProvider } from "./lib/skills/fs-provider";
+export type { BaseThreadManager, ThreadManagerConfig } from "./lib/thread";
+// Thread manager (generic, framework-agnostic)
+export { createThreadManager } from "./lib/thread";
+export type { SandboxContext } from "./lib/tool-router";
+// Activity-side handler wrappers
+export { withAutoAppend, withSandbox } from "./lib/tool-router";
 
 // Tool handlers (activity implementations)
 // Wrap sandbox handlers with withSandbox(manager, handler) at registration time
@@ -61,5 +53,6 @@ export { editHandler } from "./tools/edit/handler";
 export { globHandler } from "./tools/glob/handler";
 export { readFileHandler } from "./tools/read-file/handler";
 export { writeFileHandler } from "./tools/write-file/handler";
-
-export { toTree } from "./lib/sandbox";
+// Re-export all workflow-safe exports for convenience
+// (Activities can use these too)
+export * from "./workflow";

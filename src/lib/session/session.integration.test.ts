@@ -1,11 +1,11 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
-import { z } from "zod";
-import type { ToolResultConfig, TokenUsage } from "../types";
-import type { ThreadOps } from "./types";
-import type { RunAgentActivity } from "../model/types";
-import type { RawToolCall } from "../tool-router/types";
-import type { SandboxOps } from "../sandbox/types";
 import type { ActivityInterfaceFor } from "@temporalio/workflow";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { z } from "zod";
+import type { RunAgentActivity } from "../model/types";
+import type { SandboxOps } from "../sandbox/types";
+import type { RawToolCall } from "../tool-router/types";
+import type { TokenUsage, ToolResultConfig } from "../types";
+import type { ThreadOps } from "./types";
 
 // ---------------------------------------------------------------------------
 // Mock @temporalio/workflow
@@ -45,10 +45,10 @@ vi.mock("@temporalio/workflow", () => {
   };
 });
 
-import { createSession } from "./session";
 import { createAgentStateManager } from "../state/manager";
 import { defineTool } from "../tool-router/router";
-import type { ToolHandlerResponse, RouterContext } from "../tool-router/types";
+import type { RouterContext, ToolHandlerResponse } from "../tool-router/types";
+import { createSession } from "./session";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -103,7 +103,7 @@ type TurnScript = {
 };
 
 function createScriptedRunAgent(
-  turns: TurnScript[]
+  turns: TurnScript[],
 ): RunAgentActivity<unknown> {
   let call = 0;
   return async () => {
@@ -126,7 +126,7 @@ function createEchoTool() {
     schema: z.object({ text: z.string() }),
     handler: async (
       args: { text: string },
-      _ctx: RouterContext
+      _ctx: RouterContext,
     ): Promise<ToolHandlerResponse<{ echoed: string }>> => ({
       toolResponse: `Echo: ${args.text}`,
       data: { echoed: args.text },
@@ -265,7 +265,7 @@ describe("createSession integration", () => {
       Array.from({ length: 10 }, (_, i) => ({
         message: `turn ${i + 1}`,
         toolCalls: [{ id: `tc-${i}`, name: "Echo", args: { text: `${i}` } }],
-      }))
+      })),
     );
 
     const session = await createSession({
@@ -341,7 +341,7 @@ describe("createSession integration", () => {
     });
 
     await expect(session.runSession({ stateManager })).rejects.toThrow(
-      "No system prompt in state"
+      "No system prompt in state",
     );
   });
 
@@ -632,7 +632,7 @@ describe("createSession integration", () => {
     });
 
     await expect(session.runSession({ stateManager })).rejects.toThrow(
-      "LLM went down"
+      "LLM went down",
     );
 
     expect(endReason).toBe("failed");

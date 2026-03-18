@@ -1,11 +1,11 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
-import { z } from "zod";
-import type { ToolResultConfig, TokenUsage } from "../types";
-import type { ThreadOps } from "./types";
-import type { RunAgentActivity } from "../model/types";
-import type { RawToolCall } from "../tool-router/types";
-import type { SandboxOps } from "../sandbox/types";
 import type { ActivityInterfaceFor } from "@temporalio/workflow";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { z } from "zod";
+import type { RunAgentActivity } from "../model/types";
+import type { SandboxOps } from "../sandbox/types";
+import type { RawToolCall } from "../tool-router/types";
+import type { TokenUsage, ToolResultConfig } from "../types";
+import type { ThreadOps } from "./types";
 
 let idCounter = 0;
 
@@ -41,10 +41,10 @@ vi.mock("@temporalio/workflow", () => {
   };
 });
 
-import { createSession } from "./session";
 import { createAgentStateManager } from "../state/manager";
 import { defineTool } from "../tool-router/router";
-import type { ToolHandlerResponse, RouterContext } from "../tool-router/types";
+import type { RouterContext, ToolHandlerResponse } from "../tool-router/types";
+import { createSession } from "./session";
 
 type TurnScript = {
   message: unknown;
@@ -91,7 +91,7 @@ function createMockThreadOps() {
 }
 
 function createScriptedRunAgent(
-  turns: TurnScript[]
+  turns: TurnScript[],
 ): RunAgentActivity<unknown> {
   let call = 0;
   return async () => {
@@ -114,7 +114,7 @@ function createEchoTool() {
     schema: z.object({ text: z.string() }),
     handler: async (
       args: { text: string },
-      _ctx: RouterContext
+      _ctx: RouterContext,
     ): Promise<ToolHandlerResponse<{ echoed: string }>> => ({
       toolResponse: `Echo: ${args.text}`,
       data: { echoed: args.text },
@@ -369,7 +369,7 @@ describe("createSession edge cases", () => {
     });
 
     await expect(session.runSession({ stateManager })).rejects.toThrow(
-      "unrecoverable tool"
+      "unrecoverable tool",
     );
     expect(endReason).toBe("failed");
   });
@@ -441,7 +441,7 @@ describe("createSession edge cases", () => {
     });
 
     await expect(session.runSession({ stateManager })).rejects.toThrow(
-      "sandbox creation failed"
+      "sandbox creation failed",
     );
   });
 
@@ -484,7 +484,7 @@ describe("createSession edge cases", () => {
     });
 
     await expect(session.runSession({ stateManager })).rejects.toThrow(
-      "LLM crash"
+      "LLM crash",
     );
 
     expect(sandboxLog).toContain("create");
@@ -509,7 +509,7 @@ describe("createSession edge cases", () => {
     });
 
     await expect(session.runSession({ stateManager })).rejects.toThrow(
-      "No system prompt in state"
+      "No system prompt in state",
     );
   });
 
@@ -710,7 +710,7 @@ describe("createSession edge cases", () => {
     expect(echoResult).toBeDefined();
     if (echoResult) {
       expect((echoResult.args[1] as ToolResultConfig).content).toBe(
-        "Echo: valid"
+        "Echo: valid",
       );
     }
 
@@ -724,7 +724,7 @@ describe("createSession edge cases", () => {
       : undefined;
     expect(
       typeof unknownContent === "string" &&
-        unknownContent.includes("Invalid tool call")
+        unknownContent.includes("Invalid tool call"),
     ).toBe(true);
   });
 
@@ -888,7 +888,7 @@ describe("createSession edge cases", () => {
     if (!toolResult) throw new Error("expected tool result");
     const content = (toolResult.args[1] as ToolResultConfig).content;
     expect(typeof content === "string" && content.includes("Skipped")).toBe(
-      true
+      true,
     );
   });
 

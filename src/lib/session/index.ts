@@ -1,9 +1,9 @@
 export { createSession } from "./session";
 
 export type {
-  ThreadOps,
   PrefixedThreadOps,
   ScopedPrefix,
   SessionConfig,
+  ThreadOps,
   ZeitlichSession,
 } from "./types";

@@ -31,10 +31,9 @@ import type {
  * };
  * ```
  */
-export class VirtualSandboxProvider<
-  TCtx = unknown,
-  TMeta = FileEntryMetadata,
-> implements SandboxProvider<VirtualSandboxCreateOptions<TCtx>> {
+export class VirtualSandboxProvider<TCtx = unknown, TMeta = FileEntryMetadata>
+  implements SandboxProvider<VirtualSandboxCreateOptions<TCtx>>
+{
   readonly id = "virtual";
   readonly capabilities: SandboxCapabilities = {
     filesystem: true,
@@ -49,7 +48,7 @@ export class VirtualSandboxProvider<
   }
 
   async create(
-    options?: VirtualSandboxCreateOptions<TCtx>
+    options?: VirtualSandboxCreateOptions<TCtx>,
   ): Promise<SandboxCreateResult> {
     if (!options || !("resolverContext" in options)) {
       throw new Error("VirtualSandboxProvider.create requires resolverContext");
@@ -57,7 +56,7 @@ export class VirtualSandboxProvider<
 
     const sandboxId = options.id ?? getShortId();
     const fileTree = await this.resolver.resolveEntries(
-      options.resolverContext
+      options.resolverContext,
     );
     const workspaceBase = options.workspaceBase ?? "/";
 
@@ -82,7 +81,7 @@ export class VirtualSandboxProvider<
 
   async get(): Promise<never> {
     throw new SandboxNotSupportedError(
-      "get (virtual sandbox state lives in workflow AgentState)"
+      "get (virtual sandbox state lives in workflow AgentState)",
     );
   }
 
@@ -96,13 +95,13 @@ export class VirtualSandboxProvider<
 
   async snapshot(): Promise<never> {
     throw new SandboxNotSupportedError(
-      "snapshot (virtual sandbox state lives in workflow AgentState)"
+      "snapshot (virtual sandbox state lives in workflow AgentState)",
     );
   }
 
   async restore(): Promise<never> {
     throw new SandboxNotSupportedError(
-      "restore (virtual sandbox state lives in workflow AgentState)"
+      "restore (virtual sandbox state lives in workflow AgentState)",
     );
   }
 }

@@ -1,12 +1,12 @@
 import { Sandbox as E2bSdkSandbox } from "@e2b/code-interpreter";
 import type {
+  ExecOptions,
+  ExecResult,
   Sandbox,
   SandboxCapabilities,
   SandboxCreateResult,
   SandboxProvider,
   SandboxSnapshot,
-  ExecOptions,
-  ExecResult,
 } from "../../../lib/sandbox/types";
 import {
   SandboxNotFoundError,
@@ -35,7 +35,7 @@ class E2bSandboxImpl implements Sandbox {
   constructor(
     readonly id: string,
     private sdkSandbox: E2bSdkSandbox,
-    workspaceBase = "/home/user"
+    workspaceBase = "/home/user",
   ) {
     this.fs = new E2bSandboxFileSystem(sdkSandbox, workspaceBase);
   }
@@ -83,7 +83,7 @@ export class E2bSandboxProvider
   }
 
   async create(
-    options?: E2bSandboxCreateOptions
+    options?: E2bSandboxCreateOptions,
   ): Promise<SandboxCreateResult> {
     const template = options?.template ?? this.defaultTemplate;
     const workspaceBase = this.defaultWorkspaceBase;
@@ -99,14 +99,14 @@ export class E2bSandboxProvider
     const sandbox = new E2bSandboxImpl(
       sdkSandbox.sandboxId,
       sdkSandbox,
-      workspaceBase
+      workspaceBase,
     );
 
     if (options?.initialFiles) {
       await Promise.all(
         Object.entries(options.initialFiles).map(([path, content]) =>
-          sandbox.fs.writeFile(path, content)
-        )
+          sandbox.fs.writeFile(path, content),
+        ),
       );
     }
 
@@ -116,7 +116,11 @@ export class E2bSandboxProvider
   async get(sandboxId: string): Promise<E2bSandbox> {
     try {
       const sdkSandbox = await E2bSdkSandbox.connect(sandboxId);
-      return new E2bSandboxImpl(sandboxId, sdkSandbox, this.defaultWorkspaceBase);
+      return new E2bSandboxImpl(
+        sandboxId,
+        sdkSandbox,
+        this.defaultWorkspaceBase,
+      );
     } catch {
       throw new SandboxNotFoundError(sandboxId);
     }
@@ -145,7 +149,7 @@ export class E2bSandboxProvider
     return new E2bSandboxImpl(
       sdkSandbox.sandboxId,
       sdkSandbox,
-      this.defaultWorkspaceBase
+      this.defaultWorkspaceBase,
     );
   }
 }

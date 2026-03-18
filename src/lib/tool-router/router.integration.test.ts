@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
 vi.mock("@temporalio/workflow", () => {
@@ -28,14 +28,14 @@ vi.mock("@temporalio/workflow", () => {
   };
 });
 
+import type { ToolResultConfig } from "../types";
 import { createToolRouter, defineTool } from "./router";
 import type {
-  ToolMap,
-  ToolHandlerResponse,
-  RouterContext,
   AppendToolResultFn,
+  RouterContext,
+  ToolHandlerResponse,
+  ToolMap,
 } from "./types";
-import type { ToolResultConfig } from "../types";
 
 // ---------------------------------------------------------------------------
 // Test tool definitions
@@ -100,12 +100,12 @@ function createAppendSpy() {
     {
       executeWithOptions: (
         _opts: unknown,
-        [, config]: [string, ToolResultConfig]
+        [, config]: [string, ToolResultConfig],
       ) => {
         calls.push(config);
         return Promise.resolve();
       },
-    }
+    },
   ) as AppendToolResultFn;
   return { fn, calls };
 }
@@ -181,7 +181,7 @@ describe("createToolRouter integration", () => {
     });
 
     expect(() =>
-      router.parseToolCall({ id: "tc-1", name: "Unknown", args: {} })
+      router.parseToolCall({ id: "tc-1", name: "Unknown", args: {} }),
     ).toThrow("Tool Unknown not found");
   });
 
@@ -193,7 +193,7 @@ describe("createToolRouter integration", () => {
     });
 
     expect(() =>
-      router.parseToolCall({ id: "tc-1", name: "Echo", args: { text: 123 } })
+      router.parseToolCall({ id: "tc-1", name: "Echo", args: { text: 123 } }),
     ).toThrow();
   });
 
@@ -303,7 +303,7 @@ describe("createToolRouter integration", () => {
 
     // Force an unknown tool call (bypassing parseToolCall validation)
     const results = await router.processToolCalls([
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // biome-ignore lint/suspicious/noExplicitAny: test helper casting
       { id: "tc-1", name: "NonExistent", args: {} } as any,
     ]);
 
@@ -342,7 +342,7 @@ describe("createToolRouter integration", () => {
         toolCallId: "tc-99",
         toolName: "Spy",
         sandboxId: "sandbox-1",
-      })
+      }),
     );
   });
 
@@ -380,7 +380,7 @@ describe("createToolRouter integration", () => {
     expect(handlerSpy).not.toHaveBeenCalled();
     expect(results).toHaveLength(0);
     expect(at(appendSpy.calls, 0).content).toContain(
-      "Skipped by PreToolUse hook"
+      "Skipped by PreToolUse hook",
     );
   });
 
@@ -593,7 +593,7 @@ describe("createToolRouter integration", () => {
     });
 
     await expect(
-      router.processToolCalls([parsed], { turn: 1 })
+      router.processToolCalls([parsed], { turn: 1 }),
     ).rejects.toThrow("unrecoverable");
   });
 
@@ -617,7 +617,7 @@ describe("createToolRouter integration", () => {
     expect(router.hasTool("Disabled")).toBe(false);
     expect(router.getToolNames()).not.toContain("Disabled");
     expect(() =>
-      router.parseToolCall({ id: "tc-1", name: "Disabled", args: {} })
+      router.parseToolCall({ id: "tc-1", name: "Disabled", args: {} }),
     ).toThrow("Tool Disabled not found");
   });
 
@@ -674,7 +674,7 @@ describe("createToolRouter integration", () => {
       async (args: { text: string }) => ({
         toolResponse: `custom: ${args.text}`,
         data: { custom: args.text },
-      })
+      }),
     );
 
     expect(results).toHaveLength(2);
