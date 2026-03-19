@@ -149,11 +149,11 @@ export const createSession = async <T extends ToolMap, M = unknown>({
 
       // --- Sandbox lifecycle: create, fork, or inherit ---
       let sandboxId: string | undefined = inheritedSandboxId;
-      const hasOwnSandbox = sandboxId || previousSandboxId;
+      const isInherited = !!inheritedSandboxId && !previousSandboxId;
 
-      if (hasOwnSandbox && !sandboxOps) {
+      if (previousSandboxId && !sandboxOps) {
         throw ApplicationFailure.create({
-          message: "No sandboxOps provided — cannot manage sandbox lifecycle",
+          message: "No sandboxOps provided — cannot fork from previousSandboxId",
           nonRetryable: true,
         });
       }
@@ -236,6 +236,7 @@ export const createSession = async <T extends ToolMap, M = unknown>({
               finalMessage: message,
               exitReason,
               usage: stateManager.getTotalUsage(),
+              ...(sandboxId && { sandboxId }),
             };
           }
 
@@ -292,7 +293,7 @@ export const createSession = async <T extends ToolMap, M = unknown>({
       } finally {
         await callSessionEnd(exitReason, stateManager.getTurns());
 
-        if (hasOwnSandbox && sandboxId && sandboxOps) {
+        if (!isInherited && sandboxId && sandboxOps) {
           if (sandboxOnExit === "destroy") {
             await sandboxOps.destroySandbox(sandboxId);
           } else if (
@@ -313,6 +314,7 @@ export const createSession = async <T extends ToolMap, M = unknown>({
         finalMessage: null,
         exitReason,
         usage: stateManager.getTotalUsage(),
+        ...(sandboxId && { sandboxId }),
       };
     },
   };

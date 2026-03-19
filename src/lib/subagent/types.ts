@@ -145,4 +145,6 @@ export interface SubagentSessionInput {
   continueThread?: boolean;
   /** Sandbox ID inherited from the parent agent */
   sandboxId?: string;
+  /** Previously-paused sandbox ID to fork from (sandbox continuation) */
+  previousSandboxId?: string;
 }

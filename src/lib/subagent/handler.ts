@@ -41,6 +41,8 @@ export function createSubagentHandler<
 
   const childResults = new Map<string, SubagentHandlerResponse>();
   const pendingDestroys = new Set<string>();
+  /** Maps childThreadId → sandboxId for sandbox continuation across invocations */
+  const threadSandboxes = new Map<string, string>();
 
   setHandler(childResultSignal, ({ childWorkflowId, result }) => {
     childResults.set(childWorkflowId, result);
@@ -61,15 +63,26 @@ export function createSubagentHandler<
     const childWorkflowId = `${args.subagent}-${getShortId()}`;
 
     const { sandboxId: parentSandboxId } = context;
-    const inheritSandbox = config.sandbox !== "own" && !!parentSandboxId;
+    const usesOwnSandbox =
+      config.sandbox === "own" || !!config.continueSandbox;
+    const inheritSandbox = !usesOwnSandbox && !!parentSandboxId;
+
+    const continuationThreadId =
+      args.threadId && config.allowThreadContinuation
+        ? args.threadId
+        : undefined;
+
+    const previousSandboxId =
+      continuationThreadId && config.continueSandbox
+        ? threadSandboxes.get(continuationThreadId)
+        : undefined;
 
     const workflowInput: SubagentWorkflowInput = {
-      ...(args.threadId &&
-        args.threadId !== null &&
-        config.allowThreadContinuation && {
-          previousThreadId: args.threadId,
-        }),
+      ...(continuationThreadId && {
+        previousThreadId: continuationThreadId,
+      }),
       ...(inheritSandbox && { sandboxId: parentSandboxId }),
+      ...(previousSandboxId && { previousSandboxId }),
     };
 
     const resolvedContext =
@@ -90,7 +103,7 @@ export function createSubagentHandler<
 
     const childHandle = await startChild(config.workflow, childOpts);
 
-    if (config.sandbox === "own") {
+    if (usesOwnSandbox) {
       pendingDestroys.add(childWorkflowId);
     }
 
@@ -113,7 +126,17 @@ export function createSubagentHandler<
       };
     }
 
-    const { toolResponse, data, usage, threadId: childThreadId } = childResult;
+    const {
+      toolResponse,
+      data,
+      usage,
+      threadId: childThreadId,
+      sandboxId: childSandboxId,
+    } = childResult;
+
+    if (config.continueSandbox && childSandboxId && childThreadId) {
+      threadSandboxes.set(childThreadId, childSandboxId);
+    }
 
     if (!toolResponse) {
       return {

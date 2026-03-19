@@ -105,6 +105,9 @@ export function defineSubagentWorkflow(
         continueThread: true,
       }),
       ...(workflowInput.sandboxId && { sandboxId: workflowInput.sandboxId }),
+      ...(workflowInput.previousSandboxId && {
+        previousSandboxId: workflowInput.previousSandboxId,
+      }),
     };
     const { destroySandbox, ...result } = await fn(
       prompt,
