@@ -71,7 +71,7 @@ export function createSubagentHandler<
     }
 
     const usesOwnSandbox =
-      config.sandbox === "own" || !!config.allowSandboxContinuation;
+      config.sandbox === "own" || !!config.allowThreadContinuation;
     const inheritSandbox =
       config.sandbox === "inherit" && !!parentSandboxId;
 
@@ -81,7 +81,7 @@ export function createSubagentHandler<
         : undefined;
 
     const previousSandboxId =
-      continuationThreadId && config.allowSandboxContinuation
+      continuationThreadId && config.allowThreadContinuation
         ? threadSandboxes.get(continuationThreadId)
         : undefined;
 
@@ -142,7 +142,7 @@ export function createSubagentHandler<
       sandboxId: childSandboxId,
     } = childResult;
 
-    if (config.allowSandboxContinuation && childSandboxId && childThreadId) {
+    if (config.allowThreadContinuation && childSandboxId && childThreadId) {
       threadSandboxes.set(childThreadId, childSandboxId);
     }
 

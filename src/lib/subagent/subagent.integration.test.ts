@@ -583,7 +583,7 @@ describe("createSubagentHandler", () => {
 
   // --- Sandbox continuation ---
 
-  it("does not pass sandboxId when allowSandboxContinuation is set (own sandbox)", async () => {
+  it("does not pass sandboxId when allowThreadContinuation is set (own sandbox)", async () => {
     const { startChild } = await import("@temporalio/workflow");
     const startMock = startChild as ReturnType<typeof vi.fn>;
 
@@ -591,7 +591,6 @@ describe("createSubagentHandler", () => {
       agentName: "sb-cont",
       description: "Sandbox continuation",
       workflow: mockWorkflow(),
-      allowSandboxContinuation: true,
       allowThreadContinuation: true,
     };
 
@@ -628,7 +627,6 @@ describe("createSubagentHandler", () => {
       agentName: "sb-cont",
       description: "Sandbox continuation",
       workflow: mockWorkflow(),
-      allowSandboxContinuation: true,
       allowThreadContinuation: true,
     };
 
@@ -678,7 +676,6 @@ describe("createSubagentHandler", () => {
       agentName: "sb-cont",
       description: "Sandbox continuation",
       workflow: mockWorkflow(),
-      allowSandboxContinuation: true,
       allowThreadContinuation: true,
     };
 
@@ -708,7 +705,7 @@ describe("createSubagentHandler", () => {
     expect(workflowInput.previousThreadId).toBeUndefined();
   });
 
-  it("adds allowSandboxContinuation subagent to pendingDestroys", async () => {
+  it("adds allowThreadContinuation subagent to pendingDestroys", async () => {
     const { getExternalWorkflowHandle } = await import("@temporalio/workflow");
     const handleMock = getExternalWorkflowHandle as ReturnType<typeof vi.fn>;
     const signalSpy = vi.fn();
@@ -718,7 +715,7 @@ describe("createSubagentHandler", () => {
       agentName: "sb-cont",
       description: "Sandbox continuation",
       workflow: mockWorkflow(),
-      allowSandboxContinuation: true,
+      allowThreadContinuation: true,
     };
 
     const { handler, destroySubagentSandboxes } = createSubagentHandler([
@@ -1086,16 +1083,6 @@ describe("defineSubagent", () => {
 
     flag = false;
     expect((reg.registration.enabled as () => boolean)()).toBe(false);
-  });
-
-  it("passes allowSandboxContinuation through to config", () => {
-    const config = defineSubagent(makeDef("sb-agent"), {
-      allowSandboxContinuation: true,
-      sandbox: "own",
-    });
-
-    expect(config.allowSandboxContinuation).toBe(true);
-    expect(config.sandbox).toBe("own");
   });
 
   it("passes sandbox none through to config", () => {

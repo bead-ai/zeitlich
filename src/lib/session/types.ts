@@ -121,7 +121,7 @@ export interface SessionConfig<T extends ToolMap, M = unknown> {
   /**
    * The child's own previously-paused sandbox ID to fork from at the start of
    * a continued session. Takes precedence over `sandboxId` for the fork path.
-   * Populated automatically by the subagent handler when `allowSandboxContinuation` is set.
+   * Populated automatically by the subagent handler when `allowThreadContinuation` is set.
    */
   previousSandboxId?: string;
   /**

@@ -85,10 +85,6 @@ export interface SubagentConfig<TResult extends z.ZodType = z.ZodType> {
    * - `'own'`: the child creates and owns its own sandbox.
    */
   sandbox?: "none" | "inherit" | "own";
-  /**
-   * When true, the sandboxes are paused on exit rather than destroyed. Any threads that continue from this subagent will fork from the paused sandbox.
-   */
-  allowSandboxContinuation?: boolean;
 }
 
 /**
