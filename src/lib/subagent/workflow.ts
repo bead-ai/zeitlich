@@ -131,11 +131,19 @@ export function defineSubagentWorkflow(
     );
 
     const sandboxOnExit = config.sandboxOnExit ?? "destroy";
-    if (sandboxOnExit === "pause-until-parent-close" && !destroySandbox) {
-      throw ApplicationFailure.create({
-        message: `Subagent "${config.name}" has sandboxOnExit="${sandboxOnExit}" but fn did not return a destroySandbox callback`,
-        nonRetryable: true,
-      });
+    if (sandboxOnExit === "pause-until-parent-close") {
+      if (!destroySandbox) {
+        throw ApplicationFailure.create({
+          message: `Subagent "${config.name}" has sandboxOnExit="pause-until-parent-close" but fn did not return a destroySandbox callback`,
+          nonRetryable: true,
+        });
+      }
+      if (!result.sandboxId) {
+        throw ApplicationFailure.create({
+          message: `Subagent "${config.name}" has sandboxOnExit="pause-until-parent-close" but fn did not return a sandboxId`,
+          nonRetryable: true,
+        });
+      }
     }
 
     const { parent } = workflowInfo();
