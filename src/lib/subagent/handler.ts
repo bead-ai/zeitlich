@@ -65,7 +65,8 @@ export function createSubagentHandler<
     const { sandboxId: parentSandboxId } = context;
     const usesOwnSandbox =
       config.sandbox === "own" || !!config.continueSandbox;
-    const inheritSandbox = !usesOwnSandbox && !!parentSandboxId;
+    const inheritSandbox =
+      config.sandbox === "inherit" && !!parentSandboxId;
 
     const continuationThreadId =
       args.threadId && config.allowThreadContinuation

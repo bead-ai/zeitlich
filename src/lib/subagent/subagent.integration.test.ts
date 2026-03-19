@@ -769,6 +769,89 @@ describe("createSubagentHandler", () => {
 
     expect(handleMock).not.toHaveBeenCalled();
   });
+
+  it("does not pass sandboxId when sandbox is none (default)", async () => {
+    const { startChild } = await import("@temporalio/workflow");
+    const startMock = startChild as ReturnType<typeof vi.fn>;
+
+    const noneSubagent: SubagentConfig = {
+      agentName: "none-agent",
+      description: "No sandbox",
+      workflow: mockWorkflow(),
+    };
+
+    const { handler } = createSubagentHandler([noneSubagent]);
+
+    await handler(
+      { subagent: "none-agent", description: "test", prompt: "test" },
+      {
+        threadId: "t",
+        toolCallId: "tc",
+        toolName: "Subagent",
+        sandboxId: "parent-sb",
+      }
+    );
+
+    const lastCall = startMock.mock.calls[startMock.mock.calls.length - 1];
+    if (!lastCall) throw new Error("expected startChild call");
+    const workflowInput = lastCall[1].args[1] as SubagentWorkflowInput;
+    expect(workflowInput.sandboxId).toBeUndefined();
+  });
+
+  it("does not pass sandboxId when sandbox is explicitly none", async () => {
+    const { startChild } = await import("@temporalio/workflow");
+    const startMock = startChild as ReturnType<typeof vi.fn>;
+
+    const noneSubagent: SubagentConfig = {
+      agentName: "none-agent",
+      description: "No sandbox",
+      workflow: mockWorkflow(),
+      sandbox: "none",
+    };
+
+    const { handler } = createSubagentHandler([noneSubagent]);
+
+    await handler(
+      { subagent: "none-agent", description: "test", prompt: "test" },
+      {
+        threadId: "t",
+        toolCallId: "tc",
+        toolName: "Subagent",
+        sandboxId: "parent-sb",
+      }
+    );
+
+    const lastCall = startMock.mock.calls[startMock.mock.calls.length - 1];
+    if (!lastCall) throw new Error("expected startChild call");
+    const workflowInput = lastCall[1].args[1] as SubagentWorkflowInput;
+    expect(workflowInput.sandboxId).toBeUndefined();
+  });
+
+  it("does not signal destroy for none subagents", async () => {
+    const { getExternalWorkflowHandle } = await import("@temporalio/workflow");
+    const handleMock = getExternalWorkflowHandle as ReturnType<typeof vi.fn>;
+    handleMock.mockClear();
+
+    const noneSubagent: SubagentConfig = {
+      agentName: "none-agent",
+      description: "No sandbox",
+      workflow: mockWorkflow(),
+      sandbox: "none",
+    };
+
+    const { handler, destroySubagentSandboxes } = createSubagentHandler([
+      noneSubagent,
+    ]);
+
+    await handler(
+      { subagent: "none-agent", description: "test", prompt: "run" },
+      { threadId: "t", toolCallId: "tc", toolName: "Subagent" }
+    );
+
+    await destroySubagentSandboxes();
+
+    expect(handleMock).not.toHaveBeenCalled();
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -946,6 +1029,20 @@ describe("defineSubagent", () => {
 
     expect(config.continueSandbox).toBe(true);
     expect(config.sandbox).toBe("own");
+  });
+
+  it("passes sandbox none through to config", () => {
+    const config = defineSubagent(makeDef("no-sb"), {
+      sandbox: "none",
+    });
+
+    expect(config.sandbox).toBe("none");
+  });
+
+  it("defaults sandbox to undefined (none behavior)", () => {
+    const config = defineSubagent(makeDef("default-sb"));
+
+    expect(config.sandbox).toBeUndefined();
   });
 });
 

@@ -80,10 +80,11 @@ export interface SubagentConfig<TResult extends z.ZodType = z.ZodType> {
   hooks?: SubagentHooks;
   /**
    * Sandbox strategy for this subagent.
-   * - `'inherit'` (default): reuse the parent's sandbox (shared filesystem/exec).
+   * - `'none'` (default): no sandbox — the subagent runs without sandbox access.
+   * - `'inherit'`: reuse the parent's sandbox (shared filesystem/exec).
    * - `'own'`: the child creates and owns its own sandbox.
    */
-  sandbox?: "inherit" | "own";
+  sandbox?: "none" | "inherit" | "own";
   /**
    * When true, the sandboxes are paused on exit rather than destroyed. Any threads that continue from this subagent will fork from the paused sandbox.
    */
