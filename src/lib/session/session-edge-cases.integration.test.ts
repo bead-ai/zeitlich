@@ -1034,6 +1034,19 @@ describe("createSession edge cases", () => {
   it("returns inherited sandboxId from runSession", async () => {
     const { ops } = createMockThreadOps();
 
+    const sandboxOps: SandboxOps = {
+      createSandbox: async () => ({ sandboxId: "sb" }),
+      destroySandbox: async () => {},
+      pauseSandbox: async () => {},
+      snapshotSandbox: async () => ({
+        sandboxId: "sb",
+        providerId: "test",
+        data: null,
+        createdAt: new Date().toISOString(),
+      }),
+      forkSandbox: async () => "forked-sb",
+    };
+
     const session = await createSession({
       agentName: "TestAgent",
       threadId: "thread-1",
@@ -1041,6 +1054,7 @@ describe("createSession edge cases", () => {
       threadOps: ops,
       buildContextMessage: () => "go",
       sandboxId: "inherited-sb",
+      sandbox: sandboxOps,
     });
 
     const stateManager = createAgentStateManager({

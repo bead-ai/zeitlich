@@ -587,6 +587,19 @@ describe("createSession integration", () => {
       },
     });
 
+    const sandboxOps: SandboxOps = {
+      createSandbox: async () => ({ sandboxId: "sb" }),
+      destroySandbox: async () => {},
+      pauseSandbox: async () => {},
+      snapshotSandbox: async () => ({
+        sandboxId: "sb",
+        providerId: "test",
+        data: null,
+        createdAt: new Date().toISOString(),
+      }),
+      forkSandbox: async () => "forked-sb",
+    };
+
     const session = await createSession({
       agentName: "TestAgent",
       threadId: "thread-1",
@@ -601,6 +614,7 @@ describe("createSession integration", () => {
       tools: { Spy: spyTool },
       buildContextMessage: () => "go",
       sandboxId: "my-sandbox",
+      sandbox: sandboxOps,
     });
 
     const stateManager = createAgentStateManager({
