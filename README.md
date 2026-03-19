@@ -28,6 +28,7 @@ Temporal solves these problems for workflows. Zeitlich brings these guarantees t
 - **Type-safe tools** — Define tools with Zod schemas, get full TypeScript inference
 - **Lifecycle hooks** — Pre/post tool execution, session start/end
 - **Subagent support** — Spawn child agents as Temporal child workflows
+- **Skills** — First-class [agentskills.io](https://agentskills.io) support with progressive disclosure
 - **Filesystem utilities** — In-memory or custom providers for file operations
 - **Model flexibility** — Framework-agnostic model invocation with adapters for LangChain, Vercel AI SDK, or provider-specific SDKs
 
@@ -518,6 +519,90 @@ const session = await createSession({
 });
 ```
 
+### Skills
+
+Zeitlich has first-class support for the [agentskills.io](https://agentskills.io) specification. Skills are reusable instruction sets that an agent can load on-demand via the built-in `ReadSkill` tool — progressive disclosure keeps token usage low while giving agents access to rich, domain-specific guidance.
+
+#### Defining a Skill
+
+Each skill lives in its own directory as a `SKILL.md` file with YAML frontmatter:
+
+```
+skills/
+├── code-review/
+│   └── SKILL.md
+├── pdf-processing/
+│   └── SKILL.md
+```
+
+```markdown
+---
+name: code-review
+description: Review pull requests for correctness, style, and security issues
+allowed-tools: Bash Grep Read
+license: MIT
+---
+
+## Instructions
+
+When reviewing code, follow these steps:
+1. Read the diff with `Bash`
+2. Search for related tests with `Grep`
+3. ...
+```
+
+Required fields: `name` and `description`. Optional: `license`, `compatibility`, `allowed-tools` (space-delimited), `metadata` (key-value map).
+
+#### Loading Skills
+
+Use `FileSystemSkillProvider` to load skills from a directory (works with any sandbox filesystem):
+
+```typescript
+import { FileSystemSkillProvider } from "zeitlich";
+import { InMemorySandboxProvider } from "zeitlich/adapters/sandbox/inmemory";
+
+const provider = new InMemorySandboxProvider();
+const { sandbox } = await provider.create({});
+
+const skillProvider = new FileSystemSkillProvider(sandbox.fs, "/skills");
+const skills = await skillProvider.loadAll();
+```
+
+Or parse a single file directly:
+
+```typescript
+import { parseSkillFile } from "zeitlich/workflow";
+
+const { frontmatter, body } = parseSkillFile(rawMarkdown);
+// frontmatter: SkillMetadata, body: instruction text
+```
+
+#### Passing Skills to a Session
+
+Pass loaded skills to `createSession`. Zeitlich automatically registers a `ReadSkill` tool whose description lists all available skills — the agent discovers them through the tool definition and loads instructions on demand:
+
+```typescript
+import { createSession } from "zeitlich/workflow";
+
+const session = await createSession({
+  // ... other config
+  skills, // Skill[] — loaded via FileSystemSkillProvider or manually
+});
+```
+
+The `ReadSkill` tool accepts a `skill_name` parameter (constrained to an enum of available names) and returns the full instruction body. The handler runs directly in the workflow — no activity needed.
+
+#### Building Skills Manually
+
+For advanced use cases, you can construct the tool and handler independently:
+
+```typescript
+import { createReadSkillTool, createReadSkillHandler } from "zeitlich/workflow";
+
+const tool = createReadSkillTool(skills);    // ToolDefinition with enum schema
+const handler = createReadSkillHandler(skills); // Returns skill instructions
+```
+
 ### Thread Continuation
 
 By default, each session initializes a fresh thread. To continue from an existing thread (e.g., resuming a conversation after a workflow completes), pass `continueThread: true` along with the previous `threadId`:
@@ -696,6 +781,7 @@ Zeitlich provides ready-to-use tool definitions and handlers for common agent op
 | `Grep`            | Search file contents with regex patterns                          |
 | `Bash`            | Execute shell commands                                            |
 | `AskUserQuestion` | Ask the user questions during execution with structured options   |
+| `ReadSkill`       | Load skill instructions on demand (see [Skills](#skills))         |
 | `Task`            | Launch subagents as child workflows (see [Subagents](#subagents)) |
 
 ```typescript
@@ -755,7 +841,8 @@ Safe for use in Temporal workflow files:
 | `getShortId`                | Generate a compact, workflow-deterministic identifier (base-62, 12 chars)                              |
 | Tool definitions            | `askUserQuestionTool`, `globTool`, `grepTool`, `readFileTool`, `writeFileTool`, `editTool`, `bashTool` |
 | Task tools                  | `taskCreateTool`, `taskGetTool`, `taskListTool`, `taskUpdateTool` for workflow task management         |
-| Types                       | `SubagentDefinition`, `SubagentConfig`, `ToolDefinition`, `ToolWithHandler`, `RouterContext`, `SessionConfig`, etc. |
+| Skill utilities             | `parseSkillFile`, `createReadSkillTool`, `createReadSkillHandler`                                      |
+| Types                       | `Skill`, `SkillMetadata`, `SkillProvider`, `SubagentDefinition`, `SubagentConfig`, `ToolDefinition`, `ToolWithHandler`, `RouterContext`, `SessionConfig`, etc. |
 
 ### Activity Entry Point (`zeitlich`)
 
@@ -768,6 +855,7 @@ Framework-agnostic utilities for activities, worker setup, and Node.js code:
 | `createThreadManager`     | Generic Redis-backed thread manager factory                                                   |
 | `toTree`                  | Generate file tree string from an `IFileSystem` instance                                      |
 | `withSandbox`             | Wraps a handler to auto-resolve sandbox from context (pairs with `withAutoAppend`)            |
+| `FileSystemSkillProvider`   | Load skills from a directory following the agentskills.io layout                                  |
 | Tool handlers             | `bashHandler`, `editHandler`, `globHandler`, `readFileHandler`, `writeFileHandler`, `createAskUserQuestionHandler` |
 
 ### Thread Adapter Entry Points
