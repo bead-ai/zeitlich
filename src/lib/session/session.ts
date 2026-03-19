@@ -78,9 +78,13 @@ export const createSession = async <T extends ToolMap, M = unknown>({
   } = threadOps;
 
   const plugins: ToolMap[string][] = [];
+  let destroySubagentSandboxes: (() => Promise<void>) | undefined;
   if (subagents) {
-    const reg = buildSubagentRegistration(subagents);
-    if (reg) plugins.push(reg);
+    const result = buildSubagentRegistration(subagents);
+    if (result) {
+      plugins.push(result.registration);
+      destroySubagentSandboxes = result.destroySubagentSandboxes;
+    }
   }
   if (skills) {
     const reg = buildSkillRegistration(skills);
@@ -298,6 +302,10 @@ export const createSession = async <T extends ToolMap, M = unknown>({
             await sandboxOps.pauseSandbox(sandboxId);
           }
         }
+
+        if (destroySubagentSandboxes) {
+          await destroySubagentSandboxes();
+        }
       }
 
       return {
@@ -305,8 +313,6 @@ export const createSession = async <T extends ToolMap, M = unknown>({
         finalMessage: null,
         exitReason,
         usage: stateManager.getTotalUsage(),
-        toBeDestroyedSandboxId:
-          sandboxOnExit === "destroy" ? sandboxId : undefined,
       };
     },
   };

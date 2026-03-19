@@ -3,6 +3,7 @@ import {
   workflowInfo,
   setHandler,
   condition,
+  getExternalWorkflowHandle,
 } from "@temporalio/workflow";
 import { getShortId } from "../thread/id";
 import type { ToolHandlerResponse, RouterContext } from "../tool-router";
@@ -15,7 +16,7 @@ import type {
 } from "./types";
 import type { SubagentArgs } from "./tool";
 import type { z } from "zod";
-import { childResultSignal } from "./signals";
+import { childResultSignal, destroySandboxSignal } from "./signals";
 
 /**
  * Creates a Subagent tool handler that spawns child workflows for configured subagents.
@@ -29,16 +30,23 @@ import { childResultSignal } from "./signals";
  */
 export function createSubagentHandler<
   const T extends readonly SubagentConfig[],
->(subagents: [...T]) {
+>(subagents: [...T]): {
+  handler: (
+    args: SubagentArgs,
+    context: RouterContext
+  ) => Promise<ToolHandlerResponse<InferSubagentResult<T[number]> | null>>;
+  destroySubagentSandboxes: () => Promise<void>;
+} {
   const { taskQueue: parentTaskQueue } = workflowInfo();
 
   const childResults = new Map<string, SubagentHandlerResponse>();
+  const pendingDestroys = new Set<string>();
 
   setHandler(childResultSignal, ({ childWorkflowId, result }) => {
     childResults.set(childWorkflowId, result);
   });
 
-  return async (
+  const handler = async (
     args: SubagentArgs,
     context: RouterContext
   ): Promise<ToolHandlerResponse<InferSubagentResult<T[number]> | null>> => {
@@ -81,6 +89,10 @@ export function createSubagentHandler<
     };
 
     const childHandle = await startChild(config.workflow, childOpts);
+
+    if (config.sandbox === "own") {
+      pendingDestroys.add(childWorkflowId);
+    }
 
     // Wait for signal from child; race with child completion to propagate failures
     await Promise.race([
@@ -137,4 +149,16 @@ export function createSubagentHandler<
       ...(usage && { usage }),
     };
   };
+
+  const destroySubagentSandboxes = async (): Promise<void> => {
+    const ids = [...pendingDestroys];
+    pendingDestroys.clear();
+    await Promise.all(
+      ids.map((id) =>
+        getExternalWorkflowHandle(id).signal(destroySandboxSignal)
+      )
+    );
+  };
+
+  return { handler, destroySubagentSandboxes };
 }
