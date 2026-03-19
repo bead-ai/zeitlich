@@ -2,6 +2,7 @@ export type {
   SubagentConfig,
   SubagentContext,
   SubagentDefinition,
+  SubagentFnResult,
   SubagentHooks,
   SubagentHandlerResponse,
   SubagentWorkflow,
@@ -15,4 +16,4 @@ export { createSubagentHandler } from "./handler";
 export { defineSubagent } from "./define";
 export { defineSubagentWorkflow } from "./workflow";
 export { buildSubagentRegistration } from "./register";
-export { childResultSignal } from "./signals";
+export { childResultSignal, destroySandboxSignal } from "./signals";

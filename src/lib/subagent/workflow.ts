@@ -2,15 +2,18 @@ import type { z } from "zod";
 import {
   workflowInfo,
   getExternalWorkflowHandle,
+  setHandler,
+  condition,
   ApplicationFailure,
 } from "@temporalio/workflow";
 import type {
   SubagentDefinition,
+  SubagentFnResult,
   SubagentHandlerResponse,
   SubagentWorkflowInput,
   SubagentSessionInput,
 } from "./types";
-import { childResultSignal } from "./signals";
+import { childResultSignal, destroySandboxSignal } from "./signals";
 
 /**
  * Defines a subagent workflow with embedded metadata (name, description, resultSchema).
@@ -67,7 +70,7 @@ export function defineSubagentWorkflow<
     prompt: string,
     sessionInput: SubagentSessionInput,
     context: TContext
-  ) => Promise<SubagentHandlerResponse<null>>
+  ) => Promise<SubagentFnResult<null>>
 ): SubagentDefinition<z.ZodNull, TContext>;
 // With resultSchema — data is inferred from the schema
 export function defineSubagentWorkflow<
@@ -79,7 +82,7 @@ export function defineSubagentWorkflow<
     prompt: string,
     sessionInput: SubagentSessionInput,
     context: TContext
-  ) => Promise<SubagentHandlerResponse<z.infer<TResult> | null>>
+  ) => Promise<SubagentFnResult<z.infer<TResult> | null>>
 ): SubagentDefinition<TResult, TContext>;
 export function defineSubagentWorkflow(
   config: { name: string; description: string; resultSchema?: z.ZodType },
@@ -87,7 +90,7 @@ export function defineSubagentWorkflow(
     prompt: string,
     sessionInput: SubagentSessionInput,
     context: Record<string, unknown>
-  ) => Promise<SubagentHandlerResponse<unknown>>
+  ) => Promise<SubagentFnResult<unknown>>
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): SubagentDefinition<any, any> {
   const workflow = async (
@@ -103,7 +106,11 @@ export function defineSubagentWorkflow(
       }),
       ...(workflowInput.sandboxId && { sandboxId: workflowInput.sandboxId }),
     };
-    const result = await fn(prompt, sessionInput, context ?? {});
+    const { destroySandbox, ...result } = await fn(
+      prompt,
+      sessionInput,
+      context ?? {}
+    );
 
     const { parent } = workflowInfo();
     if (!parent) {
@@ -118,6 +125,15 @@ export function defineSubagentWorkflow(
       childWorkflowId: workflowInfo().workflowId,
       result,
     });
+
+    if (destroySandbox) {
+      let destroyRequested = false;
+      setHandler(destroySandboxSignal, () => {
+        destroyRequested = true;
+      });
+      await condition(() => destroyRequested);
+      await destroySandbox();
+    }
 
     return result;
   };

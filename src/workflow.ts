@@ -124,6 +124,7 @@ export type {
 export type {
   SubagentConfig,
   SubagentDefinition,
+  SubagentFnResult,
   SubagentHooks,
   SubagentHandlerResponse,
   SubagentWorkflow,

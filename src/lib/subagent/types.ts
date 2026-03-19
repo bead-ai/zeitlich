@@ -118,6 +118,15 @@ export interface SubagentHooks<TArgs = unknown, TResult = unknown> {
   }) => PostToolUseFailureHookResult | Promise<PostToolUseFailureHookResult>;
 }
 
+/**
+ * Extended response from the subagent `fn` — includes optional cleanup callbacks
+ * stripped before signaling the parent.
+ */
+export type SubagentFnResult<TResult = null> = SubagentHandlerResponse<TResult> & {
+  /** When provided, the workflow awaits `destroySandboxSignal` from the parent then calls this. */
+  destroySandbox?: () => Promise<void>;
+};
+
 /** Payload sent by a child workflow to signal its result back to the parent */
 export interface ChildResultSignalPayload {
   childWorkflowId: string;
