@@ -1129,6 +1129,7 @@ describe("defineSubagentWorkflow", () => {
 
     expect(capturedSession).toEqual({
       agentName: "test",
+      sandboxOnExit: "destroy",
       threadId: "prev-42",
       continueThread: true,
     });
@@ -1147,6 +1148,7 @@ describe("defineSubagentWorkflow", () => {
     await workflow("go", { sandboxId: "sb-123" });
     expect(capturedSession).toEqual({
       agentName: "test",
+      sandboxOnExit: "destroy",
       sandboxId: "sb-123",
     });
   });
@@ -1164,6 +1166,7 @@ describe("defineSubagentWorkflow", () => {
     await workflow("go", { previousSandboxId: "prev-sb-1" });
     expect(capturedSession).toEqual({
       agentName: "test",
+      sandboxOnExit: "destroy",
       previousSandboxId: "prev-sb-1",
     });
   });
@@ -1184,6 +1187,7 @@ describe("defineSubagentWorkflow", () => {
     });
     expect(capturedSession).toEqual({
       agentName: "test",
+      sandboxOnExit: "destroy",
       threadId: "prev-t",
       continueThread: true,
       previousSandboxId: "prev-sb",
@@ -1253,6 +1257,6 @@ describe("defineSubagentWorkflow", () => {
     );
 
     await workflow("go", {});
-    expect(capturedSession).toEqual({ agentName: "test" });
+    expect(capturedSession).toEqual({ agentName: "test", sandboxOnExit: "destroy" });
   });
 });
