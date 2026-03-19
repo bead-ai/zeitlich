@@ -105,6 +105,8 @@ export interface SubagentHooks<TArgs = unknown, TResult = unknown> {
     threadId: string;
     turn: number;
     durationMs: number;
+    /** Unvalidated metadata from the child workflow (e.g. infrastructure state) */
+    metadata?: Record<string, unknown>;
   }) => void | Promise<void>;
   /** Called when this subagent execution fails */
   onExecutionFailure?: (ctx: {

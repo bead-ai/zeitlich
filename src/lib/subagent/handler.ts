@@ -142,6 +142,7 @@ export function createSubagentHandler<
       usage,
       threadId: childThreadId,
       sandboxId: childSandboxId,
+      metadata,
     } = childResult;
 
     if (config.allowThreadContinuation && childSandboxId && childThreadId) {
@@ -154,6 +155,7 @@ export function createSubagentHandler<
         data: null,
         ...(usage && { usage }),
         ...(childSandboxId && { sandboxId: childSandboxId }),
+        ...(metadata && { metadata }),
       };
     }
 
@@ -167,6 +169,7 @@ export function createSubagentHandler<
         data: null,
         ...(usage && { usage }),
         ...(childSandboxId && { sandboxId: childSandboxId }),
+        ...(metadata && { metadata }),
       };
     }
 
@@ -183,6 +186,7 @@ export function createSubagentHandler<
       data: validated ? validated.data : data,
       ...(usage && { usage }),
       ...(childSandboxId && { sandboxId: childSandboxId }),
+      ...(metadata && { metadata }),
     };
   };
 

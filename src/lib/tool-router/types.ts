@@ -144,6 +144,8 @@ export interface ToolHandlerResponse<TResult = null> {
   threadId?: string;
   /** Sandbox ID created or used by the handler (e.g. child agent sandbox) */
   sandboxId?: string;
+  /** Unvalidated metadata passthrough from handler to hooks (e.g. infrastructure state) */
+  metadata?: Record<string, unknown>;
 }
 
 /**
@@ -227,6 +229,8 @@ export interface ToolCallResult<
   name: TName;
   data: TResult;
   usage?: TokenUsage;
+  /** Unvalidated metadata passthrough from handler to hooks (e.g. infrastructure state) */
+  metadata?: Record<string, unknown>;
 }
 
 /**
@@ -303,6 +307,7 @@ export interface ToolHooks<TArgs = unknown, TResult = unknown> {
     threadId: string;
     turn: number;
     durationMs: number;
+    metadata?: Record<string, unknown>;
   }) => void | Promise<void>;
   /** Called when this tool execution fails */
   onPostToolUseFailure?: (ctx: {
