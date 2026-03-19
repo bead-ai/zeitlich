@@ -68,6 +68,7 @@ export function createSubagentHandler<
       data,
       usage,
       threadId: childThreadId,
+      metadata,
     } = typeof config.workflow === "string"
       ? await executeChild(config.workflow, childOpts)
       : await executeChild(config.workflow, childOpts);
@@ -77,6 +78,7 @@ export function createSubagentHandler<
         toolResponse: "Subagent workflow returned no response",
         data: null,
         ...(usage && { usage }),
+        ...(metadata && { metadata }),
       };
     }
 
@@ -89,6 +91,7 @@ export function createSubagentHandler<
         toolResponse: `Subagent workflow returned invalid data: ${validated.error.message}`,
         data: null,
         ...(usage && { usage }),
+        ...(metadata && { metadata }),
       };
     }
 
@@ -104,6 +107,7 @@ export function createSubagentHandler<
       toolResponse: finalToolResponse,
       data: validated ? validated.data : data,
       ...(usage && { usage }),
+      ...(metadata && { metadata }),
     };
   };
 }

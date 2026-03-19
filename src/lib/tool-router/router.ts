@@ -179,6 +179,7 @@ export function createToolRouter<T extends ToolMap>(
         threadId: options.threadId,
         turn,
         durationMs,
+        ...(toolResult.metadata && { metadata: toolResult.metadata }),
       });
     }
     if (options.hooks?.onPostToolUse) {
@@ -220,6 +221,7 @@ export function createToolRouter<T extends ToolMap>(
     let result: unknown;
     let content!: ToolMessageContent;
     let resultAppended = false;
+    let metadata: Record<string, unknown> | undefined;
 
     try {
       if (tool) {
@@ -236,6 +238,7 @@ export function createToolRouter<T extends ToolMap>(
         result = response.data;
         content = response.toolResponse;
         resultAppended = response.resultAppended === true;
+        metadata = response.metadata;
       } else {
         result = { error: `Unknown tool: ${toolCall.name}` };
         content = JSON.stringify(result, null, 2);
@@ -272,6 +275,7 @@ export function createToolRouter<T extends ToolMap>(
       toolCallId: toolCall.id,
       name: toolCall.name,
       data: result,
+      ...(metadata && { metadata }),
     } as ToolCallResultUnion<TResults>;
 
     // --- Post-hooks ---
@@ -410,6 +414,7 @@ export function createToolRouter<T extends ToolMap>(
           toolCallId: toolCall.id,
           name: toolCall.name as TName,
           data: response.data,
+          ...(response.metadata && { metadata: response.metadata }),
         };
       };
 
