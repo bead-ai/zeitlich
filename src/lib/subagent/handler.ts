@@ -3,7 +3,6 @@ import {
   workflowInfo,
   setHandler,
   condition,
-  getExternalWorkflowHandle,
 } from "@temporalio/workflow";
 import { getShortId } from "../thread/id";
 import type { ToolHandlerResponse, RouterContext } from "../tool-router";
@@ -40,7 +39,10 @@ export function createSubagentHandler<
   const { taskQueue: parentTaskQueue } = workflowInfo();
 
   const childResults = new Map<string, SubagentHandlerResponse>();
-  const pendingDestroys = new Set<string>();
+  const pendingDestroys = new Map<
+    string,
+    Awaited<ReturnType<typeof startChild>>
+  >();
   /** Maps childThreadId → sandboxId for sandbox continuation across invocations */
   const threadSandboxes = new Map<string, string>();
 
@@ -112,7 +114,7 @@ export function createSubagentHandler<
     const childHandle = await startChild(config.workflow, childOpts);
 
     if (usesOwnSandbox) {
-      pendingDestroys.add(childWorkflowId);
+      pendingDestroys.set(childWorkflowId, childHandle);
     }
 
     // Wait for signal from child; race with child completion to propagate failures
@@ -185,12 +187,13 @@ export function createSubagentHandler<
   };
 
   const destroySubagentSandboxes = async (): Promise<void> => {
-    const ids = [...pendingDestroys];
+    const handles = [...pendingDestroys.values()];
     pendingDestroys.clear();
     await Promise.all(
-      ids.map((id) =>
-        getExternalWorkflowHandle(id).signal(destroySandboxSignal)
-      )
+      handles.map(async (handle) => {
+        await handle.signal(destroySandboxSignal);
+        await handle.result();
+      })
     );
   };
 

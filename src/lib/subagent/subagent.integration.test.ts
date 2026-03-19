@@ -64,6 +64,7 @@ vi.mock("@temporalio/workflow", () => {
         }
 
         return {
+          signal: vi.fn(),
           result: () => Promise.resolve(result),
           workflowId: opts.workflowId,
         };
@@ -706,10 +707,8 @@ describe("createSubagentHandler", () => {
   });
 
   it("adds allowThreadContinuation subagent to pendingDestroys", async () => {
-    const { getExternalWorkflowHandle } = await import("@temporalio/workflow");
-    const handleMock = getExternalWorkflowHandle as ReturnType<typeof vi.fn>;
-    const signalSpy = vi.fn();
-    handleMock.mockReturnValue({ signal: signalSpy });
+    const { startChild } = await import("@temporalio/workflow");
+    const startMock = startChild as ReturnType<typeof vi.fn>;
 
     const contSandboxSubagent: SubagentConfig = {
       agentName: "sb-cont",
@@ -729,15 +728,15 @@ describe("createSubagentHandler", () => {
 
     await destroySubagentSandboxes();
 
-    expect(handleMock).toHaveBeenCalled();
-    expect(signalSpy).toHaveBeenCalled();
+    const lastResult = startMock.mock.results.at(-1);
+    if (!lastResult) throw new Error("expected startChild call");
+    const childHandle = await lastResult.value;
+    expect(childHandle.signal).toHaveBeenCalled();
   });
 
-  it("signals destroy for sandbox=own subagents at cleanup", async () => {
-    const { getExternalWorkflowHandle } = await import("@temporalio/workflow");
-    const handleMock = getExternalWorkflowHandle as ReturnType<typeof vi.fn>;
-    const signalSpy = vi.fn();
-    handleMock.mockReturnValue({ signal: signalSpy });
+  it("signals destroy and awaits result for sandbox=own subagents at cleanup", async () => {
+    const { startChild } = await import("@temporalio/workflow");
+    const startMock = startChild as ReturnType<typeof vi.fn>;
 
     const ownSubagent: SubagentConfig = {
       agentName: "own-agent",
@@ -757,14 +756,15 @@ describe("createSubagentHandler", () => {
 
     await destroySubagentSandboxes();
 
-    expect(handleMock).toHaveBeenCalled();
-    expect(signalSpy).toHaveBeenCalled();
+    const lastResult = startMock.mock.results.at(-1);
+    if (!lastResult) throw new Error("expected startChild call");
+    const childHandle = await lastResult.value;
+    expect(childHandle.signal).toHaveBeenCalled();
   });
 
   it("does not signal destroy for inherit subagents", async () => {
-    const { getExternalWorkflowHandle } = await import("@temporalio/workflow");
-    const handleMock = getExternalWorkflowHandle as ReturnType<typeof vi.fn>;
-    handleMock.mockClear();
+    const { startChild } = await import("@temporalio/workflow");
+    const startMock = startChild as ReturnType<typeof vi.fn>;
 
     const inheritSubagent: SubagentConfig = {
       agentName: "inherit-agent",
@@ -787,9 +787,14 @@ describe("createSubagentHandler", () => {
       }
     );
 
+    const lastResult = startMock.mock.results.at(-1);
+    if (!lastResult) throw new Error("expected startChild call");
+    const childHandle = await lastResult.value;
+    childHandle.signal.mockClear();
+
     await destroySubagentSandboxes();
 
-    expect(handleMock).not.toHaveBeenCalled();
+    expect(childHandle.signal).not.toHaveBeenCalled();
   });
 
   it("does not pass sandboxId when sandbox is none (default)", async () => {
@@ -850,9 +855,8 @@ describe("createSubagentHandler", () => {
   });
 
   it("does not signal destroy for none subagents", async () => {
-    const { getExternalWorkflowHandle } = await import("@temporalio/workflow");
-    const handleMock = getExternalWorkflowHandle as ReturnType<typeof vi.fn>;
-    handleMock.mockClear();
+    const { startChild } = await import("@temporalio/workflow");
+    const startMock = startChild as ReturnType<typeof vi.fn>;
 
     const noneSubagent: SubagentConfig = {
       agentName: "none-agent",
@@ -870,9 +874,14 @@ describe("createSubagentHandler", () => {
       { threadId: "t", toolCallId: "tc", toolName: "Subagent" }
     );
 
+    const lastResult = startMock.mock.results.at(-1);
+    if (!lastResult) throw new Error("expected startChild call");
+    const childHandle = await lastResult.value;
+    childHandle.signal.mockClear();
+
     await destroySubagentSandboxes();
 
-    expect(handleMock).not.toHaveBeenCalled();
+    expect(childHandle.signal).not.toHaveBeenCalled();
   });
 
   it("returns sandboxId in response when child creates a sandbox", async () => {
