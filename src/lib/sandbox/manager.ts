@@ -1,5 +1,4 @@
 import type {
-  DestroySandboxActivity,
   Sandbox,
   SandboxCreateOptions,
   SandboxOps,
@@ -29,7 +28,9 @@ export class SandboxManager<
   TSandbox extends Sandbox = Sandbox,
   TId extends string = string,
 > {
-  constructor(private provider: SandboxProvider<TOptions, TSandbox> & { readonly id: TId }) {}
+  constructor(
+    private provider: SandboxProvider<TOptions, TSandbox> & { readonly id: TId }
+  ) {}
 
   async create(
     options?: TOptions
@@ -97,10 +98,13 @@ export class SandboxManager<
       }> => {
         return this.create(options);
       },
-      destroySandbox: (async (sandboxId: string): Promise<void> => {
+      destroySandbox: async (sandboxId: string): Promise<void> => {
         await this.destroy(sandboxId);
-      }) as unknown as DestroySandboxActivity,
-      pauseSandbox: async (sandboxId: string, ttlSeconds?: number): Promise<void> => {
+      },
+      pauseSandbox: async (
+        sandboxId: string,
+        ttlSeconds?: number
+      ): Promise<void> => {
         await this.pause(sandboxId, ttlSeconds);
       },
       snapshotSandbox: async (sandboxId: string): Promise<SandboxSnapshot> => {

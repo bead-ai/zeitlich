@@ -5,7 +5,6 @@ import {
   isCancellation,
   setHandler,
 } from "@temporalio/workflow";
-import type { DestroySandboxActivity } from "./types";
 
 export type ParentCloseSandboxReaperWorkflow = (
   sandboxId: string
@@ -30,13 +29,15 @@ export function getReaperWorkflowId(sandboxId: string): string {
  * `sandboxOps.destroySandbox` from one of Zeitlich's sandbox workflow proxies.
  */
 export function defineParentCloseSandboxReaper(
-  destroySandbox: DestroySandboxActivity
+  destroySandbox: (sandboxId: string) => Promise<void>
 ): ParentCloseSandboxReaperWorkflow {
   const reaper: ParentCloseSandboxReaperWorkflow = async (
     sandboxId: string
   ) => {
     let dismissed = false;
-    setHandler(dismissReaper, () => { dismissed = true; });
+    setHandler(dismissReaper, () => {
+      dismissed = true;
+    });
 
     try {
       await Promise.race([

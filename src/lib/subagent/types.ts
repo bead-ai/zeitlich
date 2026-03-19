@@ -29,7 +29,7 @@ export interface SubagentWorkflowInput {
 export type SubagentWorkflow<TResult extends z.ZodType = z.ZodType> = (
   prompt: string,
   workflowInput: SubagentWorkflowInput,
-  context?: Record<string, unknown>,
+  context?: Record<string, unknown>
 ) => Promise<SubagentHandlerResponse<z.infer<TResult> | null>>;
 
 /**
@@ -42,7 +42,7 @@ export type SubagentDefinition<
 > = ((
   prompt: string,
   workflowInput: SubagentWorkflowInput,
-  context?: TContext,
+  context?: TContext
 ) => Promise<SubagentHandlerResponse<z.infer<TResult> | null>>) & {
   readonly agentName: string;
   readonly description: string;
@@ -73,7 +73,7 @@ export interface SubagentConfig<TResult extends z.ZodType = z.ZodType> {
   /** Whether this subagent is available (default: true). Disabled subagents are excluded from the Subagent tool. */
   enabled?: boolean | (() => boolean);
   /** Temporal workflow function or type name (used with executeChild) */
-  workflow: string | SubagentWorkflow<TResult>;
+  workflow: SubagentWorkflow<TResult>;
   /** Optional task queue - defaults to parent's queue if not specified */
   taskQueue?: string;
   /** Optional Zod schema to validate the child workflow's result. If omitted, result is passed through as-is. */

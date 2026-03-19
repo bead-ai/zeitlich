@@ -35,8 +35,15 @@ export interface SandboxFileSystem {
   mkdir(path: string, options?: { recursive?: boolean }): Promise<void>;
   readdir(path: string): Promise<string[]>;
   readdirWithFileTypes(path: string): Promise<DirentEntry[]>;
-  rm(path: string, options?: { recursive?: boolean; force?: boolean }): Promise<void>;
-  cp(src: string, dest: string, options?: { recursive?: boolean }): Promise<void>;
+  rm(
+    path: string,
+    options?: { recursive?: boolean; force?: boolean }
+  ): Promise<void>;
+  cp(
+    src: string,
+    dest: string,
+    options?: { recursive?: boolean }
+  ): Promise<void>;
   mv(src: string, dest: string): Promise<void>;
   readlink(path: string): Promise<string>;
   resolvePath(base: string, path: string): string;
@@ -135,21 +142,13 @@ export interface SandboxProvider<
 // SandboxOps — workflow-side activity interface (like ThreadOps)
 // ============================================================================
 
-declare const destroySandboxActivityBrand: unique symbol;
-
-export type DestroySandboxActivity = ((
-  sandboxId: string
-) => Promise<void>) & {
-  readonly [destroySandboxActivityBrand]: true;
-};
-
 export interface SandboxOps<
   TOptions extends SandboxCreateOptions = SandboxCreateOptions,
 > {
   createSandbox(
-    options?: TOptions,
+    options?: TOptions
   ): Promise<{ sandboxId: string; stateUpdate?: Record<string, unknown> }>;
-  destroySandbox: DestroySandboxActivity;
+  destroySandbox(sandboxId: string): Promise<void>;
   pauseSandbox(sandboxId: string, ttlSeconds?: number): Promise<void>;
   snapshotSandbox(sandboxId: string): Promise<SandboxSnapshot>;
   forkSandbox(sandboxId: string): Promise<string>;
@@ -182,7 +181,7 @@ export class SandboxNotSupportedError extends ApplicationFailure {
     super(
       `Sandbox does not support: ${operation}`,
       "SandboxNotSupportedError",
-      true,
+      true
     );
   }
 }

@@ -15,9 +15,19 @@
 
 // Session
 export { createSession } from "./lib/session";
-export type { ZeitlichSession, ThreadOps, PrefixedThreadOps, ScopedPrefix, SessionConfig } from "./lib/session";
+export type {
+  ZeitlichSession,
+  ThreadOps,
+  PrefixedThreadOps,
+  ScopedPrefix,
+  SessionConfig,
+} from "./lib/session";
 export { defineWorkflow } from "./lib/workflow";
-export type { WorkflowConfig, WorkflowInput, WorkflowSessionInput } from "./lib/workflow";
+export type {
+  WorkflowConfig,
+  WorkflowInput,
+  WorkflowSessionInput,
+} from "./lib/workflow";
 
 // Thread utilities
 export { getShortId } from "./lib/thread/id";
@@ -139,7 +149,6 @@ export type {
   SandboxFileSystem,
   SandboxOps,
   PrefixedSandboxOps,
-  DestroySandboxActivity,
   SandboxProvider,
   SandboxSnapshot,
   ExecOptions,
@@ -156,9 +165,7 @@ export {
   getReaperWorkflowId,
   dismissReaper,
 } from "./lib/sandbox/reaper";
-export type {
-  ParentCloseSandboxReaperWorkflow,
-} from "./lib/sandbox/reaper";
+export type { ParentCloseSandboxReaperWorkflow } from "./lib/sandbox/reaper";
 
 // Virtual sandbox (workflow-safe — imported from leaf modules to avoid
 // pulling activity-side code like VirtualSandboxFileSystem / Provider).
