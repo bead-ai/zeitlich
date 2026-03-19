@@ -112,6 +112,12 @@ export interface SubagentHooks<TArgs = unknown, TResult = unknown> {
   }) => PostToolUseFailureHookResult | Promise<PostToolUseFailureHookResult>;
 }
 
+/** Payload sent by a child workflow to signal its result back to the parent */
+export interface ChildResultSignalPayload {
+  childWorkflowId: string;
+  result: SubagentHandlerResponse;
+}
+
 /**
  * Session config fields passed from parent to child workflow.
  */

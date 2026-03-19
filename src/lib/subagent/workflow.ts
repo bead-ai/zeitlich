@@ -1,10 +1,15 @@
 import type { z } from "zod";
+import {
+  workflowInfo,
+  getExternalWorkflowHandle,
+} from "@temporalio/workflow";
 import type {
   SubagentDefinition,
   SubagentHandlerResponse,
   SubagentWorkflowInput,
   SubagentSessionInput,
 } from "./types";
+import { childResultSignal } from "./signals";
 
 /**
  * Defines a subagent workflow with embedded metadata (name, description, resultSchema).
@@ -97,7 +102,18 @@ export function defineSubagentWorkflow(
       }),
       ...(workflowInput.sandboxId && { sandboxId: workflowInput.sandboxId }),
     };
-    return fn(prompt, sessionInput, context ?? {});
+    const result = await fn(prompt, sessionInput, context ?? {});
+
+    const { parent } = workflowInfo();
+    if (parent) {
+      const parentHandle = getExternalWorkflowHandle(parent.workflowId);
+      await parentHandle.signal(childResultSignal, {
+        childWorkflowId: workflowInfo().workflowId,
+        result,
+      });
+    }
+
+    return result;
   };
 
   // for temporal workflow name

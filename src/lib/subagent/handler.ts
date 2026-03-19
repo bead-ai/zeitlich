@@ -1,17 +1,28 @@
-import { executeChild, workflowInfo } from "@temporalio/workflow";
+import {
+  startChild,
+  workflowInfo,
+  setHandler,
+  condition,
+} from "@temporalio/workflow";
 import { getShortId } from "../thread/id";
 import type { ToolHandlerResponse, RouterContext } from "../tool-router";
 import type { ToolMessageContent } from "../types";
 import type {
   InferSubagentResult,
   SubagentConfig,
+  SubagentHandlerResponse,
   SubagentWorkflowInput,
 } from "./types";
 import type { SubagentArgs } from "./tool";
 import type { z } from "zod";
+import { childResultSignal } from "./signals";
 
 /**
  * Creates a Subagent tool handler that spawns child workflows for configured subagents.
+ *
+ * Child workflows signal their result back via `childResultSignal` instead of
+ * returning it as the workflow return value. The handler awaits the signal
+ * before continuing.
  *
  * @param subagents - Array of subagent configurations
  * @returns A tool handler function that can be used with the tool router
@@ -20,6 +31,12 @@ export function createSubagentHandler<
   const T extends readonly SubagentConfig[],
 >(subagents: [...T]) {
   const { taskQueue: parentTaskQueue } = workflowInfo();
+
+  const childResults = new Map<string, SubagentHandlerResponse>();
+
+  setHandler(childResultSignal, ({ childWorkflowId, result }) => {
+    childResults.set(childWorkflowId, result);
+  });
 
   return async (
     args: SubagentArgs,
@@ -63,14 +80,31 @@ export function createSubagentHandler<
       taskQueue: config.taskQueue ?? parentTaskQueue,
     };
 
-    const {
-      toolResponse,
-      data,
-      usage,
-      threadId: childThreadId,
-    } = typeof config.workflow === "string"
-      ? await executeChild(config.workflow, childOpts)
-      : await executeChild(config.workflow, childOpts);
+    const childHandle =
+      typeof config.workflow === "string"
+        ? await startChild(config.workflow, childOpts)
+        : await startChild(config.workflow, childOpts);
+
+    // Wait for signal from child; race with child completion to propagate failures
+    await Promise.race([
+      condition(() => childResults.has(childWorkflowId)),
+      childHandle.result(),
+    ]);
+    if (!childResults.has(childWorkflowId)) {
+      await condition(() => childResults.has(childWorkflowId));
+    }
+
+    const childResult = childResults.get(childWorkflowId);
+    childResults.delete(childWorkflowId);
+
+    if (!childResult) {
+      return {
+        toolResponse: "Subagent workflow did not signal a result",
+        data: null,
+      };
+    }
+
+    const { toolResponse, data, usage, threadId: childThreadId } = childResult;
 
     if (!toolResponse) {
       return {

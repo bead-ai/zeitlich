@@ -15,3 +15,4 @@ export { createSubagentHandler } from "./handler";
 export { defineSubagent } from "./define";
 export { defineSubagentWorkflow } from "./workflow";
 export { buildSubagentRegistration } from "./register";
+export { childResultSignal } from "./signals";
