@@ -391,6 +391,26 @@ describe("createSubagentHandler", () => {
     expect(workflowInput.sandboxId).toBe("parent-sb");
   });
 
+  it("throws when sandbox is inherit but parent has no sandbox", async () => {
+    const inheritSubagent: SubagentConfig = {
+      agentName: "inherit-agent",
+      description: "Inherits sandbox",
+      workflow: mockWorkflow(),
+      sandbox: "inherit",
+    };
+
+    const { handler } = createSubagentHandler([inheritSubagent]);
+
+    await expect(
+      handler(
+        { subagent: "inherit-agent", description: "test", prompt: "test" },
+        { threadId: "t", toolCallId: "tc", toolName: "Subagent" }
+      )
+    ).rejects.toThrow(
+      'sandbox: "inherit" but the parent has no sandbox'
+    );
+  });
+
   it("does not pass sandboxId to child when sandbox is own", async () => {
     const { startChild } = await import("@temporalio/workflow");
     const startMock = startChild as ReturnType<typeof vi.fn>;
@@ -762,7 +782,12 @@ describe("createSubagentHandler", () => {
 
     await handler(
       { subagent: "inherit-agent", description: "test", prompt: "run" },
-      { threadId: "t", toolCallId: "tc", toolName: "Subagent" }
+      {
+        threadId: "t",
+        toolCallId: "tc",
+        toolName: "Subagent",
+        sandboxId: "parent-sb",
+      }
     );
 
     await destroySubagentSandboxes();

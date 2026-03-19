@@ -63,6 +63,13 @@ export function createSubagentHandler<
     const childWorkflowId = `${args.subagent}-${getShortId()}`;
 
     const { sandboxId: parentSandboxId } = context;
+
+    if (config.sandbox === "inherit" && !parentSandboxId) {
+      throw new Error(
+        `Subagent "${config.agentName}" is configured with sandbox: "inherit" but the parent has no sandbox`
+      );
+    }
+
     const usesOwnSandbox =
       config.sandbox === "own" || !!config.continueSandbox;
     const inheritSandbox =
