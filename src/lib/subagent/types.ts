@@ -7,7 +7,9 @@ import type {
 
 /** ToolHandlerResponse with threadId required (subagents must always surface their thread) */
 export type SubagentHandlerResponse<TResult = null> =
-  ToolHandlerResponse<TResult> & { threadId: string };
+  ToolHandlerResponse<TResult> & {
+    threadId: string;
+  };
 
 /**
  * Raw workflow input fields passed from parent to child workflow.
@@ -102,6 +104,8 @@ export interface SubagentHooks<TArgs = unknown, TResult = unknown> {
     threadId: string;
     turn: number;
     durationMs: number;
+    /** Unvalidated metadata from the child workflow (e.g. infrastructure state) */
+    metadata?: Record<string, unknown>;
   }) => void | Promise<void>;
   /** Called when this subagent execution fails */
   onExecutionFailure?: (ctx: {

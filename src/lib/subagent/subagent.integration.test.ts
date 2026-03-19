@@ -418,6 +418,91 @@ describe("createSubagentHandler", () => {
     const workflowInput = lastCall[1].args[1] as SubagentWorkflowInput;
     expect(workflowInput.sandboxId).toBeUndefined();
   });
+
+  it("passes metadata through on success", async () => {
+    const { executeChild } = await import("@temporalio/workflow");
+    (executeChild as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      toolResponse: "result",
+      data: { result: "ok" },
+      threadId: "child-t",
+      metadata: { jobId: "j-123", env: "staging" },
+    });
+
+    const handler = createSubagentHandler([basicSubagent]);
+
+    const result = await handler(
+      { subagent: "researcher", description: "test", prompt: "test" },
+      { threadId: "t", toolCallId: "tc", toolName: "Subagent" }
+    );
+
+    expect(result.metadata).toEqual({ jobId: "j-123", env: "staging" });
+  });
+
+  it("passes metadata through when toolResponse is null", async () => {
+    const { executeChild } = await import("@temporalio/workflow");
+    (executeChild as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      toolResponse: null,
+      data: null,
+      threadId: "child-t",
+      metadata: { state: "pending" },
+    });
+
+    const handler = createSubagentHandler([basicSubagent]);
+
+    const result = await handler(
+      { subagent: "researcher", description: "test", prompt: "test" },
+      { threadId: "t", toolCallId: "tc", toolName: "Subagent" }
+    );
+
+    expect(result.toolResponse).toContain("no response");
+    expect(result.metadata).toEqual({ state: "pending" });
+  });
+
+  it("passes metadata through when validation fails", async () => {
+    const { executeChild } = await import("@temporalio/workflow");
+    (executeChild as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      toolResponse: "result",
+      data: { wrong: "shape" },
+      threadId: "child-t",
+      metadata: { deployId: "d-456" },
+    });
+
+    const validatedSubagent: SubagentConfig = {
+      agentName: "validated",
+      description: "Has validation",
+      workflow: "workflow",
+      resultSchema: z.object({ expected: z.string() }),
+    };
+
+    const handler = createSubagentHandler([validatedSubagent]);
+
+    const result = await handler(
+      { subagent: "validated", description: "test", prompt: "test" },
+      { threadId: "t", toolCallId: "tc", toolName: "Subagent" }
+    );
+
+    expect(result.toolResponse).toContain("invalid data");
+    expect(result.data).toBeNull();
+    expect(result.metadata).toEqual({ deployId: "d-456" });
+  });
+
+  it("omits metadata when child does not return it", async () => {
+    const { executeChild } = await import("@temporalio/workflow");
+    (executeChild as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      toolResponse: "result",
+      data: null,
+      threadId: "child-t",
+    });
+
+    const handler = createSubagentHandler([basicSubagent]);
+
+    const result = await handler(
+      { subagent: "researcher", description: "test", prompt: "test" },
+      { threadId: "t", toolCallId: "tc", toolName: "Subagent" }
+    );
+
+    expect(result.metadata).toBeUndefined();
+  });
 });
 
 // ---------------------------------------------------------------------------
