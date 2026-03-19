@@ -153,7 +153,8 @@ export const createSession = async <T extends ToolMap, M = unknown>({
 
       if (previousSandboxId && !sandboxOps) {
         throw ApplicationFailure.create({
-          message: "No sandboxOps provided — cannot fork from previousSandboxId",
+          message:
+            "No sandboxOps provided — cannot fork from previousSandboxId",
           nonRetryable: true,
         });
       }
@@ -162,6 +163,14 @@ export const createSession = async <T extends ToolMap, M = unknown>({
         throw ApplicationFailure.create({
           message:
             "Both sandboxId and previousSandboxId provided — cannot manage sandbox lifecycle",
+          nonRetryable: true,
+        });
+      }
+
+      if (sandboxId && !sandboxOps) {
+        throw ApplicationFailure.create({
+          message:
+            "sandboxId provided but no sandboxOps — cannot manage sandbox lifecycle",
           nonRetryable: true,
         });
       }
