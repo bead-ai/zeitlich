@@ -1,25 +1,56 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi, afterEach } from "vitest";
 import { z } from "zod";
 
-// Captured signal handler — `setHandler` stores it so `startChild` can deliver results
-let capturedSignalHandler: ((payload: { childWorkflowId: string; result: unknown }) => void) | null = null;
+let capturedSignalHandler:
+  | ((payload: { childWorkflowId: string; result: unknown }) => void)
+  | null = null;
 
-// Default result factory used by startChild; individual tests can swap via mockStartChildResult
 let nextStartChildResult: ((prompt: string) => unknown) | null = null;
+let lastStartChildArgs: { workflowId: string; args: unknown[] } | null = null;
 
 vi.mock("@temporalio/workflow", () => {
   let counter = 0;
+
+  class MockApplicationFailure extends Error {
+    nonRetryable?: boolean;
+    static create({
+      message,
+      nonRetryable,
+    }: {
+      message: string;
+      nonRetryable?: boolean;
+    }) {
+      const err = new MockApplicationFailure(message);
+      err.nonRetryable = nonRetryable;
+      return err;
+    }
+    static fromError(error: unknown) {
+      const src = error instanceof Error ? error : new Error(String(error));
+      return new MockApplicationFailure(src.message);
+    }
+  }
+
   return {
-    workflowInfo: () => ({ taskQueue: "default-queue" }),
-    defineSignal: vi.fn((_name: string) => ({ __signal: true })),
-    setHandler: vi.fn((_signal: unknown, handler: (...a: unknown[]) => void) => {
-      capturedSignalHandler = handler as typeof capturedSignalHandler;
+    workflowInfo: () => ({
+      taskQueue: "default-queue",
+      workflowId: "child-wf-1",
+      parent: { workflowId: "parent-wf-1" },
     }),
+    defineSignal: vi.fn((_name: string) => ({ __signal: true })),
+    setHandler: vi.fn(
+      (_signal: unknown, handler: (...a: unknown[]) => void) => {
+        capturedSignalHandler = handler as typeof capturedSignalHandler;
+      }
+    ),
     condition: vi.fn(async (fn: () => boolean) => {
       if (!fn()) throw new Error("condition predicate was not satisfied");
     }),
     startChild: vi.fn(
-      async (_workflow: unknown, opts: { workflowId: string; args: unknown[] }) => {
+      async (
+        _workflow: unknown,
+        opts: { workflowId: string; args: unknown[] }
+      ) => {
+        lastStartChildArgs = opts;
         const prompt = (opts.args as [string])[0];
         const result = nextStartChildResult
           ? nextStartChildResult(prompt)
@@ -30,17 +61,20 @@ vi.mock("@temporalio/workflow", () => {
               usage: { inputTokens: 100, outputTokens: 50 },
             };
 
-        // Deliver the result via the captured signal handler
         if (capturedSignalHandler) {
           capturedSignalHandler({ childWorkflowId: opts.workflowId, result });
         }
 
-        return { result: () => Promise.resolve(result), workflowId: opts.workflowId };
+        return {
+          result: () => Promise.resolve(result),
+          workflowId: opts.workflowId,
+        };
       }
     ),
     getExternalWorkflowHandle: vi.fn((_id: string) => ({
       signal: vi.fn(),
     })),
+    ApplicationFailure: MockApplicationFailure,
     uuid4: () => {
       counter++;
       const bytes = Array.from({ length: 16 }, (_, i) =>
@@ -51,7 +85,6 @@ vi.mock("@temporalio/workflow", () => {
   };
 });
 
-import { afterEach } from "vitest";
 import { createSubagentTool, SUBAGENT_TOOL_NAME } from "./tool";
 import { createSubagentHandler } from "./handler";
 import { buildSubagentRegistration } from "./register";
@@ -60,13 +93,25 @@ import { defineSubagent } from "./define";
 import type {
   SubagentConfig,
   SubagentSessionInput,
+  SubagentWorkflow,
   SubagentWorkflowInput,
 } from "./types";
 
 afterEach(() => {
   nextStartChildResult = null;
   capturedSignalHandler = null;
+  lastStartChildArgs = null;
 });
+
+function mockWorkflow(name?: string): SubagentWorkflow {
+  const fn = async () => ({
+    toolResponse: "ok",
+    data: null,
+    threadId: "t-1",
+  });
+  if (name) Object.defineProperty(fn, "name", { value: name });
+  return fn as SubagentWorkflow;
+}
 
 // ---------------------------------------------------------------------------
 // createSubagentTool
@@ -78,7 +123,7 @@ describe("createSubagentTool", () => {
       {
         agentName: "researcher",
         description: "Researches topics",
-        workflow: "researcherWorkflow",
+        workflow: mockWorkflow(),
       },
     ]);
 
@@ -99,35 +144,36 @@ describe("createSubagentTool", () => {
       {
         agentName: "researcher",
         description: "Researches",
-        workflow: "researcherWorkflow",
+        workflow: mockWorkflow(),
       },
       {
         agentName: "writer",
         description: "Writes",
-        workflow: "writerWorkflow",
+        workflow: mockWorkflow(),
       },
     ]);
 
-    const validResearcher = tool.schema.safeParse({
-      subagent: "researcher",
-      description: "desc",
-      prompt: "prompt",
-    });
-    expect(validResearcher.success).toBe(true);
-
-    const validWriter = tool.schema.safeParse({
-      subagent: "writer",
-      description: "desc",
-      prompt: "prompt",
-    });
-    expect(validWriter.success).toBe(true);
-
-    const invalidAgent = tool.schema.safeParse({
-      subagent: "nonexistent",
-      description: "desc",
-      prompt: "prompt",
-    });
-    expect(invalidAgent.success).toBe(false);
+    expect(
+      tool.schema.safeParse({
+        subagent: "researcher",
+        description: "d",
+        prompt: "p",
+      }).success
+    ).toBe(true);
+    expect(
+      tool.schema.safeParse({
+        subagent: "writer",
+        description: "d",
+        prompt: "p",
+      }).success
+    ).toBe(true);
+    expect(
+      tool.schema.safeParse({
+        subagent: "nonexistent",
+        description: "d",
+        prompt: "p",
+      }).success
+    ).toBe(false);
   });
 
   it("adds threadId field when allowThreadContinuation is set", () => {
@@ -135,26 +181,28 @@ describe("createSubagentTool", () => {
       {
         agentName: "agent",
         description: "supports continuation",
-        workflow: "workflow",
+        workflow: mockWorkflow(),
         allowThreadContinuation: true,
       },
     ]);
 
-    const withThread = tool.schema.safeParse({
-      subagent: "agent",
-      description: "desc",
-      prompt: "prompt",
-      threadId: "some-thread",
-    });
-    expect(withThread.success).toBe(true);
+    expect(
+      tool.schema.safeParse({
+        subagent: "agent",
+        description: "d",
+        prompt: "p",
+        threadId: "some-thread",
+      }).success
+    ).toBe(true);
 
-    const withNull = tool.schema.safeParse({
-      subagent: "agent",
-      description: "desc",
-      prompt: "prompt",
-      threadId: null,
-    });
-    expect(withNull.success).toBe(true);
+    expect(
+      tool.schema.safeParse({
+        subagent: "agent",
+        description: "d",
+        prompt: "p",
+        threadId: null,
+      }).success
+    ).toBe(true);
   });
 
   it("does not include threadId field when no subagent has allowThreadContinuation", () => {
@@ -162,14 +210,14 @@ describe("createSubagentTool", () => {
       {
         agentName: "basic",
         description: "basic agent",
-        workflow: "workflow",
+        workflow: mockWorkflow(),
       },
     ]);
 
     const result = tool.schema.safeParse({
       subagent: "basic",
-      description: "desc",
-      prompt: "prompt",
+      description: "d",
+      prompt: "p",
       threadId: "should-strip",
     });
     expect(result.success).toBe(true);
@@ -189,7 +237,7 @@ describe("createSubagentTool", () => {
       {
         agentName: "cont-agent",
         description: "Supports continuation",
-        workflow: "workflow",
+        workflow: mockWorkflow(),
         allowThreadContinuation: true,
       },
     ]);
@@ -206,11 +254,11 @@ describe("createSubagentHandler", () => {
   const basicSubagent: SubagentConfig = {
     agentName: "researcher",
     description: "Researches topics",
-    workflow: "researcherWorkflow",
+    workflow: mockWorkflow("researcherWorkflow"),
   };
 
   it("executes child workflow and returns response", async () => {
-    const handler = createSubagentHandler([basicSubagent]);
+    const { handler } = createSubagentHandler([basicSubagent]);
 
     const result = await handler(
       { subagent: "researcher", description: "test", prompt: "Find info" },
@@ -222,7 +270,7 @@ describe("createSubagentHandler", () => {
   });
 
   it("throws for unknown subagent name", async () => {
-    const handler = createSubagentHandler([basicSubagent]);
+    const { handler } = createSubagentHandler([basicSubagent]);
 
     await expect(
       handler(
@@ -233,12 +281,12 @@ describe("createSubagentHandler", () => {
   });
 
   it("includes available subagent names in error message", async () => {
-    const handler = createSubagentHandler([
+    const { handler } = createSubagentHandler([
       basicSubagent,
       {
         agentName: "writer",
         description: "Writes",
-        workflow: "writerWorkflow",
+        workflow: mockWorkflow("writerWorkflow"),
       },
     ]);
 
@@ -260,11 +308,11 @@ describe("createSubagentHandler", () => {
     const validatedSubagent: SubagentConfig = {
       agentName: "validated",
       description: "Has validation",
-      workflow: "workflow",
+      workflow: mockWorkflow(),
       resultSchema: z.object({ expected: z.string() }),
     };
 
-    const handler = createSubagentHandler([validatedSubagent]);
+    const { handler } = createSubagentHandler([validatedSubagent]);
 
     const result = await handler(
       { subagent: "validated", description: "test", prompt: "test" },
@@ -285,11 +333,11 @@ describe("createSubagentHandler", () => {
     const contSubagent: SubagentConfig = {
       agentName: "cont",
       description: "Continues threads",
-      workflow: "workflow",
+      workflow: mockWorkflow(),
       allowThreadContinuation: true,
     };
 
-    const handler = createSubagentHandler([contSubagent]);
+    const { handler } = createSubagentHandler([contSubagent]);
 
     const result = await handler(
       { subagent: "cont", description: "test", prompt: "test" },
@@ -306,7 +354,7 @@ describe("createSubagentHandler", () => {
       threadId: "child-t",
     });
 
-    const handler = createSubagentHandler([basicSubagent]);
+    const { handler } = createSubagentHandler([basicSubagent]);
 
     const result = await handler(
       { subagent: "researcher", description: "test", prompt: "test" },
@@ -324,11 +372,11 @@ describe("createSubagentHandler", () => {
     const inheritSubagent: SubagentConfig = {
       agentName: "inherit-agent",
       description: "Inherits sandbox",
-      workflow: "workflow",
+      workflow: mockWorkflow(),
       sandbox: "inherit",
     };
 
-    const handler = createSubagentHandler([inheritSubagent]);
+    const { handler } = createSubagentHandler([inheritSubagent]);
 
     await handler(
       { subagent: "inherit-agent", description: "test", prompt: "test" },
@@ -354,14 +402,14 @@ describe("createSubagentHandler", () => {
     const dynamicSubagent: SubagentConfig = {
       agentName: "dynamic-ctx",
       description: "Dynamic context",
-      workflow: "workflow",
+      workflow: mockWorkflow(),
       context: () => {
         counter++;
         return { invocation: counter };
       },
     };
 
-    const handler = createSubagentHandler([dynamicSubagent]);
+    const { handler } = createSubagentHandler([dynamicSubagent]);
 
     await handler(
       { subagent: "dynamic-ctx", description: "test", prompt: "test" },
@@ -381,11 +429,11 @@ describe("createSubagentHandler", () => {
     const staticSubagent: SubagentConfig = {
       agentName: "static-ctx",
       description: "Static context",
-      workflow: "workflow",
+      workflow: mockWorkflow(),
       context: { key: "value" },
     };
 
-    const handler = createSubagentHandler([staticSubagent]);
+    const { handler } = createSubagentHandler([staticSubagent]);
 
     await handler(
       { subagent: "static-ctx", description: "test", prompt: "test" },
@@ -405,11 +453,11 @@ describe("createSubagentHandler", () => {
     const ownSubagent: SubagentConfig = {
       agentName: "own-agent",
       description: "Own sandbox",
-      workflow: "workflow",
+      workflow: mockWorkflow(),
       sandbox: "own",
     };
 
-    const handler = createSubagentHandler([ownSubagent]);
+    const { handler } = createSubagentHandler([ownSubagent]);
 
     await handler(
       { subagent: "own-agent", description: "test", prompt: "test" },
@@ -425,6 +473,275 @@ describe("createSubagentHandler", () => {
     if (!lastCall) throw new Error("expected startChild call");
     const workflowInput = lastCall[1].args[1] as SubagentWorkflowInput;
     expect(workflowInput.sandboxId).toBeUndefined();
+  });
+
+  // --- Thread continuation ---
+
+  it("passes previousThreadId when allowThreadContinuation and threadId provided", async () => {
+    const { startChild } = await import("@temporalio/workflow");
+    const startMock = startChild as ReturnType<typeof vi.fn>;
+
+    const contSubagent: SubagentConfig = {
+      agentName: "cont",
+      description: "Continues",
+      workflow: mockWorkflow(),
+      allowThreadContinuation: true,
+    };
+
+    const { handler } = createSubagentHandler([contSubagent]);
+
+    await handler(
+      {
+        subagent: "cont",
+        description: "test",
+        prompt: "test",
+        threadId: "prev-thread-42",
+      },
+      { threadId: "t", toolCallId: "tc", toolName: "Subagent" }
+    );
+
+    const lastCall = startMock.mock.calls[startMock.mock.calls.length - 1];
+    if (!lastCall) throw new Error("expected startChild call");
+    const workflowInput = lastCall[1].args[1] as SubagentWorkflowInput;
+    expect(workflowInput.previousThreadId).toBe("prev-thread-42");
+  });
+
+  it("does not pass previousThreadId when allowThreadContinuation is false", async () => {
+    const { startChild } = await import("@temporalio/workflow");
+    const startMock = startChild as ReturnType<typeof vi.fn>;
+
+    const noContSubagent: SubagentConfig = {
+      agentName: "no-cont",
+      description: "No continuation",
+      workflow: mockWorkflow(),
+      allowThreadContinuation: false,
+    };
+
+    const { handler } = createSubagentHandler([noContSubagent]);
+
+    await handler(
+      {
+        subagent: "no-cont",
+        description: "test",
+        prompt: "test",
+        threadId: "prev-thread",
+      },
+      { threadId: "t", toolCallId: "tc", toolName: "Subagent" }
+    );
+
+    const lastCall = startMock.mock.calls[startMock.mock.calls.length - 1];
+    if (!lastCall) throw new Error("expected startChild call");
+    const workflowInput = lastCall[1].args[1] as SubagentWorkflowInput;
+    expect(workflowInput.previousThreadId).toBeUndefined();
+  });
+
+  // --- Sandbox continuation ---
+
+  it("does not pass sandboxId when continueSandbox is set (own sandbox)", async () => {
+    const { startChild } = await import("@temporalio/workflow");
+    const startMock = startChild as ReturnType<typeof vi.fn>;
+
+    const contSandboxSubagent: SubagentConfig = {
+      agentName: "sb-cont",
+      description: "Sandbox continuation",
+      workflow: mockWorkflow(),
+      continueSandbox: true,
+      allowThreadContinuation: true,
+    };
+
+    const { handler } = createSubagentHandler([contSandboxSubagent]);
+
+    await handler(
+      { subagent: "sb-cont", description: "test", prompt: "first run" },
+      {
+        threadId: "t",
+        toolCallId: "tc",
+        toolName: "Subagent",
+        sandboxId: "parent-sb",
+      }
+    );
+
+    const lastCall = startMock.mock.calls[startMock.mock.calls.length - 1];
+    if (!lastCall) throw new Error("expected startChild call");
+    const workflowInput = lastCall[1].args[1] as SubagentWorkflowInput;
+    expect(workflowInput.sandboxId).toBeUndefined();
+  });
+
+  it("tracks sandbox ID and passes previousSandboxId on continuation", async () => {
+    const { startChild } = await import("@temporalio/workflow");
+    const startMock = startChild as ReturnType<typeof vi.fn>;
+
+    nextStartChildResult = () => ({
+      toolResponse: "first run done",
+      data: null,
+      threadId: "child-thread-A",
+      sandboxId: "child-sb-1",
+    });
+
+    const contSandboxSubagent: SubagentConfig = {
+      agentName: "sb-cont",
+      description: "Sandbox continuation",
+      workflow: mockWorkflow(),
+      continueSandbox: true,
+      allowThreadContinuation: true,
+    };
+
+    const { handler } = createSubagentHandler([contSandboxSubagent]);
+
+    await handler(
+      { subagent: "sb-cont", description: "test", prompt: "first" },
+      { threadId: "t", toolCallId: "tc-1", toolName: "Subagent" }
+    );
+
+    nextStartChildResult = () => ({
+      toolResponse: "second run done",
+      data: null,
+      threadId: "child-thread-B",
+      sandboxId: "child-sb-2",
+    });
+
+    await handler(
+      {
+        subagent: "sb-cont",
+        description: "test",
+        prompt: "second",
+        threadId: "child-thread-A",
+      },
+      { threadId: "t", toolCallId: "tc-2", toolName: "Subagent" }
+    );
+
+    const secondCall = startMock.mock.calls[startMock.mock.calls.length - 1];
+    if (!secondCall) throw new Error("expected second startChild call");
+    const workflowInput = secondCall[1].args[1] as SubagentWorkflowInput;
+    expect(workflowInput.previousThreadId).toBe("child-thread-A");
+    expect(workflowInput.previousSandboxId).toBe("child-sb-1");
+  });
+
+  it("does not pass previousSandboxId without thread continuation", async () => {
+    const { startChild } = await import("@temporalio/workflow");
+    const startMock = startChild as ReturnType<typeof vi.fn>;
+
+    nextStartChildResult = () => ({
+      toolResponse: "done",
+      data: null,
+      threadId: "child-thread-A",
+      sandboxId: "child-sb-1",
+    });
+
+    const contSandboxSubagent: SubagentConfig = {
+      agentName: "sb-cont",
+      description: "Sandbox continuation",
+      workflow: mockWorkflow(),
+      continueSandbox: true,
+      allowThreadContinuation: true,
+    };
+
+    const { handler } = createSubagentHandler([contSandboxSubagent]);
+
+    await handler(
+      { subagent: "sb-cont", description: "test", prompt: "first" },
+      { threadId: "t", toolCallId: "tc-1", toolName: "Subagent" }
+    );
+
+    nextStartChildResult = () => ({
+      toolResponse: "new run",
+      data: null,
+      threadId: "child-thread-B",
+      sandboxId: "child-sb-2",
+    });
+
+    await handler(
+      { subagent: "sb-cont", description: "test", prompt: "no continuation" },
+      { threadId: "t", toolCallId: "tc-2", toolName: "Subagent" }
+    );
+
+    const secondCall = startMock.mock.calls[startMock.mock.calls.length - 1];
+    if (!secondCall) throw new Error("expected startChild call");
+    const workflowInput = secondCall[1].args[1] as SubagentWorkflowInput;
+    expect(workflowInput.previousSandboxId).toBeUndefined();
+    expect(workflowInput.previousThreadId).toBeUndefined();
+  });
+
+  it("adds continueSandbox subagent to pendingDestroys", async () => {
+    const { getExternalWorkflowHandle } = await import("@temporalio/workflow");
+    const handleMock = getExternalWorkflowHandle as ReturnType<typeof vi.fn>;
+    const signalSpy = vi.fn();
+    handleMock.mockReturnValue({ signal: signalSpy });
+
+    const contSandboxSubagent: SubagentConfig = {
+      agentName: "sb-cont",
+      description: "Sandbox continuation",
+      workflow: mockWorkflow(),
+      continueSandbox: true,
+    };
+
+    const { handler, destroySubagentSandboxes } = createSubagentHandler([
+      contSandboxSubagent,
+    ]);
+
+    await handler(
+      { subagent: "sb-cont", description: "test", prompt: "run" },
+      { threadId: "t", toolCallId: "tc", toolName: "Subagent" }
+    );
+
+    await destroySubagentSandboxes();
+
+    expect(handleMock).toHaveBeenCalled();
+    expect(signalSpy).toHaveBeenCalled();
+  });
+
+  it("signals destroy for sandbox=own subagents at cleanup", async () => {
+    const { getExternalWorkflowHandle } = await import("@temporalio/workflow");
+    const handleMock = getExternalWorkflowHandle as ReturnType<typeof vi.fn>;
+    const signalSpy = vi.fn();
+    handleMock.mockReturnValue({ signal: signalSpy });
+
+    const ownSubagent: SubagentConfig = {
+      agentName: "own-agent",
+      description: "Own sandbox",
+      workflow: mockWorkflow(),
+      sandbox: "own",
+    };
+
+    const { handler, destroySubagentSandboxes } = createSubagentHandler([
+      ownSubagent,
+    ]);
+
+    await handler(
+      { subagent: "own-agent", description: "test", prompt: "run" },
+      { threadId: "t", toolCallId: "tc", toolName: "Subagent" }
+    );
+
+    await destroySubagentSandboxes();
+
+    expect(handleMock).toHaveBeenCalled();
+    expect(signalSpy).toHaveBeenCalled();
+  });
+
+  it("does not signal destroy for inherit subagents", async () => {
+    const { getExternalWorkflowHandle } = await import("@temporalio/workflow");
+    const handleMock = getExternalWorkflowHandle as ReturnType<typeof vi.fn>;
+    handleMock.mockClear();
+
+    const inheritSubagent: SubagentConfig = {
+      agentName: "inherit-agent",
+      description: "Inherits sandbox",
+      workflow: mockWorkflow(),
+      sandbox: "inherit",
+    };
+
+    const { handler, destroySubagentSandboxes } = createSubagentHandler([
+      inheritSubagent,
+    ]);
+
+    await handler(
+      { subagent: "inherit-agent", description: "test", prompt: "run" },
+      { threadId: "t", toolCallId: "tc", toolName: "Subagent" }
+    );
+
+    await destroySubagentSandboxes();
+
+    expect(handleMock).not.toHaveBeenCalled();
   });
 });
 
@@ -442,15 +759,14 @@ describe("buildSubagentRegistration", () => {
       {
         agentName: "agent",
         description: "An agent",
-        workflow: "workflow",
+        workflow: mockWorkflow(),
       },
     ]);
 
     expect(reg).not.toBeNull();
-    expect(reg).toBeDefined();
     if (reg) {
-      expect(reg.name).toBe(SUBAGENT_TOOL_NAME);
-      expect(typeof reg.handler).toBe("function");
+      expect(reg.registration.name).toBe(SUBAGENT_TOOL_NAME);
+      expect(typeof reg.registration.handler).toBe("function");
     }
   });
 
@@ -460,17 +776,17 @@ describe("buildSubagentRegistration", () => {
       {
         agentName: "toggle",
         description: "Toggleable",
-        workflow: "workflow",
+        workflow: mockWorkflow(),
         enabled: () => flag,
       },
     ]);
 
     expect(reg).toBeDefined();
     if (!reg) return;
-    expect((reg.enabled as () => boolean)()).toBe(true);
+    expect((reg.registration.enabled as () => boolean)()).toBe(true);
 
     flag = false;
-    expect((reg.enabled as () => boolean)()).toBe(false);
+    expect((reg.registration.enabled as () => boolean)()).toBe(false);
   });
 
   it("disabled when all subagents are disabled", () => {
@@ -478,14 +794,14 @@ describe("buildSubagentRegistration", () => {
       {
         agentName: "off",
         description: "Disabled",
-        workflow: "workflow",
+        workflow: mockWorkflow(),
         enabled: false,
       },
     ]);
 
     expect(reg).toBeDefined();
     if (reg) {
-      expect((reg.enabled as () => boolean)()).toBe(false);
+      expect((reg.registration.enabled as () => boolean)()).toBe(false);
     }
   });
 
@@ -496,7 +812,7 @@ describe("buildSubagentRegistration", () => {
       {
         agentName: "hooked",
         description: "Has hooks",
-        workflow: "workflow",
+        workflow: mockWorkflow(),
         hooks: {
           onPreExecution: hookSpy,
         },
@@ -505,9 +821,9 @@ describe("buildSubagentRegistration", () => {
 
     expect(reg).toBeDefined();
     if (reg) {
-      expect(reg.hooks).toBeDefined();
-      if (reg.hooks) {
-        expect(reg.hooks.onPreToolUse).toBeDefined();
+      expect(reg.registration.hooks).toBeDefined();
+      if (reg.registration.hooks) {
+        expect(reg.registration.hooks.onPreToolUse).toBeDefined();
       }
     }
   });
@@ -517,13 +833,13 @@ describe("buildSubagentRegistration", () => {
       {
         agentName: "plain",
         description: "No hooks",
-        workflow: "workflow",
+        workflow: mockWorkflow(),
       },
     ]);
 
     expect(reg).toBeDefined();
     if (reg) {
-      expect(reg.hooks).toBeUndefined();
+      expect(reg.registration.hooks).toBeUndefined();
     }
   });
 
@@ -533,20 +849,20 @@ describe("buildSubagentRegistration", () => {
       {
         agentName: "a",
         description: "Agent A",
-        workflow: "workflow",
+        workflow: mockWorkflow(),
         enabled: true,
       },
       {
         agentName: "b",
         description: "Agent B",
-        workflow: "workflow",
+        workflow: mockWorkflow(),
         enabled: () => bEnabled,
       },
     ]);
 
     expect(reg).toBeDefined();
     if (reg) {
-      const desc = reg.description as () => string;
+      const desc = reg.registration.description as () => string;
       expect(desc()).toContain("Agent A");
       expect(desc()).toContain("Agent B");
 
@@ -590,10 +906,20 @@ describe("defineSubagent", () => {
     const reg = buildSubagentRegistration([config]);
     expect(reg).toBeDefined();
     if (!reg) return;
-    expect((reg.enabled as () => boolean)()).toBe(true);
+    expect((reg.registration.enabled as () => boolean)()).toBe(true);
 
     flag = false;
-    expect((reg.enabled as () => boolean)()).toBe(false);
+    expect((reg.registration.enabled as () => boolean)()).toBe(false);
+  });
+
+  it("passes continueSandbox through to config", () => {
+    const config = defineSubagent(makeDef("sb-agent"), {
+      continueSandbox: true,
+      sandbox: "own",
+    });
+
+    expect(config.continueSandbox).toBe(true);
+    expect(config.sandbox).toBe("own");
   });
 });
 
@@ -603,13 +929,11 @@ describe("defineSubagent", () => {
 
 describe("defineSubagentWorkflow", () => {
   it("maps previousThreadId to threadId + continueThread", async () => {
-    let capturedPrompt: string | undefined;
     let capturedSession: SubagentSessionInput | undefined;
 
     const workflow = defineSubagentWorkflow(
       { name: "test", description: "test agent" },
-      async (prompt, sessionInput) => {
-        capturedPrompt = prompt;
+      async (_prompt, sessionInput) => {
         capturedSession = sessionInput;
         return { toolResponse: "ok", data: null, threadId: "t" };
       }
@@ -617,7 +941,6 @@ describe("defineSubagentWorkflow", () => {
 
     await workflow("go", { previousThreadId: "prev-42" });
 
-    expect(capturedPrompt).toBe("go");
     expect(capturedSession).toEqual({
       agentName: "test",
       threadId: "prev-42",
@@ -636,7 +959,49 @@ describe("defineSubagentWorkflow", () => {
     );
 
     await workflow("go", { sandboxId: "sb-123" });
-    expect(capturedSession).toEqual({ agentName: "test", sandboxId: "sb-123" });
+    expect(capturedSession).toEqual({
+      agentName: "test",
+      sandboxId: "sb-123",
+    });
+  });
+
+  it("maps previousSandboxId", async () => {
+    let capturedSession: SubagentSessionInput | undefined;
+    const workflow = defineSubagentWorkflow(
+      { name: "test", description: "test agent" },
+      async (_prompt, sessionInput) => {
+        capturedSession = sessionInput;
+        return { toolResponse: "ok", data: null, threadId: "t" };
+      }
+    );
+
+    await workflow("go", { previousSandboxId: "prev-sb-1" });
+    expect(capturedSession).toEqual({
+      agentName: "test",
+      previousSandboxId: "prev-sb-1",
+    });
+  });
+
+  it("maps both previousThreadId and previousSandboxId together", async () => {
+    let capturedSession: SubagentSessionInput | undefined;
+    const workflow = defineSubagentWorkflow(
+      { name: "test", description: "test agent" },
+      async (_prompt, sessionInput) => {
+        capturedSession = sessionInput;
+        return { toolResponse: "ok", data: null, threadId: "t" };
+      }
+    );
+
+    await workflow("go", {
+      previousThreadId: "prev-t",
+      previousSandboxId: "prev-sb",
+    });
+    expect(capturedSession).toEqual({
+      agentName: "test",
+      threadId: "prev-t",
+      continueThread: true,
+      previousSandboxId: "prev-sb",
+    });
   });
 
   it("passes context as optional third argument", async () => {
@@ -689,5 +1054,19 @@ describe("defineSubagentWorkflow", () => {
     expect(workflow.agentName).toBe("researcher");
     expect(workflow.description).toBe("Researches topics");
     expect(workflow.resultSchema).toBe(schema);
+  });
+
+  it("passes empty workflowInput fields as empty sessionInput", async () => {
+    let capturedSession: SubagentSessionInput | undefined;
+    const workflow = defineSubagentWorkflow(
+      { name: "test", description: "test agent" },
+      async (_prompt, sessionInput) => {
+        capturedSession = sessionInput;
+        return { toolResponse: "ok", data: null, threadId: "t" };
+      }
+    );
+
+    await workflow("go", {});
+    expect(capturedSession).toEqual({ agentName: "test" });
   });
 });
