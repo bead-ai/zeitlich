@@ -60,6 +60,8 @@ export const createSession = async <T extends ToolMap, M = unknown>({
   waitForInputTimeout = "48h",
   sandbox: sandboxOps,
   sandboxId: inheritedSandboxId,
+  previousSandboxId,
+  sandboxOnExit = "destroy",
 }: SessionConfig<T, M>): Promise<ZeitlichSession<M>> => {
   const sourceThreadId = continueThread ? providedThreadId : undefined;
   const threadId =
@@ -119,6 +121,7 @@ export const createSession = async <T extends ToolMap, M = unknown>({
       finalMessage: M | null;
       exitReason: SessionExitReason;
       usage: ReturnType<AgentStateManager<TState>["getTotalUsage"]>;
+      sandboxId?: string;
     }> => {
       setHandler(
         defineUpdate<unknown, [MessageContent]>(`add${agentName}Message`),
@@ -140,14 +143,34 @@ export const createSession = async <T extends ToolMap, M = unknown>({
         }
       );
 
-      // --- Sandbox lifecycle: create or inherit ---
+      // --- Sandbox lifecycle: create, fork, or inherit ---
       let sandboxId: string | undefined = inheritedSandboxId;
-      const ownsSandbox = !sandboxId && !!sandboxOps;
-      if (ownsSandbox) {
-        const result = await sandboxOps.createSandbox({ id: threadId });
-        sandboxId = result.sandboxId;
-        if (result.stateUpdate) {
-          stateManager.mergeUpdate(result.stateUpdate as Partial<TState>);
+      const hasOwnSandbox = sandboxId || previousSandboxId;
+
+      if (hasOwnSandbox && !sandboxOps) {
+        throw ApplicationFailure.create({
+          message: "No sandboxOps provided — cannot manage sandbox lifecycle",
+          nonRetryable: true,
+        });
+      }
+
+      if (sandboxId && previousSandboxId) {
+        throw ApplicationFailure.create({
+          message:
+            "Both sandboxId and previousSandboxId provided — cannot manage sandbox lifecycle",
+          nonRetryable: true,
+        });
+      }
+
+      if (sandboxOps) {
+        if (previousSandboxId) {
+          sandboxId = await sandboxOps.forkSandbox(previousSandboxId);
+        } else if (!sandboxId) {
+          const result = await sandboxOps.createSandbox();
+          sandboxId = result.sandboxId;
+          if (result.stateUpdate) {
+            stateManager.mergeUpdate(result.stateUpdate as Partial<TState>);
+          }
         }
       }
 
@@ -265,8 +288,15 @@ export const createSession = async <T extends ToolMap, M = unknown>({
       } finally {
         await callSessionEnd(exitReason, stateManager.getTurns());
 
-        if (ownsSandbox && sandboxId && sandboxOps) {
-          await sandboxOps.destroySandbox(sandboxId);
+        if (hasOwnSandbox && sandboxId && sandboxOps) {
+          if (sandboxOnExit === "destroy") {
+            await sandboxOps.destroySandbox(sandboxId);
+          } else if (
+            sandboxOnExit === "pause" ||
+            sandboxOnExit === "pause-until-parent-close"
+          ) {
+            await sandboxOps.pauseSandbox(sandboxId);
+          }
         }
       }
 
@@ -275,8 +305,9 @@ export const createSession = async <T extends ToolMap, M = unknown>({
         finalMessage: null,
         exitReason,
         usage: stateManager.getTotalUsage(),
+        toBeDestroyedSandboxId:
+          sandboxOnExit === "destroy" ? sandboxId : undefined,
       };
     },
   };
 };
-

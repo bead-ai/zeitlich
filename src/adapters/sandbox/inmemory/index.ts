@@ -18,7 +18,7 @@ import type {
   DirentEntry,
   FileStat,
 } from "../../../lib/sandbox/types";
-import { SandboxNotFoundError } from "../../../lib/sandbox/types";
+import { SandboxNotFoundError, SandboxNotSupportedError } from "../../../lib/sandbox/types";
 import { getShortId } from "../../../lib/thread/id";
 
 // ============================================================================
@@ -155,6 +155,10 @@ export class InMemorySandboxProvider implements SandboxProvider {
       await sandbox.destroy();
       this.sandboxes.delete(id);
     }
+  }
+
+  async pause(_sandboxId: string, _ttlSeconds?: number): Promise<void> {
+    throw new SandboxNotSupportedError("pause");
   }
 
   async create(options?: SandboxCreateOptions): Promise<SandboxCreateResult> {

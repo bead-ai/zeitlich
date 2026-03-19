@@ -28,7 +28,9 @@ export class SandboxManager<
   TSandbox extends Sandbox = Sandbox,
   TId extends string = string,
 > {
-  constructor(private provider: SandboxProvider<TOptions, TSandbox> & { readonly id: TId }) {}
+  constructor(
+    private provider: SandboxProvider<TOptions, TSandbox> & { readonly id: TId }
+  ) {}
 
   async create(
     options?: TOptions
@@ -43,6 +45,10 @@ export class SandboxManager<
 
   async destroy(id: string): Promise<void> {
     await this.provider.destroy(id);
+  }
+
+  async pause(id: string, ttlSeconds?: number): Promise<void> {
+    await this.provider.pause(id, ttlSeconds);
   }
 
   async snapshot(id: string): Promise<SandboxSnapshot> {
@@ -94,6 +100,12 @@ export class SandboxManager<
       },
       destroySandbox: async (sandboxId: string): Promise<void> => {
         await this.destroy(sandboxId);
+      },
+      pauseSandbox: async (
+        sandboxId: string,
+        ttlSeconds?: number
+      ): Promise<void> => {
+        await this.pause(sandboxId, ttlSeconds);
       },
       snapshotSandbox: async (sandboxId: string): Promise<SandboxSnapshot> => {
         return this.snapshot(sandboxId);

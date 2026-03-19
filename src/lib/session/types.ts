@@ -118,6 +118,21 @@ export interface SessionConfig<T extends ToolMap, M = unknown> {
    * sandbox on exit (the owner is responsible for cleanup).
    */
   sandboxId?: string;
+  /**
+   * The child's own previously-paused sandbox ID to fork from at the start of
+   * a continued session. Takes precedence over `sandboxId` for the fork path.
+   * Populated automatically by the subagent handler when `continueSandbox` is set.
+   */
+  previousSandboxId?: string;
+  /**
+   * Sandbox lifecycle policy applied when this session exits.
+   *
+   * Defaults to `{ kind: "destroy" }` when omitted.
+   *
+   * Has no effect if the session does not own the sandbox (i.e. `sandboxId`
+   * was provided by the caller).
+   */
+  sandboxOnExit?: "destroy" | "pause" | "pause-until-parent-close";
 }
 
 export interface ZeitlichSession<M = unknown> {

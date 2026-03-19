@@ -7,7 +7,7 @@ import type {
 
 /** ToolHandlerResponse with threadId required (subagents must always surface their thread) */
 export type SubagentHandlerResponse<TResult = null> =
-  ToolHandlerResponse<TResult> & { threadId: string };
+  ToolHandlerResponse<TResult> & { threadId: string; sandboxId?: string };
 
 /**
  * Raw workflow input fields passed from parent to child workflow.
@@ -18,12 +18,14 @@ export interface SubagentWorkflowInput {
   previousThreadId?: string;
   /** Sandbox ID inherited from parent */
   sandboxId?: string;
+  /** Sandbox ID to fork from */
+  previousSandboxId?: string;
 }
 
 export type SubagentWorkflow<TResult extends z.ZodType = z.ZodType> = (
   prompt: string,
   workflowInput: SubagentWorkflowInput,
-  context?: Record<string, unknown>,
+  context?: Record<string, unknown>
 ) => Promise<SubagentHandlerResponse<z.infer<TResult> | null>>;
 
 /**
@@ -36,7 +38,7 @@ export type SubagentDefinition<
 > = ((
   prompt: string,
   workflowInput: SubagentWorkflowInput,
-  context?: TContext,
+  context?: TContext
 ) => Promise<SubagentHandlerResponse<z.infer<TResult> | null>>) & {
   readonly agentName: string;
   readonly description: string;
@@ -82,6 +84,10 @@ export interface SubagentConfig<TResult extends z.ZodType = z.ZodType> {
    * - `'own'`: the child creates and owns its own sandbox.
    */
   sandbox?: "inherit" | "own";
+  /**
+   * When true, the sandboxes are paused on exit rather than destroyed. Any threads that continue from this subagent will fork from the paused sandbox.
+   */
+  continueSandbox?: boolean;
 }
 
 /**
