@@ -2,6 +2,7 @@ import type { z } from "zod";
 import {
   workflowInfo,
   getExternalWorkflowHandle,
+  ApplicationFailure,
 } from "@temporalio/workflow";
 import type {
   SubagentDefinition,
@@ -105,13 +106,18 @@ export function defineSubagentWorkflow(
     const result = await fn(prompt, sessionInput, context ?? {});
 
     const { parent } = workflowInfo();
-    if (parent) {
-      const parentHandle = getExternalWorkflowHandle(parent.workflowId);
-      await parentHandle.signal(childResultSignal, {
-        childWorkflowId: workflowInfo().workflowId,
-        result,
+    if (!parent) {
+      throw ApplicationFailure.create({
+        message: "Subagent workflow called without a parent workflow",
+        nonRetryable: true,
       });
     }
+
+    const parentHandle = getExternalWorkflowHandle(parent.workflowId);
+    await parentHandle.signal(childResultSignal, {
+      childWorkflowId: workflowInfo().workflowId,
+      result,
+    });
 
     return result;
   };
