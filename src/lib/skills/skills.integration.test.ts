@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 import { parseSkillFile } from "./parse";
 import { createReadSkillTool } from "./tool";
 import { createReadSkillHandler } from "./handler";
-import { buildSkillRegistration } from "./register";
-import type { Skill } from "./types";
+import { createReadSkillReferenceTool } from "./reference-tool";
+import { createReadSkillReferenceHandler } from "./reference-handler";
+import { buildSkillRegistration, buildSkillReferenceRegistration } from "./register";
+import type { Skill, SkillProvider } from "./types";
 
 // ---------------------------------------------------------------------------
 // parseSkillFile
@@ -252,12 +254,109 @@ describe("createReadSkillHandler", () => {
 });
 
 // ---------------------------------------------------------------------------
+// createReadSkillReferenceTool
+// ---------------------------------------------------------------------------
+
+describe("createReadSkillReferenceTool", () => {
+  const skills: Skill[] = [
+    { name: "skill-a", description: "First skill", instructions: "Do A", references: ["overview", "examples"] },
+    { name: "skill-b", description: "Second skill", instructions: "Do B" },
+  ];
+
+  it("creates a tool with correct name", () => {
+    const tool = createReadSkillReferenceTool(skills);
+    expect(tool.name).toBe("ReadSkillReference");
+  });
+
+  it("description lists references per skill", () => {
+    const tool = createReadSkillReferenceTool(skills);
+    expect(tool.description).toContain("skill-a");
+    expect(tool.description).toContain("overview");
+    expect(tool.description).toContain("examples");
+  });
+
+  it("schema enum only includes skills that have references", () => {
+    const tool = createReadSkillReferenceTool(skills);
+    const validResult = tool.schema.safeParse({ skill_name: "skill-a", reference_name: "overview" });
+    expect(validResult.success).toBe(true);
+
+    const invalidResult = tool.schema.safeParse({ skill_name: "skill-b", reference_name: "overview" });
+    expect(invalidResult.success).toBe(false);
+  });
+
+  it("throws when no skills have references", () => {
+    const noRefSkills: Skill[] = [
+      { name: "skill-a", description: "First", instructions: "Do A" },
+    ];
+    expect(() => createReadSkillReferenceTool(noRefSkills)).toThrow(
+      "createReadSkillReferenceTool requires at least one skill with references"
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// createReadSkillReferenceHandler
+// ---------------------------------------------------------------------------
+
+describe("createReadSkillReferenceHandler", () => {
+  it("returns reference content via provider.getReference", async () => {
+    const provider: SkillProvider = {
+      listSkills: async () => [],
+      loadAll: async () => [],
+      getSkill: async () => ({ name: "s", description: "d", instructions: "i" }),
+      getReference: async (skillName, refName) => `Content of ${skillName}/${refName}`,
+    };
+
+    const handler = createReadSkillReferenceHandler(provider);
+    const result = await handler({ skill_name: "skill-a", reference_name: "overview" });
+
+    expect(result.toolResponse).toBe("Content of skill-a/overview");
+    expect(result.data).toBeNull();
+  });
+
+  it("returns error when provider has no getReference", async () => {
+    const provider: SkillProvider = {
+      listSkills: async () => [],
+      loadAll: async () => [],
+      getSkill: async () => ({ name: "s", description: "d", instructions: "i" }),
+    };
+
+    const handler = createReadSkillReferenceHandler(provider);
+    const result = await handler({ skill_name: "skill-a", reference_name: "overview" });
+
+    expect(result.toolResponse).toContain("does not support reference loading");
+  });
+
+  it("returns error when reference not found", async () => {
+    const provider: SkillProvider = {
+      listSkills: async () => [],
+      loadAll: async () => [],
+      getSkill: async () => ({ name: "s", description: "d", instructions: "i" }),
+      getReference: async () => { throw new Error("Reference not found"); },
+    };
+
+    const handler = createReadSkillReferenceHandler(provider);
+    const result = await handler({ skill_name: "skill-a", reference_name: "missing" });
+
+    expect(result.toolResponse).toContain("not found");
+  });
+});
+
+// ---------------------------------------------------------------------------
 // buildSkillRegistration
 // ---------------------------------------------------------------------------
 
 describe("buildSkillRegistration", () => {
   it("returns null for empty skills array", () => {
     expect(buildSkillRegistration([])).toBeNull();
+  });
+
+  it("throws on duplicate skill names", () => {
+    const skills: Skill[] = [
+      { name: "dupe", description: "First", instructions: "A" },
+      { name: "dupe", description: "Second", instructions: "B" },
+    ];
+    expect(() => buildSkillRegistration(skills)).toThrow("Duplicate skill names: dupe");
   });
 
   it("returns a complete tool entry with handler", () => {
@@ -304,5 +403,75 @@ describe("buildSkillRegistration", () => {
     }
     expect(result.toolResponse).toBe("Test instructions content");
     return;
+  });
+});
+
+// ---------------------------------------------------------------------------
+// buildSkillReferenceRegistration
+// ---------------------------------------------------------------------------
+
+describe("buildSkillReferenceRegistration", () => {
+  const provider: SkillProvider = {
+    listSkills: async () => [],
+    loadAll: async () => [],
+    getSkill: async () => ({ name: "s", description: "d", instructions: "i" }),
+    getReference: async (skillName, refName) => `Content of ${skillName}/${refName}`,
+  };
+
+  const providerNoRefs: SkillProvider = {
+    listSkills: async () => [],
+    loadAll: async () => [],
+    getSkill: async () => ({ name: "s", description: "d", instructions: "i" }),
+  };
+
+  it("returns null when provider has no getReference", () => {
+    const skills: Skill[] = [
+      { name: "skill-a", description: "A", instructions: "A", references: ["ref"] },
+    ];
+    expect(buildSkillReferenceRegistration(skills, providerNoRefs)).toBeNull();
+  });
+
+  it("returns null when no skills have references", () => {
+    const skills: Skill[] = [
+      { name: "skill-a", description: "A", instructions: "A" },
+    ];
+    expect(buildSkillReferenceRegistration(skills, provider)).toBeNull();
+  });
+
+  it("throws on duplicate skill names", () => {
+    const skills: Skill[] = [
+      { name: "dupe", description: "First", instructions: "A", references: ["ref"] },
+      { name: "dupe", description: "Second", instructions: "B", references: ["ref"] },
+    ];
+    expect(() => buildSkillReferenceRegistration(skills, provider)).toThrow("Duplicate skill names: dupe");
+  });
+
+  it("returns a complete tool entry for skills with references", () => {
+    const skills: Skill[] = [
+      { name: "skill-a", description: "A", instructions: "A", references: ["overview"] },
+    ];
+
+    const registration = buildSkillReferenceRegistration(skills, provider);
+    expect(registration).not.toBeNull();
+    if (!registration) return;
+    expect(registration.name).toBe("ReadSkillReference");
+    expect(registration.handler).toBeDefined();
+  });
+
+  it("registered handler returns reference content end-to-end", async () => {
+    const skills: Skill[] = [
+      { name: "skill-a", description: "A", instructions: "A", references: ["overview"] },
+    ];
+
+    const registration = buildSkillReferenceRegistration(skills, provider);
+    expect(registration).not.toBeNull();
+    if (!registration) return;
+
+    const result = await registration.handler(
+      { skill_name: "skill-a", reference_name: "overview" },
+      { threadId: "t-1", toolCallId: "tc-1", toolName: "ReadSkillReference" },
+    );
+
+    expect(result.toolResponse).toBe("Content of skill-a/overview");
   });
 });

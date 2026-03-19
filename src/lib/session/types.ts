@@ -11,7 +11,7 @@ import type {
 } from "../tool-router/types";
 import type { Hooks } from "../hooks/types";
 import type { SubagentConfig } from "../subagent/types";
-import type { Skill } from "../skills/types";
+import type { SkillProvider } from "../skills/types";
 import type { SandboxOps } from "../sandbox/types";
 import type { RunAgentActivity } from "../model/types";
 import type { AgentStateManager, JsonSerializable } from "../state/types";
@@ -95,8 +95,11 @@ export interface SessionConfig<T extends ToolMap, M = unknown> {
   tools?: T;
   /** Subagent configurations */
   subagents?: SubagentConfig[];
-  /** Skills available to this agent (metadata + instructions, loaded activity-side) */
-  skills?: Skill[];
+  /**
+   * Provider for skills available to this agent. Used to load skill metadata,
+   * instructions, and references on demand.
+   */
+  skillProvider?: SkillProvider;
   /** Session lifecycle hooks */
   hooks?: Hooks<T, ToolCallResultUnion<InferToolResults<T>>>;
   /** Whether to process tools in parallel */

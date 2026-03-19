@@ -30,7 +30,8 @@ export class FileSystemSkillProvider implements SkillProvider {
     for (const dir of dirs) {
       const raw = await this.fs.readFile(join(this.baseDir, dir, "SKILL.md"));
       const { frontmatter } = parseSkillFile(raw);
-      skills.push(frontmatter);
+      const references = await this.discoverReferenceNames(dir);
+      skills.push({ ...frontmatter, ...(references.length > 0 && { references }) });
     }
 
     return skills;
@@ -48,7 +49,16 @@ export class FileSystemSkillProvider implements SkillProvider {
       );
     }
 
-    return { ...frontmatter, instructions: body };
+    const references = await this.discoverReferenceNames(name);
+    return { ...frontmatter, instructions: body, ...(references.length > 0 && { references }) };
+  }
+
+  async getReference(skillName: string, refName: string): Promise<string> {
+    const refPath = join(this.baseDir, skillName, "references", `${refName}.md`);
+    if (!(await this.fs.exists(refPath))) {
+      throw new Error(`Reference "${refName}" not found in skill "${skillName}"`);
+    }
+    return this.fs.readFile(refPath);
   }
 
   /**
@@ -62,10 +72,20 @@ export class FileSystemSkillProvider implements SkillProvider {
     for (const dir of dirs) {
       const raw = await this.fs.readFile(join(this.baseDir, dir, "SKILL.md"));
       const { frontmatter, body } = parseSkillFile(raw);
-      skills.push({ ...frontmatter, instructions: body });
+      const references = await this.discoverReferenceNames(dir);
+      skills.push({ ...frontmatter, instructions: body, ...(references.length > 0 && { references }) });
     }
 
     return skills;
+  }
+
+  private async discoverReferenceNames(skillDir: string): Promise<string[]> {
+    const refsPath = join(this.baseDir, skillDir, "references");
+    if (!(await this.fs.exists(refsPath))) return [];
+    const entries = await this.fs.readdirWithFileTypes(refsPath);
+    return entries
+      .filter((e) => e.isFile && e.name.endsWith(".md"))
+      .map((e) => e.name.slice(0, -3));
   }
 
   private async discoverSkillDirs(): Promise<string[]> {

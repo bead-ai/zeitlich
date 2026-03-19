@@ -11,7 +11,7 @@ import { createToolRouter } from "../tool-router/router";
 import type { ParsedToolCallUnion, ToolMap } from "../tool-router/types";
 import { getShortId } from "../thread/id";
 import { buildSubagentRegistration } from "../subagent/register";
-import { buildSkillRegistration } from "../skills/register";
+import { buildSkillRegistration, buildSkillReferenceRegistration } from "../skills/register";
 import { uuid4 } from "@temporalio/workflow";
 
 /**
@@ -51,7 +51,7 @@ export const createSession = async <T extends ToolMap, M = unknown>({
   threadOps,
   buildContextMessage,
   subagents,
-  skills,
+  skillProvider,
   tools = {} as T,
   processToolsInParallel = true,
   hooks = {},
@@ -80,9 +80,12 @@ export const createSession = async <T extends ToolMap, M = unknown>({
     const reg = buildSubagentRegistration(subagents);
     if (reg) plugins.push(reg);
   }
-  if (skills) {
+  if (skillProvider) {
+    const skills = await skillProvider.loadAll();
     const reg = buildSkillRegistration(skills);
     if (reg) plugins.push(reg);
+    const refReg = buildSkillReferenceRegistration(skills, skillProvider);
+    if (refReg) plugins.push(refReg);
   }
 
   const toolRouter = createToolRouter({
