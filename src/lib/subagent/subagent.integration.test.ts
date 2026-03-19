@@ -391,6 +391,35 @@ describe("createSubagentHandler", () => {
     expect(workflowInput.sandboxId).toBe("parent-sb");
   });
 
+  it("does not pass sandboxId to child when sandbox is own", async () => {
+    const { startChild } = await import("@temporalio/workflow");
+    const startMock = startChild as ReturnType<typeof vi.fn>;
+
+    const ownSubagent: SubagentConfig = {
+      agentName: "own-agent",
+      description: "Own sandbox",
+      workflow: mockWorkflow(),
+      sandbox: "own",
+    };
+
+    const { handler } = createSubagentHandler([ownSubagent]);
+
+    await handler(
+      { subagent: "own-agent", description: "test", prompt: "test" },
+      {
+        threadId: "t",
+        toolCallId: "tc",
+        toolName: "Subagent",
+        sandboxId: "parent-sb",
+      }
+    );
+
+    const lastCall = startMock.mock.calls[startMock.mock.calls.length - 1];
+    if (!lastCall) throw new Error("expected startChild call");
+    const workflowInput = lastCall[1].args[1] as SubagentWorkflowInput;
+    expect(workflowInput.sandboxId).toBeUndefined();
+  });
+
   it("resolves context function at invocation time", async () => {
     const { startChild } = await import("@temporalio/workflow");
     const startMock = startChild as ReturnType<typeof vi.fn>;
