@@ -144,4 +144,6 @@ export interface SubagentSessionInput {
   sandboxId?: string;
   /** Previously-paused sandbox ID to fork from (sandbox continuation) */
   previousSandboxId?: string;
+  /** What to do with the sandbox when the session ends (default: "destroy") */
+  sandboxOnExit?: "destroy" | "pause" | "pause-until-parent-close";
 }

@@ -65,7 +65,11 @@ import { childResultSignal, destroySandboxSignal } from "./signals";
 export function defineSubagentWorkflow<
   TContext extends Record<string, unknown> = Record<string, unknown>,
 >(
-  config: { name: string; description: string },
+  config: {
+    name: string;
+    description: string;
+    sandboxOnExit?: "destroy" | "pause" | "pause-until-parent-close";
+  },
   fn: (
     prompt: string,
     sessionInput: SubagentSessionInput,
@@ -77,7 +81,12 @@ export function defineSubagentWorkflow<
   TResult extends z.ZodType,
   TContext extends Record<string, unknown> = Record<string, unknown>,
 >(
-  config: { name: string; description: string; resultSchema: TResult },
+  config: {
+    name: string;
+    description: string;
+    resultSchema: TResult;
+    sandboxOnExit?: "destroy" | "pause" | "pause-until-parent-close";
+  },
   fn: (
     prompt: string,
     sessionInput: SubagentSessionInput,
@@ -85,7 +94,12 @@ export function defineSubagentWorkflow<
   ) => Promise<SubagentFnResult<z.infer<TResult> | null>>
 ): SubagentDefinition<TResult, TContext>;
 export function defineSubagentWorkflow(
-  config: { name: string; description: string; resultSchema?: z.ZodType },
+  config: {
+    name: string;
+    description: string;
+    resultSchema?: z.ZodType;
+    sandboxOnExit?: "destroy" | "pause" | "pause-until-parent-close";
+  },
   fn: (
     prompt: string,
     sessionInput: SubagentSessionInput,
@@ -100,6 +114,7 @@ export function defineSubagentWorkflow(
   ): Promise<SubagentHandlerResponse<unknown>> => {
     const sessionInput: SubagentSessionInput = {
       agentName: config.name,
+      sandboxOnExit: config.sandboxOnExit ?? "destroy",
       ...(workflowInput.previousThreadId && {
         threadId: workflowInput.previousThreadId,
         continueThread: true,
