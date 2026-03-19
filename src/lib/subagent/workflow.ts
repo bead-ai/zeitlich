@@ -130,6 +130,14 @@ export function defineSubagentWorkflow(
       context ?? {}
     );
 
+    const sandboxOnExit = config.sandboxOnExit ?? "destroy";
+    if (sandboxOnExit !== "destroy" && !destroySandbox) {
+      throw ApplicationFailure.create({
+        message: `Subagent "${config.name}" has sandboxOnExit="${sandboxOnExit}" but fn did not return a destroySandbox callback`,
+        nonRetryable: true,
+      });
+    }
+
     const { parent } = workflowInfo();
     if (!parent) {
       throw ApplicationFailure.create({
