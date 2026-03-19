@@ -131,7 +131,7 @@ export function defineSubagentWorkflow(
     );
 
     const sandboxOnExit = config.sandboxOnExit ?? "destroy";
-    if (sandboxOnExit !== "destroy" && !destroySandbox) {
+    if (sandboxOnExit === "pause-until-parent-close" && !destroySandbox) {
       throw ApplicationFailure.create({
         message: `Subagent "${config.name}" has sandboxOnExit="${sandboxOnExit}" but fn did not return a destroySandbox callback`,
         nonRetryable: true,
