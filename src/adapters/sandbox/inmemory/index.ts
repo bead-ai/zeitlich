@@ -27,7 +27,8 @@ import { getShortId } from "../../../lib/thread/id";
 
 function toSandboxFs(fs: IFileSystem): SandboxFileSystem {
   const workspaceBase = "/";
-  const normalisePath = (path: string): string => fs.resolvePath(workspaceBase, path);
+  const normalisePath = (path: string): string =>
+    fs.resolvePath(workspaceBase, path);
 
   return {
     workspaceBase,
@@ -68,7 +69,8 @@ function toSandboxFs(fs: IFileSystem): SandboxFileSystem {
       return fs.readdirWithFileTypes(dirPath);
     },
     rm: (path, opts) => fs.rm(normalisePath(path), opts),
-    cp: (src, dest, opts) => fs.cp(normalisePath(src), normalisePath(dest), opts),
+    cp: (src, dest, opts) =>
+      fs.cp(normalisePath(src), normalisePath(dest), opts),
     mv: (src, dest) => fs.mv(normalisePath(src), normalisePath(dest)),
     readlink: (path) => fs.readlink(normalisePath(path)),
     resolvePath: (base, p) => fs.resolvePath(normalisePath(base), p),
@@ -157,6 +159,10 @@ export class InMemorySandboxProvider implements SandboxProvider {
     }
   }
 
+  async pause(_sandboxId: string, _ttlSeconds?: number): Promise<void> {
+    // In-memory: nothing to pause
+  }
+
   async create(options?: SandboxCreateOptions): Promise<SandboxCreateResult> {
     const id = options?.id ?? getShortId();
     const initialFiles: InitialFiles = {};
@@ -200,8 +206,22 @@ export class InMemorySandboxProvider implements SandboxProvider {
     };
   }
 
-  async fork(_sandboxId: string): Promise<Sandbox> {
-    throw new Error("Not implemented");
+  async fork(sandboxId: string): Promise<Sandbox> {
+    const sandbox = await this.get(sandboxId);
+
+    const entries = await sandbox.fs.readdirWithFileTypes("/");
+    const initialFiles: Record<string, Uint8Array> = {};
+    for (const entry of entries) {
+      if (entry.isFile) {
+        initialFiles[entry.name] = await sandbox.fs.readFileBuffer(entry.name);
+      }
+    }
+
+    const newSandbox = await this.create({
+      id: getShortId(),
+      initialFiles,
+    });
+    return newSandbox.sandbox;
   }
 
   async restore(snapshot: SandboxSnapshot): Promise<Sandbox> {

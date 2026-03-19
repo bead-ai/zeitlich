@@ -38,7 +38,11 @@ vi.mock("@temporalio/workflow", () => {
     condition: async (fn: () => boolean) => fn(),
     defineUpdate: (name: string) => ({ __type: "update", name }),
     defineQuery: (name: string) => ({ __type: "query", name }),
+    defineSignal: (name: string) => ({ __type: "signal", name }),
     setHandler: (_def: unknown, _handler: unknown) => {},
+    startChild: async () => ({ result: () => Promise.resolve(null) }),
+    workflowInfo: () => ({ taskQueue: "default-queue" }),
+    getExternalWorkflowHandle: () => ({ signal: async () => {} }),
     uuid4: () =>
       `00000000-0000-0000-0000-${String(++idCounter).padStart(12, "0")}`,
     ApplicationFailure: MockApplicationFailure,
@@ -490,9 +494,9 @@ describe("createSession integration", () => {
     const sandboxLog: string[] = [];
 
     const sandboxOps: SandboxOps = {
-      createSandbox: async (options) => {
-        sandboxLog.push(`create:${options?.id ?? "unknown"}`);
-        return { sandboxId: `sb-${options?.id ?? "unknown"}` };
+      createSandbox: async () => {
+        sandboxLog.push("create");
+        return { sandboxId: "sb-1" };
       },
       destroySandbox: async (sandboxId: string) => {
         sandboxLog.push(`destroy:${sandboxId}`);
@@ -504,6 +508,7 @@ describe("createSession integration", () => {
         createdAt: new Date().toISOString(),
       }),
       forkSandbox: async () => "forked-sandbox-id",
+      pauseSandbox: async () => {},
     };
 
     const session = await createSession({
@@ -512,7 +517,7 @@ describe("createSession integration", () => {
       runAgent: createScriptedRunAgent([{ message: "done", toolCalls: [] }]),
       threadOps: ops,
       buildContextMessage: () => "go",
-      sandbox: sandboxOps,
+      sandboxOps,
     });
 
     const stateManager = createAgentStateManager({
@@ -521,8 +526,8 @@ describe("createSession integration", () => {
 
     await session.runSession({ stateManager });
 
-    expect(sandboxLog).toContain("create:thread-1");
-    expect(sandboxLog).toContain("destroy:sb-thread-1");
+    expect(sandboxLog).toContain("create");
+    expect(sandboxLog).toContain("destroy:sb-1");
   });
 
   it("does not create or destroy sandbox when sandboxId is inherited", async () => {
@@ -544,6 +549,7 @@ describe("createSession integration", () => {
         createdAt: new Date().toISOString(),
       }),
       forkSandbox: async () => "forked-sandbox-id",
+      pauseSandbox: async () => {},
     };
 
     const session = await createSession({
@@ -552,7 +558,7 @@ describe("createSession integration", () => {
       runAgent: createScriptedRunAgent([{ message: "done", toolCalls: [] }]),
       threadOps: ops,
       buildContextMessage: () => "go",
-      sandbox: sandboxOps,
+      sandboxOps,
       sandboxId: "inherited-sb",
     });
 
@@ -581,6 +587,19 @@ describe("createSession integration", () => {
       },
     });
 
+    const sandboxOps: SandboxOps = {
+      createSandbox: async () => ({ sandboxId: "sb" }),
+      destroySandbox: async () => {},
+      pauseSandbox: async () => {},
+      snapshotSandbox: async () => ({
+        sandboxId: "sb",
+        providerId: "test",
+        data: null,
+        createdAt: new Date().toISOString(),
+      }),
+      forkSandbox: async () => "forked-sb",
+    };
+
     const session = await createSession({
       agentName: "TestAgent",
       threadId: "thread-1",
@@ -595,6 +614,7 @@ describe("createSession integration", () => {
       tools: { Spy: spyTool },
       buildContextMessage: () => "go",
       sandboxId: "my-sandbox",
+      sandboxOps,
     });
 
     const stateManager = createAgentStateManager({
@@ -789,6 +809,7 @@ describe("createSession integration", () => {
         createdAt: new Date().toISOString(),
       }),
       forkSandbox: async () => "forked-sandbox-id",
+      pauseSandbox: async () => {},
     };
 
     const session = await createSession({
@@ -797,7 +818,7 @@ describe("createSession integration", () => {
       runAgent: createScriptedRunAgent([{ message: "done", toolCalls: [] }]),
       threadOps: ops,
       buildContextMessage: () => "go",
-      sandbox: sandboxOps,
+      sandboxOps,
     });
 
     const stateManager = createAgentStateManager<{ customField: string }>({

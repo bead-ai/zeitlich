@@ -7,9 +7,7 @@ import type {
 
 /** ToolHandlerResponse with threadId required (subagents must always surface their thread) */
 export type SubagentHandlerResponse<TResult = null> =
-  ToolHandlerResponse<TResult> & {
-    threadId: string;
-  };
+  ToolHandlerResponse<TResult> & { threadId: string; sandboxId?: string };
 
 /**
  * Raw workflow input fields passed from parent to child workflow.
@@ -20,12 +18,14 @@ export interface SubagentWorkflowInput {
   previousThreadId?: string;
   /** Sandbox ID inherited from parent */
   sandboxId?: string;
+  /** Sandbox ID to fork from */
+  previousSandboxId?: string;
 }
 
 export type SubagentWorkflow<TResult extends z.ZodType = z.ZodType> = (
   prompt: string,
   workflowInput: SubagentWorkflowInput,
-  context?: Record<string, unknown>,
+  context?: Record<string, unknown>
 ) => Promise<SubagentHandlerResponse<z.infer<TResult> | null>>;
 
 /**
@@ -38,7 +38,7 @@ export type SubagentDefinition<
 > = ((
   prompt: string,
   workflowInput: SubagentWorkflowInput,
-  context?: TContext,
+  context?: TContext
 ) => Promise<SubagentHandlerResponse<z.infer<TResult> | null>>) & {
   readonly agentName: string;
   readonly description: string;
@@ -67,7 +67,7 @@ export interface SubagentConfig<TResult extends z.ZodType = z.ZodType> {
   /** Whether this subagent is available (default: true). Disabled subagents are excluded from the Subagent tool. */
   enabled?: boolean | (() => boolean);
   /** Temporal workflow function or type name (used with executeChild) */
-  workflow: string | SubagentWorkflow<TResult>;
+  workflow: SubagentWorkflow<TResult>;
   /** Optional task queue - defaults to parent's queue if not specified */
   taskQueue?: string;
   /** Optional Zod schema to validate the child workflow's result. If omitted, result is passed through as-is. */
@@ -80,10 +80,11 @@ export interface SubagentConfig<TResult extends z.ZodType = z.ZodType> {
   hooks?: SubagentHooks;
   /**
    * Sandbox strategy for this subagent.
-   * - `'inherit'` (default): reuse the parent's sandbox (shared filesystem/exec).
+   * - `'none'` (default): no sandbox — the subagent runs without sandbox access.
+   * - `'inherit'`: reuse the parent's sandbox (shared filesystem/exec).
    * - `'own'`: the child creates and owns its own sandbox.
    */
-  sandbox?: "inherit" | "own";
+  sandbox?: "none" | "inherit" | "own";
 }
 
 /**
@@ -116,6 +117,29 @@ export interface SubagentHooks<TArgs = unknown, TResult = unknown> {
   }) => PostToolUseFailureHookResult | Promise<PostToolUseFailureHookResult>;
 }
 
+export type SandboxOnExitPolicy = "destroy" | "pause" | "pause-until-parent-close";
+
+/**
+ * Extended response from the subagent `fn` — includes optional cleanup callbacks
+ * stripped before signaling the parent.
+ *
+ * When `TSandboxOnExit` is `"pause-until-parent-close"`, both `destroySandbox`
+ * and `sandboxId` become required so the parent can coordinate cleanup.
+ */
+export type SubagentFnResult<
+  TResult = null,
+  TSandboxOnExit extends SandboxOnExitPolicy = SandboxOnExitPolicy,
+> = SubagentHandlerResponse<TResult> &
+  (TSandboxOnExit extends "pause-until-parent-close"
+    ? { destroySandbox: () => Promise<void>; sandboxId: string }
+    : { destroySandbox?: () => Promise<void> });
+
+/** Payload sent by a child workflow to signal its result back to the parent */
+export interface ChildResultSignalPayload {
+  childWorkflowId: string;
+  result: SubagentHandlerResponse;
+}
+
 /**
  * Session config fields passed from parent to child workflow.
  */
@@ -128,4 +152,8 @@ export interface SubagentSessionInput {
   continueThread?: boolean;
   /** Sandbox ID inherited from the parent agent */
   sandboxId?: string;
+  /** Previously-paused sandbox ID to fork from (sandbox continuation) */
+  previousSandboxId?: string;
+  /** What to do with the sandbox when the session ends (default: "destroy") */
+  sandboxOnExit?: SandboxOnExitPolicy;
 }

@@ -10,7 +10,7 @@ import type {
   InferToolResults,
 } from "../tool-router/types";
 import type { Hooks } from "../hooks/types";
-import type { SubagentConfig } from "../subagent/types";
+import type { SubagentConfig, SandboxOnExitPolicy } from "../subagent/types";
 import type { Skill } from "../skills/types";
 import type { SandboxOps } from "../sandbox/types";
 import type { RunAgentActivity } from "../model/types";
@@ -111,22 +111,48 @@ export interface SessionConfig<T extends ToolMap, M = unknown> {
   /** How long to wait for input before cancelling the workflow */
   waitForInputTimeout?: Duration;
   /** Sandbox lifecycle operations (optional — omit for agents that don't need a sandbox) */
-  sandbox?: SandboxOps;
+  sandboxOps?: SandboxOps;
   /**
    * Pre-existing sandbox ID to reuse (e.g. inherited from a parent agent).
    * When set, the session skips `createSandbox` and will not destroy the
    * sandbox on exit (the owner is responsible for cleanup).
    */
   sandboxId?: string;
+  /**
+   * The child's own previously-paused sandbox ID to fork from at the start of
+   * a continued session. Takes precedence over `sandboxId` for the fork path.
+   * Populated automatically by the subagent handler when `allowThreadContinuation` is set.
+   */
+  previousSandboxId?: string;
+  /**
+   * Sandbox lifecycle policy applied when this session exits.
+   *
+   * Defaults to `{ kind: "destroy" }` when omitted.
+   *
+   * Has no effect if the session does not own the sandbox (i.e. `sandboxId`
+   * was provided by the caller).
+   */
+  sandboxOnExit?: SandboxOnExitPolicy;
 }
 
-export interface ZeitlichSession<M = unknown> {
+export type SessionResult<
+  M,
+  TState extends JsonSerializable<TState>,
+  HasSandbox extends boolean = boolean,
+> = {
+  threadId: string;
+  finalMessage: M | null;
+  exitReason: SessionExitReason;
+  usage: ReturnType<AgentStateManager<TState>["getTotalUsage"]>;
+} & (HasSandbox extends true
+  ? { sandboxId: string }
+  : { sandboxId?: undefined });
+
+export interface ZeitlichSession<
+  M = unknown,
+  HasSandbox extends boolean = boolean,
+> {
   runSession<T extends JsonSerializable<T>>(args: {
     stateManager: AgentStateManager<T>;
-  }): Promise<{
-    threadId: string;
-    finalMessage: M | null;
-    exitReason: SessionExitReason;
-    usage: ReturnType<AgentStateManager<T>["getTotalUsage"]>;
-  }>;
+  }): Promise<SessionResult<M, T, HasSandbox>>;
 }

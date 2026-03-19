@@ -1,10 +1,20 @@
 import type { z } from "zod";
+import {
+  workflowInfo,
+  getExternalWorkflowHandle,
+  setHandler,
+  condition,
+  ApplicationFailure,
+} from "@temporalio/workflow";
 import type {
   SubagentDefinition,
+  SubagentFnResult,
   SubagentHandlerResponse,
   SubagentWorkflowInput,
   SubagentSessionInput,
+  SandboxOnExitPolicy,
 } from "./types";
+import { childResultSignal, destroySandboxSignal } from "./signals";
 
 /**
  * Defines a subagent workflow with embedded metadata (name, description, resultSchema).
@@ -54,34 +64,50 @@ import type {
  */
 // Without resultSchema — data is null
 export function defineSubagentWorkflow<
+  TSandboxOnExit extends SandboxOnExitPolicy = "destroy",
   TContext extends Record<string, unknown> = Record<string, unknown>,
 >(
-  config: { name: string; description: string },
+  config: {
+    name: string;
+    description: string;
+    sandboxOnExit?: TSandboxOnExit;
+  },
   fn: (
     prompt: string,
     sessionInput: SubagentSessionInput,
     context: TContext
-  ) => Promise<SubagentHandlerResponse<null>>
+  ) => Promise<SubagentFnResult<null, TSandboxOnExit>>
 ): SubagentDefinition<z.ZodNull, TContext>;
 // With resultSchema — data is inferred from the schema
 export function defineSubagentWorkflow<
   TResult extends z.ZodType,
+  TSandboxOnExit extends SandboxOnExitPolicy = "destroy",
   TContext extends Record<string, unknown> = Record<string, unknown>,
 >(
-  config: { name: string; description: string; resultSchema: TResult },
+  config: {
+    name: string;
+    description: string;
+    resultSchema: TResult;
+    sandboxOnExit?: TSandboxOnExit;
+  },
   fn: (
     prompt: string,
     sessionInput: SubagentSessionInput,
     context: TContext
-  ) => Promise<SubagentHandlerResponse<z.infer<TResult> | null>>
+  ) => Promise<SubagentFnResult<z.infer<TResult> | null, TSandboxOnExit>>
 ): SubagentDefinition<TResult, TContext>;
 export function defineSubagentWorkflow(
-  config: { name: string; description: string; resultSchema?: z.ZodType },
+  config: {
+    name: string;
+    description: string;
+    resultSchema?: z.ZodType;
+    sandboxOnExit?: SandboxOnExitPolicy;
+  },
   fn: (
     prompt: string,
     sessionInput: SubagentSessionInput,
     context: Record<string, unknown>
-  ) => Promise<SubagentHandlerResponse<unknown>>
+  ) => Promise<SubagentFnResult<unknown>>
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): SubagentDefinition<any, any> {
   const workflow = async (
@@ -91,13 +117,62 @@ export function defineSubagentWorkflow(
   ): Promise<SubagentHandlerResponse<unknown>> => {
     const sessionInput: SubagentSessionInput = {
       agentName: config.name,
+      sandboxOnExit: config.sandboxOnExit ?? "destroy",
       ...(workflowInput.previousThreadId && {
         threadId: workflowInput.previousThreadId,
         continueThread: true,
       }),
       ...(workflowInput.sandboxId && { sandboxId: workflowInput.sandboxId }),
+      ...(workflowInput.previousSandboxId && {
+        previousSandboxId: workflowInput.previousSandboxId,
+      }),
     };
-    return fn(prompt, sessionInput, context ?? {});
+    const { destroySandbox, ...result } = await fn(
+      prompt,
+      sessionInput,
+      context ?? {}
+    );
+
+    const sandboxOnExit = config.sandboxOnExit ?? "destroy";
+    if (sandboxOnExit === "pause-until-parent-close") {
+      if (!destroySandbox) {
+        throw ApplicationFailure.create({
+          message: `Subagent "${config.name}" has sandboxOnExit="pause-until-parent-close" but fn did not return a destroySandbox callback`,
+          nonRetryable: true,
+        });
+      }
+      if (!result.sandboxId) {
+        throw ApplicationFailure.create({
+          message: `Subagent "${config.name}" has sandboxOnExit="pause-until-parent-close" but fn did not return a sandboxId`,
+          nonRetryable: true,
+        });
+      }
+    }
+
+    const { parent } = workflowInfo();
+    if (!parent) {
+      throw ApplicationFailure.create({
+        message: "Subagent workflow called without a parent workflow",
+        nonRetryable: true,
+      });
+    }
+
+    const parentHandle = getExternalWorkflowHandle(parent.workflowId);
+    await parentHandle.signal(childResultSignal, {
+      childWorkflowId: workflowInfo().workflowId,
+      result,
+    });
+
+    if (destroySandbox) {
+      let destroyRequested = false;
+      setHandler(destroySandboxSignal, () => {
+        destroyRequested = true;
+      });
+      await condition(() => destroyRequested);
+      await destroySandbox();
+    }
+
+    return result;
   };
 
   // for temporal workflow name
