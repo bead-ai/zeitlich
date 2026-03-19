@@ -44,7 +44,7 @@ export function defineSubagent<
     taskQueue?: string;
     allowThreadContinuation?: boolean;
     sandbox?: "none" | "inherit" | "own";
-    continueSandbox?: boolean;
+    allowSandboxContinuation?: boolean;
   },
 ): SubagentConfig<TResult> {
   return {

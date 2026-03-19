@@ -88,7 +88,7 @@ export interface SubagentConfig<TResult extends z.ZodType = z.ZodType> {
   /**
    * When true, the sandboxes are paused on exit rather than destroyed. Any threads that continue from this subagent will fork from the paused sandbox.
    */
-  continueSandbox?: boolean;
+  allowSandboxContinuation?: boolean;
 }
 
 /**
