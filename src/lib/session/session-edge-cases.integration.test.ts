@@ -438,7 +438,7 @@ describe("createSession edge cases", () => {
       runAgent: createScriptedRunAgent([{ message: "done", toolCalls: [] }]),
       threadOps: ops,
       buildContextMessage: () => "go",
-      sandbox: sandboxOps,
+      sandboxOps,
     });
 
     const stateManager = createAgentStateManager({
@@ -482,7 +482,7 @@ describe("createSession edge cases", () => {
       },
       threadOps: ops,
       buildContextMessage: () => "go",
-      sandbox: sandboxOps,
+      sandboxOps,
     });
 
     const stateManager = createAgentStateManager({
@@ -923,7 +923,7 @@ describe("createSession edge cases", () => {
       runAgent: createScriptedRunAgent([{ message: "done", toolCalls: [] }]),
       threadOps: ops,
       buildContextMessage: () => "go",
-      sandbox: sandboxOps,
+      sandboxOps,
     });
 
     const stateManager = createAgentStateManager({
@@ -1020,7 +1020,7 @@ describe("createSession edge cases", () => {
       runAgent: createScriptedRunAgent([{ message: "done", toolCalls: [] }]),
       threadOps: ops,
       buildContextMessage: () => "go",
-      sandbox: sandboxOps,
+      sandboxOps,
     });
 
     const stateManager = createAgentStateManager({
@@ -1054,7 +1054,7 @@ describe("createSession edge cases", () => {
       threadOps: ops,
       buildContextMessage: () => "go",
       sandboxId: "inherited-sb",
-      sandbox: sandboxOps,
+      sandboxOps,
     });
 
     const stateManager = createAgentStateManager({
@@ -1097,7 +1097,7 @@ describe("createSession edge cases", () => {
       runAgent: createScriptedRunAgent([{ message: "done", toolCalls: [] }]),
       threadOps: ops,
       buildContextMessage: () => "go",
-      sandbox: sandboxOps,
+      sandboxOps,
       sandboxId: "inherited-sb",
     });
 
@@ -1143,7 +1143,7 @@ describe("createSession edge cases", () => {
       runAgent: createScriptedRunAgent([{ message: "done", toolCalls: [] }]),
       threadOps: ops,
       buildContextMessage: () => "go",
-      sandbox: sandboxOps,
+      sandboxOps,
       previousSandboxId: "paused-sb-1",
     });
 
@@ -1186,7 +1186,7 @@ describe("createSession edge cases", () => {
       runAgent: createScriptedRunAgent([{ message: "done", toolCalls: [] }]),
       threadOps: ops,
       buildContextMessage: () => "go",
-      sandbox: sandboxOps,
+      sandboxOps,
       previousSandboxId: "old-sb",
     });
 
@@ -1228,7 +1228,7 @@ describe("createSession edge cases", () => {
       runAgent: createScriptedRunAgent([{ message: "done", toolCalls: [] }]),
       threadOps: ops,
       buildContextMessage: () => "go",
-      sandbox: sandboxOps,
+      sandboxOps,
       sandboxOnExit: "pause",
     });
 
@@ -1271,7 +1271,7 @@ describe("createSession edge cases", () => {
       runAgent: createScriptedRunAgent([{ message: "done", toolCalls: [] }]),
       threadOps: ops,
       buildContextMessage: () => "go",
-      sandbox: sandboxOps,
+      sandboxOps,
       sandboxOnExit: "pause-until-parent-close",
     });
 
@@ -1332,7 +1332,7 @@ describe("createSession edge cases", () => {
       runAgent: createScriptedRunAgent([{ message: "done", toolCalls: [] }]),
       threadOps: ops,
       buildContextMessage: () => "go",
-      sandbox: sandboxOps,
+      sandboxOps,
       sandboxId: "inherited-sb",
       previousSandboxId: "prev-sb",
     });
@@ -1427,7 +1427,7 @@ describe("createSession edge cases", () => {
       },
       threadOps: ops,
       buildContextMessage: () => "go",
-      sandbox: sandboxOps,
+      sandboxOps,
       sandboxOnExit: "pause",
     });
 

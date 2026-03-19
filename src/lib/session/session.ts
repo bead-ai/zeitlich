@@ -58,7 +58,7 @@ export const createSession = async <T extends ToolMap, M = unknown>({
   appendSystemPrompt = true,
   continueThread = false,
   waitForInputTimeout = "48h",
-  sandbox: sandboxOps,
+  sandboxOps,
   sandboxId: inheritedSandboxId,
   previousSandboxId,
   sandboxOnExit = "destroy",

@@ -111,7 +111,7 @@ export interface SessionConfig<T extends ToolMap, M = unknown> {
   /** How long to wait for input before cancelling the workflow */
   waitForInputTimeout?: Duration;
   /** Sandbox lifecycle operations (optional — omit for agents that don't need a sandbox) */
-  sandbox?: SandboxOps;
+  sandboxOps?: SandboxOps;
   /**
    * Pre-existing sandbox ID to reuse (e.g. inherited from a parent agent).
    * When set, the session skips `createSandbox` and will not destroy the

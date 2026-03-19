@@ -517,7 +517,7 @@ describe("createSession integration", () => {
       runAgent: createScriptedRunAgent([{ message: "done", toolCalls: [] }]),
       threadOps: ops,
       buildContextMessage: () => "go",
-      sandbox: sandboxOps,
+      sandboxOps,
     });
 
     const stateManager = createAgentStateManager({
@@ -558,7 +558,7 @@ describe("createSession integration", () => {
       runAgent: createScriptedRunAgent([{ message: "done", toolCalls: [] }]),
       threadOps: ops,
       buildContextMessage: () => "go",
-      sandbox: sandboxOps,
+      sandboxOps,
       sandboxId: "inherited-sb",
     });
 
@@ -614,7 +614,7 @@ describe("createSession integration", () => {
       tools: { Spy: spyTool },
       buildContextMessage: () => "go",
       sandboxId: "my-sandbox",
-      sandbox: sandboxOps,
+      sandboxOps,
     });
 
     const stateManager = createAgentStateManager({
@@ -818,7 +818,7 @@ describe("createSession integration", () => {
       runAgent: createScriptedRunAgent([{ message: "done", toolCalls: [] }]),
       threadOps: ops,
       buildContextMessage: () => "go",
-      sandbox: sandboxOps,
+      sandboxOps,
     });
 
     const stateManager = createAgentStateManager<{ customField: string }>({
