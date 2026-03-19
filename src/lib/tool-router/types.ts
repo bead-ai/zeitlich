@@ -142,6 +142,8 @@ export interface ToolHandlerResponse<TResult = null> {
   usage?: TokenUsage;
   /** Thread ID used by the handler (surfaced to the LLM for subagent thread continuation) */
   threadId?: string;
+  /** Sandbox ID created or used by the handler (e.g. child agent sandbox) */
+  sandboxId?: string;
 }
 
 /**

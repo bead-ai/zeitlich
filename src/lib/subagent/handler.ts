@@ -151,6 +151,7 @@ export function createSubagentHandler<
         toolResponse: "Subagent workflow returned no response",
         data: null,
         ...(usage && { usage }),
+        ...(childSandboxId && { sandboxId: childSandboxId }),
       };
     }
 
@@ -163,6 +164,7 @@ export function createSubagentHandler<
         toolResponse: `Subagent workflow returned invalid data: ${validated.error.message}`,
         data: null,
         ...(usage && { usage }),
+        ...(childSandboxId && { sandboxId: childSandboxId }),
       };
     }
 
@@ -178,6 +180,7 @@ export function createSubagentHandler<
       toolResponse: finalToolResponse,
       data: validated ? validated.data : data,
       ...(usage && { usage }),
+      ...(childSandboxId && { sandboxId: childSandboxId }),
     };
   };
 

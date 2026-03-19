@@ -877,6 +877,48 @@ describe("createSubagentHandler", () => {
 
     expect(handleMock).not.toHaveBeenCalled();
   });
+
+  it("returns sandboxId in response when child creates a sandbox", async () => {
+    nextStartChildResult = () => ({
+      toolResponse: "done",
+      data: null,
+      threadId: "child-t",
+      sandboxId: "child-sb-42",
+    });
+
+    const ownSubagent: SubagentConfig = {
+      agentName: "own-agent",
+      description: "Own sandbox",
+      workflow: mockWorkflow(),
+      sandbox: "own",
+    };
+
+    const { handler } = createSubagentHandler([ownSubagent]);
+
+    const result = await handler(
+      { subagent: "own-agent", description: "test", prompt: "test" },
+      { threadId: "t", toolCallId: "tc", toolName: "Subagent" }
+    );
+
+    expect(result.sandboxId).toBe("child-sb-42");
+  });
+
+  it("does not include sandboxId in response when child has none", async () => {
+    nextStartChildResult = () => ({
+      toolResponse: "done",
+      data: null,
+      threadId: "child-t",
+    });
+
+    const { handler } = createSubagentHandler([basicSubagent]);
+
+    const result = await handler(
+      { subagent: "researcher", description: "test", prompt: "test" },
+      { threadId: "t", toolCallId: "tc", toolName: "Subagent" }
+    );
+
+    expect(result.sandboxId).toBeUndefined();
+  });
 });
 
 // ---------------------------------------------------------------------------
