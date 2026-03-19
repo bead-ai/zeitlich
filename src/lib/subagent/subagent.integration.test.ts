@@ -6,7 +6,6 @@ let capturedSignalHandler:
   | null = null;
 
 let nextStartChildResult: ((prompt: string) => unknown) | null = null;
-let lastStartChildArgs: { workflowId: string; args: unknown[] } | null = null;
 
 vi.mock("@temporalio/workflow", () => {
   let counter = 0;
@@ -50,7 +49,6 @@ vi.mock("@temporalio/workflow", () => {
         _workflow: unknown,
         opts: { workflowId: string; args: unknown[] }
       ) => {
-        lastStartChildArgs = opts;
         const prompt = (opts.args as [string])[0];
         const result = nextStartChildResult
           ? nextStartChildResult(prompt)
@@ -100,7 +98,6 @@ import type {
 afterEach(() => {
   nextStartChildResult = null;
   capturedSignalHandler = null;
-  lastStartChildArgs = null;
 });
 
 function mockWorkflow(name?: string): SubagentWorkflow {
