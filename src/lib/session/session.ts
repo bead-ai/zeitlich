@@ -6,6 +6,7 @@ import {
 } from "@temporalio/workflow";
 import type { SessionExitReason, MessageContent } from "../types";
 import type { SessionConfig, ZeitlichSession } from "./types";
+import type { SandboxOps } from "../sandbox/types";
 import { type AgentStateManager, type JsonSerializable } from "../state/types";
 import { createToolRouter } from "../tool-router/router";
 import type { ParsedToolCallUnion, ToolMap } from "../tool-router/types";
@@ -17,6 +18,9 @@ import { uuid4 } from "@temporalio/workflow";
 /**
  * Creates an agent session that manages the agent loop: LLM invocation,
  * tool routing, subagent coordination, and lifecycle hooks.
+ *
+ * When `sandboxOps` is provided the returned session result is guaranteed to
+ * include `sandboxId: string`. Without it, `sandboxId` is `undefined`.
  *
  * @param config - Session and agent configuration (merged `SessionConfig` and `AgentConfig`)
  * @returns A session object with `runSession()` to start the agent loop
@@ -42,7 +46,13 @@ import { uuid4 } from "@temporalio/workflow";
  * const { finalMessage, exitReason } = await session.runSession({ stateManager });
  * ```
  */
-export const createSession = async <T extends ToolMap, M = unknown>({
+export async function createSession<T extends ToolMap, M = unknown>(
+  config: SessionConfig<T, M> & { sandboxOps: SandboxOps }
+): Promise<ZeitlichSession<M, true>>;
+export async function createSession<T extends ToolMap, M = unknown>(
+  config: SessionConfig<T, M>
+): Promise<ZeitlichSession<M, false>>;
+export async function createSession<T extends ToolMap, M = unknown>({
   threadId: providedThreadId,
   agentName,
   maxTurns = 50,
@@ -62,7 +72,7 @@ export const createSession = async <T extends ToolMap, M = unknown>({
   sandboxId: inheritedSandboxId,
   previousSandboxId,
   sandboxOnExit = "destroy",
-}: SessionConfig<T, M>): Promise<ZeitlichSession<M>> => {
+}: SessionConfig<T, M>): Promise<ZeitlichSession<M, boolean>> {
   const sourceThreadId = continueThread ? providedThreadId : undefined;
   const threadId =
     continueThread && providedThreadId
@@ -120,13 +130,7 @@ export const createSession = async <T extends ToolMap, M = unknown>({
       stateManager,
     }: {
       stateManager: AgentStateManager<TState>;
-    }): Promise<{
-      threadId: string;
-      finalMessage: M | null;
-      exitReason: SessionExitReason;
-      usage: ReturnType<AgentStateManager<TState>["getTotalUsage"]>;
-      sandboxId?: string;
-    }> => {
+    }) => {
       setHandler(
         defineUpdate<unknown, [MessageContent]>(`add${agentName}Message`),
         async (message: MessageContent) => {
@@ -245,8 +249,8 @@ export const createSession = async <T extends ToolMap, M = unknown>({
               finalMessage: message,
               exitReason,
               usage: stateManager.getTotalUsage(),
-              ...(sandboxId && { sandboxId }),
-            };
+              sandboxId,
+            } as Awaited<ReturnType<ZeitlichSession<M, boolean>["runSession"]>>;
           }
 
           const parsedToolCalls: ParsedToolCallUnion<T>[] = [];
@@ -323,8 +327,8 @@ export const createSession = async <T extends ToolMap, M = unknown>({
         finalMessage: null,
         exitReason,
         usage: stateManager.getTotalUsage(),
-        ...(sandboxId && { sandboxId }),
-      };
+        sandboxId,
+      } as Awaited<ReturnType<ZeitlichSession<M, boolean>["runSession"]>>;
     },
   };
-};
+}

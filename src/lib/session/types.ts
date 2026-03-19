@@ -135,14 +135,24 @@ export interface SessionConfig<T extends ToolMap, M = unknown> {
   sandboxOnExit?: SandboxOnExitPolicy;
 }
 
-export interface ZeitlichSession<M = unknown> {
+export type SessionResult<
+  M,
+  TState extends JsonSerializable<TState>,
+  HasSandbox extends boolean = boolean,
+> = {
+  threadId: string;
+  finalMessage: M | null;
+  exitReason: SessionExitReason;
+  usage: ReturnType<AgentStateManager<TState>["getTotalUsage"]>;
+} & (HasSandbox extends true
+  ? { sandboxId: string }
+  : { sandboxId?: undefined });
+
+export interface ZeitlichSession<
+  M = unknown,
+  HasSandbox extends boolean = boolean,
+> {
   runSession<T extends JsonSerializable<T>>(args: {
     stateManager: AgentStateManager<T>;
-  }): Promise<{
-    threadId: string;
-    finalMessage: M | null;
-    exitReason: SessionExitReason;
-    usage: ReturnType<AgentStateManager<T>["getTotalUsage"]>;
-    sandboxId?: string;
-  }>;
+  }): Promise<SessionResult<M, T, HasSandbox>>;
 }

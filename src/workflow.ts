@@ -15,7 +15,7 @@
 
 // Session
 export { createSession } from "./lib/session";
-export type { ZeitlichSession, ThreadOps, PrefixedThreadOps, ScopedPrefix, SessionConfig } from "./lib/session";
+export type { ZeitlichSession, SessionResult, ThreadOps, PrefixedThreadOps, ScopedPrefix, SessionConfig } from "./lib/session";
 export { defineWorkflow } from "./lib/workflow";
 export type { WorkflowConfig, WorkflowInput, WorkflowSessionInput } from "./lib/workflow";
 
