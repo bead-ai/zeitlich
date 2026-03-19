@@ -80,10 +80,7 @@ export function createSubagentHandler<
       taskQueue: config.taskQueue ?? parentTaskQueue,
     };
 
-    const childHandle =
-      typeof config.workflow === "string"
-        ? await startChild(config.workflow, childOpts)
-        : await startChild(config.workflow, childOpts);
+    const childHandle = await startChild(config.workflow, childOpts);
 
     // Wait for signal from child; race with child completion to propagate failures
     await Promise.race([

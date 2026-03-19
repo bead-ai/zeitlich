@@ -40,7 +40,10 @@ export function defineWorkflow<TInput, TResult>(
   config: WorkflowConfig,
   fn: (input: TInput, sessionInput: WorkflowSessionInput) => Promise<TResult>
 ): (input: TInput, workflowInput?: WorkflowInput) => Promise<TResult> {
-  const workflow = async (input: TInput, workflowInput: WorkflowInput = {}) => {
+  const workflow = async (
+    input: TInput,
+    workflowInput: WorkflowInput = {}
+  ): Promise<TResult> => {
     const sessionInput: WorkflowSessionInput = {
       agentName: config.name,
       ...(workflowInput.previousThreadId && {
