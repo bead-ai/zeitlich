@@ -115,14 +115,22 @@ export interface SubagentHooks<TArgs = unknown, TResult = unknown> {
   }) => PostToolUseFailureHookResult | Promise<PostToolUseFailureHookResult>;
 }
 
+export type SandboxOnExitPolicy = "destroy" | "pause" | "pause-until-parent-close";
+
 /**
  * Extended response from the subagent `fn` — includes optional cleanup callbacks
  * stripped before signaling the parent.
+ *
+ * When `TSandboxOnExit` is `"pause-until-parent-close"`, both `destroySandbox`
+ * and `sandboxId` become required so the parent can coordinate cleanup.
  */
-export type SubagentFnResult<TResult = null> = SubagentHandlerResponse<TResult> & {
-  /** When provided, the workflow awaits `destroySandboxSignal` from the parent then calls this. */
-  destroySandbox?: () => Promise<void>;
-};
+export type SubagentFnResult<
+  TResult = null,
+  TSandboxOnExit extends SandboxOnExitPolicy = SandboxOnExitPolicy,
+> = SubagentHandlerResponse<TResult> &
+  (TSandboxOnExit extends "pause-until-parent-close"
+    ? { destroySandbox: () => Promise<void>; sandboxId: string }
+    : { destroySandbox?: () => Promise<void> });
 
 /** Payload sent by a child workflow to signal its result back to the parent */
 export interface ChildResultSignalPayload {
@@ -145,5 +153,5 @@ export interface SubagentSessionInput {
   /** Previously-paused sandbox ID to fork from (sandbox continuation) */
   previousSandboxId?: string;
   /** What to do with the sandbox when the session ends (default: "destroy") */
-  sandboxOnExit?: "destroy" | "pause" | "pause-until-parent-close";
+  sandboxOnExit?: SandboxOnExitPolicy;
 }

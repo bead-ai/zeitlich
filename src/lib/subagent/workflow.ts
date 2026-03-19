@@ -12,6 +12,7 @@ import type {
   SubagentHandlerResponse,
   SubagentWorkflowInput,
   SubagentSessionInput,
+  SandboxOnExitPolicy,
 } from "./types";
 import { childResultSignal, destroySandboxSignal } from "./signals";
 
@@ -63,42 +64,44 @@ import { childResultSignal, destroySandboxSignal } from "./signals";
  */
 // Without resultSchema — data is null
 export function defineSubagentWorkflow<
+  TSandboxOnExit extends SandboxOnExitPolicy = "destroy",
   TContext extends Record<string, unknown> = Record<string, unknown>,
 >(
   config: {
     name: string;
     description: string;
-    sandboxOnExit?: "destroy" | "pause" | "pause-until-parent-close";
+    sandboxOnExit?: TSandboxOnExit;
   },
   fn: (
     prompt: string,
     sessionInput: SubagentSessionInput,
     context: TContext
-  ) => Promise<SubagentFnResult<null>>
+  ) => Promise<SubagentFnResult<null, TSandboxOnExit>>
 ): SubagentDefinition<z.ZodNull, TContext>;
 // With resultSchema — data is inferred from the schema
 export function defineSubagentWorkflow<
   TResult extends z.ZodType,
+  TSandboxOnExit extends SandboxOnExitPolicy = "destroy",
   TContext extends Record<string, unknown> = Record<string, unknown>,
 >(
   config: {
     name: string;
     description: string;
     resultSchema: TResult;
-    sandboxOnExit?: "destroy" | "pause" | "pause-until-parent-close";
+    sandboxOnExit?: TSandboxOnExit;
   },
   fn: (
     prompt: string,
     sessionInput: SubagentSessionInput,
     context: TContext
-  ) => Promise<SubagentFnResult<z.infer<TResult> | null>>
+  ) => Promise<SubagentFnResult<z.infer<TResult> | null, TSandboxOnExit>>
 ): SubagentDefinition<TResult, TContext>;
 export function defineSubagentWorkflow(
   config: {
     name: string;
     description: string;
     resultSchema?: z.ZodType;
-    sandboxOnExit?: "destroy" | "pause" | "pause-until-parent-close";
+    sandboxOnExit?: SandboxOnExitPolicy;
   },
   fn: (
     prompt: string,

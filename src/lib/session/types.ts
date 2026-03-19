@@ -10,7 +10,7 @@ import type {
   InferToolResults,
 } from "../tool-router/types";
 import type { Hooks } from "../hooks/types";
-import type { SubagentConfig } from "../subagent/types";
+import type { SubagentConfig, SandboxOnExitPolicy } from "../subagent/types";
 import type { Skill } from "../skills/types";
 import type { SandboxOps } from "../sandbox/types";
 import type { RunAgentActivity } from "../model/types";
@@ -132,7 +132,7 @@ export interface SessionConfig<T extends ToolMap, M = unknown> {
    * Has no effect if the session does not own the sandbox (i.e. `sandboxId`
    * was provided by the caller).
    */
-  sandboxOnExit?: "destroy" | "pause" | "pause-until-parent-close";
+  sandboxOnExit?: SandboxOnExitPolicy;
 }
 
 export interface ZeitlichSession<M = unknown> {
@@ -143,5 +143,6 @@ export interface ZeitlichSession<M = unknown> {
     finalMessage: M | null;
     exitReason: SessionExitReason;
     usage: ReturnType<AgentStateManager<T>["getTotalUsage"]>;
+    sandboxId?: string;
   }>;
 }
