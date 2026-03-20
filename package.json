@@ -190,6 +190,7 @@
     "node": ">=18"
   },
   "devDependencies": {
+    "@aws-sdk/client-bedrock-agentcore": "^3.900.0",
     "@daytonaio/sdk": "^0.149.0",
     "@e2b/code-interpreter": "^2.3.3",
     "@eslint/js": "^10.0.1",

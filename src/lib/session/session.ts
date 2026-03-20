@@ -189,9 +189,15 @@ export async function createSession<T extends ToolMap, M = unknown>({
       const sandboxMode = sandboxInit?.mode;
       let sandboxId: string | undefined;
       let sandboxOwned = false;
+      let sandboxStateUpdate: Record<string, unknown> | undefined;
 
       if (sandboxMode === "inherit") {
-        sandboxId = (sandboxInit as { mode: "inherit"; sandboxId: string }).sandboxId;
+        const inheritInit = sandboxInit as { mode: "inherit"; sandboxId: string; stateUpdate?: Record<string, unknown> };
+        sandboxId = inheritInit.sandboxId;
+        if (inheritInit.stateUpdate) {
+          sandboxStateUpdate = inheritInit.stateUpdate;
+          stateManager.mergeUpdate(inheritInit.stateUpdate as Partial<TState>);
+        }
         if (!sandboxOps) {
           throw ApplicationFailure.create({
             message: "sandboxId provided but no sandboxOps — cannot manage sandbox lifecycle",
@@ -226,6 +232,7 @@ export async function createSession<T extends ToolMap, M = unknown>({
         sandboxId = result.sandboxId;
         sandboxOwned = true;
         if (result.stateUpdate) {
+          sandboxStateUpdate = result.stateUpdate;
           stateManager.mergeUpdate(result.stateUpdate as Partial<TState>);
         }
       }
@@ -316,6 +323,7 @@ export async function createSession<T extends ToolMap, M = unknown>({
             {
               turn: currentTurn,
               ...(sandboxId !== undefined && { sandboxId }),
+              ...(sandboxStateUpdate && { sandboxStateUpdate }),
             }
           );
 

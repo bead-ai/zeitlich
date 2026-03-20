@@ -103,7 +103,11 @@ export function createSubagentHandler<
     // --- Build sandbox init ---
     let sandbox: SandboxInit | undefined;
     if (sandboxCfg.source === "inherit" && parentSandboxId) {
-      sandbox = { mode: "inherit", sandboxId: parentSandboxId };
+      sandbox = {
+        mode: "inherit",
+        sandboxId: parentSandboxId,
+        ...(context.sandboxStateUpdate && { stateUpdate: context.sandboxStateUpdate }),
+      };
     } else if (sandboxCfg.source === "own") {
       const prevSbId = continuationThreadId
         ? threadSandboxes.get(continuationThreadId)

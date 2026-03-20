@@ -34,7 +34,7 @@ export type SandboxInit =
   | { mode: "new" }
   | { mode: "continue"; sandboxId: string }
   | { mode: "fork"; sandboxId: string }
-  | { mode: "inherit"; sandboxId: string };
+  | { mode: "inherit"; sandboxId: string; stateUpdate?: Record<string, unknown> };
 
 /**
  * What to do with the sandbox when the session exits.

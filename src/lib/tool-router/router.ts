@@ -201,7 +201,8 @@ export function createToolRouter<T extends ToolMap>(
   async function processToolCall(
     toolCall: ParsedToolCallUnion<T>,
     turn: number,
-    sandboxId?: string
+    sandboxId?: string,
+    sandboxStateUpdate?: Record<string, unknown>
   ): Promise<ToolCallResultUnion<TResults> | null> {
     const startTime = Date.now();
     const tool = toolMap.get(toolCall.name);
@@ -235,6 +236,7 @@ export function createToolRouter<T extends ToolMap>(
           toolCallId: toolCall.id,
           toolName: toolCall.name,
           ...(sandboxId !== undefined && { sandboxId }),
+          ...(sandboxStateUpdate && { sandboxStateUpdate }),
         };
         const response = await tool.handler(
           effectiveArgs as Parameters<typeof tool.handler>[0],
@@ -350,10 +352,11 @@ export function createToolRouter<T extends ToolMap>(
 
       const turn = context?.turn ?? 0;
       const sandboxId = context?.sandboxId;
+      const sandboxStateUpdate = context?.sandboxStateUpdate;
 
       if (options.parallel) {
         const results = await Promise.all(
-          toolCalls.map((tc) => processToolCall(tc, turn, sandboxId))
+          toolCalls.map((tc) => processToolCall(tc, turn, sandboxId, sandboxStateUpdate))
         );
         return results.filter(
           (r): r is NonNullable<typeof r> => r !== null
@@ -362,7 +365,7 @@ export function createToolRouter<T extends ToolMap>(
 
       const results: ToolCallResultUnion<TResults>[] = [];
       for (const toolCall of toolCalls) {
-        const result = await processToolCall(toolCall, turn, sandboxId);
+        const result = await processToolCall(toolCall, turn, sandboxId, sandboxStateUpdate);
         if (result !== null) {
           results.push(result);
         }
