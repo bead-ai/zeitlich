@@ -5,11 +5,11 @@ export type {
   SubagentFnResult,
   SubagentHooks,
   SubagentHandlerResponse,
+  SubagentSandboxConfig,
   SubagentWorkflow,
   SubagentWorkflowInput,
   SubagentSessionInput,
   InferSubagentResult,
-  SandboxOnExitPolicy,
 } from "./types";
 export { createSubagentTool, SUBAGENT_TOOL_NAME } from "./tool";
 export type { SubagentArgs } from "./tool";

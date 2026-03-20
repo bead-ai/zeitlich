@@ -12,8 +12,8 @@ import type {
   SubagentHandlerResponse,
   SubagentWorkflowInput,
   SubagentSessionInput,
-  SandboxOnExitPolicy,
 } from "./types";
+import type { SubagentSandboxShutdown } from "../lifecycle";
 import { childResultSignal, destroySandboxSignal } from "./signals";
 
 /**
@@ -64,44 +64,44 @@ import { childResultSignal, destroySandboxSignal } from "./signals";
  */
 // Without resultSchema — data is null
 export function defineSubagentWorkflow<
-  TSandboxOnExit extends SandboxOnExitPolicy = "destroy",
+  TSandboxShutdown extends SubagentSandboxShutdown = "destroy",
   TContext extends Record<string, unknown> = Record<string, unknown>,
 >(
   config: {
     name: string;
     description: string;
-    sandboxOnExit?: TSandboxOnExit;
+    sandboxShutdown?: TSandboxShutdown;
   },
   fn: (
     prompt: string,
     sessionInput: SubagentSessionInput,
     context: TContext
-  ) => Promise<SubagentFnResult<null, TSandboxOnExit>>
+  ) => Promise<SubagentFnResult<null, TSandboxShutdown>>
 ): SubagentDefinition<z.ZodNull, TContext>;
 // With resultSchema — data is inferred from the schema
 export function defineSubagentWorkflow<
   TResult extends z.ZodType,
-  TSandboxOnExit extends SandboxOnExitPolicy = "destroy",
+  TSandboxShutdown extends SubagentSandboxShutdown = "destroy",
   TContext extends Record<string, unknown> = Record<string, unknown>,
 >(
   config: {
     name: string;
     description: string;
     resultSchema: TResult;
-    sandboxOnExit?: TSandboxOnExit;
+    sandboxShutdown?: TSandboxShutdown;
   },
   fn: (
     prompt: string,
     sessionInput: SubagentSessionInput,
     context: TContext
-  ) => Promise<SubagentFnResult<z.infer<TResult> | null, TSandboxOnExit>>
+  ) => Promise<SubagentFnResult<z.infer<TResult> | null, TSandboxShutdown>>
 ): SubagentDefinition<TResult, TContext>;
 export function defineSubagentWorkflow(
   config: {
     name: string;
     description: string;
     resultSchema?: z.ZodType;
-    sandboxOnExit?: SandboxOnExitPolicy;
+    sandboxShutdown?: SubagentSandboxShutdown;
   },
   fn: (
     prompt: string,
@@ -115,17 +115,14 @@ export function defineSubagentWorkflow(
     workflowInput: SubagentWorkflowInput,
     context?: Record<string, unknown>
   ): Promise<SubagentHandlerResponse<unknown>> => {
+    const effectiveShutdown =
+      workflowInput.sandboxShutdown ?? config.sandboxShutdown ?? "destroy";
+
     const sessionInput: SubagentSessionInput = {
       agentName: config.name,
-      sandboxOnExit: config.sandboxOnExit ?? "destroy",
-      ...(workflowInput.previousThreadId && {
-        threadId: workflowInput.previousThreadId,
-        continueThread: true,
-      }),
-      ...(workflowInput.sandboxId && { sandboxId: workflowInput.sandboxId }),
-      ...(workflowInput.previousSandboxId && {
-        previousSandboxId: workflowInput.previousSandboxId,
-      }),
+      sandboxShutdown: effectiveShutdown,
+      ...(workflowInput.thread && { thread: workflowInput.thread }),
+      ...(workflowInput.sandbox && { sandbox: workflowInput.sandbox }),
     };
     const { destroySandbox, ...result } = await fn(
       prompt,
@@ -133,17 +130,16 @@ export function defineSubagentWorkflow(
       context ?? {}
     );
 
-    const sandboxOnExit = config.sandboxOnExit ?? "destroy";
-    if (sandboxOnExit === "pause-until-parent-close") {
+    if (effectiveShutdown === "pause-until-parent-close") {
       if (!destroySandbox) {
         throw ApplicationFailure.create({
-          message: `Subagent "${config.name}" has sandboxOnExit="pause-until-parent-close" but fn did not return a destroySandbox callback`,
+          message: `Subagent "${config.name}" has sandboxShutdown="pause-until-parent-close" but fn did not return a destroySandbox callback`,
           nonRetryable: true,
         });
       }
       if (!result.sandboxId) {
         throw ApplicationFailure.create({
-          message: `Subagent "${config.name}" has sandboxOnExit="pause-until-parent-close" but fn did not return a sandboxId`,
+          message: `Subagent "${config.name}" has sandboxShutdown="pause-until-parent-close" but fn did not return a sandboxId`,
           nonRetryable: true,
         });
       }
