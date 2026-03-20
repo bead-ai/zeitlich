@@ -84,6 +84,14 @@ export class VirtualSandboxFileSystem<
     return this.entries.get(normalisePath(path, this.workspaceBase));
   }
 
+  /** Look up a file entry by its unique id. */
+  getEntryById(id: string): FileEntry<TMeta> | undefined {
+    for (const entry of this.entries.values()) {
+      if (entry.id === id) return entry;
+    }
+    return undefined;
+  }
+
   // --------------------------------------------------------------------------
   // Read operations — delegate to resolver lazily
   // --------------------------------------------------------------------------
