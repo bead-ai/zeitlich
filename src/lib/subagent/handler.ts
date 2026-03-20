@@ -97,6 +97,7 @@ export function createSubagentHandler<
     let thread: ThreadInit | undefined;
     if (continuationThreadId) {
       thread = { mode: threadMode as "fork" | "continue", threadId: continuationThreadId };
+
     }
 
     // --- Build sandbox init ---
@@ -201,6 +202,7 @@ export function createSubagentHandler<
     }
 
     let finalToolResponse: ToolMessageContent = toolResponse;
+
     if (allowsContinuation && childThreadId) {
       finalToolResponse =
         typeof toolResponse === "string"

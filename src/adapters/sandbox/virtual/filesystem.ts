@@ -29,7 +29,7 @@ function parentDir(p: string): string {
  */
 function inferDirectories(
   entries: { path: string }[],
-  workspaceBase: string,
+  workspaceBase: string
 ): Set<string> {
   const dirs = new Set<string>();
   dirs.add("/");
@@ -54,8 +54,7 @@ function inferDirectories(
 export class VirtualSandboxFileSystem<
   TCtx = unknown,
   TMeta = FileEntryMetadata,
-> implements SandboxFileSystem
-{
+> implements SandboxFileSystem {
   readonly workspaceBase: string;
   private entries: Map<string, FileEntry<TMeta>>;
   private directories: Set<string>;
@@ -65,11 +64,11 @@ export class VirtualSandboxFileSystem<
     tree: FileEntry<TMeta>[],
     private resolver: FileResolver<TCtx, TMeta>,
     private ctx: TCtx,
-    workspaceBase = "/",
+    workspaceBase = "/"
   ) {
     this.workspaceBase = normalisePath(workspaceBase);
     this.entries = new Map(
-      tree.map((e) => [normalisePath(e.path, this.workspaceBase), e]),
+      tree.map((e) => [normalisePath(e.path, this.workspaceBase), e])
     );
     this.directories = inferDirectories(tree, this.workspaceBase);
   }
@@ -91,13 +90,13 @@ export class VirtualSandboxFileSystem<
   async readFile(path: string): Promise<string> {
     const entry = this.entries.get(normalisePath(path, this.workspaceBase));
     if (!entry) throw new Error(`ENOENT: no such file: ${path}`);
-    return this.resolver.readFile(entry.id, this.ctx);
+    return this.resolver.readFile(entry.id, this.ctx, entry.metadata);
   }
 
   async readFileBuffer(path: string): Promise<Uint8Array> {
     const entry = this.entries.get(normalisePath(path, this.workspaceBase));
     if (!entry) throw new Error(`ENOENT: no such file: ${path}`);
-    return this.resolver.readFileBuffer(entry.id, this.ctx);
+    return this.resolver.readFileBuffer(entry.id, this.ctx, entry.metadata);
   }
 
   // --------------------------------------------------------------------------
@@ -180,7 +179,12 @@ export class VirtualSandboxFileSystem<
     const existing = this.entries.get(norm);
 
     if (existing) {
-      await this.resolver.writeFile(existing.id, content, this.ctx);
+      await this.resolver.writeFile(
+        existing.id,
+        content,
+        this.ctx,
+        existing.metadata
+      );
       const size =
         typeof content === "string"
           ? new TextEncoder().encode(content).byteLength
@@ -209,12 +213,21 @@ export class VirtualSandboxFileSystem<
       return this.writeFile(path, content);
     }
 
-    const current = await this.resolver.readFile(existing.id, this.ctx);
+    const current = await this.resolver.readFile(
+      existing.id,
+      this.ctx,
+      existing.metadata
+    );
     const appended =
       typeof content === "string"
         ? current + content
         : current + new TextDecoder().decode(content);
-    await this.resolver.writeFile(existing.id, appended, this.ctx);
+    await this.resolver.writeFile(
+      existing.id,
+      appended,
+      this.ctx,
+      existing.metadata
+    );
 
     const size = new TextEncoder().encode(appended).byteLength;
     const updated: FileEntry<TMeta> = {
@@ -226,7 +239,10 @@ export class VirtualSandboxFileSystem<
     this.mutations.push({ type: "update", path: norm, entry: updated });
   }
 
-  async mkdir(_path: string, _options?: { recursive?: boolean }): Promise<void> {
+  async mkdir(
+    _path: string,
+    _options?: { recursive?: boolean }
+  ): Promise<void> {
     const norm = normalisePath(_path, this.workspaceBase);
     if (this.directories.has(norm)) return;
 
@@ -244,13 +260,13 @@ export class VirtualSandboxFileSystem<
 
   async rm(
     path: string,
-    options?: { recursive?: boolean; force?: boolean },
+    options?: { recursive?: boolean; force?: boolean }
   ): Promise<void> {
     const norm = normalisePath(path, this.workspaceBase);
     const entry = this.entries.get(norm);
 
     if (entry) {
-      await this.resolver.deleteFile(entry.id, this.ctx);
+      await this.resolver.deleteFile(entry.id, this.ctx, entry.metadata);
       this.entries.delete(norm);
       this.mutations.push({ type: "remove", path: norm });
       return;
@@ -263,7 +279,7 @@ export class VirtualSandboxFileSystem<
       const prefix = norm === "/" ? "/" : norm + "/";
       for (const [p, e] of this.entries) {
         if (p.startsWith(prefix)) {
-          await this.resolver.deleteFile(e.id, this.ctx);
+          await this.resolver.deleteFile(e.id, this.ctx, e.metadata);
           this.entries.delete(p);
           this.mutations.push({ type: "remove", path: p });
         }
@@ -283,14 +299,18 @@ export class VirtualSandboxFileSystem<
   async cp(
     src: string,
     dest: string,
-    _options?: { recursive?: boolean },
+    _options?: { recursive?: boolean }
   ): Promise<void> {
     const normSrc = normalisePath(src, this.workspaceBase);
     const normDest = normalisePath(dest, this.workspaceBase);
 
     const entry = this.entries.get(normSrc);
     if (entry) {
-      const content = await this.resolver.readFile(entry.id, this.ctx);
+      const content = await this.resolver.readFile(
+        entry.id,
+        this.ctx,
+        entry.metadata
+      );
       await this.writeFile(normDest, content);
       return;
     }
@@ -306,7 +326,11 @@ export class VirtualSandboxFileSystem<
     for (const [p, e] of this.entries) {
       if (p.startsWith(prefix)) {
         const relative = p.slice(normSrc.length);
-        const content = await this.resolver.readFile(e.id, this.ctx);
+        const content = await this.resolver.readFile(
+          e.id,
+          this.ctx,
+          e.metadata
+        );
         await this.writeFile(normDest + relative, content);
       }
     }

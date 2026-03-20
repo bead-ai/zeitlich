@@ -56,15 +56,20 @@ export type TreeMutation<TMeta = FileEntryMetadata> =
  */
 export interface FileResolver<TCtx = unknown, TMeta = FileEntryMetadata> {
   resolveEntries(ctx: TCtx): Promise<FileEntry<TMeta>[]>;
-  readFile(id: string, ctx: TCtx): Promise<string>;
-  readFileBuffer(id: string, ctx: TCtx): Promise<Uint8Array>;
-  writeFile(id: string, content: string | Uint8Array, ctx: TCtx): Promise<void>;
+  readFile(id: string, ctx: TCtx, metadata: TMeta): Promise<string>;
+  readFileBuffer(id: string, ctx: TCtx, metadata: TMeta): Promise<Uint8Array>;
+  writeFile(
+    id: string,
+    content: string | Uint8Array,
+    ctx: TCtx,
+    metadata: TMeta
+  ): Promise<void>;
   createFile(
     path: string,
     content: string | Uint8Array,
     ctx: TCtx
   ): Promise<FileEntry<TMeta>>;
-  deleteFile(id: string, ctx: TCtx): Promise<void>;
+  deleteFile(id: string, ctx: TCtx, metadata: TMeta): Promise<void>;
 }
 
 // ============================================================================
