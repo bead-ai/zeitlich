@@ -68,7 +68,23 @@ export class BedrockSandboxFileSystem implements SandboxFileSystem {
   }
 
   private normalisePath(path: string): string {
-    return posix.resolve(this.workspaceBase, path);
+    if (
+      posix.isAbsolute(path) &&
+      !path.startsWith(this.workspaceBase + "/") &&
+      path !== this.workspaceBase
+    ) {
+      path = path.replace(/^\/+/, "");
+    }
+    const resolved = posix.resolve(this.workspaceBase, path);
+    if (
+      !resolved.startsWith(this.workspaceBase + "/") &&
+      resolved !== this.workspaceBase
+    ) {
+      throw new Error(
+        `Invalid file path: "${resolved}" escapes workspace "${this.workspaceBase}"`
+      );
+    }
+    return resolved;
   }
 
   private async invoke(
