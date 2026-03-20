@@ -142,6 +142,18 @@ export interface WorkflowTask {
 }
 
 // ============================================================================
+// Continuation modes
+// ============================================================================
+
+/**
+ * Controls how a previous thread or sandbox is reused.
+ *
+ * - `"fork"` — copy into a new thread/sandbox; the original is preserved.
+ * - `"continue"` — write directly to the existing thread/sandbox.
+ */
+export type ContinuationMode = "fork" | "continue";
+
+// ============================================================================
 // Session exit
 // ============================================================================
 

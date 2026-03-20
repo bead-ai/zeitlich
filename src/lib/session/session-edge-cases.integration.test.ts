@@ -1304,7 +1304,7 @@ describe("createSession edge cases", () => {
     });
 
     await expect(session.runSession({ stateManager })).rejects.toThrow(
-      "cannot fork from previousSandboxId"
+      "cannot fork/continue from previousSandboxId"
     );
   });
 

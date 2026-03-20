@@ -149,4 +149,157 @@ describe("defineWorkflow", () => {
 
     expect(workflow.name).toBe("my-main-workflow");
   });
+
+  it("maps previousSandboxId", async () => {
+    let capturedSession: WorkflowSessionInput | undefined;
+
+    const workflow = defineWorkflow(cfg, async (_input, sessionInput) => {
+      capturedSession = sessionInput;
+      return { ok: true };
+    });
+
+    await workflow({}, { previousSandboxId: "sb-prev-1" });
+
+    expect(capturedSession).toEqual({
+      agentName: "test-workflow",
+      previousSandboxId: "sb-prev-1",
+    });
+  });
+
+  it("maps sandboxOnExit", async () => {
+    let capturedSession: WorkflowSessionInput | undefined;
+
+    const workflow = defineWorkflow(cfg, async (_input, sessionInput) => {
+      capturedSession = sessionInput;
+      return { ok: true };
+    });
+
+    await workflow({}, { sandboxOnExit: "pause" });
+
+    expect(capturedSession).toEqual({
+      agentName: "test-workflow",
+      sandboxOnExit: "pause",
+    });
+  });
+
+  it("maps threadContinuationMode with previousThreadId", async () => {
+    let capturedSession: WorkflowSessionInput | undefined;
+
+    const workflow = defineWorkflow(cfg, async (_input, sessionInput) => {
+      capturedSession = sessionInput;
+      return { ok: true };
+    });
+
+    await workflow(
+      {},
+      { previousThreadId: "prev-1", threadContinuationMode: "continue" }
+    );
+
+    expect(capturedSession).toEqual({
+      agentName: "test-workflow",
+      threadId: "prev-1",
+      continueThread: true,
+      threadContinuationMode: "continue",
+    });
+  });
+
+  it("ignores threadContinuationMode without previousThreadId", async () => {
+    let capturedSession: WorkflowSessionInput | undefined;
+
+    const workflow = defineWorkflow(cfg, async (_input, sessionInput) => {
+      capturedSession = sessionInput;
+      return { ok: true };
+    });
+
+    await workflow({}, { threadContinuationMode: "continue" });
+
+    expect(capturedSession).toEqual({
+      agentName: "test-workflow",
+    });
+  });
+
+  it("maps sandboxContinuationMode with previousSandboxId", async () => {
+    let capturedSession: WorkflowSessionInput | undefined;
+
+    const workflow = defineWorkflow(cfg, async (_input, sessionInput) => {
+      capturedSession = sessionInput;
+      return { ok: true };
+    });
+
+    await workflow(
+      {},
+      { previousSandboxId: "sb-1", sandboxContinuationMode: "continue" }
+    );
+
+    expect(capturedSession).toEqual({
+      agentName: "test-workflow",
+      previousSandboxId: "sb-1",
+      sandboxContinuationMode: "continue",
+    });
+  });
+
+  it("ignores sandboxContinuationMode without previousSandboxId", async () => {
+    let capturedSession: WorkflowSessionInput | undefined;
+
+    const workflow = defineWorkflow(cfg, async (_input, sessionInput) => {
+      capturedSession = sessionInput;
+      return { ok: true };
+    });
+
+    await workflow({}, { sandboxContinuationMode: "continue" });
+
+    expect(capturedSession).toEqual({
+      agentName: "test-workflow",
+    });
+  });
+
+  it("maps all fields together", async () => {
+    let capturedSession: WorkflowSessionInput | undefined;
+
+    const workflow = defineWorkflow(cfg, async (_input, sessionInput) => {
+      capturedSession = sessionInput;
+      return { ok: true };
+    });
+
+    await workflow(
+      {},
+      {
+        previousThreadId: "prev-t",
+        threadContinuationMode: "continue",
+        sandboxId: "sb-inherited",
+        previousSandboxId: "sb-prev",
+        sandboxContinuationMode: "fork",
+        sandboxOnExit: "pause-until-parent-close",
+      }
+    );
+
+    expect(capturedSession).toEqual({
+      agentName: "test-workflow",
+      threadId: "prev-t",
+      continueThread: true,
+      threadContinuationMode: "continue",
+      sandboxId: "sb-inherited",
+      previousSandboxId: "sb-prev",
+      sandboxContinuationMode: "fork",
+      sandboxOnExit: "pause-until-parent-close",
+    });
+  });
+
+  it("defaults threadContinuationMode to fork when not specified", async () => {
+    let capturedSession: WorkflowSessionInput | undefined;
+
+    const workflow = defineWorkflow(cfg, async (_input, sessionInput) => {
+      capturedSession = sessionInput;
+      return { ok: true };
+    });
+
+    await workflow({}, { previousThreadId: "prev-42" });
+
+    expect(capturedSession).toEqual({
+      agentName: "test-workflow",
+      threadId: "prev-42",
+      continueThread: true,
+    });
+    expect(capturedSession?.threadContinuationMode).toBeUndefined();
+  });
 });

@@ -121,10 +121,16 @@ export function defineSubagentWorkflow(
       ...(workflowInput.previousThreadId && {
         threadId: workflowInput.previousThreadId,
         continueThread: true,
+        ...(workflowInput.threadContinuationMode && {
+          threadContinuationMode: workflowInput.threadContinuationMode,
+        }),
       }),
       ...(workflowInput.sandboxId && { sandboxId: workflowInput.sandboxId }),
       ...(workflowInput.previousSandboxId && {
         previousSandboxId: workflowInput.previousSandboxId,
+        ...(workflowInput.sandboxContinuationMode && {
+          sandboxContinuationMode: workflowInput.sandboxContinuationMode,
+        }),
       }),
     };
     const { destroySandbox, ...result } = await fn(

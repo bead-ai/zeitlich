@@ -1,4 +1,5 @@
 import type { z } from "zod";
+import type { ContinuationMode } from "../types";
 import type {
   ToolHandlerResponse,
   PreToolUseHookResult,
@@ -16,10 +17,24 @@ export type SubagentHandlerResponse<TResult = null> =
 export interface SubagentWorkflowInput {
   /** Thread ID from parent for continuation */
   previousThreadId?: string;
+  /**
+   * How to handle the previous thread.
+   *
+   * - `"fork"` (default) — copy messages into a new thread.
+   * - `"continue"` — write directly to the existing thread.
+   */
+  threadContinuationMode?: ContinuationMode;
   /** Sandbox ID inherited from parent */
   sandboxId?: string;
-  /** Sandbox ID to fork from */
+  /** Sandbox ID to fork from or resume */
   previousSandboxId?: string;
+  /**
+   * How to handle the previous sandbox.
+   *
+   * - `"fork"` (default) — create a new sandbox from the previous state.
+   * - `"continue"` — resume the same sandbox directly.
+   */
+  sandboxContinuationMode?: ContinuationMode;
 }
 
 export type SubagentWorkflow<TResult extends z.ZodType = z.ZodType> = (
@@ -150,10 +165,24 @@ export interface SubagentSessionInput {
   threadId?: string;
   /** Whether to continue an existing thread */
   continueThread?: boolean;
+  /**
+   * How to handle the previous thread when `continueThread` is true.
+   *
+   * - `"fork"` (default) — copy messages into a new thread.
+   * - `"continue"` — write directly to the existing thread.
+   */
+  threadContinuationMode?: ContinuationMode;
   /** Sandbox ID inherited from the parent agent */
   sandboxId?: string;
-  /** Previously-paused sandbox ID to fork from (sandbox continuation) */
+  /** Previously-paused sandbox ID to fork from or resume */
   previousSandboxId?: string;
+  /**
+   * How to handle the previous sandbox when `previousSandboxId` is set.
+   *
+   * - `"fork"` (default) — create a new sandbox from the previous state.
+   * - `"continue"` — resume the same sandbox directly.
+   */
+  sandboxContinuationMode?: ContinuationMode;
   /** What to do with the sandbox when the session ends (default: "destroy") */
   sandboxOnExit?: SandboxOnExitPolicy;
 }

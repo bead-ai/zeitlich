@@ -3,6 +3,7 @@ import type {
   MessageContent,
   ToolResultConfig,
   SessionExitReason,
+  ContinuationMode,
 } from "../types";
 import type {
   ToolMap,
@@ -108,6 +109,13 @@ export interface SessionConfig<T extends ToolMap, M = unknown> {
   buildContextMessage: () => MessageContent | Promise<MessageContent>;
   /** When true, skip thread initialization and system prompt — append only the new human message to the existing thread. */
   continueThread?: boolean;
+  /**
+   * How to handle the previous thread when `continueThread` is true.
+   *
+   * - `"fork"` (default) — copy messages into a new thread ID.
+   * - `"continue"` — write directly to the existing thread ID.
+   */
+  threadContinuationMode?: ContinuationMode;
   /** How long to wait for input before cancelling the workflow */
   waitForInputTimeout?: Duration;
   /** Sandbox lifecycle operations (optional — omit for agents that don't need a sandbox) */
@@ -119,11 +127,19 @@ export interface SessionConfig<T extends ToolMap, M = unknown> {
    */
   sandboxId?: string;
   /**
-   * The child's own previously-paused sandbox ID to fork from at the start of
-   * a continued session. Takes precedence over `sandboxId` for the fork path.
-   * Populated automatically by the subagent handler when `allowThreadContinuation` is set.
+   * The child's own previously-paused sandbox ID to fork from or resume at the
+   * start of a continued session. Takes precedence over `sandboxId` for the
+   * fork/continue path. Populated automatically by the subagent handler when
+   * `allowThreadContinuation` is set.
    */
   previousSandboxId?: string;
+  /**
+   * How to handle the previous sandbox when `previousSandboxId` is set.
+   *
+   * - `"fork"` (default) — create a new sandbox from the previous state.
+   * - `"continue"` — resume the same sandbox directly (no fork).
+   */
+  sandboxContinuationMode?: ContinuationMode;
   /**
    * Sandbox lifecycle policy applied when this session exits.
    *

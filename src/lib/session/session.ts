@@ -67,15 +67,20 @@ export async function createSession<T extends ToolMap, M = unknown>({
   hooks = {},
   appendSystemPrompt = true,
   continueThread = false,
+  threadContinuationMode = "fork",
   waitForInputTimeout = "48h",
   sandboxOps,
   sandboxId: inheritedSandboxId,
   previousSandboxId,
+  sandboxContinuationMode = "fork",
   sandboxOnExit = "destroy",
 }: SessionConfig<T, M>): Promise<ZeitlichSession<M, boolean>> {
-  const sourceThreadId = continueThread ? providedThreadId : undefined;
+  const shouldForkThread =
+    continueThread && providedThreadId && threadContinuationMode === "fork";
+
+  const sourceThreadId = shouldForkThread ? providedThreadId : undefined;
   const threadId =
-    continueThread && providedThreadId
+    shouldForkThread
       ? getShortId()
       : (providedThreadId ?? getShortId());
 
@@ -151,14 +156,14 @@ export async function createSession<T extends ToolMap, M = unknown>({
         }
       );
 
-      // --- Sandbox lifecycle: create, fork, or inherit ---
+      // --- Sandbox lifecycle: create, fork, continue, or inherit ---
       let sandboxId: string | undefined = inheritedSandboxId;
       const isInherited = !!inheritedSandboxId && !previousSandboxId;
 
       if (previousSandboxId && !sandboxOps) {
         throw ApplicationFailure.create({
           message:
-            "No sandboxOps provided — cannot fork from previousSandboxId",
+            "No sandboxOps provided — cannot fork/continue from previousSandboxId",
           nonRetryable: true,
         });
       }
@@ -181,7 +186,11 @@ export async function createSession<T extends ToolMap, M = unknown>({
 
       if (sandboxOps) {
         if (previousSandboxId) {
-          sandboxId = await sandboxOps.forkSandbox(previousSandboxId);
+          if (sandboxContinuationMode === "continue") {
+            sandboxId = previousSandboxId;
+          } else {
+            sandboxId = await sandboxOps.forkSandbox(previousSandboxId);
+          }
         } else if (!sandboxId) {
           const result = await sandboxOps.createSandbox();
           sandboxId = result.sandboxId;
@@ -201,8 +210,10 @@ export async function createSession<T extends ToolMap, M = unknown>({
 
       const systemPrompt = stateManager.getSystemPrompt();
 
-      if (continueThread && sourceThreadId) {
+      if (shouldForkThread && sourceThreadId) {
         await forkThread(sourceThreadId, threadId);
+      } else if (continueThread && providedThreadId) {
+        // "continue" mode — thread already has history; skip init and system prompt
       } else {
         if (appendSystemPrompt) {
           if (!systemPrompt || systemPrompt.trim() === "") {

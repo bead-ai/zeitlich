@@ -106,6 +106,8 @@ export type {
   ToolResultConfig,
   SessionExitReason,
   SerializableToolDefinition,
+  // Continuation
+  ContinuationMode,
   // Task types
   TaskStatus,
   WorkflowTask,
@@ -130,6 +132,7 @@ export type {
   SubagentWorkflow,
   SubagentWorkflowInput,
   SubagentSessionInput,
+  SandboxOnExitPolicy,
 } from "./lib/subagent/types";
 // Sandbox types (workflow-safe — no activity-side code)
 export type {

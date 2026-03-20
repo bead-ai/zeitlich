@@ -1340,4 +1340,87 @@ describe("defineSubagentWorkflow", () => {
     await workflow("go", {});
     expect(capturedSession).toEqual({ agentName: "test", sandboxOnExit: "destroy" });
   });
+
+  it("maps threadContinuationMode with previousThreadId", async () => {
+    let capturedSession: SubagentSessionInput | undefined;
+    const workflow = defineSubagentWorkflow(
+      { name: "test", description: "test agent" },
+      async (_prompt, sessionInput) => {
+        capturedSession = sessionInput;
+        return { toolResponse: "ok", data: null, threadId: "t" };
+      }
+    );
+
+    await workflow("go", {
+      previousThreadId: "prev-1",
+      threadContinuationMode: "continue",
+    });
+
+    expect(capturedSession).toEqual({
+      agentName: "test",
+      sandboxOnExit: "destroy",
+      threadId: "prev-1",
+      continueThread: true,
+      threadContinuationMode: "continue",
+    });
+  });
+
+  it("ignores threadContinuationMode without previousThreadId", async () => {
+    let capturedSession: SubagentSessionInput | undefined;
+    const workflow = defineSubagentWorkflow(
+      { name: "test", description: "test agent" },
+      async (_prompt, sessionInput) => {
+        capturedSession = sessionInput;
+        return { toolResponse: "ok", data: null, threadId: "t" };
+      }
+    );
+
+    await workflow("go", { threadContinuationMode: "continue" });
+
+    expect(capturedSession).toEqual({
+      agentName: "test",
+      sandboxOnExit: "destroy",
+    });
+  });
+
+  it("maps sandboxContinuationMode with previousSandboxId", async () => {
+    let capturedSession: SubagentSessionInput | undefined;
+    const workflow = defineSubagentWorkflow(
+      { name: "test", description: "test agent" },
+      async (_prompt, sessionInput) => {
+        capturedSession = sessionInput;
+        return { toolResponse: "ok", data: null, threadId: "t" };
+      }
+    );
+
+    await workflow("go", {
+      previousSandboxId: "sb-prev",
+      sandboxContinuationMode: "continue",
+    });
+
+    expect(capturedSession).toEqual({
+      agentName: "test",
+      sandboxOnExit: "destroy",
+      previousSandboxId: "sb-prev",
+      sandboxContinuationMode: "continue",
+    });
+  });
+
+  it("ignores sandboxContinuationMode without previousSandboxId", async () => {
+    let capturedSession: SubagentSessionInput | undefined;
+    const workflow = defineSubagentWorkflow(
+      { name: "test", description: "test agent" },
+      async (_prompt, sessionInput) => {
+        capturedSession = sessionInput;
+        return { toolResponse: "ok", data: null, threadId: "t" };
+      }
+    );
+
+    await workflow("go", { sandboxContinuationMode: "continue" });
+
+    expect(capturedSession).toEqual({
+      agentName: "test",
+      sandboxOnExit: "destroy",
+    });
+  });
 });

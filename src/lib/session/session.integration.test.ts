@@ -457,7 +457,7 @@ describe("createSession integration", () => {
 
   // --- continueThread ---
 
-  it("forks thread when continueThread is set", async () => {
+  it("forks thread when continueThread is set (default fork mode)", async () => {
     const { ops, log } = createMockThreadOps();
 
     const session = await createSession({
@@ -485,6 +485,79 @@ describe("createSession integration", () => {
 
     const systemOps = log.filter((l) => l.op === "appendSystemMessage");
     expect(systemOps).toHaveLength(0);
+
+    // threadId should be a new generated ID, not the source
+    expect(result.threadId).not.toBe("source-thread");
+  });
+
+  it("continues thread directly when threadContinuationMode is 'continue'", async () => {
+    const { ops, log } = createMockThreadOps();
+
+    const session = await createSession({
+      agentName: "TestAgent",
+      threadId: "existing-thread",
+      continueThread: true,
+      threadContinuationMode: "continue",
+      runAgent: createScriptedRunAgent([
+        { message: "continued on same", toolCalls: [] },
+      ]),
+      threadOps: ops,
+      buildContextMessage: () => "continue directly",
+    });
+
+    const stateManager = createAgentStateManager({
+      initialState: { systemPrompt: "test" },
+    });
+
+    const result = await session.runSession({ stateManager });
+
+    expect(result.exitReason).toBe("completed");
+    expect(result.threadId).toBe("existing-thread");
+
+    // No fork should happen
+    const forkOps = log.filter((l) => l.op === "forkThread");
+    expect(forkOps).toHaveLength(0);
+
+    // No system message or init — thread already has history
+    const systemOps = log.filter((l) => l.op === "appendSystemMessage");
+    expect(systemOps).toHaveLength(0);
+    const initOps = log.filter((l) => l.op === "initializeThread");
+    expect(initOps).toHaveLength(0);
+
+    // Human message should be appended to the existing thread
+    const humanOps = log.filter((l) => l.op === "appendHumanMessage");
+    expect(humanOps).toHaveLength(1);
+    expect(at(humanOps, 0).args[0]).toBe("existing-thread");
+    expect(at(humanOps, 0).args[2]).toBe("continue directly");
+  });
+
+  it("forks thread when threadContinuationMode is explicitly 'fork'", async () => {
+    const { ops, log } = createMockThreadOps();
+
+    const session = await createSession({
+      agentName: "TestAgent",
+      threadId: "source-thread",
+      continueThread: true,
+      threadContinuationMode: "fork",
+      runAgent: createScriptedRunAgent([
+        { message: "forked", toolCalls: [] },
+      ]),
+      threadOps: ops,
+      buildContextMessage: () => "fork it",
+    });
+
+    const stateManager = createAgentStateManager({
+      initialState: { systemPrompt: "test" },
+    });
+
+    const result = await session.runSession({ stateManager });
+
+    expect(result.exitReason).toBe("completed");
+    expect(result.threadId).not.toBe("source-thread");
+
+    const forkOps = log.filter((l) => l.op === "forkThread");
+    expect(forkOps).toHaveLength(1);
+    expect(at(forkOps, 0).args[0]).toBe("source-thread");
   });
 
   // --- Sandbox lifecycle ---
@@ -528,6 +601,147 @@ describe("createSession integration", () => {
 
     expect(sandboxLog).toContain("create");
     expect(sandboxLog).toContain("destroy:sb-1");
+  });
+
+  it("forks sandbox by default when previousSandboxId is set", async () => {
+    const { ops } = createMockThreadOps();
+    const sandboxLog: string[] = [];
+
+    const sandboxOps: SandboxOps = {
+      createSandbox: async () => {
+        sandboxLog.push("create");
+        return { sandboxId: "sb-new" };
+      },
+      destroySandbox: async (sandboxId: string) => {
+        sandboxLog.push(`destroy:${sandboxId}`);
+      },
+      snapshotSandbox: async () => ({
+        sandboxId: "sb-1",
+        providerId: "test",
+        data: null,
+        createdAt: new Date().toISOString(),
+      }),
+      forkSandbox: async (sandboxId: string) => {
+        sandboxLog.push(`fork:${sandboxId}`);
+        return "sb-forked";
+      },
+      pauseSandbox: async () => {},
+    };
+
+    const session = await createSession({
+      agentName: "TestAgent",
+      threadId: "thread-1",
+      runAgent: createScriptedRunAgent([{ message: "done", toolCalls: [] }]),
+      threadOps: ops,
+      buildContextMessage: () => "go",
+      sandboxOps,
+      previousSandboxId: "sb-prev",
+    });
+
+    const stateManager = createAgentStateManager({
+      initialState: { systemPrompt: "test" },
+    });
+
+    const result = await session.runSession({ stateManager });
+
+    expect(sandboxLog).toContain("fork:sb-prev");
+    expect(sandboxLog).not.toContain("create");
+    expect(sandboxLog).toContain("destroy:sb-forked");
+    expect(result.sandboxId).toBe("sb-forked");
+  });
+
+  it("resumes sandbox directly when sandboxContinuationMode is 'continue'", async () => {
+    const { ops } = createMockThreadOps();
+    const sandboxLog: string[] = [];
+
+    const sandboxOps: SandboxOps = {
+      createSandbox: async () => {
+        sandboxLog.push("create");
+        return { sandboxId: "sb-new" };
+      },
+      destroySandbox: async (sandboxId: string) => {
+        sandboxLog.push(`destroy:${sandboxId}`);
+      },
+      snapshotSandbox: async () => ({
+        sandboxId: "sb-prev",
+        providerId: "test",
+        data: null,
+        createdAt: new Date().toISOString(),
+      }),
+      forkSandbox: async (sandboxId: string) => {
+        sandboxLog.push(`fork:${sandboxId}`);
+        return "sb-forked";
+      },
+      pauseSandbox: async () => {},
+    };
+
+    const session = await createSession({
+      agentName: "TestAgent",
+      threadId: "thread-1",
+      runAgent: createScriptedRunAgent([{ message: "done", toolCalls: [] }]),
+      threadOps: ops,
+      buildContextMessage: () => "go",
+      sandboxOps,
+      previousSandboxId: "sb-prev",
+      sandboxContinuationMode: "continue",
+    });
+
+    const stateManager = createAgentStateManager({
+      initialState: { systemPrompt: "test" },
+    });
+
+    const result = await session.runSession({ stateManager });
+
+    // No fork should happen — reuse the same sandbox
+    expect(sandboxLog).not.toContain("fork:sb-prev");
+    expect(sandboxLog).not.toContain("create");
+    expect(sandboxLog).toContain("destroy:sb-prev");
+    expect(result.sandboxId).toBe("sb-prev");
+  });
+
+  it("pauses sandbox on exit when sandboxOnExit is 'pause'", async () => {
+    const { ops } = createMockThreadOps();
+    const sandboxLog: string[] = [];
+
+    const sandboxOps: SandboxOps = {
+      createSandbox: async () => {
+        sandboxLog.push("create");
+        return { sandboxId: "sb-1" };
+      },
+      destroySandbox: async (sandboxId: string) => {
+        sandboxLog.push(`destroy:${sandboxId}`);
+      },
+      snapshotSandbox: async () => ({
+        sandboxId: "sb-1",
+        providerId: "test",
+        data: null,
+        createdAt: new Date().toISOString(),
+      }),
+      forkSandbox: async () => "sb-forked",
+      pauseSandbox: async (sandboxId: string) => {
+        sandboxLog.push(`pause:${sandboxId}`);
+      },
+    };
+
+    const session = await createSession({
+      agentName: "TestAgent",
+      threadId: "thread-1",
+      runAgent: createScriptedRunAgent([{ message: "done", toolCalls: [] }]),
+      threadOps: ops,
+      buildContextMessage: () => "go",
+      sandboxOps,
+      sandboxOnExit: "pause",
+    });
+
+    const stateManager = createAgentStateManager({
+      initialState: { systemPrompt: "test" },
+    });
+
+    await session.runSession({ stateManager });
+
+    expect(sandboxLog).toContain("create");
+    expect(sandboxLog).toContain("pause:sb-1");
+    expect(sandboxLog).not.toContain("destroy:sb-1");
   });
 
   it("does not create or destroy sandbox when sandboxId is inherited", async () => {
