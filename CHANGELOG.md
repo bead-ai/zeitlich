@@ -2,6 +2,45 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.23](https://github.com/bead-ai/zeitlich/compare/v0.2.22...v0.2.23) (2026-03-20)
+
+
+### ⚠ BREAKING CHANGES
+
+* introduces ThreadInit, SandboxInit, SandboxShutdown, and SubagentSandboxShutdown types that replace the scattered thread/sandbox config fields across SessionConfig, WorkflowInput, and SubagentConfig.
+
+### Features
+
+* add getEntryById method to VirtualSandboxFileSystem for file retrieval by unique id ([8063014](https://github.com/bead-ai/zeitlich/commit/806301490f477c8e1dbc926fe6abda6589c5f90a))
+* add metadata passthrough from tool handlers and subagent workflows to hooks ([#52](https://github.com/bead-ai/zeitlich/issues/52)) ([452c131](https://github.com/bead-ai/zeitlich/commit/452c131b525f50ea1a0a4be26f9833950f191319))
+* fork sandboxes when forking threads ([#54](https://github.com/bead-ai/zeitlich/issues/54)) ([8d4af29](https://github.com/bead-ai/zeitlich/commit/8d4af296765cb57b75419dea9e8b5dadc8007604))
+* redesign thread and sandbox lifecycle configuration ([#58](https://github.com/bead-ai/zeitlich/issues/58)) ([c5acdb0](https://github.com/bead-ai/zeitlich/commit/c5acdb0708f684181651f106f4539db4e244b3f5))
+* **workflow:** add thread and sandbox continuation support for main agent ([#57](https://github.com/bead-ai/zeitlich/issues/57)) ([a751360](https://github.com/bead-ai/zeitlich/commit/a75136045c5f5a365c1688965bdbe149a9901f05))
+
+
+### Bug Fixes
+
+* normalise path for daytona fs multi write ([3487cf2](https://github.com/bead-ai/zeitlich/commit/3487cf27c20f9c5522f9c8259c67ffab27d28115))
+* update test cases to handle additional parameters in append functions ([e0bfa68](https://github.com/bead-ai/zeitlich/commit/e0bfa6837e67d93be8b7f22e02d3bb85fa36a592))
+* update test cases to handle additional parameters in append functions ([ae73102](https://github.com/bead-ai/zeitlich/commit/ae73102ca1dfd8401e66b5598a9b01158daea589))
+
+
+### Code Refactoring
+
+* enhance myAgentWorkflow with thread operations and session management ([1a7af4b](https://github.com/bead-ai/zeitlich/commit/1a7af4b6ae3523e4b76228ba3478b77301741e3a))
+* remove ApplicationFailure import and update error handling in runFailureHooks ([85d0297](https://github.com/bead-ai/zeitlich/commit/85d0297b62d1a1e244ce00f77492d95322e94a8c))
+
+
+### Documentation
+
+* add Skills section to README for agent skills support ([084243e](https://github.com/bead-ai/zeitlich/commit/084243eab163d955f228806ac6fe464dc7310d57))
+* update README to clarify adapter usage and integration details ([f0f4bce](https://github.com/bead-ai/zeitlich/commit/f0f4bce9e707be32ce0aa523d9d822ad4da08564))
+
+
+### Miscellaneous Chores
+
+* release 0.2.23 ([70d3fb5](https://github.com/bead-ai/zeitlich/commit/70d3fb50fda751bb74920eb3a738bb55726098ee))
+
 ## [0.2.22](https://github.com/bead-ai/zeitlich/compare/v0.2.21...v0.2.22) (2026-03-17)
 
 

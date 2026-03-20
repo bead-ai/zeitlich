@@ -1,6 +1,6 @@
 {
   "name": "zeitlich",
-  "version": "0.2.22",
+  "version": "0.2.23",
   "description": "[EXPERIMENTAL] An opinionated AI agent implementation for Temporal",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
@@ -126,6 +126,26 @@
         "types": "./dist/adapters/sandbox/daytona/workflow.d.ts",
         "default": "./dist/adapters/sandbox/daytona/workflow.js"
       }
+    },
+    "./adapters/sandbox/bedrock": {
+      "import": {
+        "types": "./dist/adapters/sandbox/bedrock/index.d.ts",
+        "default": "./dist/adapters/sandbox/bedrock/index.js"
+      },
+      "require": {
+        "types": "./dist/adapters/sandbox/bedrock/index.d.ts",
+        "default": "./dist/adapters/sandbox/bedrock/index.js"
+      }
+    },
+    "./adapters/sandbox/bedrock/workflow": {
+      "import": {
+        "types": "./dist/adapters/sandbox/bedrock/workflow.d.ts",
+        "default": "./dist/adapters/sandbox/bedrock/workflow.js"
+      },
+      "require": {
+        "types": "./dist/adapters/sandbox/bedrock/workflow.d.ts",
+        "default": "./dist/adapters/sandbox/bedrock/workflow.js"
+      }
     }
   },
   "files": [
@@ -189,6 +209,7 @@
     "vitest": "^4.0.18"
   },
   "peerDependencies": {
+    "@aws-sdk/client-bedrock-agentcore": "^3.900.0",
     "@daytonaio/sdk": ">=0.153.0",
     "@e2b/code-interpreter": "^2.3.3",
     "@google/genai": "^1.43.0",
@@ -197,6 +218,9 @@
     "just-bash": ">=2.0.0"
   },
   "peerDependenciesMeta": {
+    "@aws-sdk/client-bedrock-agentcore": {
+      "optional": true
+    },
     "@daytonaio/sdk": {
       "optional": true
     },
