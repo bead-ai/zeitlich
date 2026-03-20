@@ -173,13 +173,13 @@ describe("createSubagentTool", () => {
     ).toBe(false);
   });
 
-  it("adds threadId field when thread.allowContinuation is set", () => {
+  it("adds threadId field when thread mode allows continuation", () => {
     const tool = createSubagentTool([
       {
         agentName: "agent",
         description: "supports continuation",
         workflow: mockWorkflow(),
-        thread: { allowContinuation: true },
+        thread: "fork",
       },
     ]);
 
@@ -202,7 +202,7 @@ describe("createSubagentTool", () => {
     ).toBe(true);
   });
 
-  it("does not include threadId field when no subagent has thread.allowContinuation", () => {
+  it("does not include threadId field when thread mode is new", () => {
     const tool = createSubagentTool([
       {
         agentName: "basic",
@@ -235,7 +235,7 @@ describe("createSubagentTool", () => {
         agentName: "cont-agent",
         description: "Supports continuation",
         workflow: mockWorkflow(),
-        thread: { allowContinuation: true },
+        thread: "fork",
       },
     ]);
 
@@ -320,7 +320,7 @@ describe("createSubagentHandler", () => {
     expect(result.data).toBeNull();
   });
 
-  it("appends thread ID when thread.allowContinuation is set", async () => {
+  it("appends thread ID when thread is fork", async () => {
     nextStartChildResult = () => ({
       toolResponse: "Some response",
       data: null,
@@ -331,7 +331,7 @@ describe("createSubagentHandler", () => {
       agentName: "cont",
       description: "Continues threads",
       workflow: mockWorkflow(),
-      thread: { allowContinuation: true },
+      thread: "fork",
     };
 
     const { handler } = createSubagentHandler([contSubagent]);
@@ -524,9 +524,9 @@ describe("createSubagentHandler", () => {
     expect(workflowInput.sandbox).toBeUndefined();
   });
 
-  // --- Thread continuation ---
+  // --- Thread mode ---
 
-  it("passes thread fork when thread.allowContinuation and threadId provided", async () => {
+  it("passes thread fork when thread is fork and threadId provided", async () => {
     const { startChild } = await import("@temporalio/workflow");
     const startMock = startChild as ReturnType<typeof vi.fn>;
 
@@ -534,7 +534,7 @@ describe("createSubagentHandler", () => {
       agentName: "cont",
       description: "Continues",
       workflow: mockWorkflow(),
-      thread: { allowContinuation: true },
+      thread: "fork",
     };
 
     const { handler } = createSubagentHandler([contSubagent]);
@@ -558,7 +558,7 @@ describe("createSubagentHandler", () => {
     });
   });
 
-  it("passes thread continue when continuationMode is continue", async () => {
+  it("passes thread continue when thread is continue", async () => {
     const { startChild } = await import("@temporalio/workflow");
     const startMock = startChild as ReturnType<typeof vi.fn>;
 
@@ -566,7 +566,7 @@ describe("createSubagentHandler", () => {
       agentName: "cont-mode",
       description: "Continue mode",
       workflow: mockWorkflow(),
-      thread: { allowContinuation: true, continuationMode: "continue" },
+      thread: "continue",
     };
 
     const { handler } = createSubagentHandler([contSubagent]);
@@ -590,7 +590,7 @@ describe("createSubagentHandler", () => {
     });
   });
 
-  it("does not pass thread when thread.allowContinuation is false", async () => {
+  it("does not pass thread when thread is new", async () => {
     const { startChild } = await import("@temporalio/workflow");
     const startMock = startChild as ReturnType<typeof vi.fn>;
 
@@ -598,7 +598,6 @@ describe("createSubagentHandler", () => {
       agentName: "no-cont",
       description: "No continuation",
       workflow: mockWorkflow(),
-      thread: { allowContinuation: false },
     };
 
     const { handler } = createSubagentHandler([noContSubagent]);
@@ -621,7 +620,7 @@ describe("createSubagentHandler", () => {
 
   // --- Sandbox continuation ---
 
-  it("does not pass sandbox when thread.allowContinuation is set (own sandbox)", async () => {
+  it("does not pass sandbox when thread is fork (own sandbox)", async () => {
     const { startChild } = await import("@temporalio/workflow");
     const startMock = startChild as ReturnType<typeof vi.fn>;
 
@@ -629,7 +628,7 @@ describe("createSubagentHandler", () => {
       agentName: "sb-cont",
       description: "Sandbox continuation",
       workflow: mockWorkflow(),
-      thread: { allowContinuation: true },
+      thread: "fork",
     };
 
     const { handler } = createSubagentHandler([contSandboxSubagent]);
@@ -665,7 +664,7 @@ describe("createSubagentHandler", () => {
       agentName: "sb-cont",
       description: "Sandbox continuation",
       workflow: mockWorkflow(),
-      thread: { allowContinuation: true },
+      thread: "fork",
       sandbox: "own",
     };
 
@@ -721,7 +720,7 @@ describe("createSubagentHandler", () => {
       agentName: "sb-cont",
       description: "Sandbox continuation",
       workflow: mockWorkflow(),
-      thread: { allowContinuation: true },
+      thread: "fork",
       sandbox: "own",
     };
 
@@ -751,7 +750,7 @@ describe("createSubagentHandler", () => {
     expect(workflowInput.thread).toBeUndefined();
   });
 
-  it("adds thread.allowContinuation subagent to pendingDestroys", async () => {
+  it("adds fork-mode subagent to pendingDestroys", async () => {
     const { startChild } = await import("@temporalio/workflow");
     const startMock = startChild as ReturnType<typeof vi.fn>;
 
@@ -759,7 +758,7 @@ describe("createSubagentHandler", () => {
       agentName: "sb-cont",
       description: "Sandbox continuation",
       workflow: mockWorkflow(),
-      thread: { allowContinuation: true },
+      thread: "fork",
     };
 
     const { handler, destroySubagentSandboxes } = createSubagentHandler([

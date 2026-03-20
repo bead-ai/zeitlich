@@ -99,18 +99,15 @@ export interface SubagentConfig<TResult extends z.ZodType = z.ZodType> {
   /** Per-subagent lifecycle hooks */
   hooks?: SubagentHooks;
   /**
-   * Thread strategy for this subagent.
+   * Thread mode for this subagent.
    *
-   * - `allowContinuation` — when `true`, the parent agent can pass a
-   *   `threadId` to continue a previous conversation.
-   * - `continuationMode` — how to handle the previous thread:
-   *   - `"fork"` (default) — copy messages into a new thread and continue there.
-   *   - `"continue"` — append directly to the existing thread in-place.
+   * - `"new"` (default) — always start a fresh thread.
+   * - `"fork"` — the parent can pass a `threadId`; messages are copied into
+   *   a new thread and the subagent continues there.
+   * - `"continue"` — the parent can pass a `threadId`; the subagent appends
+   *   directly to the existing thread in-place.
    */
-  thread?: {
-    allowContinuation?: boolean;
-    continuationMode?: "fork" | "continue";
-  };
+  thread?: "new" | "fork" | "continue";
   /**
    * Sandbox strategy for this subagent.
    *
