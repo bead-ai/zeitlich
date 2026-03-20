@@ -95,7 +95,8 @@ export function createSubagentHandler<
     // --- Build thread init ---
     let thread: ThreadInit | undefined;
     if (continuationThreadId) {
-      thread = { mode: "fork", threadId: continuationThreadId };
+      const mode = config.thread?.continuationMode ?? "fork";
+      thread = { mode, threadId: continuationThreadId };
     }
 
     // --- Build sandbox init ---

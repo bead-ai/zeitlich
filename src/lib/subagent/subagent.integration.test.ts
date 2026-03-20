@@ -558,6 +558,38 @@ describe("createSubagentHandler", () => {
     });
   });
 
+  it("passes thread continue when continuationMode is continue", async () => {
+    const { startChild } = await import("@temporalio/workflow");
+    const startMock = startChild as ReturnType<typeof vi.fn>;
+
+    const contSubagent: SubagentConfig = {
+      agentName: "cont-mode",
+      description: "Continue mode",
+      workflow: mockWorkflow(),
+      thread: { allowContinuation: true, continuationMode: "continue" },
+    };
+
+    const { handler } = createSubagentHandler([contSubagent]);
+
+    await handler(
+      {
+        subagent: "cont-mode",
+        description: "test",
+        prompt: "test",
+        threadId: "prev-thread-99",
+      },
+      { threadId: "t", toolCallId: "tc", toolName: "Subagent" }
+    );
+
+    const lastCall = startMock.mock.calls[startMock.mock.calls.length - 1];
+    if (!lastCall) throw new Error("expected startChild call");
+    const workflowInput = lastCall[1].args[1] as SubagentWorkflowInput;
+    expect(workflowInput.thread).toEqual({
+      mode: "continue",
+      threadId: "prev-thread-99",
+    });
+  });
+
   it("does not pass thread when thread.allowContinuation is false", async () => {
     const { startChild } = await import("@temporalio/workflow");
     const startMock = startChild as ReturnType<typeof vi.fn>;
