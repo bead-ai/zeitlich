@@ -522,7 +522,7 @@ Resource files are any non-`SKILL.md` files inside the skill directory (discover
 
 #### Loading Skills
 
-Use `FileSystemSkillProvider` to load skills from a directory (works with any sandbox filesystem). `loadAll()` eagerly reads `SKILL.md` instructions **and** all resource file contents into each `Skill` object:
+Use `FileSystemSkillProvider` to load skills from a directory. It accepts any `SandboxFileSystem` implementation. `loadAll()` eagerly reads `SKILL.md` instructions **and** all resource file contents into each `Skill` object:
 
 ```typescript
 import { FileSystemSkillProvider } from "zeitlich";
@@ -535,6 +535,19 @@ const skillProvider = new FileSystemSkillProvider(sandbox.fs, "/skills");
 const skills = await skillProvider.loadAll();
 // Each skill has: { name, description, instructions, resourceContents }
 // resourceContents: { "resources/checklist.md": "...", ... }
+```
+
+**Loading from the local filesystem (activity-side):** Use `NodeFsSandboxFileSystem` to read skills from the worker's disk. This is the simplest option when skill files are bundled alongside your application code:
+
+```typescript
+import { NodeFsSandboxFileSystem, FileSystemSkillProvider } from "zeitlich";
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const fs = new NodeFsSandboxFileSystem(join(__dirname, "skills"));
+const skillProvider = new FileSystemSkillProvider(fs, "/");
+const skills = await skillProvider.loadAll();
 ```
 
 For lightweight discovery without reading file contents, use `listSkills()`:
@@ -820,7 +833,7 @@ Safe for use in Temporal workflow files:
 | `getShortId`                | Generate a compact, workflow-deterministic identifier (base-62, 12 chars)                              |
 | Tool definitions            | `askUserQuestionTool`, `globTool`, `grepTool`, `readFileTool`, `writeFileTool`, `editTool`, `bashTool` |
 | Task tools                  | `taskCreateTool`, `taskGetTool`, `taskListTool`, `taskUpdateTool` for workflow task management         |
-| Skill utilities             | `parseSkillFile`, `createReadSkillTool`, `createReadSkillHandler`, `buildSkillRegistration`             |
+| Skill utilities             | `parseSkillFile`, `createReadSkillTool`, `createReadSkillHandler`                                      |
 | Types                       | `Skill`, `SkillMetadata`, `SkillProvider`, `SubagentDefinition`, `SubagentConfig`, `ToolDefinition`, `ToolWithHandler`, `RouterContext`, `SessionConfig`, etc. |
 
 ### Activity Entry Point (`zeitlich`)
@@ -834,6 +847,7 @@ Framework-agnostic utilities for activities, worker setup, and Node.js code:
 | `createThreadManager`     | Generic Redis-backed thread manager factory                                                   |
 | `toTree`                  | Generate file tree string from an `IFileSystem` instance                                      |
 | `withSandbox`             | Wraps a handler to auto-resolve sandbox from context (pairs with `withAutoAppend`)            |
+| `NodeFsSandboxFileSystem`   | `node:fs` adapter for `SandboxFileSystem` — read skills from the worker's local disk              |
 | `FileSystemSkillProvider`   | Load skills from a directory following the agentskills.io layout                                  |
 | Tool handlers             | `bashHandler`, `editHandler`, `globHandler`, `readFileHandler`, `writeFileHandler`, `createAskUserQuestionHandler` |
 

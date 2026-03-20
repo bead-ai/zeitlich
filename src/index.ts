@@ -51,8 +51,9 @@ export {
 } from "./lib/activity";
 export type { AgentStateContext } from "./lib/activity";
 
-// Sandbox (activity-side: manager)
+// Sandbox (activity-side: manager + Node.js filesystem adapter)
 export { SandboxManager } from "./lib/sandbox/manager";
+export { NodeFsSandboxFileSystem } from "./lib/sandbox/node-fs";
 
 // Tool handlers (activity implementations)
 // Wrap sandbox handlers with withSandbox(manager, handler) at registration time
