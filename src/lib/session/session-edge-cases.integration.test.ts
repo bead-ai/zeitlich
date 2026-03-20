@@ -1109,9 +1109,9 @@ describe("createSession edge cases", () => {
     expect(sandboxLog).toHaveLength(0);
   });
 
-  // --- Sandbox fork from previousSandboxId ---
+  // --- Sandbox fork ---
 
-  it("forks sandbox when previousSandboxId is provided", async () => {
+  it("forks sandbox when sandbox init mode is fork", async () => {
     const { ops } = createMockThreadOps();
     const sandboxLog: string[] = [];
 
@@ -1198,9 +1198,9 @@ describe("createSession edge cases", () => {
     expect(sandboxLog).toContain("destroy:forked-sb");
   });
 
-  // --- sandboxOnExit: "pause" ---
+  // --- sandboxShutdown: "pause" ---
 
-  it("pauses sandbox on exit when sandboxOnExit is pause", async () => {
+  it("pauses sandbox on exit when sandboxShutdown is pause", async () => {
     const { ops } = createMockThreadOps();
     const sandboxLog: string[] = [];
 
@@ -1241,9 +1241,9 @@ describe("createSession edge cases", () => {
     expect(sandboxLog).not.toContain("destroy:sb-pause-test");
   });
 
-  // --- sandboxOnExit: "pause-until-parent-close" ---
+  // --- sandboxShutdown: "pause-until-parent-close" ---
 
-  it("pauses sandbox on exit when sandboxOnExit is pause-until-parent-close", async () => {
+  it("pauses sandbox on exit when sandboxShutdown is pause-until-parent-close", async () => {
     const { ops } = createMockThreadOps();
     const sandboxLog: string[] = [];
 
@@ -1284,9 +1284,9 @@ describe("createSession edge cases", () => {
     expect(sandboxLog).not.toContain("destroy:sb-parent-close");
   });
 
-  // --- Throws when previousSandboxId provided without sandboxOps ---
+  // --- Throws when sandbox fork/continue provided without sandboxOps ---
 
-  it("throws when previousSandboxId is set without sandboxOps", async () => {
+  it("throws when sandbox fork mode is set without sandboxOps", async () => {
     const { ops } = createMockThreadOps();
 
     const session = await createSession({
@@ -1328,7 +1328,7 @@ describe("createSession edge cases", () => {
     expect((result as { sandboxId?: string }).sandboxId).toBeUndefined();
   });
 
-  // --- Thread: continueThread without provided threadId ---
+  // --- Thread: defaults to new thread when no thread field provided ---
 
   it("defaults to new thread without fork when no thread field is provided", async () => {
     const { ops, log } = createMockThreadOps();
@@ -1358,7 +1358,7 @@ describe("createSession edge cases", () => {
 
   // --- Sandbox pause on error ---
 
-  it("pauses sandbox even when session fails if sandboxOnExit is pause", async () => {
+  it("pauses sandbox even when session fails if sandboxShutdown is pause", async () => {
     const { ops } = createMockThreadOps();
     const sandboxLog: string[] = [];
 

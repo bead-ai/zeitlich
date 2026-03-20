@@ -212,7 +212,7 @@ export const myAgentWorkflow = defineWorkflow(
     const session = await createSession({
       agentName: "my-agent",
       maxTurns: 20,
-      threadId: runId,
+      thread: { mode: "new", threadId: runId },
       threadOps: proxyLangChainThreadOps(),
       sandboxOps: proxyInMemorySandboxOps(),
       runAgent: runAgentActivity,
@@ -436,7 +436,7 @@ export const researcherWorkflow = defineSubagentWorkflow(
     });
 
     const session = await createSession({
-      ...sessionInput, // spreads agentName, threadId, continueThread, sandboxId
+      ...sessionInput, // spreads agentName, thread, sandbox, sandboxShutdown
       threadOps: proxyLangChainThreadOps(), // auto-scoped to "Researcher"
       runAgent: runResearcherActivity,
       buildContextMessage: () => [{ type: "text", text: prompt }],
@@ -464,7 +464,7 @@ export const researcherSubagent = defineSubagent(researcherWorkflow);
 
 // Optionally override parent-specific config
 export const researcherSubagent = defineSubagent(researcherWorkflow, {
-  allowThreadContinuation: true,
+  thread: "fork",
   sandbox: "own",
   hooks: {
     onPostExecution: ({ result }) => console.log("researcher done", result),
@@ -595,39 +595,102 @@ const tool = createReadSkillTool(skills);    // ToolDefinition with enum schema
 const handler = createReadSkillHandler(skills); // Returns skill instructions
 ```
 
-### Thread Continuation
+### Thread & Sandbox Lifecycle
 
-By default, each session initializes a fresh thread. To continue from an existing thread (e.g., resuming a conversation after a workflow completes), pass `continueThread: true` along with the previous `threadId`:
+Every session has a **thread** (conversation history) and an optional **sandbox** (filesystem environment). Both are configured with explicit lifecycle types that control how they are initialized and torn down.
+
+#### Thread Initialization (`ThreadInit`)
+
+The `thread` field on `SessionConfig` (and `WorkflowInput`) accepts one of three modes:
+
+| Mode | Description |
+|------|-------------|
+| `{ mode: "new" }` | Start a fresh thread (default). Optionally pass `threadId` to choose the ID. |
+| `{ mode: "fork", threadId }` | Copy all messages from an existing thread into a new one and continue there. The original is never mutated. |
+| `{ mode: "continue", threadId }` | Append directly to an existing thread in-place. |
 
 ```typescript
 import { createSession } from "zeitlich/workflow";
 
-// First run — threadId defaults to getShortId() if omitted
+// First run — fresh thread
 const session = await createSession({
-  // threadId is optional, auto-generated if not provided
+  thread: { mode: "new" },
   // ... other config
 });
 
-// Later — new workflow forks the previous thread
+// Later — fork the previous conversation
 const resumedSession = await createSession({
-  threadId: savedThreadId, // the thread to continue from
-  continueThread: true, // fork into a new thread with the old messages
+  thread: { mode: "fork", threadId: savedThreadId },
+  // ... other config
+});
+
+// Or append directly to the existing thread
+const continuedSession = await createSession({
+  thread: { mode: "continue", threadId: savedThreadId },
   // ... other config
 });
 ```
 
-When `continueThread` is true the session **forks** the provided thread — it copies all messages into a new thread and operates on the copy. The original thread is never mutated, so multiple sessions can safely continue from the same thread in parallel.
-
 `getShortId()` produces compact, workflow-deterministic IDs (~12 base-62 chars) that are more token-efficient than UUIDs.
 
-#### Subagent Thread Continuation
+#### Sandbox Initialization (`SandboxInit`)
 
-Subagents can opt in to thread continuation via `allowThreadContinuation`. When enabled, the parent agent can pass a `threadId` to resume a previous subagent conversation:
+The `sandbox` field controls how a sandbox is created or reused:
+
+| Mode | Description |
+|------|-------------|
+| `{ mode: "new" }` | Create a fresh sandbox (default when `sandboxOps` is provided). |
+| `{ mode: "continue", sandboxId }` | Resume a previously-paused sandbox. This session takes ownership. |
+| `{ mode: "fork", sandboxId }` | Fork from an existing sandbox. A new sandbox is created and owned by this session. |
+| `{ mode: "inherit", sandboxId }` | Use a sandbox owned by someone else (e.g. a parent agent). Shutdown policy is ignored. |
+
+#### Sandbox Shutdown (`SandboxShutdown`)
+
+The `sandboxShutdown` field controls what happens to the sandbox when the session exits:
+
+| Value | Description |
+|-------|-------------|
+| `"destroy"` | Tear down the sandbox entirely (default). |
+| `"pause"` | Pause the sandbox so it can be resumed later. |
+| `"keep"` | Leave the sandbox running (no-op on exit). |
+
+Subagents also support `"pause-until-parent-close"` — pause on exit, then wait for the parent workflow to signal when to destroy it.
+
+#### Subagent Thread & Sandbox Config
+
+Subagents configure thread and sandbox strategies via `defineSubagent`:
 
 ```typescript
-import { defineSubagentWorkflow, defineSubagent, createSession } from "zeitlich/workflow";
-import { proxyLangChainThreadOps } from "zeitlich/adapters/thread/langchain/workflow";
+import { defineSubagent } from "zeitlich/workflow";
+import { researcherWorkflow } from "./researcher.workflow";
 
+// Fresh thread each time, no sandbox (defaults)
+export const researcherSubagent = defineSubagent(researcherWorkflow);
+
+// Allow the parent to continue a previous conversation via fork
+export const researcherSubagent = defineSubagent(researcherWorkflow, {
+  thread: "fork",
+});
+
+// Own sandbox with pause-on-exit
+export const researcherSubagent = defineSubagent(researcherWorkflow, {
+  thread: "fork",
+  sandbox: { source: "own", shutdown: "pause" },
+});
+
+// Inherit the parent's sandbox
+export const researcherSubagent = defineSubagent(researcherWorkflow, {
+  sandbox: "inherit",
+});
+```
+
+The `thread` field accepts `"new"` (default), `"fork"`, or `"continue"`. When set to `"fork"` or `"continue"`, the parent agent can pass a `threadId` in a subsequent `Task` tool call to resume the conversation. The subagent returns its `threadId` in the response (surfaced as `[Thread ID: ...]`), which the parent can use for continuation.
+
+The `sandbox` field accepts `"none"` (default), `"inherit"`, `"own"`, or `{ source: "own", shutdown }` for explicit shutdown policy.
+
+The subagent workflow receives lifecycle fields via `sessionInput`:
+
+```typescript
 export const researcherWorkflow = defineSubagentWorkflow(
   {
     name: "Researcher",
@@ -635,27 +698,16 @@ export const researcherWorkflow = defineSubagentWorkflow(
   },
   async (prompt, sessionInput) => {
     const session = await createSession({
-      ...sessionInput, // threadId/continueThread are provided by parent when resuming
+      ...sessionInput, // spreads agentName, thread, sandbox, sandboxShutdown
       threadOps: proxyLangChainThreadOps(),
       // ... other config
     });
 
     const { threadId, finalMessage } = await session.runSession({ stateManager });
-    return {
-      toolResponse: finalMessage ? extractText(finalMessage) : "No response",
-      data: null,
-      threadId,
-    };
+    return { toolResponse: extractText(finalMessage), data: null, threadId };
   },
 );
-
-// Enable thread continuation in the parent registration
-export const researcherSubagent = defineSubagent(researcherWorkflow, {
-  allowThreadContinuation: true,
-});
 ```
-
-The subagent returns its `threadId` in the response, which the handler surfaces to the parent LLM as `[Thread ID: ...]`. The parent can then pass that ID back in a subsequent `Subagent` tool call to continue the conversation.
 
 ### Filesystem Utilities
 
@@ -834,7 +886,9 @@ Safe for use in Temporal workflow files:
 | Tool definitions            | `askUserQuestionTool`, `globTool`, `grepTool`, `readFileTool`, `writeFileTool`, `editTool`, `bashTool` |
 | Task tools                  | `taskCreateTool`, `taskGetTool`, `taskListTool`, `taskUpdateTool` for workflow task management         |
 | Skill utilities             | `parseSkillFile`, `createReadSkillTool`, `createReadSkillHandler`                                      |
-| Types                       | `Skill`, `SkillMetadata`, `SkillProvider`, `SubagentDefinition`, `SubagentConfig`, `ToolDefinition`, `ToolWithHandler`, `RouterContext`, `SessionConfig`, etc. |
+| `defineWorkflow`            | Wraps a main workflow function, translating `WorkflowInput` into session-compatible fields             |
+| Lifecycle types             | `ThreadInit`, `SandboxInit`, `SandboxShutdown`, `SubagentSandboxShutdown`, `SubagentSandboxConfig`     |
+| Types                       | `Skill`, `SkillMetadata`, `SkillProvider`, `SubagentDefinition`, `SubagentConfig`, `ToolDefinition`, `ToolWithHandler`, `RouterContext`, `SessionConfig`, `WorkflowConfig`, `WorkflowInput`, etc. |
 
 ### Activity Entry Point (`zeitlich`)
 
@@ -885,6 +939,11 @@ Framework-agnostic utilities for activities, worker setup, and Node.js code:
 | `RouterContext`          | Base context every tool handler receives (`threadId`, `toolCallId`, `toolName`, `sandboxId?`) |
 | `Hooks`                 | Combined session lifecycle + tool execution hooks                            |
 | `ToolRouterHooks`       | Narrowed hook interface for tool execution only (pre/post/failure)            |
+| `ThreadInit`            | Thread initialization strategy: `"new"`, `"continue"`, or `"fork"`               |
+| `SandboxInit`           | Sandbox initialization strategy: `"new"`, `"continue"`, `"fork"`, or `"inherit"` |
+| `SandboxShutdown`       | Sandbox exit policy: `"destroy" \| "pause" \| "keep"`                            |
+| `SubagentSandboxShutdown` | Extended shutdown with `"pause-until-parent-close"`                             |
+| `SubagentSandboxConfig` | Subagent sandbox strategy: `"none" \| "inherit" \| "own" \| { source, shutdown }` |
 | `SubagentDefinition`    | Callable subagent workflow with embedded metadata (from `defineSubagentWorkflow`) |
 | `SubagentConfig`        | Resolved subagent configuration consumed by `createSession`                  |
 | `AgentState`            | Generic agent state type                                                     |
