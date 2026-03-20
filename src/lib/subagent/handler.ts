@@ -88,14 +88,16 @@ export function createSubagentHandler<
       );
     }
 
-    const allowContinuation = !!config.thread?.allowContinuation;
+    const threadMode = config.thread ?? "new";
+    const allowsContinuation = threadMode !== "new";
     const continuationThreadId =
-      args.threadId && allowContinuation ? args.threadId : undefined;
+      args.threadId && allowsContinuation ? args.threadId : undefined;
 
     // --- Build thread init ---
     let thread: ThreadInit | undefined;
     if (continuationThreadId) {
-      thread = { mode: "fork", threadId: continuationThreadId };
+      thread = { mode: threadMode as "fork" | "continue", threadId: continuationThreadId };
+
     }
 
     // --- Build sandbox init ---
@@ -137,7 +139,7 @@ export function createSubagentHandler<
     const childHandle = await startChild(config.workflow, childOpts);
 
     const usesOwnSandbox =
-      sandboxCfg.source === "own" || (allowContinuation && sandboxCfg.source !== "inherit");
+      sandboxCfg.source === "own" || (allowsContinuation && sandboxCfg.source !== "inherit");
 
     if (usesOwnSandbox) {
       pendingDestroys.set(childWorkflowId, childHandle);
@@ -171,7 +173,7 @@ export function createSubagentHandler<
       metadata,
     } = childResult;
 
-    if (allowContinuation && childSandboxId && childThreadId) {
+    if (allowsContinuation && childSandboxId && childThreadId) {
       threadSandboxes.set(childThreadId, childSandboxId);
     }
 
@@ -200,7 +202,8 @@ export function createSubagentHandler<
     }
 
     let finalToolResponse: ToolMessageContent = toolResponse;
-    if (allowContinuation && childThreadId) {
+
+    if (allowsContinuation && childThreadId) {
       finalToolResponse =
         typeof toolResponse === "string"
           ? `${toolResponse}\n\n[${config.agentName} Thread ID: ${childThreadId}]`
