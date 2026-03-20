@@ -20,7 +20,7 @@ import type {
 } from "./types";
 
 import type { z } from "zod";
-import { ApplicationFailure, uuid4 } from "@temporalio/workflow";
+import { uuid4 } from "@temporalio/workflow";
 
 /**
  * Creates a tool router for declarative tool call processing.
@@ -110,7 +110,7 @@ export function createToolRouter<T extends ToolMap>(
 
   /**
    * Run per-tool → global failure hooks. Returns recovery content/result,
-   * or throws if no hook recovers.
+   * or a generic error response if no hook recovers.
    */
   async function runFailureHooks(
     toolCall: ParsedToolCallUnion<T>,
@@ -160,7 +160,12 @@ export function createToolRouter<T extends ToolMap>(
         };
     }
 
-    throw ApplicationFailure.fromError(error, { nonRetryable: true });
+    return {
+      content: JSON.stringify({
+        error: "The tool encountered an error. Please try again or use a different approach.",
+      }),
+      result: { error: errorStr, suppressed: true },
+    };
   }
 
   /** Run per-tool → global post-hooks. */
