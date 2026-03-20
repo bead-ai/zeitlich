@@ -8,7 +8,7 @@ import {
 const cfg = { name: "test-workflow" };
 
 describe("defineWorkflow", () => {
-  it("maps previousThreadId to threadId + continueThread", async () => {
+  it("maps thread fork into sessionInput", async () => {
     let capturedSession: WorkflowSessionInput | undefined;
 
     const workflow = defineWorkflow(cfg, async (_input, sessionInput) => {
@@ -16,17 +16,16 @@ describe("defineWorkflow", () => {
       return { ok: true };
     });
 
-    await workflow({}, { previousThreadId: "prev-42" });
+    await workflow({}, { thread: { mode: "fork", threadId: "prev-42" } });
 
     expect(capturedSession).toEqual({
       agentName: "test-workflow",
-      sandboxOnExit: "destroy",
-      threadId: "prev-42",
-      continueThread: true,
+      sandboxShutdown: "destroy",
+      thread: { mode: "fork", threadId: "prev-42" },
     });
   });
 
-  it("maps sandboxId", async () => {
+  it("maps sandbox inherit", async () => {
     let capturedSession: WorkflowSessionInput | undefined;
 
     const workflow = defineWorkflow(cfg, async (_input, sessionInput) => {
@@ -34,16 +33,16 @@ describe("defineWorkflow", () => {
       return { ok: true };
     });
 
-    await workflow({}, { sandboxId: "sb-123" });
+    await workflow({}, { sandbox: { mode: "inherit", sandboxId: "sb-123" } });
 
     expect(capturedSession).toEqual({
       agentName: "test-workflow",
-      sandboxOnExit: "destroy",
-      sandboxId: "sb-123",
+      sandboxShutdown: "destroy",
+      sandbox: { mode: "inherit", sandboxId: "sb-123" },
     });
   });
 
-  it("maps both previousThreadId and sandboxId together", async () => {
+  it("maps thread fork and sandbox together", async () => {
     let capturedSession: WorkflowSessionInput | undefined;
 
     const workflow = defineWorkflow(cfg, async (_input, sessionInput) => {
@@ -51,18 +50,20 @@ describe("defineWorkflow", () => {
       return { ok: true };
     });
 
-    await workflow({}, { previousThreadId: "prev-1", sandboxId: "sb-1" });
+    await workflow({}, {
+      thread: { mode: "fork", threadId: "prev-1" },
+      sandbox: { mode: "continue", sandboxId: "sb-1" },
+    });
 
     expect(capturedSession).toEqual({
       agentName: "test-workflow",
-      sandboxOnExit: "destroy",
-      threadId: "prev-1",
-      continueThread: true,
-      sandboxId: "sb-1",
+      sandboxShutdown: "destroy",
+      thread: { mode: "fork", threadId: "prev-1" },
+      sandbox: { mode: "continue", sandboxId: "sb-1" },
     });
   });
 
-  it("defaults sandboxOnExit to destroy when no workflowInput", async () => {
+  it("defaults sandboxShutdown to destroy when no workflowInput", async () => {
     let capturedSession: WorkflowSessionInput | undefined;
 
     const workflow = defineWorkflow(cfg, async (_input, sessionInput) => {
@@ -74,11 +75,11 @@ describe("defineWorkflow", () => {
 
     expect(capturedSession).toEqual({
       agentName: "test-workflow",
-      sandboxOnExit: "destroy",
+      sandboxShutdown: "destroy",
     });
   });
 
-  it("maps previousSandboxId from workflowInput", async () => {
+  it("maps sandbox fork from workflowInput", async () => {
     let capturedSession: WorkflowSessionInput | undefined;
 
     const workflow = defineWorkflow(cfg, async (_input, sessionInput) => {
@@ -86,20 +87,20 @@ describe("defineWorkflow", () => {
       return { ok: true };
     });
 
-    await workflow({}, { previousSandboxId: "prev-sb-1" });
+    await workflow({}, { sandbox: { mode: "fork", sandboxId: "prev-sb-1" } });
 
     expect(capturedSession).toEqual({
       agentName: "test-workflow",
-      sandboxOnExit: "destroy",
-      previousSandboxId: "prev-sb-1",
+      sandboxShutdown: "destroy",
+      sandbox: { mode: "fork", sandboxId: "prev-sb-1" },
     });
   });
 
-  it("uses sandboxOnExit from config", async () => {
+  it("uses sandboxShutdown from config", async () => {
     let capturedSession: WorkflowSessionInput | undefined;
 
     const workflow = defineWorkflow(
-      { name: "test-workflow", sandboxOnExit: "pause" },
+      { name: "test-workflow", sandboxShutdown: "pause" },
       async (_input, sessionInput) => {
         capturedSession = sessionInput;
         return { ok: true };
@@ -110,15 +111,15 @@ describe("defineWorkflow", () => {
 
     expect(capturedSession).toEqual({
       agentName: "test-workflow",
-      sandboxOnExit: "pause",
+      sandboxShutdown: "pause",
     });
   });
 
-  it("maps all continuation fields together", async () => {
+  it("maps all lifecycle fields together", async () => {
     let capturedSession: WorkflowSessionInput | undefined;
 
     const workflow = defineWorkflow(
-      { name: "test-workflow", sandboxOnExit: "pause" },
+      { name: "test-workflow", sandboxShutdown: "pause" },
       async (_input, sessionInput) => {
         capturedSession = sessionInput;
         return { ok: true };
@@ -128,19 +129,16 @@ describe("defineWorkflow", () => {
     await workflow(
       {},
       {
-        previousThreadId: "prev-t",
-        sandboxId: "sb-1",
-        previousSandboxId: "prev-sb-1",
+        thread: { mode: "fork", threadId: "prev-t" },
+        sandbox: { mode: "fork", sandboxId: "prev-sb-1" },
       }
     );
 
     expect(capturedSession).toEqual({
       agentName: "test-workflow",
-      sandboxOnExit: "pause",
-      threadId: "prev-t",
-      continueThread: true,
-      sandboxId: "sb-1",
-      previousSandboxId: "prev-sb-1",
+      sandboxShutdown: "pause",
+      thread: { mode: "fork", threadId: "prev-t" },
+      sandbox: { mode: "fork", sandboxId: "prev-sb-1" },
     });
   });
 
@@ -151,8 +149,6 @@ describe("defineWorkflow", () => {
       {
         prompt: string;
         metadata: { key: string };
-        previousThreadId?: string;
-        sandboxId?: string;
       },
       { ok: boolean }
     >(cfg, async (input, _sessionInput) => {
@@ -185,18 +181,17 @@ describe("defineWorkflow", () => {
     );
 
     const workflowInput: WorkflowInput = {
-      previousThreadId: "prev",
-      sandboxId: "sb",
+      thread: { mode: "fork", threadId: "prev" },
+      sandbox: { mode: "continue", sandboxId: "sb" },
     };
     await workflow({ prompt: "go" }, workflowInput);
 
     expect(capturedInput).toEqual({ prompt: "go" });
     expect(capturedSession).toEqual({
       agentName: "test-workflow",
-      sandboxOnExit: "destroy",
-      threadId: "prev",
-      continueThread: true,
-      sandboxId: "sb",
+      sandboxShutdown: "destroy",
+      thread: { mode: "fork", threadId: "prev" },
+      sandbox: { mode: "continue", sandboxId: "sb" },
     });
   });
 
