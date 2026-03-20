@@ -579,7 +579,7 @@ describe("createToolRouter integration", () => {
     });
   });
 
-  it("throws when handler fails and no hook recovers", async () => {
+  it("suppresses error when handler fails and no hook recovers", async () => {
     const router = createToolRouter({
       tools: { Fail: failingTool } as const,
       threadId: "t-1",
@@ -592,9 +592,12 @@ describe("createToolRouter integration", () => {
       args: { reason: "unrecoverable" },
     });
 
-    await expect(
-      router.processToolCalls([parsed], { turn: 1 })
-    ).rejects.toThrow("unrecoverable");
+    const results = await router.processToolCalls([parsed], { turn: 1 });
+    expect(results).toHaveLength(1);
+    expect(at(results, 0).data).toEqual({
+      error: "Error: unrecoverable",
+      suppressed: true,
+    });
   });
 
   // --- Disabled tools ---

@@ -336,7 +336,7 @@ describe("createSession edge cases", () => {
 
   // --- Tool handler throws without recovery ---
 
-  it("session fails when tool handler throws with no failure hook", async () => {
+  it("session completes when tool handler throws with no failure hook (error suppressed)", async () => {
     const { ops } = createMockThreadOps();
     let endReason: string | undefined;
 
@@ -372,10 +372,10 @@ describe("createSession edge cases", () => {
       initialState: { systemPrompt: "test" },
     });
 
-    await expect(session.runSession({ stateManager })).rejects.toThrow(
-      "unrecoverable tool"
-    );
-    expect(endReason).toBe("failed");
+    const result = await session.runSession({ stateManager });
+    expect(result.exitReason).toBe("completed");
+    expect(result.finalMessage).toBe("done");
+    expect(endReason).toBe("completed");
   });
 
   // --- Metadata passed through to hooks ---
