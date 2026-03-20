@@ -15,8 +15,10 @@ export interface SkillMetadata {
   metadata?: Record<string, string>;
   /** Space-delimited list of pre-approved tools the skill may use */
   allowedTools?: string[];
-  /** Names of available reference files (without extension) in the references/ subdirectory */
-  references?: string[];
+  /** Absolute path to the skill directory (parent of SKILL.md) */
+  location?: string;
+  /** Relative paths to bundled resource files (references, scripts, assets) */
+  resources?: string[];
 }
 
 /**
@@ -42,6 +44,4 @@ export interface SkillProvider {
   getSkill(name: string): Promise<Skill>;
   /** Load all skills with full instructions */
   loadAll(): Promise<Skill[]>;
-  /** Load the content of a named reference file for a skill (lazy, on-demand) */
-  getReference?(skillName: string, refName: string): Promise<string>;
 }
