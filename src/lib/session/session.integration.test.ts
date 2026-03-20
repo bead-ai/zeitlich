@@ -154,7 +154,7 @@ describe("createSession integration", () => {
 
     const session = await createSession({
       agentName: "TestAgent",
-      threadId: "thread-1",
+      thread: { mode: "new", threadId: "thread-1" },
       runAgent: createScriptedRunAgent([{ message: "Hello!", toolCalls: [] }]),
       threadOps: ops,
       buildContextMessage: () => "What is 2+2?",
@@ -186,7 +186,7 @@ describe("createSession integration", () => {
 
     const session = await createSession({
       agentName: "TestAgent",
-      threadId: "thread-1",
+      thread: { mode: "new", threadId: "thread-1" },
       runAgent: createScriptedRunAgent([
         {
           message: "Let me echo that.",
@@ -225,7 +225,7 @@ describe("createSession integration", () => {
 
     const session = await createSession({
       agentName: "TestAgent",
-      threadId: "thread-1",
+      thread: { mode: "new", threadId: "thread-1" },
       runAgent: createScriptedRunAgent([
         {
           message: "turn 1",
@@ -274,7 +274,7 @@ describe("createSession integration", () => {
 
     const session = await createSession({
       agentName: "TestAgent",
-      threadId: "thread-1",
+      thread: { mode: "new", threadId: "thread-1" },
       maxTurns: 3,
       runAgent: infiniteAgent,
       threadOps: ops,
@@ -301,7 +301,7 @@ describe("createSession integration", () => {
 
     const session = await createSession({
       agentName: "TestAgent",
-      threadId: "thread-1",
+      thread: { mode: "new", threadId: "thread-1" },
       runAgent: createScriptedRunAgent([{ message: "done", toolCalls: [] }]),
       threadOps: ops,
       buildContextMessage: () => "hi",
@@ -334,7 +334,7 @@ describe("createSession integration", () => {
 
     const session = await createSession({
       agentName: "TestAgent",
-      threadId: "thread-1",
+      thread: { mode: "new", threadId: "thread-1" },
       runAgent: createScriptedRunAgent([]),
       threadOps: ops,
       buildContextMessage: () => "hi",
@@ -354,7 +354,7 @@ describe("createSession integration", () => {
 
     const session = await createSession({
       agentName: "TestAgent",
-      threadId: "thread-1",
+      thread: { mode: "new", threadId: "thread-1" },
       appendSystemPrompt: false,
       runAgent: createScriptedRunAgent([{ message: "ok", toolCalls: [] }]),
       threadOps: ops,
@@ -381,7 +381,7 @@ describe("createSession integration", () => {
 
     const session = await createSession({
       agentName: "TestAgent",
-      threadId: "thread-1",
+      thread: { mode: "new", threadId: "thread-1" },
       runAgent: createScriptedRunAgent([
         {
           message: "turn 1",
@@ -417,7 +417,7 @@ describe("createSession integration", () => {
 
     const session = await createSession({
       agentName: "TestAgent",
-      threadId: "thread-1",
+      thread: { mode: "new", threadId: "thread-1" },
       runAgent: createScriptedRunAgent([
         {
           message: "bad call",
@@ -455,15 +455,14 @@ describe("createSession integration", () => {
     expect(errorConfig?.content).toContain("Invalid tool call");
   });
 
-  // --- continueThread ---
+  // --- Thread fork mode ---
 
-  it("forks thread when continueThread is set", async () => {
+  it("forks thread when thread mode is fork", async () => {
     const { ops, log } = createMockThreadOps();
 
     const session = await createSession({
       agentName: "TestAgent",
-      threadId: "source-thread",
-      continueThread: true,
+      thread: { mode: "fork", threadId: "source-thread" },
       runAgent: createScriptedRunAgent([
         { message: "continued", toolCalls: [] },
       ]),
@@ -513,7 +512,7 @@ describe("createSession integration", () => {
 
     const session = await createSession({
       agentName: "TestAgent",
-      threadId: "thread-1",
+      thread: { mode: "new", threadId: "thread-1" },
       runAgent: createScriptedRunAgent([{ message: "done", toolCalls: [] }]),
       threadOps: ops,
       buildContextMessage: () => "go",
@@ -554,12 +553,12 @@ describe("createSession integration", () => {
 
     const session = await createSession({
       agentName: "TestAgent",
-      threadId: "thread-1",
+      thread: { mode: "new", threadId: "thread-1" },
       runAgent: createScriptedRunAgent([{ message: "done", toolCalls: [] }]),
       threadOps: ops,
       buildContextMessage: () => "go",
       sandboxOps,
-      sandboxId: "inherited-sb",
+      sandbox: { mode: "inherit", sandboxId: "inherited-sb" },
     });
 
     const stateManager = createAgentStateManager({
@@ -602,7 +601,7 @@ describe("createSession integration", () => {
 
     const session = await createSession({
       agentName: "TestAgent",
-      threadId: "thread-1",
+      thread: { mode: "new", threadId: "thread-1" },
       runAgent: createScriptedRunAgent([
         {
           message: "spy",
@@ -613,7 +612,7 @@ describe("createSession integration", () => {
       threadOps: ops,
       tools: { Spy: spyTool },
       buildContextMessage: () => "go",
-      sandboxId: "my-sandbox",
+      sandbox: { mode: "inherit", sandboxId: "my-sandbox" },
       sandboxOps,
     });
 
@@ -634,7 +633,7 @@ describe("createSession integration", () => {
 
     const session = await createSession({
       agentName: "TestAgent",
-      threadId: "thread-1",
+      thread: { mode: "new", threadId: "thread-1" },
       runAgent: async () => {
         throw new Error("LLM went down");
       },
@@ -666,7 +665,7 @@ describe("createSession integration", () => {
 
     const session = await createSession({
       agentName: "TestAgent",
-      threadId: "thread-1",
+      thread: { mode: "new", threadId: "thread-1" },
       runAgent: createScriptedRunAgent([
         {
           message: "call echo",
@@ -736,7 +735,7 @@ describe("createSession integration", () => {
 
     const session = await createSession({
       agentName: "TestAgent",
-      threadId: "thread-1",
+      thread: { mode: "new", threadId: "thread-1" },
       runAgent: createScriptedRunAgent([
         {
           message: "computing",
@@ -772,7 +771,7 @@ describe("createSession integration", () => {
 
     const session = await createSession({
       agentName: "TestAgent",
-      threadId: "thread-1",
+      thread: { mode: "new", threadId: "thread-1" },
       runAgent: createScriptedRunAgent([{ message: "done", toolCalls: [] }]),
       threadOps: ops,
       buildContextMessage: async () => {
@@ -814,7 +813,7 @@ describe("createSession integration", () => {
 
     const session = await createSession({
       agentName: "TestAgent",
-      threadId: "thread-1",
+      thread: { mode: "new", threadId: "thread-1" },
       runAgent: createScriptedRunAgent([{ message: "done", toolCalls: [] }]),
       threadOps: ops,
       buildContextMessage: () => "go",
@@ -848,7 +847,7 @@ describe("createSession integration", () => {
 
     const session = await createSession({
       agentName: "TestAgent",
-      threadId: "thread-1",
+      thread: { mode: "new", threadId: "thread-1" },
       runAgent: createScriptedRunAgent([
         {
           message: "t1",

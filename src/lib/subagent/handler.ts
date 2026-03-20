@@ -11,11 +11,26 @@ import type {
   InferSubagentResult,
   SubagentConfig,
   SubagentHandlerResponse,
+  SubagentSandboxConfig,
   SubagentWorkflowInput,
 } from "./types";
 import type { SubagentArgs } from "./tool";
 import type { z } from "zod";
+import type { ThreadInit, SandboxInit, SubagentSandboxShutdown } from "../lifecycle";
 import { childResultSignal, destroySandboxSignal } from "./signals";
+
+/**
+ * Resolve the shorthand/object `SubagentSandboxConfig` into a normalized form.
+ */
+function resolveSandboxConfig(config?: SubagentSandboxConfig): {
+  source: "none" | "inherit" | "own";
+  shutdown?: SubagentSandboxShutdown;
+} {
+  if (!config || config === "none") return { source: "none" };
+  if (config === "inherit") return { source: "inherit" };
+  if (config === "own") return { source: "own" };
+  return { source: "own", shutdown: config.shutdown };
+}
 
 /**
  * Creates a Subagent tool handler that spawns child workflows for configured subagents.
@@ -65,34 +80,42 @@ export function createSubagentHandler<
     const childWorkflowId = `${args.subagent}-${getShortId()}`;
 
     const { sandboxId: parentSandboxId } = context;
+    const sandboxCfg = resolveSandboxConfig(config.sandbox);
 
-    if (config.sandbox === "inherit" && !parentSandboxId) {
+    if (sandboxCfg.source === "inherit" && !parentSandboxId) {
       throw new Error(
         `Subagent "${config.agentName}" is configured with sandbox: "inherit" but the parent has no sandbox`
       );
     }
 
-    const usesOwnSandbox =
-      config.sandbox === "own" || !!config.allowThreadContinuation;
-    const inheritSandbox =
-      config.sandbox === "inherit" && !!parentSandboxId;
-
+    const allowContinuation = !!config.thread?.allowContinuation;
     const continuationThreadId =
-      args.threadId && config.allowThreadContinuation
-        ? args.threadId
-        : undefined;
+      args.threadId && allowContinuation ? args.threadId : undefined;
 
-    const previousSandboxId =
-      continuationThreadId && config.allowThreadContinuation
+    // --- Build thread init ---
+    let thread: ThreadInit | undefined;
+    if (continuationThreadId) {
+      thread = { mode: "fork", threadId: continuationThreadId };
+    }
+
+    // --- Build sandbox init ---
+    let sandbox: SandboxInit | undefined;
+    if (sandboxCfg.source === "inherit" && parentSandboxId) {
+      sandbox = { mode: "inherit", sandboxId: parentSandboxId };
+    } else if (sandboxCfg.source === "own") {
+      const prevSbId = continuationThreadId
         ? threadSandboxes.get(continuationThreadId)
         : undefined;
+      if (prevSbId) {
+        sandbox = { mode: "fork", sandboxId: prevSbId };
+      }
+      // When no previous sandbox, omit — the child will create its own via sandboxOps
+    }
 
     const workflowInput: SubagentWorkflowInput = {
-      ...(continuationThreadId && {
-        previousThreadId: continuationThreadId,
-      }),
-      ...(inheritSandbox && { sandboxId: parentSandboxId }),
-      ...(previousSandboxId && { previousSandboxId }),
+      ...(thread && { thread }),
+      ...(sandbox && { sandbox }),
+      ...(sandboxCfg.shutdown && { sandboxShutdown: sandboxCfg.shutdown }),
     };
 
     const resolvedContext =
@@ -112,6 +135,9 @@ export function createSubagentHandler<
     };
 
     const childHandle = await startChild(config.workflow, childOpts);
+
+    const usesOwnSandbox =
+      sandboxCfg.source === "own" || (allowContinuation && sandboxCfg.source !== "inherit");
 
     if (usesOwnSandbox) {
       pendingDestroys.set(childWorkflowId, childHandle);
@@ -145,7 +171,7 @@ export function createSubagentHandler<
       metadata,
     } = childResult;
 
-    if (config.allowThreadContinuation && childSandboxId && childThreadId) {
+    if (allowContinuation && childSandboxId && childThreadId) {
       threadSandboxes.set(childThreadId, childSandboxId);
     }
 
@@ -174,7 +200,7 @@ export function createSubagentHandler<
     }
 
     let finalToolResponse: ToolMessageContent = toolResponse;
-    if (config.allowThreadContinuation && childThreadId) {
+    if (allowContinuation && childThreadId) {
       finalToolResponse =
         typeof toolResponse === "string"
           ? `${toolResponse}\n\n[${config.agentName} Thread ID: ${childThreadId}]`

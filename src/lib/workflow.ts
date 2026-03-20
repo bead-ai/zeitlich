@@ -1,9 +1,8 @@
-/**
- * Sandbox exit policy for the main agent workflow.
- * Only `"destroy"` and `"pause"` are valid — there is no parent to
- * coordinate `"pause-until-parent-close"`.
- */
-export type MainAgentSandboxOnExitPolicy = "destroy" | "pause";
+import type {
+  ThreadInit,
+  SandboxInit,
+  SandboxShutdown,
+} from "./lifecycle";
 
 /**
  * Session config fields derived from a main workflow input, ready to spread
@@ -12,38 +11,33 @@ export type MainAgentSandboxOnExitPolicy = "destroy" | "pause";
 export interface WorkflowSessionInput {
   /** Agent name — spread directly into `createSession` */
   agentName: string;
-  /** Thread ID to continue (set from `input.previousThreadId`) */
-  threadId?: string;
-  /** Whether to continue an existing thread (true when `previousThreadId` is present) */
-  continueThread?: boolean;
-  /** Optional sandbox ID forwarded to the session */
-  sandboxId?: string;
-  /** Previously-paused sandbox ID to fork from (sandbox continuation) */
-  previousSandboxId?: string;
-  /** Sandbox lifecycle policy applied when this session exits */
-  sandboxOnExit?: MainAgentSandboxOnExitPolicy;
+  /** Thread initialization strategy */
+  thread?: ThreadInit;
+  /** Sandbox initialization strategy */
+  sandbox?: SandboxInit;
+  /** Sandbox shutdown policy (default: "destroy") */
+  sandboxShutdown?: SandboxShutdown;
 }
 
 /** Raw workflow input fields that map into `WorkflowSessionInput`. */
 export interface WorkflowInput {
-  /** When set, continue this thread instead of starting fresh */
-  previousThreadId?: string;
-  /** Optional sandbox ID to reuse */
-  sandboxId?: string;
-  /** Previously-paused sandbox ID to fork from */
-  previousSandboxId?: string;
+  /** Thread initialization strategy (default: `{ mode: "new" }`) */
+  thread?: ThreadInit;
+  /** Sandbox initialization strategy */
+  sandbox?: SandboxInit;
 }
 
 export interface WorkflowConfig {
   /** Workflow name — used as the Temporal workflow function name */
   name: string;
   /**
-   * Sandbox lifecycle policy applied when the main agent session exits.
+   * Sandbox shutdown policy applied when the main agent session exits.
    *
    * - `"destroy"` (default) — destroy the sandbox on exit.
    * - `"pause"` — pause the sandbox so it can be resumed later.
+   * - `"keep"` — leave the sandbox running (no-op on exit).
    */
-  sandboxOnExit?: MainAgentSandboxOnExitPolicy;
+  sandboxShutdown?: SandboxShutdown;
 }
 
 /**
@@ -53,8 +47,8 @@ export interface WorkflowConfig {
  * The wrapper:
  * - Accepts a `config` with at least a `name` (used for Temporal workflow naming)
  * - Accepts a handler `fn` receiving `(input, sessionInput)`
- * - Derives `threadId` + `continueThread` from `workflowInput.previousThreadId`
- * - Derives `sandboxId` from `workflowInput.sandboxId`
+ * - Derives thread / sandbox init from `workflowInput`
+ * - Applies the configured `sandboxShutdown` policy
  */
 export function defineWorkflow<TInput, TResult>(
   config: WorkflowConfig,
@@ -66,15 +60,9 @@ export function defineWorkflow<TInput, TResult>(
   ): Promise<TResult> => {
     const sessionInput: WorkflowSessionInput = {
       agentName: config.name,
-      sandboxOnExit: config.sandboxOnExit ?? "destroy",
-      ...(workflowInput.previousThreadId && {
-        threadId: workflowInput.previousThreadId,
-        continueThread: true,
-      }),
-      ...(workflowInput.sandboxId && { sandboxId: workflowInput.sandboxId }),
-      ...(workflowInput.previousSandboxId && {
-        previousSandboxId: workflowInput.previousSandboxId,
-      }),
+      sandboxShutdown: config.sandboxShutdown ?? "destroy",
+      ...(workflowInput.thread && { thread: workflowInput.thread }),
+      ...(workflowInput.sandbox && { sandbox: workflowInput.sandbox }),
     };
     return fn(input, sessionInput);
   };

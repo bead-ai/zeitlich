@@ -33,8 +33,8 @@ import { uuid4 } from "@temporalio/workflow";
  * const session = await createSession({
  *   agentName: "my-agent",
  *   maxTurns: 20,
- *   threadId: runId,
- *   threadOps: proxyGoogleGenAIThreadOps(), // auto-scoped to current workflow
+ *   thread: { mode: "new" },
+ *   threadOps: proxyGoogleGenAIThreadOps(),
  *   runAgent: runAgentActivity,
  *   buildContextMessage: () => [{ type: "text", text: prompt }],
  *   subagents: [researcherSubagent],
@@ -53,7 +53,6 @@ export async function createSession<T extends ToolMap, M = unknown>(
   config: SessionConfig<T, M>
 ): Promise<ZeitlichSession<M, false>>;
 export async function createSession<T extends ToolMap, M = unknown>({
-  threadId: providedThreadId,
   agentName,
   maxTurns = 50,
   metadata = {},
@@ -66,18 +65,33 @@ export async function createSession<T extends ToolMap, M = unknown>({
   processToolsInParallel = true,
   hooks = {},
   appendSystemPrompt = true,
-  continueThread = false,
   waitForInputTimeout = "48h",
   sandboxOps,
-  sandboxId: inheritedSandboxId,
-  previousSandboxId,
-  sandboxOnExit = "destroy",
+  thread: threadInit,
+  sandbox: sandboxInit,
+  sandboxShutdown = "destroy",
 }: SessionConfig<T, M>): Promise<ZeitlichSession<M, boolean>> {
-  const sourceThreadId = continueThread ? providedThreadId : undefined;
-  const threadId =
-    continueThread && providedThreadId
-      ? getShortId()
-      : (providedThreadId ?? getShortId());
+  // ---------------------------------------------------------------------------
+  // Thread resolution
+  // ---------------------------------------------------------------------------
+  const threadMode = threadInit?.mode ?? "new";
+  let threadId: string;
+  let sourceThreadId: string | undefined;
+
+  switch (threadMode) {
+    case "new":
+      threadId = threadInit?.mode === "new" && threadInit.threadId
+        ? threadInit.threadId
+        : getShortId();
+      break;
+    case "continue":
+      threadId = (threadInit as { mode: "continue"; threadId: string }).threadId;
+      break;
+    case "fork":
+      sourceThreadId = (threadInit as { mode: "fork"; threadId: string }).threadId;
+      threadId = getShortId();
+      break;
+  }
 
   const {
     appendToolResult,
@@ -151,43 +165,45 @@ export async function createSession<T extends ToolMap, M = unknown>({
         }
       );
 
-      // --- Sandbox lifecycle: create, fork, or inherit ---
-      let sandboxId: string | undefined = inheritedSandboxId;
-      const isInherited = !!inheritedSandboxId && !previousSandboxId;
+      // --- Sandbox lifecycle: create, continue, fork, or inherit ----------
+      const sandboxMode = sandboxInit?.mode;
+      let sandboxId: string | undefined;
+      let sandboxOwned = false;
 
-      if (previousSandboxId && !sandboxOps) {
-        throw ApplicationFailure.create({
-          message:
-            "No sandboxOps provided — cannot fork from previousSandboxId",
-          nonRetryable: true,
-        });
-      }
-
-      if (sandboxId && previousSandboxId) {
-        throw ApplicationFailure.create({
-          message:
-            "Both sandboxId and previousSandboxId provided — cannot manage sandbox lifecycle",
-          nonRetryable: true,
-        });
-      }
-
-      if (sandboxId && !sandboxOps) {
-        throw ApplicationFailure.create({
-          message:
-            "sandboxId provided but no sandboxOps — cannot manage sandbox lifecycle",
-          nonRetryable: true,
-        });
-      }
-
-      if (sandboxOps) {
-        if (previousSandboxId) {
-          sandboxId = await sandboxOps.forkSandbox(previousSandboxId);
-        } else if (!sandboxId) {
-          const result = await sandboxOps.createSandbox();
-          sandboxId = result.sandboxId;
-          if (result.stateUpdate) {
-            stateManager.mergeUpdate(result.stateUpdate as Partial<TState>);
-          }
+      if (sandboxMode === "inherit") {
+        sandboxId = (sandboxInit as { mode: "inherit"; sandboxId: string }).sandboxId;
+        if (!sandboxOps) {
+          throw ApplicationFailure.create({
+            message: "sandboxId provided but no sandboxOps — cannot manage sandbox lifecycle",
+            nonRetryable: true,
+          });
+        }
+      } else if (sandboxMode === "continue") {
+        if (!sandboxOps) {
+          throw ApplicationFailure.create({
+            message: "No sandboxOps provided — cannot continue sandbox",
+            nonRetryable: true,
+          });
+        }
+        sandboxId = (sandboxInit as { mode: "continue"; sandboxId: string }).sandboxId;
+        sandboxOwned = true;
+      } else if (sandboxMode === "fork") {
+        if (!sandboxOps) {
+          throw ApplicationFailure.create({
+            message: "No sandboxOps provided — cannot fork sandbox",
+            nonRetryable: true,
+          });
+        }
+        sandboxId = await sandboxOps.forkSandbox(
+          (sandboxInit as { mode: "fork"; sandboxId: string }).sandboxId
+        );
+        sandboxOwned = true;
+      } else if (sandboxOps) {
+        const result = await sandboxOps.createSandbox();
+        sandboxId = result.sandboxId;
+        sandboxOwned = true;
+        if (result.stateUpdate) {
+          stateManager.mergeUpdate(result.stateUpdate as Partial<TState>);
         }
       }
 
@@ -201,8 +217,11 @@ export async function createSession<T extends ToolMap, M = unknown>({
 
       const systemPrompt = stateManager.getSystemPrompt();
 
-      if (continueThread && sourceThreadId) {
+      // --- Thread lifecycle: new, continue, or fork ----------------------
+      if (threadMode === "fork" && sourceThreadId) {
         await forkThread(sourceThreadId, threadId);
+      } else if (threadMode === "continue") {
+        // "continue" — thread already exists, just append the new message
       } else {
         if (appendSystemPrompt) {
           if (!systemPrompt || systemPrompt.trim() === "") {
@@ -306,14 +325,17 @@ export async function createSession<T extends ToolMap, M = unknown>({
       } finally {
         await callSessionEnd(exitReason, stateManager.getTurns());
 
-        if (!isInherited && sandboxId && sandboxOps) {
-          if (sandboxOnExit === "destroy") {
-            await sandboxOps.destroySandbox(sandboxId);
-          } else if (
-            sandboxOnExit === "pause" ||
-            sandboxOnExit === "pause-until-parent-close"
-          ) {
-            await sandboxOps.pauseSandbox(sandboxId);
+        if (sandboxOwned && sandboxId && sandboxOps) {
+          switch (sandboxShutdown) {
+            case "destroy":
+              await sandboxOps.destroySandbox(sandboxId);
+              break;
+            case "pause":
+            case "pause-until-parent-close":
+              await sandboxOps.pauseSandbox(sandboxId);
+              break;
+            case "keep":
+              break;
           }
         }
 
