@@ -67,6 +67,10 @@ export class BedrockSandboxFileSystem implements SandboxFileSystem {
     this.workspaceBase = posix.resolve("/", workspaceBase);
   }
 
+  /**
+   * Resolve a caller-supplied path to an absolute path within the workspace.
+   * Used for shell commands that need full paths.
+   */
   private normalisePath(path: string): string {
     if (
       posix.isAbsolute(path) &&
@@ -85,6 +89,17 @@ export class BedrockSandboxFileSystem implements SandboxFileSystem {
       );
     }
     return resolved;
+  }
+
+  /**
+   * Return a workspace-relative path for Bedrock tool invocations
+   * (`writeFiles`, `readFiles`, `listFiles`, `removeFiles`), which
+   * reject absolute paths as "path traversal".
+   */
+  private toToolPath(path: string): string {
+    const abs = this.normalisePath(path);
+    const prefix = this.workspaceBase + "/";
+    return abs.startsWith(prefix) ? abs.slice(prefix.length) : abs;
   }
 
   private async invoke(
@@ -119,9 +134,9 @@ export class BedrockSandboxFileSystem implements SandboxFileSystem {
   }
 
   async readFile(path: string): Promise<string> {
-    const norm = this.normalisePath(path);
+    const rel = this.toToolPath(path);
     const result = await this.invoke("readFiles" as ToolNameType, {
-      paths: [norm],
+      paths: [rel],
     });
 
     for (const block of result.content ?? []) {
@@ -132,9 +147,9 @@ export class BedrockSandboxFileSystem implements SandboxFileSystem {
   }
 
   async readFileBuffer(path: string): Promise<Uint8Array> {
-    const norm = this.normalisePath(path);
+    const rel = this.toToolPath(path);
     const result = await this.invoke("readFiles" as ToolNameType, {
-      paths: [norm],
+      paths: [rel],
     });
 
     for (const block of result.content ?? []) {
@@ -148,12 +163,12 @@ export class BedrockSandboxFileSystem implements SandboxFileSystem {
   }
 
   async writeFile(path: string, content: string | Uint8Array): Promise<void> {
-    const norm = this.normalisePath(path);
+    const rel = this.toToolPath(path);
     const isText = typeof content === "string";
     const result = await this.invoke("writeFiles" as ToolNameType, {
       content: [
         {
-          path: norm,
+          path: rel,
           ...(isText
             ? { text: content as string }
             : { blob: content as Uint8Array }),
@@ -219,9 +234,9 @@ export class BedrockSandboxFileSystem implements SandboxFileSystem {
   }
 
   async readdir(path: string): Promise<string[]> {
-    const norm = this.normalisePath(path);
+    const rel = this.toToolPath(path);
     const result = await this.invoke("listFiles" as ToolNameType, {
-      directoryPath: norm,
+      directoryPath: rel,
     });
 
     const names: string[] = [];
@@ -231,6 +246,7 @@ export class BedrockSandboxFileSystem implements SandboxFileSystem {
 
     if (names.length > 0) return names;
 
+    const norm = this.normalisePath(path);
     const { stdout, exitCode, stderr } = await this.execShell(
       `ls -1A "${norm}"`
     );
@@ -280,8 +296,9 @@ export class BedrockSandboxFileSystem implements SandboxFileSystem {
       return;
     }
 
+    const rel = this.toToolPath(path);
     const result = await this.invoke("removeFiles" as ToolNameType, {
-      paths: [norm],
+      paths: [rel],
     });
     if (result.isError) {
       const msg =
