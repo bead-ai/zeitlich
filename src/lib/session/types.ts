@@ -10,12 +10,13 @@ import type {
   InferToolResults,
 } from "../tool-router/types";
 import type { Hooks } from "../hooks/types";
-import type { SubagentConfig, SandboxOnExitPolicy } from "../subagent/types";
+import type { SubagentConfig } from "../subagent/types";
 import type { Skill } from "../skills/types";
 import type { SandboxOps } from "../sandbox/types";
 import type { RunAgentActivity } from "../model/types";
 import type { AgentStateManager, JsonSerializable } from "../state/types";
 import type { ActivityInterfaceFor } from "@temporalio/workflow";
+import type { ThreadInit, SandboxInit, SubagentSandboxShutdown } from "../lifecycle";
 
 /**
  * Thread operations required by a session.
@@ -79,8 +80,6 @@ export type PrefixedThreadOps<TPrefix extends string> = {
 export interface SessionConfig<T extends ToolMap, M = unknown> {
   /** The name of the agent, should be unique within the workflows */
   agentName: string;
-  /** The thread ID to use for the session (defaults to a short generated ID) */
-  threadId?: string;
   /** Metadata for the session */
   metadata?: Record<string, unknown>;
   /** Whether to append the system prompt as message to the thread */
@@ -106,33 +105,47 @@ export interface SessionConfig<T extends ToolMap, M = unknown> {
    * Returns MessageContent array for the initial HumanMessage.
    */
   buildContextMessage: () => MessageContent | Promise<MessageContent>;
-  /** When true, skip thread initialization and system prompt — append only the new human message to the existing thread. */
-  continueThread?: boolean;
   /** How long to wait for input before cancelling the workflow */
   waitForInputTimeout?: Duration;
+
+  // ---------------------------------------------------------------------------
+  // Thread lifecycle
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Thread initialization strategy (default: `{ mode: "new" }`).
+   *
+   * - `{ mode: "new" }` — start a fresh thread.
+   * - `{ mode: "new", threadId: "..." }` — start a fresh thread with a specific ID.
+   * - `{ mode: "continue", threadId: "..." }` — append to an existing thread in-place.
+   * - `{ mode: "fork", threadId: "..." }` — fork an existing thread and continue in the copy.
+   */
+  thread?: ThreadInit;
+
+  // ---------------------------------------------------------------------------
+  // Sandbox lifecycle
+  // ---------------------------------------------------------------------------
+
   /** Sandbox lifecycle operations (optional — omit for agents that don't need a sandbox) */
   sandboxOps?: SandboxOps;
   /**
-   * Pre-existing sandbox ID to reuse (e.g. inherited from a parent agent).
-   * When set, the session skips `createSandbox` and will not destroy the
-   * sandbox on exit (the owner is responsible for cleanup).
-   */
-  sandboxId?: string;
-  /**
-   * The child's own previously-paused sandbox ID to fork from at the start of
-   * a continued session. Takes precedence over `sandboxId` for the fork path.
-   * Populated automatically by the subagent handler when `allowThreadContinuation` is set.
-   */
-  previousSandboxId?: string;
-  /**
-   * Sandbox lifecycle policy applied when this session exits.
+   * Sandbox initialization strategy.
    *
-   * Defaults to `{ kind: "destroy" }` when omitted.
+   * - `{ mode: "new" }` — create a fresh sandbox.
+   * - `{ mode: "continue", sandboxId: "..." }` — resume a paused sandbox (session owns it).
+   * - `{ mode: "fork", sandboxId: "..." }` — fork from an existing sandbox.
+   * - `{ mode: "inherit", sandboxId: "..." }` — use a parent's sandbox without ownership.
    *
-   * Has no effect if the session does not own the sandbox (i.e. `sandboxId`
-   * was provided by the caller).
+   * When omitted and `sandboxOps` is provided, defaults to `{ mode: "new" }`.
    */
-  sandboxOnExit?: SandboxOnExitPolicy;
+  sandbox?: SandboxInit;
+  /**
+   * What to do with the sandbox when this session exits.
+   *
+   * Defaults to `"destroy"` when omitted.
+   * Has no effect when the sandbox is inherited (`sandbox.mode === "inherit"`).
+   */
+  sandboxShutdown?: SubagentSandboxShutdown;
 }
 
 export type SessionResult<
