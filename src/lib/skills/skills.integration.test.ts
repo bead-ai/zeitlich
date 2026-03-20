@@ -208,32 +208,87 @@ describe("createReadSkillTool", () => {
 });
 
 // ---------------------------------------------------------------------------
-// createReadSkillHandler
+// createReadSkillHandler — structured wrapping
 // ---------------------------------------------------------------------------
 
 describe("createReadSkillHandler", () => {
-  const skills: Skill[] = [
-    {
-      name: "skill-a",
-      description: "First skill",
-      instructions: "Instructions for A",
-    },
-    {
-      name: "skill-b",
-      description: "Second skill",
-      instructions: "Instructions for B",
-    },
-  ];
-
-  it("returns skill instructions for a valid skill name", () => {
+  it("wraps instructions in <skill_content> tags", () => {
+    const skills: Skill[] = [
+      { name: "skill-a", description: "First", instructions: "Do the thing." },
+    ];
     const handler = createReadSkillHandler(skills);
     const result = handler({ skill_name: "skill-a" });
 
-    expect(result.toolResponse).toBe("Instructions for A");
+    const text = result.toolResponse as string;
+    expect(text).toContain('<skill_content name="skill-a">');
+    expect(text).toContain("Do the thing.");
+    expect(text).toContain("</skill_content>");
     expect(result.data).toBeNull();
   });
 
+  it("includes skill directory when location is set", () => {
+    const skills: Skill[] = [
+      {
+        name: "skill-a",
+        description: "First",
+        instructions: "Do A",
+        location: "/skills/skill-a",
+      },
+    ];
+    const handler = createReadSkillHandler(skills);
+    const result = handler({ skill_name: "skill-a" });
+
+    const text = result.toolResponse as string;
+    expect(text).toContain("Skill directory: /skills/skill-a");
+    expect(text).toContain("Relative paths in this skill resolve against the skill directory above.");
+  });
+
+  it("lists resources when present", () => {
+    const skills: Skill[] = [
+      {
+        name: "skill-a",
+        description: "First",
+        instructions: "Do A",
+        location: "/skills/skill-a",
+        resources: ["references/overview.md", "scripts/extract.py"],
+      },
+    ];
+    const handler = createReadSkillHandler(skills);
+    const result = handler({ skill_name: "skill-a" });
+
+    const text = result.toolResponse as string;
+    expect(text).toContain("<skill_resources>");
+    expect(text).toContain("<file>references/overview.md</file>");
+    expect(text).toContain("<file>scripts/extract.py</file>");
+    expect(text).toContain("</skill_resources>");
+  });
+
+  it("omits resources block when skill has no resources", () => {
+    const skills: Skill[] = [
+      { name: "skill-a", description: "First", instructions: "Do A" },
+    ];
+    const handler = createReadSkillHandler(skills);
+    const result = handler({ skill_name: "skill-a" });
+
+    const text = result.toolResponse as string;
+    expect(text).not.toContain("<skill_resources>");
+  });
+
+  it("omits location line when location is not set", () => {
+    const skills: Skill[] = [
+      { name: "skill-a", description: "First", instructions: "Do A" },
+    ];
+    const handler = createReadSkillHandler(skills);
+    const result = handler({ skill_name: "skill-a" });
+
+    const text = result.toolResponse as string;
+    expect(text).not.toContain("Skill directory:");
+  });
+
   it("returns error for unknown skill name", () => {
+    const skills: Skill[] = [
+      { name: "skill-a", description: "First", instructions: "Do A" },
+    ];
     const handler = createReadSkillHandler(skills);
     const result = handler({ skill_name: "nonexistent" });
 
@@ -243,11 +298,12 @@ describe("createReadSkillHandler", () => {
   });
 
   it("handles single skill", () => {
-    const firstSkill = skills[0];
-    if (!firstSkill) throw new Error("expected skill");
-    const handler = createReadSkillHandler([firstSkill]);
+    const skills: Skill[] = [
+      { name: "skill-a", description: "First", instructions: "Instructions for A" },
+    ];
+    const handler = createReadSkillHandler(skills);
     const result = handler({ skill_name: "skill-a" });
-    expect(result.toolResponse).toBe("Instructions for A");
+    expect((result.toolResponse as string)).toContain("Instructions for A");
   });
 });
 
@@ -258,6 +314,14 @@ describe("createReadSkillHandler", () => {
 describe("buildSkillRegistration", () => {
   it("returns null for empty skills array", () => {
     expect(buildSkillRegistration([])).toBeNull();
+  });
+
+  it("throws on duplicate skill names", () => {
+    const skills: Skill[] = [
+      { name: "dupe", description: "First", instructions: "A" },
+      { name: "dupe", description: "Second", instructions: "B" },
+    ];
+    expect(() => buildSkillRegistration(skills)).toThrow("Duplicate skill names: dupe");
   });
 
   it("returns a complete tool entry with handler", () => {
@@ -280,12 +344,14 @@ describe("buildSkillRegistration", () => {
     }
   });
 
-  it("registered handler works end-to-end", () => {
+  it("registered handler returns structured wrapping end-to-end", () => {
     const skills: Skill[] = [
       {
         name: "test-skill",
         description: "Test",
         instructions: "Test instructions content",
+        location: "/skills/test-skill",
+        resources: ["references/guide.md"],
       },
     ];
 
@@ -299,10 +365,18 @@ describe("buildSkillRegistration", () => {
 
     if (result instanceof Promise) {
       return result.then((r) => {
-        expect(r.toolResponse).toBe("Test instructions content");
+        const text = r.toolResponse as string;
+        expect(text).toContain('<skill_content name="test-skill">');
+        expect(text).toContain("Test instructions content");
+        expect(text).toContain("Skill directory: /skills/test-skill");
+        expect(text).toContain("<file>references/guide.md</file>");
       });
     }
-    expect(result.toolResponse).toBe("Test instructions content");
+    const text = result.toolResponse as string;
+    expect(text).toContain('<skill_content name="test-skill">');
+    expect(text).toContain("Test instructions content");
+    expect(text).toContain("Skill directory: /skills/test-skill");
+    expect(text).toContain("<file>references/guide.md</file>");
     return;
   });
 });

@@ -11,7 +11,11 @@ import { parseSkillFile } from "./parse";
  * ├── code-review/
  * │   └── SKILL.md
  * ├── pdf-processing/
- * │   └── SKILL.md
+ * │   ├── SKILL.md
+ * │   ├── references/
+ * │   │   └── spec-summary.md
+ * │   └── scripts/
+ * │       └── extract.py
  * ```
  *
  * Uses the sandbox filesystem abstraction — works with any backend
@@ -30,7 +34,13 @@ export class FileSystemSkillProvider implements SkillProvider {
     for (const dir of dirs) {
       const raw = await this.fs.readFile(join(this.baseDir, dir, "SKILL.md"));
       const { frontmatter } = parseSkillFile(raw);
-      skills.push(frontmatter);
+      const location = join(this.baseDir, dir);
+      const resources = await this.discoverResources(dir);
+      skills.push({
+        ...frontmatter,
+        location,
+        ...(resources.length > 0 && { resources }),
+      });
     }
 
     return skills;
@@ -48,7 +58,14 @@ export class FileSystemSkillProvider implements SkillProvider {
       );
     }
 
-    return { ...frontmatter, instructions: body };
+    const location = join(this.baseDir, name);
+    const resources = await this.discoverResources(name);
+    return {
+      ...frontmatter,
+      instructions: body,
+      location,
+      ...(resources.length > 0 && { resources }),
+    };
   }
 
   /**
@@ -62,10 +79,39 @@ export class FileSystemSkillProvider implements SkillProvider {
     for (const dir of dirs) {
       const raw = await this.fs.readFile(join(this.baseDir, dir, "SKILL.md"));
       const { frontmatter, body } = parseSkillFile(raw);
-      skills.push({ ...frontmatter, instructions: body });
+      const location = join(this.baseDir, dir);
+      const resources = await this.discoverResources(dir);
+      skills.push({
+        ...frontmatter,
+        instructions: body,
+        location,
+        ...(resources.length > 0 && { resources }),
+      });
     }
 
     return skills;
+  }
+
+  /**
+   * Scans the standard resource subdirectories (references/, scripts/, assets/)
+   * and returns relative paths for all discovered files.
+   */
+  private async discoverResources(skillDir: string): Promise<string[]> {
+    const resourceDirs = ["references", "scripts", "assets"];
+    const resources: string[] = [];
+
+    for (const subdir of resourceDirs) {
+      const dirPath = join(this.baseDir, skillDir, subdir);
+      if (!(await this.fs.exists(dirPath))) continue;
+      const entries = await this.fs.readdirWithFileTypes(dirPath);
+      for (const e of entries) {
+        if (e.isFile) {
+          resources.push(`${subdir}/${e.name}`);
+        }
+      }
+    }
+
+    return resources;
   }
 
   private async discoverSkillDirs(): Promise<string[]> {

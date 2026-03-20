@@ -94,7 +94,7 @@ export interface SessionConfig<T extends ToolMap, M = unknown> {
   tools?: T;
   /** Subagent configurations */
   subagents?: SubagentConfig[];
-  /** Skills available to this agent (metadata + instructions, loaded activity-side) */
+  /** Skills available to this agent (metadata + instructions, loaded before session creation) */
   skills?: Skill[];
   /** Session lifecycle hooks */
   hooks?: Hooks<T, ToolCallResultUnion<InferToolResults<T>>>;
