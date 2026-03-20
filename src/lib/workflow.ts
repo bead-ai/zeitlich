@@ -1,4 +1,11 @@
 /**
+ * Sandbox exit policy for the main agent workflow.
+ * Only `"destroy"` and `"pause"` are valid — there is no parent to
+ * coordinate `"pause-until-parent-close"`.
+ */
+export type MainAgentSandboxOnExitPolicy = "destroy" | "pause";
+
+/**
  * Session config fields derived from a main workflow input, ready to spread
  * into `createSession`.
  */
@@ -11,6 +18,10 @@ export interface WorkflowSessionInput {
   continueThread?: boolean;
   /** Optional sandbox ID forwarded to the session */
   sandboxId?: string;
+  /** Previously-paused sandbox ID to fork from (sandbox continuation) */
+  previousSandboxId?: string;
+  /** Sandbox lifecycle policy applied when this session exits */
+  sandboxOnExit?: MainAgentSandboxOnExitPolicy;
 }
 
 /** Raw workflow input fields that map into `WorkflowSessionInput`. */
@@ -19,11 +30,20 @@ export interface WorkflowInput {
   previousThreadId?: string;
   /** Optional sandbox ID to reuse */
   sandboxId?: string;
+  /** Previously-paused sandbox ID to fork from */
+  previousSandboxId?: string;
 }
 
 export interface WorkflowConfig {
   /** Workflow name — used as the Temporal workflow function name */
   name: string;
+  /**
+   * Sandbox lifecycle policy applied when the main agent session exits.
+   *
+   * - `"destroy"` (default) — destroy the sandbox on exit.
+   * - `"pause"` — pause the sandbox so it can be resumed later.
+   */
+  sandboxOnExit?: MainAgentSandboxOnExitPolicy;
 }
 
 /**
@@ -46,11 +66,15 @@ export function defineWorkflow<TInput, TResult>(
   ): Promise<TResult> => {
     const sessionInput: WorkflowSessionInput = {
       agentName: config.name,
+      sandboxOnExit: config.sandboxOnExit ?? "destroy",
       ...(workflowInput.previousThreadId && {
         threadId: workflowInput.previousThreadId,
         continueThread: true,
       }),
       ...(workflowInput.sandboxId && { sandboxId: workflowInput.sandboxId }),
+      ...(workflowInput.previousSandboxId && {
+        previousSandboxId: workflowInput.previousSandboxId,
+      }),
     };
     return fn(input, sessionInput);
   };
