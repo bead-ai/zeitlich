@@ -51,7 +51,7 @@ export const createSession = async <T extends ToolMap, M = unknown>({
   threadOps,
   buildContextMessage,
   subagents,
-  skillProvider,
+  skills,
   tools = {} as T,
   processToolsInParallel = true,
   hooks = {},
@@ -80,8 +80,7 @@ export const createSession = async <T extends ToolMap, M = unknown>({
     const reg = buildSubagentRegistration(subagents);
     if (reg) plugins.push(reg);
   }
-  if (skillProvider) {
-    const skills = await skillProvider.loadAll();
+  if (skills) {
     const reg = buildSkillRegistration(skills);
     if (reg) plugins.push(reg);
   }
