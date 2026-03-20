@@ -829,6 +829,103 @@ describe("createSession integration", () => {
     expect(stateManager.get("customField")).toBe("from-sandbox");
   });
 
+  // --- Skill resourceContents seeded as initialFiles ---
+
+  it("passes skill resourceContents as initialFiles to createSandbox", async () => {
+    const { ops } = createMockThreadOps();
+    let capturedOptions: Record<string, unknown> | undefined;
+
+    const sandboxOps: SandboxOps = {
+      createSandbox: async (options) => {
+        capturedOptions = options as Record<string, unknown>;
+        return { sandboxId: "sb-skill" };
+      },
+      destroySandbox: async () => {},
+      snapshotSandbox: async () => ({
+        sandboxId: "sb-skill",
+        providerId: "test",
+        data: null,
+        createdAt: new Date().toISOString(),
+      }),
+      forkSandbox: async () => "forked-sandbox-id",
+      pauseSandbox: async () => {},
+    };
+
+    const session = await createSession({
+      agentName: "TestAgent",
+      thread: { mode: "new", threadId: "thread-1" },
+      runAgent: createScriptedRunAgent([{ message: "done", toolCalls: [] }]),
+      threadOps: ops,
+      buildContextMessage: () => "go",
+      sandboxOps,
+      skills: [
+        {
+          name: "test-skill",
+          description: "Test",
+          instructions: "Do test",
+          location: "/skills/test-skill",
+          resourceContents: { "references/guide.md": "# Guide content" },
+        },
+      ],
+    });
+
+    const stateManager = createAgentStateManager({
+      initialState: { systemPrompt: "test" },
+    });
+
+    await session.runSession({ stateManager });
+
+    expect(capturedOptions).toBeDefined();
+    expect(capturedOptions?.initialFiles).toEqual({
+      "/skills/test-skill/references/guide.md": "# Guide content",
+    });
+  });
+
+  it("does not pass initialFiles when skills have no resourceContents", async () => {
+    const { ops } = createMockThreadOps();
+    let capturedOptions: Record<string, unknown> | undefined;
+
+    const sandboxOps: SandboxOps = {
+      createSandbox: async (options) => {
+        capturedOptions = options as Record<string, unknown>;
+        return { sandboxId: "sb-no-rc" };
+      },
+      destroySandbox: async () => {},
+      snapshotSandbox: async () => ({
+        sandboxId: "sb-no-rc",
+        providerId: "test",
+        data: null,
+        createdAt: new Date().toISOString(),
+      }),
+      forkSandbox: async () => "forked-sandbox-id",
+      pauseSandbox: async () => {},
+    };
+
+    const session = await createSession({
+      agentName: "TestAgent",
+      thread: { mode: "new", threadId: "thread-1" },
+      runAgent: createScriptedRunAgent([{ message: "done", toolCalls: [] }]),
+      threadOps: ops,
+      buildContextMessage: () => "go",
+      sandboxOps,
+      skills: [
+        {
+          name: "test-skill",
+          description: "Test",
+          instructions: "Do test",
+        },
+      ],
+    });
+
+    const stateManager = createAgentStateManager({
+      initialState: { systemPrompt: "test" },
+    });
+
+    await session.runSession({ stateManager });
+
+    expect(capturedOptions).toBeUndefined();
+  });
+
   // --- Tool usage tracking from tool results ---
 
   it("accumulates usage from tool call results", async () => {

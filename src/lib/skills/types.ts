@@ -17,8 +17,6 @@ export interface SkillMetadata {
   allowedTools?: string[];
   /** Absolute path to the skill directory (parent of SKILL.md) */
   location?: string;
-  /** Relative paths to bundled resource files (references, scripts, assets) */
-  resources?: string[];
 }
 
 /**
@@ -29,6 +27,8 @@ export interface SkillMetadata {
 export interface Skill extends SkillMetadata {
   /** The markdown body of SKILL.md (everything after the frontmatter) */
   instructions: string;
+  /** Resource file contents keyed by relative path (e.g. `references/overview.md` → content) */
+  resourceContents?: Record<string, string>;
 }
 
 /**

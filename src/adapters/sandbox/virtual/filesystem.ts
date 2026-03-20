@@ -64,7 +64,7 @@ export class VirtualSandboxFileSystem<
     tree: FileEntry<TMeta>[],
     private resolver: FileResolver<TCtx, TMeta>,
     private ctx: TCtx,
-    workspaceBase = "/"
+    workspaceBase = "/",
   ) {
     this.workspaceBase = normalisePath(workspaceBase);
     this.entries = new Map(
@@ -88,13 +88,15 @@ export class VirtualSandboxFileSystem<
   // --------------------------------------------------------------------------
 
   async readFile(path: string): Promise<string> {
-    const entry = this.entries.get(normalisePath(path, this.workspaceBase));
+    const norm = normalisePath(path, this.workspaceBase);
+    const entry = this.entries.get(norm);
     if (!entry) throw new Error(`ENOENT: no such file: ${path}`);
     return this.resolver.readFile(entry.id, this.ctx, entry.metadata);
   }
 
   async readFileBuffer(path: string): Promise<Uint8Array> {
-    const entry = this.entries.get(normalisePath(path, this.workspaceBase));
+    const norm = normalisePath(path, this.workspaceBase);
+    const entry = this.entries.get(norm);
     if (!entry) throw new Error(`ENOENT: no such file: ${path}`);
     return this.resolver.readFileBuffer(entry.id, this.ctx, entry.metadata);
   }

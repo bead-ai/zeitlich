@@ -13,7 +13,27 @@ import type { ParsedToolCallUnion, ToolMap } from "../tool-router/types";
 import { getShortId } from "../thread/id";
 import { buildSubagentRegistration } from "../subagent/register";
 import { buildSkillRegistration } from "../skills/register";
+import type { Skill } from "../skills/types";
 import { uuid4 } from "@temporalio/workflow";
+
+/**
+ * Collects resource file contents from all skills into a flat map
+ * keyed by absolute path (location + relative resource path).
+ * Returns undefined when no skills carry resource contents.
+ */
+function collectSkillFiles(
+  skills: Skill[],
+): Record<string, string> | undefined {
+  let files: Record<string, string> | undefined;
+  for (const skill of skills) {
+    if (!skill.resourceContents || !skill.location) continue;
+    for (const [relPath, content] of Object.entries(skill.resourceContents)) {
+      files ??= {};
+      files[`${skill.location}/${relPath}`] = content;
+    }
+  }
+  return files;
+}
 
 /**
  * Creates an agent session that manages the agent loop: LLM invocation,
@@ -199,7 +219,10 @@ export async function createSession<T extends ToolMap, M = unknown>({
         );
         sandboxOwned = true;
       } else if (sandboxOps) {
-        const result = await sandboxOps.createSandbox();
+        const skillFiles = skills ? collectSkillFiles(skills) : undefined;
+        const result = await sandboxOps.createSandbox(
+          skillFiles ? { initialFiles: skillFiles } : undefined,
+        );
         sandboxId = result.sandboxId;
         sandboxOwned = true;
         if (result.stateUpdate) {

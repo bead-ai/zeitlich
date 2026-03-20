@@ -69,6 +69,15 @@ export class VirtualSandboxProvider<
       workspaceBase,
     );
 
+    if (options.initialFiles) {
+      for (const [path, content] of Object.entries(options.initialFiles)) {
+        await sandbox.fs.writeFile(path, content);
+      }
+      for (const m of sandbox.fs.getMutations()) {
+        if (m.type === "add") fileTree.push(m.entry);
+      }
+    }
+
     return {
       sandbox,
       stateUpdate: {

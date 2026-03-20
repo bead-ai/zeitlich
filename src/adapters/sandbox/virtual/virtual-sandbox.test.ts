@@ -428,6 +428,32 @@ describe("VirtualSandboxProvider", () => {
       "requires resolverContext",
     );
   });
+
+  it("create seeds initialFiles via writeFile into sandbox and fileTree", async () => {
+    const { resolver } = createMockResolver();
+    const provider = new VirtualSandboxProvider(resolver);
+    const { sandbox, stateUpdate } = await provider.create({
+      resolverContext: ctx,
+      initialFiles: {
+        "/skills/my-skill/SKILL.md": "---\nname: my-skill\n---\nDo things.",
+        "/skills/my-skill/references/guide.md": "# Guide\nStep 1...",
+      },
+    });
+
+    expect(await sandbox.fs.readFile("/skills/my-skill/SKILL.md")).toBe(
+      "---\nname: my-skill\n---\nDo things.",
+    );
+    expect(await sandbox.fs.readFile("/skills/my-skill/references/guide.md")).toBe(
+      "# Guide\nStep 1...",
+    );
+    expect(await sandbox.fs.exists("/skills/my-skill")).toBe(true);
+    expect(await sandbox.fs.exists("/skills/my-skill/references")).toBe(true);
+
+    const tree = stateUpdate?.fileTree as FileEntry[];
+    expect(tree.find((e) => e.path === "/skills/my-skill/SKILL.md")).toBeDefined();
+    expect(tree.find((e) => e.path === "/skills/my-skill/references/guide.md")).toBeDefined();
+    expect(stateUpdate).not.toHaveProperty("localFiles");
+  });
 });
 
 // ============================================================================

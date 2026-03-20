@@ -61,6 +61,7 @@ A sandbox adapter provides filesystem access for tools like `Bash`, `Read`, `Wri
 | Virtual | `zeitlich/adapters/sandbox/virtual` | Custom resolvers with path-only ops |
 | Daytona | `zeitlich/adapters/sandbox/daytona` | Remote Daytona workspaces |
 | E2B | `zeitlich/adapters/sandbox/e2b` | E2B cloud sandboxes |
+| Bedrock | `zeitlich/adapters/sandbox/bedrock` | AWS Bedrock AgentCore Code Interpreter |
 
 ### Example: LangChain Adapter
 
@@ -95,6 +96,7 @@ npm install zeitlich ioredis
 - `ioredis` >= 5.0.0
 - `@langchain/core` >= 1.0.0 (optional — only when using the LangChain adapter)
 - `@google/genai` >= 1.0.0 (optional — only when using the Google GenAI adapter)
+- `@aws-sdk/client-bedrock-agentcore` >= 3.900.0 (optional — only when using the Bedrock adapter)
 
 **Required infrastructure:**
 
@@ -483,14 +485,18 @@ Zeitlich has first-class support for the [agentskills.io](https://agentskills.io
 
 #### Defining a Skill
 
-Each skill lives in its own directory as a `SKILL.md` file with YAML frontmatter:
+Each skill lives in its own directory as a `SKILL.md` file with YAML frontmatter. A skill directory can also contain **resource files** — supporting documents, templates, or data that the agent can read from the sandbox filesystem:
 
 ```
 skills/
 ├── code-review/
-│   └── SKILL.md
+│   ├── SKILL.md
+│   └── resources/
+│       └── checklist.md
 ├── pdf-processing/
-│   └── SKILL.md
+│   ├── SKILL.md
+│   └── templates/
+│       └── extraction-prompt.txt
 ```
 
 ```markdown
@@ -506,14 +512,17 @@ license: MIT
 When reviewing code, follow these steps:
 1. Read the diff with `Bash`
 2. Search for related tests with `Grep`
-3. ...
+3. Read the checklist from `resources/checklist.md`
+4. ...
 ```
 
 Required fields: `name` and `description`. Optional: `license`, `compatibility`, `allowed-tools` (space-delimited), `metadata` (key-value map).
 
+Resource files are any non-`SKILL.md` files inside the skill directory (discovered recursively). When loaded via `FileSystemSkillProvider`, their contents are stored in `skill.resourceContents` — a `Record<string, string>` keyed by relative path (e.g. `"resources/checklist.md"`).
+
 #### Loading Skills
 
-Use `FileSystemSkillProvider` to load skills from a directory (works with any sandbox filesystem):
+Use `FileSystemSkillProvider` to load skills from a directory. It accepts any `SandboxFileSystem` implementation. `loadAll()` eagerly reads `SKILL.md` instructions **and** all resource file contents into each `Skill` object:
 
 ```typescript
 import { FileSystemSkillProvider } from "zeitlich";
@@ -524,6 +533,28 @@ const { sandbox } = await provider.create({});
 
 const skillProvider = new FileSystemSkillProvider(sandbox.fs, "/skills");
 const skills = await skillProvider.loadAll();
+// Each skill has: { name, description, instructions, resourceContents }
+// resourceContents: { "resources/checklist.md": "...", ... }
+```
+
+**Loading from the local filesystem (activity-side):** Use `NodeFsSandboxFileSystem` to read skills from the worker's disk. This is the simplest option when skill files are bundled alongside your application code:
+
+```typescript
+import { NodeFsSandboxFileSystem, FileSystemSkillProvider } from "zeitlich";
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const fs = new NodeFsSandboxFileSystem(join(__dirname, "skills"));
+const skillProvider = new FileSystemSkillProvider(fs, "/");
+const skills = await skillProvider.loadAll();
+```
+
+For lightweight discovery without reading file contents, use `listSkills()`:
+
+```typescript
+const metadata = await skillProvider.listSkills();
+// SkillMetadata[] — name, description, location only
 ```
 
 Or parse a single file directly:
@@ -537,7 +568,10 @@ const { frontmatter, body } = parseSkillFile(rawMarkdown);
 
 #### Passing Skills to a Session
 
-Pass loaded skills to `createSession`. Zeitlich automatically registers a `ReadSkill` tool whose description lists all available skills — the agent discovers them through the tool definition and loads instructions on demand:
+Pass loaded skills to `createSession`. Zeitlich automatically:
+
+1. Registers a `ReadSkill` tool whose description lists all available skills — the agent discovers them through the tool definition and loads instructions on demand.
+2. Seeds `resourceContents` into the sandbox as `initialFiles` (when `sandboxOps` is configured), so the agent can read resource files with its `Read` tool without any extra setup.
 
 ```typescript
 import { createSession } from "zeitlich/workflow";
@@ -548,7 +582,7 @@ const session = await createSession({
 });
 ```
 
-The `ReadSkill` tool accepts a `skill_name` parameter (constrained to an enum of available names) and returns the full instruction body. The handler runs directly in the workflow — no activity needed.
+The `ReadSkill` tool accepts a `skill_name` parameter (constrained to an enum of available names) and returns the full instruction body plus a list of available resource file paths. The handler runs directly in the workflow — no activity needed. Resource file contents are not included in the `ReadSkill` response (progressive disclosure); the agent reads them from the sandbox filesystem on demand.
 
 #### Building Skills Manually
 
@@ -813,6 +847,7 @@ Framework-agnostic utilities for activities, worker setup, and Node.js code:
 | `createThreadManager`     | Generic Redis-backed thread manager factory                                                   |
 | `toTree`                  | Generate file tree string from an `IFileSystem` instance                                      |
 | `withSandbox`             | Wraps a handler to auto-resolve sandbox from context (pairs with `withAutoAppend`)            |
+| `NodeFsSandboxFileSystem`   | `node:fs` adapter for `SandboxFileSystem` — read skills from the worker's local disk              |
 | `FileSystemSkillProvider`   | Load skills from a directory following the agentskills.io layout                                  |
 | Tool handlers             | `bashHandler`, `editHandler`, `globHandler`, `readFileHandler`, `writeFileHandler`, `createAskUserQuestionHandler` |
 
@@ -867,6 +902,7 @@ Framework-agnostic utilities for activities, worker setup, and Node.js code:
 │  │  │ • Turns        │  │  • Tool routing & hooks       │   │  │
 │  │  │ • Custom state │  │  • Prompts (system, context)  │   │  │
 │  │  └────────────────┘  │  • Subagent coordination      │   │  │
+│  │                      │  • Skills (progressive load)   │   │  │
 │  │                      └───────────────────────────────┘   │  │
 │  └──────────────────────────────────────────────────────────┘  │
 │                              │                                  │
@@ -883,7 +919,7 @@ Framework-agnostic utilities for activities, worker setup, and Node.js code:
 │  └──────────────────────────────────────────────────────────┘  │
 │  ┌──────────────────────────────────────────────────────────┐  │
 │  │         Sandbox Adapter (zeitlich/adapters/sandbox/*)      │  │
-│  │  • In-memory, Virtual, Daytona, E2B, or custom            │  │
+│  │  • In-memory, Virtual, Daytona, E2B, Bedrock, or custom   │  │
 │  │  • Filesystem ops for agent tools                          │  │
 │  └──────────────────────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────────────┘
