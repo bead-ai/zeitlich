@@ -1,9 +1,11 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { parseSkillFile } from "./parse";
 import { createReadSkillTool } from "./tool";
 import { createReadSkillHandler } from "./handler";
 import { buildSkillRegistration } from "./register";
+import { FileSystemSkillProvider } from "./fs-provider";
 import type { Skill } from "./types";
+import type { SandboxFileSystem, DirentEntry } from "../sandbox/types";
 
 // ---------------------------------------------------------------------------
 // parseSkillFile
@@ -405,5 +407,186 @@ describe("buildSkillRegistration", () => {
     expect(text).toContain("Skill directory: /skills/test-skill");
     expect(text).toContain("<file>references/guide.md</file>");
     return;
+  });
+});
+
+// ---------------------------------------------------------------------------
+// FileSystemSkillProvider — resource discovery
+// ---------------------------------------------------------------------------
+
+function createMockFs(
+  tree: Record<string, string | "DIR">,
+): SandboxFileSystem {
+  const dir = (entries: DirentEntry[]): DirentEntry[] => entries;
+
+  return {
+    workspaceBase: "/",
+    readFile: vi.fn(async (path: string) => {
+      const val = tree[path];
+      if (val === undefined || val === "DIR")
+        throw new Error(`ENOENT: ${path}`);
+      return val;
+    }),
+    exists: vi.fn(async (path: string) => path in tree),
+    readdirWithFileTypes: vi.fn(async (path: string) => {
+      const prefix = path.endsWith("/") ? path : `${path}/`;
+      const seen = new Set<string>();
+      const entries: DirentEntry[] = [];
+      for (const key of Object.keys(tree)) {
+        if (!key.startsWith(prefix)) continue;
+        const rest = key.slice(prefix.length);
+        const parts = rest.split("/");
+        const name = parts[0] ?? "";
+        if (!name || seen.has(name)) continue;
+        seen.add(name);
+        const isDir = parts.length > 1 || tree[key] === "DIR";
+        entries.push({
+          name,
+          isFile: !isDir,
+          isDirectory: isDir,
+          isSymbolicLink: false,
+        });
+      }
+      return dir(entries);
+    }),
+    readFileBuffer: vi.fn(),
+    writeFile: vi.fn(),
+    appendFile: vi.fn(),
+    stat: vi.fn(),
+    mkdir: vi.fn(),
+    readdir: vi.fn(),
+    rm: vi.fn(),
+    cp: vi.fn(),
+    mv: vi.fn(),
+    readlink: vi.fn(),
+    resolvePath: vi.fn(),
+  };
+}
+
+describe("FileSystemSkillProvider", () => {
+  const skillMd = `---
+name: my-skill
+description: A test skill
+---
+Do the thing.`;
+
+  it("discovers resources in arbitrary subdirectories", async () => {
+    const fs = createMockFs({
+      "/skills/my-skill/SKILL.md": skillMd,
+      "/skills/my-skill/templates/prompt.txt": "prompt content",
+      "/skills/my-skill/templates": "DIR",
+      "/skills/my-skill/data/config.json": '{"key":"value"}',
+      "/skills/my-skill/data": "DIR",
+      "/skills/my-skill": "DIR",
+    });
+
+    const provider = new FileSystemSkillProvider(fs, "/skills");
+    const skills = await provider.loadAll();
+
+    expect(skills).toHaveLength(1);
+    const [skill] = skills;
+    expect(skill?.resourceContents).toEqual({
+      "templates/prompt.txt": "prompt content",
+      "data/config.json": '{"key":"value"}',
+    });
+  });
+
+  it("discovers deeply nested resources", async () => {
+    const fs = createMockFs({
+      "/skills/my-skill/SKILL.md": skillMd,
+      "/skills/my-skill/references": "DIR",
+      "/skills/my-skill/references/deep": "DIR",
+      "/skills/my-skill/references/deep/nested.md": "nested content",
+      "/skills/my-skill": "DIR",
+    });
+
+    const provider = new FileSystemSkillProvider(fs, "/skills");
+    const skills = await provider.loadAll();
+
+    expect(skills).toHaveLength(1);
+    expect(skills[0]?.resourceContents).toEqual({
+      "references/deep/nested.md": "nested content",
+    });
+  });
+
+  it("excludes SKILL.md from resource contents", async () => {
+    const fs = createMockFs({
+      "/skills/my-skill/SKILL.md": skillMd,
+      "/skills/my-skill/readme.txt": "readme",
+      "/skills/my-skill": "DIR",
+    });
+
+    const provider = new FileSystemSkillProvider(fs, "/skills");
+    const skills = await provider.loadAll();
+
+    expect(skills).toHaveLength(1);
+    expect(skills[0]?.resourceContents).toEqual({
+      "readme.txt": "readme",
+    });
+  });
+
+  it("returns undefined resourceContents when no resources exist", async () => {
+    const fs = createMockFs({
+      "/skills/my-skill/SKILL.md": skillMd,
+      "/skills/my-skill": "DIR",
+    });
+
+    const provider = new FileSystemSkillProvider(fs, "/skills");
+    const skills = await provider.loadAll();
+
+    expect(skills).toHaveLength(1);
+    expect(skills[0]?.resourceContents).toBeUndefined();
+  });
+
+  it("getSkill loads resources from arbitrary directories", async () => {
+    const fs = createMockFs({
+      "/skills/my-skill/SKILL.md": skillMd,
+      "/skills/my-skill/custom-dir": "DIR",
+      "/skills/my-skill/custom-dir/file.txt": "custom content",
+      "/skills/my-skill": "DIR",
+    });
+
+    const provider = new FileSystemSkillProvider(fs, "/skills");
+    const skill = await provider.getSkill("my-skill");
+
+    expect(skill.resourceContents).toEqual({
+      "custom-dir/file.txt": "custom content",
+    });
+  });
+
+  it("ignores hidden files and directories", async () => {
+    const fs = createMockFs({
+      "/skills/my-skill/SKILL.md": skillMd,
+      "/skills/my-skill/.git": "DIR",
+      "/skills/my-skill/.git/config": "git config",
+      "/skills/my-skill/.DS_Store": "binary",
+      "/skills/my-skill/data": "DIR",
+      "/skills/my-skill/data/file.txt": "visible",
+      "/skills/my-skill": "DIR",
+    });
+
+    const provider = new FileSystemSkillProvider(fs, "/skills");
+    const skills = await provider.loadAll();
+
+    expect(skills).toHaveLength(1);
+    expect(skills[0]?.resourceContents).toEqual({
+      "data/file.txt": "visible",
+    });
+  });
+
+  it("listSkills does not load resourceContents", async () => {
+    const fs = createMockFs({
+      "/skills/my-skill/SKILL.md": skillMd,
+      "/skills/my-skill/data/file.txt": "data",
+      "/skills/my-skill/data": "DIR",
+      "/skills/my-skill": "DIR",
+    });
+
+    const provider = new FileSystemSkillProvider(fs, "/skills");
+    const metadata = await provider.listSkills();
+
+    expect(metadata).toHaveLength(1);
+    expect(metadata[0]?.name).toBe("my-skill");
+    expect((metadata[0] as Skill).resourceContents).toBeUndefined();
   });
 });

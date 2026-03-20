@@ -60,25 +60,17 @@ export class VirtualSandboxFileSystem<
   private directories: Set<string>;
   private mutations: TreeMutation<TMeta>[] = [];
 
-  private localFiles: Map<string, string | Uint8Array>;
-
   constructor(
     tree: FileEntry<TMeta>[],
     private resolver: FileResolver<TCtx, TMeta>,
     private ctx: TCtx,
     workspaceBase = "/",
-    localFiles?: Map<string, string | Uint8Array>,
   ) {
     this.workspaceBase = normalisePath(workspaceBase);
     this.entries = new Map(
       tree.map((e) => [normalisePath(e.path, this.workspaceBase), e])
     );
     this.directories = inferDirectories(tree, this.workspaceBase);
-    this.localFiles = localFiles
-      ? new Map(
-          [...localFiles].map(([k, v]) => [normalisePath(k, this.workspaceBase), v])
-        )
-      : new Map();
   }
 
   /** Return all mutations accumulated during this invocation. */
@@ -97,10 +89,6 @@ export class VirtualSandboxFileSystem<
 
   async readFile(path: string): Promise<string> {
     const norm = normalisePath(path, this.workspaceBase);
-    const local = this.localFiles.get(norm);
-    if (local !== undefined) {
-      return typeof local === "string" ? local : new TextDecoder().decode(local);
-    }
     const entry = this.entries.get(norm);
     if (!entry) throw new Error(`ENOENT: no such file: ${path}`);
     return this.resolver.readFile(entry.id, this.ctx, entry.metadata);
@@ -108,10 +96,6 @@ export class VirtualSandboxFileSystem<
 
   async readFileBuffer(path: string): Promise<Uint8Array> {
     const norm = normalisePath(path, this.workspaceBase);
-    const local = this.localFiles.get(norm);
-    if (local !== undefined) {
-      return typeof local === "string" ? new TextEncoder().encode(local) : local;
-    }
     const entry = this.entries.get(norm);
     if (!entry) throw new Error(`ENOENT: no such file: ${path}`);
     return this.resolver.readFileBuffer(entry.id, this.ctx, entry.metadata);

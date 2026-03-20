@@ -93,24 +93,27 @@ export class FileSystemSkillProvider implements SkillProvider {
   }
 
   /**
-   * Scans the standard resource subdirectories (references/, scripts/, assets/)
-   * and returns relative paths for all discovered files.
+   * Recursively discovers all non-SKILL.md files inside the skill directory
+   * and returns their paths relative to the skill root.
    */
   private async discoverResources(skillDir: string): Promise<string[]> {
-    const resourceDirs = ["references", "scripts", "assets"];
+    const skillRoot = join(this.baseDir, skillDir);
     const resources: string[] = [];
 
-    for (const subdir of resourceDirs) {
-      const dirPath = join(this.baseDir, skillDir, subdir);
-      if (!(await this.fs.exists(dirPath))) continue;
-      const entries = await this.fs.readdirWithFileTypes(dirPath);
+    const walk = async (dir: string, prefix: string): Promise<void> => {
+      const entries = await this.fs.readdirWithFileTypes(dir);
       for (const e of entries) {
-        if (e.isFile) {
-          resources.push(`${subdir}/${e.name}`);
+        if (e.name.startsWith(".")) continue;
+        const relPath = prefix ? `${prefix}/${e.name}` : e.name;
+        if (e.isDirectory) {
+          await walk(join(dir, e.name), relPath);
+        } else if (e.isFile && e.name !== "SKILL.md") {
+          resources.push(relPath);
         }
       }
-    }
+    };
 
+    await walk(skillRoot, "");
     return resources;
   }
 
