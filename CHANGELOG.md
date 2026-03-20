@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.24](https://github.com/bead-ai/zeitlich/compare/v0.2.23...v0.2.24) (2026-03-20)
+
+
+### Features
+
+* add adapter for AWS Bedrock sandboxes ([#55](https://github.com/bead-ai/zeitlich/issues/55)) ([932dba0](https://github.com/bead-ai/zeitlich/commit/932dba0cecdb7252256b4ce787cc06a08edbff1d))
+* add support for skill references in the session management ([#53](https://github.com/bead-ai/zeitlich/issues/53)) ([62d5e0a](https://github.com/bead-ai/zeitlich/commit/62d5e0acdc60f56a1b8b7b1350665c79d497039b))
+* enhance sandbox state management in lifecycle and router ([67f1ac5](https://github.com/bead-ai/zeitlich/commit/67f1ac53135acbe054ded0dc5cdec87e848f9213))
+
+
+### Code Refactoring
+
+* update session edge case tests and README for thread and sandbox lifecycle changes ([c4b91b4](https://github.com/bead-ai/zeitlich/commit/c4b91b421aaa2eaad582ec98fb88fc54e99d33b9))
+
+
+### Miscellaneous Chores
+
+* release 0.2.24 ([21b81d2](https://github.com/bead-ai/zeitlich/commit/21b81d28118a8fc95433ecdefee3790ca681f7c8))
+
 ## [0.2.23](https://github.com/bead-ai/zeitlich/compare/v0.2.22...v0.2.23) (2026-03-20)
 
 
