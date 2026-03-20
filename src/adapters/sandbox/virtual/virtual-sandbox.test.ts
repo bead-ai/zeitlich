@@ -333,6 +333,20 @@ describe("VirtualSandboxFileSystem", () => {
     expect(await fsWithLocal.readFile("/skills/my-skill/SKILL.md")).toBe("# Skill instructions");
   });
 
+  it("readFile resolves localFiles with non-root workspaceBase", async () => {
+    const { resolver } = createMockResolver();
+    const localFiles = new Map<string, string | Uint8Array>([
+      ["skills/my-skill/SKILL.md", "# Non-root skill"],
+    ]);
+    const tree: FileEntry[] = [
+      { id: "local:skills/my-skill/SKILL.md", path: "skills/my-skill/SKILL.md", size: 18, mtime: "2025-01-01T00:00:00.000Z", metadata: {} },
+    ];
+    const fsWithBase = new VirtualSandboxFileSystem(tree, resolver, ctx, "/home/user", localFiles);
+
+    expect(await fsWithBase.readFile("skills/my-skill/SKILL.md")).toBe("# Non-root skill");
+    expect(await fsWithBase.readFile("/home/user/skills/my-skill/SKILL.md")).toBe("# Non-root skill");
+  });
+
   it("readFileBuffer returns local file as Uint8Array", async () => {
     const { resolver } = createMockResolver();
     const localFiles = new Map<string, string | Uint8Array>([

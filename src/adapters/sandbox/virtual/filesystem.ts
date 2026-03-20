@@ -74,7 +74,11 @@ export class VirtualSandboxFileSystem<
       tree.map((e) => [normalisePath(e.path, this.workspaceBase), e])
     );
     this.directories = inferDirectories(tree, this.workspaceBase);
-    this.localFiles = localFiles ?? new Map();
+    this.localFiles = localFiles
+      ? new Map(
+          [...localFiles].map(([k, v]) => [normalisePath(k, this.workspaceBase), v])
+        )
+      : new Map();
   }
 
   /** Return all mutations accumulated during this invocation. */
