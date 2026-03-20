@@ -105,6 +105,8 @@ export interface VirtualSandboxState<
   fileTree: FileEntry<TMeta>[];
   resolverContext: TCtx;
   workspaceBase?: string;
+  /** Content for files seeded via `initialFiles` that bypass the resolver. */
+  localFiles?: Record<string, string>;
 }
 
 // ============================================================================

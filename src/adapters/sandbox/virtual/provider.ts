@@ -7,6 +7,7 @@ import { SandboxNotSupportedError } from "../../../lib/sandbox/types";
 import { getShortId } from "../../../lib/thread/id";
 import { createVirtualSandbox } from "./index";
 import type {
+  FileEntry,
   FileEntryMetadata,
   FileResolver,
   VirtualSandboxCreateOptions,
@@ -61,12 +62,41 @@ export class VirtualSandboxProvider<
     );
     const workspaceBase = options.workspaceBase ?? "/";
 
+    let localFilesMap: Map<string, string | Uint8Array> | undefined;
+    let localFilesState: Record<string, string> | undefined;
+
+    if (options.initialFiles && Object.keys(options.initialFiles).length > 0) {
+      localFilesMap = new Map();
+      localFilesState = {};
+      const now = new Date().toISOString();
+
+      for (const [path, content] of Object.entries(options.initialFiles)) {
+        const size = typeof content === "string"
+          ? new TextEncoder().encode(content).byteLength
+          : content.byteLength;
+
+        const entry: FileEntry<TMeta> = {
+          id: `local:${path}`,
+          path,
+          size,
+          mtime: now,
+          metadata: {} as TMeta,
+        };
+        fileTree.push(entry);
+        localFilesMap.set(path, content);
+        localFilesState[path] = typeof content === "string"
+          ? content
+          : new TextDecoder().decode(content);
+      }
+    }
+
     const sandbox = createVirtualSandbox(
       sandboxId,
       fileTree,
       this.resolver,
       options.resolverContext,
       workspaceBase,
+      localFilesMap,
     );
 
     return {
@@ -76,6 +106,7 @@ export class VirtualSandboxProvider<
         fileTree,
         resolverContext: options.resolverContext,
         workspaceBase,
+        ...(localFilesState && { localFiles: localFilesState }),
       },
     };
   }

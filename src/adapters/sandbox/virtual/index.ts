@@ -36,8 +36,9 @@ class VirtualSandboxImpl<
     resolver: FileResolver<TCtx, TMeta>,
     ctx: TCtx,
     workspaceBase = "/",
+    localFiles?: Map<string, string | Uint8Array>,
   ) {
-    this.fs = new VirtualSandboxFileSystem(tree, resolver, ctx, workspaceBase);
+    this.fs = new VirtualSandboxFileSystem(tree, resolver, ctx, workspaceBase, localFiles);
   }
 
   async exec(_command: string, _options?: ExecOptions): Promise<ExecResult> {
@@ -69,8 +70,9 @@ export function createVirtualSandbox<
   resolver: FileResolver<TCtx, TMeta>,
   ctx: TCtx,
   workspaceBase = "/",
+  localFiles?: Map<string, string | Uint8Array>,
 ): VirtualSandbox<TCtx, TMeta> {
-  return new VirtualSandboxImpl(id, tree, resolver, ctx, workspaceBase);
+  return new VirtualSandboxImpl(id, tree, resolver, ctx, workspaceBase, localFiles);
 }
 
 // Re-exports for convenience

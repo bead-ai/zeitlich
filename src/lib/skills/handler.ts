@@ -22,10 +22,13 @@ function formatSkillResponse(skill: Skill): string {
     );
   }
 
-  if (skill.resources && skill.resources.length > 0) {
+  const resources = skill.resourceContents
+    ? Object.keys(skill.resourceContents)
+    : [];
+  if (resources.length > 0) {
     parts.push("");
     parts.push("<skill_resources>");
-    for (const r of skill.resources) {
+    for (const r of resources) {
       parts.push(`  <file>${r}</file>`);
     }
     parts.push("</skill_resources>");

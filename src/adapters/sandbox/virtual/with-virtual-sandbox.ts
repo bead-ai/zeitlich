@@ -63,7 +63,7 @@ export function withVirtualSandbox<
     const state =
       await queryParentWorkflowState<VirtualSandboxState<TCtx, TMeta>>(client);
 
-    const { sandboxId, fileTree, resolverContext, workspaceBase } = state;
+    const { sandboxId, fileTree, resolverContext, workspaceBase, localFiles } = state;
     if (!fileTree || !sandboxId) {
       return {
         toolResponse: `Error: No fileTree/sandboxId in agent state. The ${context.toolName} tool requires a virtual sandbox.`,
@@ -71,12 +71,17 @@ export function withVirtualSandbox<
       };
     }
 
+    const localFilesMap = localFiles
+      ? new Map(Object.entries(localFiles))
+      : undefined;
+
     const sandbox = createVirtualSandbox(
       sandboxId,
       fileTree,
       provider.resolver,
       resolverContext,
       workspaceBase ?? "/",
+      localFilesMap,
     );
     const response = await handler(args, { ...context, sandbox });
     const mutations = sandbox.fs.getMutations();

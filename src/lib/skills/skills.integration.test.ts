@@ -243,14 +243,17 @@ describe("createReadSkillHandler", () => {
     expect(text).toContain("Relative paths in this skill resolve against the skill directory above.");
   });
 
-  it("lists resources when present", () => {
+  it("lists resources derived from resourceContents keys", () => {
     const skills: Skill[] = [
       {
         name: "skill-a",
         description: "First",
         instructions: "Do A",
         location: "/skills/skill-a",
-        resources: ["references/overview.md", "scripts/extract.py"],
+        resourceContents: {
+          "references/overview.md": "# Overview",
+          "scripts/extract.py": "print('hi')",
+        },
       },
     ];
     const handler = createReadSkillHandler(skills);
@@ -263,7 +266,7 @@ describe("createReadSkillHandler", () => {
     expect(text).toContain("</skill_resources>");
   });
 
-  it("omits resources block when skill has no resources", () => {
+  it("omits resources block when skill has no resourceContents", () => {
     const skills: Skill[] = [
       { name: "skill-a", description: "First", instructions: "Do A" },
     ];
@@ -304,6 +307,30 @@ describe("createReadSkillHandler", () => {
     const handler = createReadSkillHandler(skills);
     const result = handler({ skill_name: "skill-a" });
     expect((result.toolResponse as string)).toContain("Instructions for A");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// createReadSkillHandler — resourceContents
+// ---------------------------------------------------------------------------
+
+describe("createReadSkillHandler with resourceContents", () => {
+  it("does not leak resourceContents into the tool response", () => {
+    const skills: Skill[] = [
+      {
+        name: "skill-a",
+        description: "First",
+        instructions: "Do A",
+        location: "/skills/skill-a",
+        resourceContents: { "references/overview.md": "# Overview content" },
+      },
+    ];
+    const handler = createReadSkillHandler(skills);
+    const result = handler({ skill_name: "skill-a" });
+
+    const text = result.toolResponse as string;
+    expect(text).toContain("<file>references/overview.md</file>");
+    expect(text).not.toContain("# Overview content");
   });
 });
 
@@ -351,7 +378,7 @@ describe("buildSkillRegistration", () => {
         description: "Test",
         instructions: "Test instructions content",
         location: "/skills/test-skill",
-        resources: ["references/guide.md"],
+        resourceContents: { "references/guide.md": "# Guide" },
       },
     ];
 

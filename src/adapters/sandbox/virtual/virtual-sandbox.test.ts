@@ -317,6 +317,36 @@ describe("VirtualSandboxFileSystem", () => {
     expect(fs.resolvePath("/src", "file.ts")).toBe("/src/file.ts");
   });
 
+  // --- localFiles ---
+
+  it("readFile returns local file content before checking resolver", async () => {
+    const { resolver } = createMockResolver();
+    const localFiles = new Map<string, string | Uint8Array>([
+      ["/skills/my-skill/SKILL.md", "# Skill instructions"],
+    ]);
+    const tree: FileEntry[] = [
+      ...sampleTree,
+      { id: "local:/skills/my-skill/SKILL.md", path: "/skills/my-skill/SKILL.md", size: 22, mtime: "2025-01-01T00:00:00.000Z", metadata: {} },
+    ];
+    const fsWithLocal = new VirtualSandboxFileSystem(tree, resolver, ctx, "/", localFiles);
+
+    expect(await fsWithLocal.readFile("/skills/my-skill/SKILL.md")).toBe("# Skill instructions");
+  });
+
+  it("readFileBuffer returns local file as Uint8Array", async () => {
+    const { resolver } = createMockResolver();
+    const localFiles = new Map<string, string | Uint8Array>([
+      ["/data/file.bin", "binary content"],
+    ]);
+    const tree: FileEntry[] = [
+      { id: "local:/data/file.bin", path: "/data/file.bin", size: 14, mtime: "2025-01-01T00:00:00.000Z", metadata: {} },
+    ];
+    const fsWithLocal = new VirtualSandboxFileSystem(tree, resolver, ctx, "/", localFiles);
+
+    const buf = await fsWithLocal.readFileBuffer("/data/file.bin");
+    expect(new TextDecoder().decode(buf)).toBe("binary content");
+  });
+
   // --- readlink ---
 
   it("readlink throws SandboxNotSupportedError", async () => {
@@ -427,6 +457,43 @@ describe("VirtualSandboxProvider", () => {
     await expect(provider.create()).rejects.toThrow(
       "requires resolverContext",
     );
+  });
+
+  it("create seeds initialFiles into the sandbox and stateUpdate", async () => {
+    const { resolver } = createMockResolver();
+    const provider = new VirtualSandboxProvider(resolver);
+    const { sandbox, stateUpdate } = await provider.create({
+      resolverContext: ctx,
+      initialFiles: {
+        "/skills/my-skill/SKILL.md": "---\nname: my-skill\n---\nDo things.",
+        "/skills/my-skill/references/guide.md": "# Guide\nStep 1...",
+      },
+    });
+
+    expect(await sandbox.fs.readFile("/skills/my-skill/SKILL.md")).toBe(
+      "---\nname: my-skill\n---\nDo things.",
+    );
+    expect(await sandbox.fs.readFile("/skills/my-skill/references/guide.md")).toBe(
+      "# Guide\nStep 1...",
+    );
+    expect(await sandbox.fs.exists("/skills/my-skill")).toBe(true);
+    expect(await sandbox.fs.exists("/skills/my-skill/references")).toBe(true);
+
+    expect(stateUpdate?.localFiles).toBeDefined();
+    const localFiles = stateUpdate?.localFiles as Record<string, string>;
+    expect(localFiles["/skills/my-skill/SKILL.md"]).toBe(
+      "---\nname: my-skill\n---\nDo things.",
+    );
+
+    const tree = stateUpdate?.fileTree as FileEntry[];
+    expect(tree.find((e) => e.path === "/skills/my-skill/SKILL.md")).toBeDefined();
+  });
+
+  it("create without initialFiles has no localFiles in stateUpdate", async () => {
+    const { resolver } = createMockResolver();
+    const provider = new VirtualSandboxProvider(resolver);
+    const { stateUpdate } = await provider.create({ resolverContext: ctx });
+    expect(stateUpdate?.localFiles).toBeUndefined();
   });
 });
 

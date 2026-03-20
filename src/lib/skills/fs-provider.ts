@@ -35,11 +35,9 @@ export class FileSystemSkillProvider implements SkillProvider {
       const raw = await this.fs.readFile(join(this.baseDir, dir, "SKILL.md"));
       const { frontmatter } = parseSkillFile(raw);
       const location = join(this.baseDir, dir);
-      const resources = await this.discoverResources(dir);
       skills.push({
         ...frontmatter,
         location,
-        ...(resources.length > 0 && { resources }),
       });
     }
 
@@ -59,12 +57,13 @@ export class FileSystemSkillProvider implements SkillProvider {
     }
 
     const location = join(this.baseDir, name);
-    const resources = await this.discoverResources(name);
+    const resourcePaths = await this.discoverResources(name);
+    const resourceContents = await this.readResourceContents(location, resourcePaths);
     return {
       ...frontmatter,
       instructions: body,
       location,
-      ...(resources.length > 0 && { resources }),
+      ...(resourceContents && { resourceContents }),
     };
   }
 
@@ -80,12 +79,13 @@ export class FileSystemSkillProvider implements SkillProvider {
       const raw = await this.fs.readFile(join(this.baseDir, dir, "SKILL.md"));
       const { frontmatter, body } = parseSkillFile(raw);
       const location = join(this.baseDir, dir);
-      const resources = await this.discoverResources(dir);
+      const resourcePaths = await this.discoverResources(dir);
+      const resourceContents = await this.readResourceContents(location, resourcePaths);
       skills.push({
         ...frontmatter,
         instructions: body,
         location,
-        ...(resources.length > 0 && { resources }),
+        ...(resourceContents && { resourceContents }),
       });
     }
 
@@ -112,6 +112,18 @@ export class FileSystemSkillProvider implements SkillProvider {
     }
 
     return resources;
+  }
+
+  private async readResourceContents(
+    location: string,
+    resources: string[],
+  ): Promise<Record<string, string> | undefined> {
+    if (resources.length === 0) return undefined;
+    const contents: Record<string, string> = {};
+    for (const r of resources) {
+      contents[r] = await this.fs.readFile(join(location, r));
+    }
+    return contents;
   }
 
   private async discoverSkillDirs(): Promise<string[]> {
