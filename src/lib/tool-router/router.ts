@@ -20,7 +20,7 @@ import type {
 } from "./types";
 
 import type { z } from "zod";
-import { ApplicationFailure, uuid4 } from "@temporalio/workflow";
+import { uuid4 } from "@temporalio/workflow";
 
 /**
  * Creates a tool router for declarative tool call processing.
@@ -110,7 +110,7 @@ export function createToolRouter<T extends ToolMap>(
 
   /**
    * Run per-tool → global failure hooks. Returns recovery content/result,
-   * or throws if no hook recovers.
+   * or a generic error response if no hook recovers.
    */
   async function runFailureHooks(
     toolCall: ParsedToolCallUnion<T>,
@@ -160,7 +160,12 @@ export function createToolRouter<T extends ToolMap>(
         };
     }
 
-    throw ApplicationFailure.fromError(error, { nonRetryable: true });
+    return {
+      content: JSON.stringify({
+        error: "The tool encountered an error. Please try again or use a different approach.",
+      }),
+      result: { error: errorStr, suppressed: true },
+    };
   }
 
   /** Run per-tool → global post-hooks. */
@@ -179,6 +184,7 @@ export function createToolRouter<T extends ToolMap>(
         threadId: options.threadId,
         turn,
         durationMs,
+        ...(toolResult.metadata && { metadata: toolResult.metadata }),
       });
     }
     if (options.hooks?.onPostToolUse) {
@@ -220,6 +226,7 @@ export function createToolRouter<T extends ToolMap>(
     let result: unknown;
     let content!: ToolMessageContent;
     let resultAppended = false;
+    let metadata: Record<string, unknown> | undefined;
 
     try {
       if (tool) {
@@ -236,6 +243,7 @@ export function createToolRouter<T extends ToolMap>(
         result = response.data;
         content = response.toolResponse;
         resultAppended = response.resultAppended === true;
+        metadata = response.metadata;
       } else {
         result = { error: `Unknown tool: ${toolCall.name}` };
         content = JSON.stringify(result, null, 2);
@@ -272,6 +280,7 @@ export function createToolRouter<T extends ToolMap>(
       toolCallId: toolCall.id,
       name: toolCall.name,
       data: result,
+      ...(metadata && { metadata }),
     } as ToolCallResultUnion<TResults>;
 
     // --- Post-hooks ---
@@ -410,6 +419,7 @@ export function createToolRouter<T extends ToolMap>(
           toolCallId: toolCall.id,
           name: toolCall.name as TName,
           data: response.data,
+          ...(response.metadata && { metadata: response.metadata }),
         };
       };
 

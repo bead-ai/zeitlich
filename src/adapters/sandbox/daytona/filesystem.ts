@@ -55,7 +55,7 @@ export class DaytonaSandboxFileSystem implements SandboxFileSystem {
     await this.sandbox.fs.uploadFiles(
       files.map((f) => ({
         source: Buffer.from(f.content),
-        destination: f.path,
+        destination: this.normalisePath(f.path),
       }))
     );
   }

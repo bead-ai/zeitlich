@@ -6,6 +6,7 @@ import {
 } from "@temporalio/workflow";
 import type { SessionExitReason, MessageContent } from "../types";
 import type { SessionConfig, ZeitlichSession } from "./types";
+import type { SandboxOps } from "../sandbox/types";
 import { type AgentStateManager, type JsonSerializable } from "../state/types";
 import { createToolRouter } from "../tool-router/router";
 import type { ParsedToolCallUnion, ToolMap } from "../tool-router/types";
@@ -18,6 +19,9 @@ import { uuid4 } from "@temporalio/workflow";
  * Creates an agent session that manages the agent loop: LLM invocation,
  * tool routing, subagent coordination, and lifecycle hooks.
  *
+ * When `sandboxOps` is provided the returned session result is guaranteed to
+ * include `sandboxId: string`. Without it, `sandboxId` is `undefined`.
+ *
  * @param config - Session and agent configuration (merged `SessionConfig` and `AgentConfig`)
  * @returns A session object with `runSession()` to start the agent loop
  *
@@ -29,8 +33,8 @@ import { uuid4 } from "@temporalio/workflow";
  * const session = await createSession({
  *   agentName: "my-agent",
  *   maxTurns: 20,
- *   threadId: runId,
- *   threadOps: proxyGoogleGenAIThreadOps(), // auto-scoped to current workflow
+ *   thread: { mode: "new" },
+ *   threadOps: proxyGoogleGenAIThreadOps(),
  *   runAgent: runAgentActivity,
  *   buildContextMessage: () => [{ type: "text", text: prompt }],
  *   subagents: [researcherSubagent],
@@ -42,8 +46,13 @@ import { uuid4 } from "@temporalio/workflow";
  * const { finalMessage, exitReason } = await session.runSession({ stateManager });
  * ```
  */
-export const createSession = async <T extends ToolMap, M = unknown>({
-  threadId: providedThreadId,
+export async function createSession<T extends ToolMap, M = unknown>(
+  config: SessionConfig<T, M> & { sandboxOps: SandboxOps }
+): Promise<ZeitlichSession<M, true>>;
+export async function createSession<T extends ToolMap, M = unknown>(
+  config: SessionConfig<T, M>
+): Promise<ZeitlichSession<M, false>>;
+export async function createSession<T extends ToolMap, M = unknown>({
   agentName,
   maxTurns = 50,
   metadata = {},
@@ -56,16 +65,33 @@ export const createSession = async <T extends ToolMap, M = unknown>({
   processToolsInParallel = true,
   hooks = {},
   appendSystemPrompt = true,
-  continueThread = false,
   waitForInputTimeout = "48h",
-  sandbox: sandboxOps,
-  sandboxId: inheritedSandboxId,
-}: SessionConfig<T, M>): Promise<ZeitlichSession<M>> => {
-  const sourceThreadId = continueThread ? providedThreadId : undefined;
-  const threadId =
-    continueThread && providedThreadId
-      ? getShortId()
-      : (providedThreadId ?? getShortId());
+  sandboxOps,
+  thread: threadInit,
+  sandbox: sandboxInit,
+  sandboxShutdown = "destroy",
+}: SessionConfig<T, M>): Promise<ZeitlichSession<M, boolean>> {
+  // ---------------------------------------------------------------------------
+  // Thread resolution
+  // ---------------------------------------------------------------------------
+  const threadMode = threadInit?.mode ?? "new";
+  let threadId: string;
+  let sourceThreadId: string | undefined;
+
+  switch (threadMode) {
+    case "new":
+      threadId = threadInit?.mode === "new" && threadInit.threadId
+        ? threadInit.threadId
+        : getShortId();
+      break;
+    case "continue":
+      threadId = (threadInit as { mode: "continue"; threadId: string }).threadId;
+      break;
+    case "fork":
+      sourceThreadId = (threadInit as { mode: "fork"; threadId: string }).threadId;
+      threadId = getShortId();
+      break;
+  }
 
   const {
     appendToolResult,
@@ -76,9 +102,13 @@ export const createSession = async <T extends ToolMap, M = unknown>({
   } = threadOps;
 
   const plugins: ToolMap[string][] = [];
+  let destroySubagentSandboxes: (() => Promise<void>) | undefined;
   if (subagents) {
-    const reg = buildSubagentRegistration(subagents);
-    if (reg) plugins.push(reg);
+    const result = buildSubagentRegistration(subagents);
+    if (result) {
+      plugins.push(result.registration);
+      destroySubagentSandboxes = result.destroySubagentSandboxes;
+    }
   }
   if (skills) {
     const reg = buildSkillRegistration(skills);
@@ -114,12 +144,7 @@ export const createSession = async <T extends ToolMap, M = unknown>({
       stateManager,
     }: {
       stateManager: AgentStateManager<TState>;
-    }): Promise<{
-      threadId: string;
-      finalMessage: M | null;
-      exitReason: SessionExitReason;
-      usage: ReturnType<AgentStateManager<TState>["getTotalUsage"]>;
-    }> => {
+    }) => {
       setHandler(
         defineUpdate<unknown, [MessageContent]>(`add${agentName}Message`),
         async (message: MessageContent) => {
@@ -140,12 +165,43 @@ export const createSession = async <T extends ToolMap, M = unknown>({
         }
       );
 
-      // --- Sandbox lifecycle: create or inherit ---
-      let sandboxId: string | undefined = inheritedSandboxId;
-      const ownsSandbox = !sandboxId && !!sandboxOps;
-      if (ownsSandbox) {
-        const result = await sandboxOps.createSandbox({ id: threadId });
+      // --- Sandbox lifecycle: create, continue, fork, or inherit ----------
+      const sandboxMode = sandboxInit?.mode;
+      let sandboxId: string | undefined;
+      let sandboxOwned = false;
+
+      if (sandboxMode === "inherit") {
+        sandboxId = (sandboxInit as { mode: "inherit"; sandboxId: string }).sandboxId;
+        if (!sandboxOps) {
+          throw ApplicationFailure.create({
+            message: "sandboxId provided but no sandboxOps — cannot manage sandbox lifecycle",
+            nonRetryable: true,
+          });
+        }
+      } else if (sandboxMode === "continue") {
+        if (!sandboxOps) {
+          throw ApplicationFailure.create({
+            message: "No sandboxOps provided — cannot continue sandbox",
+            nonRetryable: true,
+          });
+        }
+        sandboxId = (sandboxInit as { mode: "continue"; sandboxId: string }).sandboxId;
+        sandboxOwned = true;
+      } else if (sandboxMode === "fork") {
+        if (!sandboxOps) {
+          throw ApplicationFailure.create({
+            message: "No sandboxOps provided — cannot fork sandbox",
+            nonRetryable: true,
+          });
+        }
+        sandboxId = await sandboxOps.forkSandbox(
+          (sandboxInit as { mode: "fork"; sandboxId: string }).sandboxId
+        );
+        sandboxOwned = true;
+      } else if (sandboxOps) {
+        const result = await sandboxOps.createSandbox();
         sandboxId = result.sandboxId;
+        sandboxOwned = true;
         if (result.stateUpdate) {
           stateManager.mergeUpdate(result.stateUpdate as Partial<TState>);
         }
@@ -161,8 +217,11 @@ export const createSession = async <T extends ToolMap, M = unknown>({
 
       const systemPrompt = stateManager.getSystemPrompt();
 
-      if (continueThread && sourceThreadId) {
+      // --- Thread lifecycle: new, continue, or fork ----------------------
+      if (threadMode === "fork" && sourceThreadId) {
         await forkThread(sourceThreadId, threadId);
+      } else if (threadMode === "continue") {
+        // "continue" — thread already exists, just append the new message
       } else {
         if (appendSystemPrompt) {
           if (!systemPrompt || systemPrompt.trim() === "") {
@@ -209,7 +268,8 @@ export const createSession = async <T extends ToolMap, M = unknown>({
               finalMessage: message,
               exitReason,
               usage: stateManager.getTotalUsage(),
-            };
+              sandboxId,
+            } as Awaited<ReturnType<ZeitlichSession<M, boolean>["runSession"]>>;
           }
 
           const parsedToolCalls: ParsedToolCallUnion<T>[] = [];
@@ -265,8 +325,22 @@ export const createSession = async <T extends ToolMap, M = unknown>({
       } finally {
         await callSessionEnd(exitReason, stateManager.getTurns());
 
-        if (ownsSandbox && sandboxId && sandboxOps) {
-          await sandboxOps.destroySandbox(sandboxId);
+        if (sandboxOwned && sandboxId && sandboxOps) {
+          switch (sandboxShutdown) {
+            case "destroy":
+              await sandboxOps.destroySandbox(sandboxId);
+              break;
+            case "pause":
+            case "pause-until-parent-close":
+              await sandboxOps.pauseSandbox(sandboxId);
+              break;
+            case "keep":
+              break;
+          }
+        }
+
+        if (destroySubagentSandboxes) {
+          await destroySubagentSandboxes();
         }
       }
 
@@ -275,8 +349,8 @@ export const createSession = async <T extends ToolMap, M = unknown>({
         finalMessage: null,
         exitReason,
         usage: stateManager.getTotalUsage(),
-      };
+        sandboxId,
+      } as Awaited<ReturnType<ZeitlichSession<M, boolean>["runSession"]>>;
     },
   };
-};
-
+}

@@ -19,6 +19,7 @@
  */
 import { proxyActivities, workflowInfo } from "@temporalio/workflow";
 import type { SandboxOps } from "../../../lib/sandbox/types";
+import type { DaytonaSandboxCreateOptions } from "./types";
 
 const ADAPTER_PREFIX = "daytona";
 
@@ -41,15 +42,15 @@ export function proxyDaytonaSandboxOps(
     }
   );
 
-  const prefix =
-    `${ADAPTER_PREFIX}${resolvedScope.charAt(0).toUpperCase()}${resolvedScope.slice(1)}`;
+  const prefix = `${ADAPTER_PREFIX}${resolvedScope.charAt(0).toUpperCase()}${resolvedScope.slice(1)}`;
   const p = (key: string): string =>
     `${prefix}${key.charAt(0).toUpperCase()}${key.slice(1)}`;
 
   return {
     createSandbox: acts[p("createSandbox")],
     destroySandbox: acts[p("destroySandbox")],
+    pauseSandbox: acts[p("pauseSandbox")],
     snapshotSandbox: acts[p("snapshotSandbox")],
     forkSandbox: acts[p("forkSandbox")],
-  } as SandboxOps;
+  } as SandboxOps<DaytonaSandboxCreateOptions>;
 }

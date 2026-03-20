@@ -21,7 +21,10 @@ import { createSubagentHandler } from "./handler";
  */
 export function buildSubagentRegistration(
   subagents: SubagentConfig[]
-): ToolMap[string] | null {
+): {
+  registration: ToolMap[string];
+  destroySubagentSandboxes: () => Promise<void>;
+} | null {
   if (subagents.length === 0) return null;
 
   const getEnabled = (): SubagentConfig[] =>
@@ -37,12 +40,14 @@ export function buildSubagentRegistration(
   const resolveSubagentName = (args: unknown): string =>
     (args as SubagentArgs).subagent;
 
-  return {
+  const { handler, destroySubagentSandboxes } = createSubagentHandler(subagents);
+
+  const registration: ToolMap[string] = {
     name: SUBAGENT_TOOL_NAME,
     enabled: (): boolean => getEnabled().length > 0,
     description: (): string => createSubagentTool(getEnabled()).description,
     schema: (): z.ZodObject<z.ZodRawShape> => createSubagentTool(getEnabled()).schema,
-    handler: createSubagentHandler(subagents),
+    handler,
     ...(subagentHooksMap.size > 0 && {
       hooks: {
         onPreToolUse: async (ctx): Promise<PreToolUseHookResult> => {
@@ -62,4 +67,6 @@ export function buildSubagentRegistration(
       } satisfies ToolHooks,
     }),
   };
+
+  return { registration, destroySubagentSandboxes };
 }

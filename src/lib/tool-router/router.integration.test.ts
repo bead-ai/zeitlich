@@ -707,6 +707,136 @@ describe("createToolRouter integration", () => {
     expect(router.getResultsByName(results, "Add")).toHaveLength(1);
   });
 
+  // --- Metadata passthrough ---
+
+  it("handler metadata flows to ToolCallResult", async () => {
+    const metaTool = defineTool({
+      name: "Meta" as const,
+      description: "returns metadata",
+      schema: z.object({}),
+      handler: async () => ({
+        toolResponse: "ok",
+        data: null,
+        metadata: { jobId: "j-99", env: "prod" },
+      }),
+    });
+
+    const router = createToolRouter({
+      tools: { Meta: metaTool } as const,
+      threadId: "t-1",
+      appendToolResult: appendSpy.fn,
+    });
+
+    const parsed = router.parseToolCall({ id: "tc-1", name: "Meta", args: {} });
+    const results = await router.processToolCalls([parsed], { turn: 1 });
+
+    expect(at(results, 0).metadata).toEqual({ jobId: "j-99", env: "prod" });
+  });
+
+  it("handler metadata flows to per-tool post-hook", async () => {
+    let hookMetadata: Record<string, unknown> | undefined;
+
+    const metaTool = defineTool({
+      name: "Meta" as const,
+      description: "returns metadata",
+      schema: z.object({}),
+      handler: async () => ({
+        toolResponse: "ok",
+        data: null,
+        metadata: { region: "us-east-1" },
+      }),
+      hooks: {
+        onPostToolUse: async ({ metadata }) => {
+          hookMetadata = metadata;
+        },
+      },
+    });
+
+    const router = createToolRouter({
+      tools: { Meta: metaTool } as const,
+      threadId: "t-1",
+      appendToolResult: appendSpy.fn,
+    });
+
+    const parsed = router.parseToolCall({ id: "tc-1", name: "Meta", args: {} });
+    await router.processToolCalls([parsed], { turn: 1 });
+
+    expect(hookMetadata).toEqual({ region: "us-east-1" });
+  });
+
+  it("handler metadata flows to global post-hook via result", async () => {
+    let resultMetadata: Record<string, unknown> | undefined;
+
+    const metaTool = defineTool({
+      name: "Meta" as const,
+      description: "returns metadata",
+      schema: z.object({}),
+      handler: async () => ({
+        toolResponse: "ok",
+        data: null,
+        metadata: { traceId: "abc" },
+      }),
+    });
+
+    const router = createToolRouter({
+      tools: { Meta: metaTool } as const,
+      threadId: "t-1",
+      appendToolResult: appendSpy.fn,
+      hooks: {
+        onPostToolUse: async ({ result }) => {
+          resultMetadata = result.metadata;
+        },
+      },
+    });
+
+    const parsed = router.parseToolCall({ id: "tc-1", name: "Meta", args: {} });
+    await router.processToolCalls([parsed], { turn: 1 });
+
+    expect(resultMetadata).toEqual({ traceId: "abc" });
+  });
+
+  it("metadata is undefined when handler does not set it", async () => {
+    const router = createToolRouter({
+      tools: createTools(),
+      threadId: "t-1",
+      appendToolResult: appendSpy.fn,
+    });
+
+    const parsed = router.parseToolCall({
+      id: "tc-1",
+      name: "Echo",
+      args: { text: "hi" },
+    });
+    const results = await router.processToolCalls([parsed], { turn: 1 });
+
+    expect(at(results, 0).metadata).toBeUndefined();
+  });
+
+  it("processToolCallsByName passes metadata through", async () => {
+    const router = createToolRouter({
+      tools: createTools(),
+      threadId: "t-1",
+      appendToolResult: appendSpy.fn,
+    });
+
+    const calls = [
+      router.parseToolCall({ id: "tc-1", name: "Echo", args: { text: "a" } }),
+    ];
+
+    const results = await router.processToolCallsByName(
+      calls,
+      "Echo",
+      async (args: { text: string }) => ({
+        toolResponse: `custom: ${args.text}`,
+        data: { custom: args.text },
+        metadata: { source: "custom-handler" },
+      })
+    );
+
+    expect(results).toHaveLength(1);
+    expect(at(results, 0).metadata).toEqual({ source: "custom-handler" });
+  });
+
   // --- resultAppended flag ---
 
   it("skips appendToolResult when handler sets resultAppended", async () => {

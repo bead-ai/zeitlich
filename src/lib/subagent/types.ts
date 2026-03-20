@@ -4,26 +4,33 @@ import type {
   PreToolUseHookResult,
   PostToolUseFailureHookResult,
 } from "../tool-router/types";
+import type {
+  ThreadInit,
+  SandboxInit,
+  SubagentSandboxShutdown,
+} from "../lifecycle";
 
 /** ToolHandlerResponse with threadId required (subagents must always surface their thread) */
 export type SubagentHandlerResponse<TResult = null> =
-  ToolHandlerResponse<TResult> & { threadId: string };
+  ToolHandlerResponse<TResult> & { threadId: string; sandboxId?: string };
 
 /**
  * Raw workflow input fields passed from parent to child workflow.
  * `defineSubagentWorkflow` maps this into `SubagentSessionInput`.
  */
 export interface SubagentWorkflowInput {
-  /** Thread ID from parent for continuation */
-  previousThreadId?: string;
-  /** Sandbox ID inherited from parent */
-  sandboxId?: string;
+  /** Thread initialization strategy forwarded from the parent */
+  thread?: ThreadInit;
+  /** Sandbox initialization strategy forwarded from the parent */
+  sandbox?: SandboxInit;
+  /** Sandbox shutdown override from the parent (takes precedence over workflow default) */
+  sandboxShutdown?: SubagentSandboxShutdown;
 }
 
 export type SubagentWorkflow<TResult extends z.ZodType = z.ZodType> = (
   prompt: string,
   workflowInput: SubagentWorkflowInput,
-  context?: Record<string, unknown>,
+  context?: Record<string, unknown>
 ) => Promise<SubagentHandlerResponse<z.infer<TResult> | null>>;
 
 /**
@@ -36,7 +43,7 @@ export type SubagentDefinition<
 > = ((
   prompt: string,
   workflowInput: SubagentWorkflowInput,
-  context?: TContext,
+  context?: TContext
 ) => Promise<SubagentHandlerResponse<z.infer<TResult> | null>>) & {
   readonly agentName: string;
   readonly description: string;
@@ -53,6 +60,23 @@ export type InferSubagentResult<T extends SubagentConfig> =
   T extends SubagentConfig<infer S> ? z.infer<S> : null;
 
 /**
+ * Sandbox configuration for a subagent.
+ *
+ * String shorthands:
+ * - `"none"` — no sandbox (default).
+ * - `"inherit"` — reuse the parent's sandbox (shared filesystem/exec).
+ * - `"own"` — the child creates and owns its own sandbox (shutdown defaults to `"destroy"`).
+ *
+ * Object form (only for `source: "own"`):
+ * - `{ source: "own", shutdown?: SubagentSandboxShutdown }` — own sandbox with explicit shutdown policy.
+ */
+export type SubagentSandboxConfig =
+  | "none"
+  | "inherit"
+  | "own"
+  | { source: "own"; shutdown?: SubagentSandboxShutdown };
+
+/**
  * Configuration for a subagent that can be spawned by the parent workflow.
  *
  * @template TResult - Zod schema type for validating the child workflow's result
@@ -65,23 +89,34 @@ export interface SubagentConfig<TResult extends z.ZodType = z.ZodType> {
   /** Whether this subagent is available (default: true). Disabled subagents are excluded from the Subagent tool. */
   enabled?: boolean | (() => boolean);
   /** Temporal workflow function or type name (used with executeChild) */
-  workflow: string | SubagentWorkflow<TResult>;
+  workflow: SubagentWorkflow<TResult>;
   /** Optional task queue - defaults to parent's queue if not specified */
   taskQueue?: string;
   /** Optional Zod schema to validate the child workflow's result. If omitted, result is passed through as-is. */
   resultSchema?: TResult;
   /** Optional context passed to the subagent — a static object or a function evaluated at invocation time */
   context?: SubagentContext;
-  /** Allow the parent agent to pass a threadId for this subagent to continue (default: false) */
-  allowThreadContinuation?: boolean;
   /** Per-subagent lifecycle hooks */
   hooks?: SubagentHooks;
   /**
-   * Sandbox strategy for this subagent.
-   * - `'inherit'` (default): reuse the parent's sandbox (shared filesystem/exec).
-   * - `'own'`: the child creates and owns its own sandbox.
+   * Thread mode for this subagent.
+   *
+   * - `"new"` (default) — always start a fresh thread.
+   * - `"fork"` — the parent can pass a `threadId`; messages are copied into
+   *   a new thread and the subagent continues there.
+   * - `"continue"` — the parent can pass a `threadId`; the subagent appends
+   *   directly to the existing thread in-place.
    */
-  sandbox?: "inherit" | "own";
+  thread?: "new" | "fork" | "continue";
+  /**
+   * Sandbox strategy for this subagent.
+   *
+   * String shorthands: `"none"` (default) | `"inherit"` | `"own"`.
+   * Object form: `{ source: "own", shutdown?: SubagentSandboxShutdown }`.
+   *
+   * @see {@link SubagentSandboxConfig}
+   */
+  sandbox?: SubagentSandboxConfig;
 }
 
 /**
@@ -102,6 +137,8 @@ export interface SubagentHooks<TArgs = unknown, TResult = unknown> {
     threadId: string;
     turn: number;
     durationMs: number;
+    /** Unvalidated metadata from the child workflow (e.g. infrastructure state) */
+    metadata?: Record<string, unknown>;
   }) => void | Promise<void>;
   /** Called when this subagent execution fails */
   onExecutionFailure?: (ctx: {
@@ -113,15 +150,36 @@ export interface SubagentHooks<TArgs = unknown, TResult = unknown> {
 }
 
 /**
+ * Extended response from the subagent `fn` — includes optional cleanup callbacks
+ * stripped before signaling the parent.
+ *
+ * When `TSandboxShutdown` is `"pause-until-parent-close"`, both `destroySandbox`
+ * and `sandboxId` become required so the parent can coordinate cleanup.
+ */
+export type SubagentFnResult<
+  TResult = null,
+  TSandboxShutdown extends SubagentSandboxShutdown = SubagentSandboxShutdown,
+> = SubagentHandlerResponse<TResult> &
+  (TSandboxShutdown extends "pause-until-parent-close"
+    ? { destroySandbox: () => Promise<void>; sandboxId: string }
+    : { destroySandbox?: () => Promise<void> });
+
+/** Payload sent by a child workflow to signal its result back to the parent */
+export interface ChildResultSignalPayload {
+  childWorkflowId: string;
+  result: SubagentHandlerResponse;
+}
+
+/**
  * Session config fields passed from parent to child workflow.
  */
 export interface SubagentSessionInput {
   /** Agent name — spread directly into `createSession` */
   agentName: string;
-  /** Thread ID to continue from */
-  threadId?: string;
-  /** Whether to continue an existing thread */
-  continueThread?: boolean;
-  /** Sandbox ID inherited from the parent agent */
-  sandboxId?: string;
+  /** Thread initialization strategy */
+  thread?: ThreadInit;
+  /** Sandbox initialization strategy */
+  sandbox?: SandboxInit;
+  /** Sandbox shutdown policy (default: "destroy") */
+  sandboxShutdown?: SubagentSandboxShutdown;
 }

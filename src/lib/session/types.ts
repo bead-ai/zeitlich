@@ -16,6 +16,7 @@ import type { SandboxOps } from "../sandbox/types";
 import type { RunAgentActivity } from "../model/types";
 import type { AgentStateManager, JsonSerializable } from "../state/types";
 import type { ActivityInterfaceFor } from "@temporalio/workflow";
+import type { ThreadInit, SandboxInit, SubagentSandboxShutdown } from "../lifecycle";
 
 /**
  * Thread operations required by a session.
@@ -79,8 +80,6 @@ export type PrefixedThreadOps<TPrefix extends string> = {
 export interface SessionConfig<T extends ToolMap, M = unknown> {
   /** The name of the agent, should be unique within the workflows */
   agentName: string;
-  /** The thread ID to use for the session (defaults to a short generated ID) */
-  threadId?: string;
   /** Metadata for the session */
   metadata?: Record<string, unknown>;
   /** Whether to append the system prompt as message to the thread */
@@ -106,27 +105,67 @@ export interface SessionConfig<T extends ToolMap, M = unknown> {
    * Returns MessageContent array for the initial HumanMessage.
    */
   buildContextMessage: () => MessageContent | Promise<MessageContent>;
-  /** When true, skip thread initialization and system prompt — append only the new human message to the existing thread. */
-  continueThread?: boolean;
   /** How long to wait for input before cancelling the workflow */
   waitForInputTimeout?: Duration;
-  /** Sandbox lifecycle operations (optional — omit for agents that don't need a sandbox) */
-  sandbox?: SandboxOps;
+
+  // ---------------------------------------------------------------------------
+  // Thread lifecycle
+  // ---------------------------------------------------------------------------
+
   /**
-   * Pre-existing sandbox ID to reuse (e.g. inherited from a parent agent).
-   * When set, the session skips `createSandbox` and will not destroy the
-   * sandbox on exit (the owner is responsible for cleanup).
+   * Thread initialization strategy (default: `{ mode: "new" }`).
+   *
+   * - `{ mode: "new" }` — start a fresh thread.
+   * - `{ mode: "new", threadId: "..." }` — start a fresh thread with a specific ID.
+   * - `{ mode: "continue", threadId: "..." }` — append to an existing thread in-place.
+   * - `{ mode: "fork", threadId: "..." }` — fork an existing thread and continue in the copy.
    */
-  sandboxId?: string;
+  thread?: ThreadInit;
+
+  // ---------------------------------------------------------------------------
+  // Sandbox lifecycle
+  // ---------------------------------------------------------------------------
+
+  /** Sandbox lifecycle operations (optional — omit for agents that don't need a sandbox) */
+  sandboxOps?: SandboxOps;
+  /**
+   * Sandbox initialization strategy.
+   *
+   * - `{ mode: "new" }` — create a fresh sandbox.
+   * - `{ mode: "continue", sandboxId: "..." }` — resume a paused sandbox (session owns it).
+   * - `{ mode: "fork", sandboxId: "..." }` — fork from an existing sandbox.
+   * - `{ mode: "inherit", sandboxId: "..." }` — use a parent's sandbox without ownership.
+   *
+   * When omitted and `sandboxOps` is provided, defaults to `{ mode: "new" }`.
+   */
+  sandbox?: SandboxInit;
+  /**
+   * What to do with the sandbox when this session exits.
+   *
+   * Defaults to `"destroy"` when omitted.
+   * Has no effect when the sandbox is inherited (`sandbox.mode === "inherit"`).
+   */
+  sandboxShutdown?: SubagentSandboxShutdown;
 }
 
-export interface ZeitlichSession<M = unknown> {
+export type SessionResult<
+  M,
+  TState extends JsonSerializable<TState>,
+  HasSandbox extends boolean = boolean,
+> = {
+  threadId: string;
+  finalMessage: M | null;
+  exitReason: SessionExitReason;
+  usage: ReturnType<AgentStateManager<TState>["getTotalUsage"]>;
+} & (HasSandbox extends true
+  ? { sandboxId: string }
+  : { sandboxId?: undefined });
+
+export interface ZeitlichSession<
+  M = unknown,
+  HasSandbox extends boolean = boolean,
+> {
   runSession<T extends JsonSerializable<T>>(args: {
     stateManager: AgentStateManager<T>;
-  }): Promise<{
-    threadId: string;
-    finalMessage: M | null;
-    exitReason: SessionExitReason;
-    usage: ReturnType<AgentStateManager<T>["getTotalUsage"]>;
-  }>;
+  }): Promise<SessionResult<M, T, HasSandbox>>;
 }

@@ -35,8 +35,15 @@ export interface SandboxFileSystem {
   mkdir(path: string, options?: { recursive?: boolean }): Promise<void>;
   readdir(path: string): Promise<string[]>;
   readdirWithFileTypes(path: string): Promise<DirentEntry[]>;
-  rm(path: string, options?: { recursive?: boolean; force?: boolean }): Promise<void>;
-  cp(src: string, dest: string, options?: { recursive?: boolean }): Promise<void>;
+  rm(
+    path: string,
+    options?: { recursive?: boolean; force?: boolean }
+  ): Promise<void>;
+  cp(
+    src: string,
+    dest: string,
+    options?: { recursive?: boolean }
+  ): Promise<void>;
   mv(src: string, dest: string): Promise<void>;
   readlink(path: string): Promise<string>;
   resolvePath(base: string, path: string): string;
@@ -125,6 +132,7 @@ export interface SandboxProvider<
   create(options?: TOptions): Promise<SandboxCreateResult>;
   get(sandboxId: string): Promise<TSandbox>;
   destroy(sandboxId: string): Promise<void>;
+  pause(sandboxId: string, ttlSeconds?: number): Promise<void>;
   snapshot(sandboxId: string): Promise<SandboxSnapshot>;
   restore(snapshot: SandboxSnapshot): Promise<Sandbox>;
   fork(sandboxId: string): Promise<Sandbox>;
@@ -138,9 +146,10 @@ export interface SandboxOps<
   TOptions extends SandboxCreateOptions = SandboxCreateOptions,
 > {
   createSandbox(
-    options?: TOptions,
+    options?: TOptions
   ): Promise<{ sandboxId: string; stateUpdate?: Record<string, unknown> }>;
   destroySandbox(sandboxId: string): Promise<void>;
+  pauseSandbox(sandboxId: string): Promise<void>;
   snapshotSandbox(sandboxId: string): Promise<SandboxSnapshot>;
   forkSandbox(sandboxId: string): Promise<string>;
 }
@@ -172,7 +181,7 @@ export class SandboxNotSupportedError extends ApplicationFailure {
     super(
       `Sandbox does not support: ${operation}`,
       "SandboxNotSupportedError",
-      true,
+      true
     );
   }
 }

@@ -15,9 +15,12 @@
 
 // Session
 export { createSession } from "./lib/session";
-export type { ZeitlichSession, ThreadOps, PrefixedThreadOps, ScopedPrefix, SessionConfig } from "./lib/session";
+export type { ZeitlichSession, SessionResult, ThreadOps, PrefixedThreadOps, ScopedPrefix, SessionConfig } from "./lib/session";
 export { defineWorkflow } from "./lib/workflow";
 export type { WorkflowConfig, WorkflowInput, WorkflowSessionInput } from "./lib/workflow";
+
+// Lifecycle types
+export type { ThreadInit, SandboxInit, SandboxShutdown, SubagentSandboxShutdown } from "./lib/lifecycle";
 
 // Thread utilities
 export { getShortId } from "./lib/thread/id";
@@ -124,8 +127,10 @@ export type {
 export type {
   SubagentConfig,
   SubagentDefinition,
+  SubagentFnResult,
   SubagentHooks,
   SubagentHandlerResponse,
+  SubagentSandboxConfig,
   SubagentWorkflow,
   SubagentWorkflowInput,
   SubagentSessionInput,

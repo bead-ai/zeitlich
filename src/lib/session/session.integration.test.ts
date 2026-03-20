@@ -38,7 +38,11 @@ vi.mock("@temporalio/workflow", () => {
     condition: async (fn: () => boolean) => fn(),
     defineUpdate: (name: string) => ({ __type: "update", name }),
     defineQuery: (name: string) => ({ __type: "query", name }),
+    defineSignal: (name: string) => ({ __type: "signal", name }),
     setHandler: (_def: unknown, _handler: unknown) => {},
+    startChild: async () => ({ result: () => Promise.resolve(null) }),
+    workflowInfo: () => ({ taskQueue: "default-queue" }),
+    getExternalWorkflowHandle: () => ({ signal: async () => {} }),
     uuid4: () =>
       `00000000-0000-0000-0000-${String(++idCounter).padStart(12, "0")}`,
     ApplicationFailure: MockApplicationFailure,
@@ -150,7 +154,7 @@ describe("createSession integration", () => {
 
     const session = await createSession({
       agentName: "TestAgent",
-      threadId: "thread-1",
+      thread: { mode: "new", threadId: "thread-1" },
       runAgent: createScriptedRunAgent([{ message: "Hello!", toolCalls: [] }]),
       threadOps: ops,
       buildContextMessage: () => "What is 2+2?",
@@ -182,7 +186,7 @@ describe("createSession integration", () => {
 
     const session = await createSession({
       agentName: "TestAgent",
-      threadId: "thread-1",
+      thread: { mode: "new", threadId: "thread-1" },
       runAgent: createScriptedRunAgent([
         {
           message: "Let me echo that.",
@@ -221,7 +225,7 @@ describe("createSession integration", () => {
 
     const session = await createSession({
       agentName: "TestAgent",
-      threadId: "thread-1",
+      thread: { mode: "new", threadId: "thread-1" },
       runAgent: createScriptedRunAgent([
         {
           message: "turn 1",
@@ -270,7 +274,7 @@ describe("createSession integration", () => {
 
     const session = await createSession({
       agentName: "TestAgent",
-      threadId: "thread-1",
+      thread: { mode: "new", threadId: "thread-1" },
       maxTurns: 3,
       runAgent: infiniteAgent,
       threadOps: ops,
@@ -297,7 +301,7 @@ describe("createSession integration", () => {
 
     const session = await createSession({
       agentName: "TestAgent",
-      threadId: "thread-1",
+      thread: { mode: "new", threadId: "thread-1" },
       runAgent: createScriptedRunAgent([{ message: "done", toolCalls: [] }]),
       threadOps: ops,
       buildContextMessage: () => "hi",
@@ -330,7 +334,7 @@ describe("createSession integration", () => {
 
     const session = await createSession({
       agentName: "TestAgent",
-      threadId: "thread-1",
+      thread: { mode: "new", threadId: "thread-1" },
       runAgent: createScriptedRunAgent([]),
       threadOps: ops,
       buildContextMessage: () => "hi",
@@ -350,7 +354,7 @@ describe("createSession integration", () => {
 
     const session = await createSession({
       agentName: "TestAgent",
-      threadId: "thread-1",
+      thread: { mode: "new", threadId: "thread-1" },
       appendSystemPrompt: false,
       runAgent: createScriptedRunAgent([{ message: "ok", toolCalls: [] }]),
       threadOps: ops,
@@ -377,7 +381,7 @@ describe("createSession integration", () => {
 
     const session = await createSession({
       agentName: "TestAgent",
-      threadId: "thread-1",
+      thread: { mode: "new", threadId: "thread-1" },
       runAgent: createScriptedRunAgent([
         {
           message: "turn 1",
@@ -413,7 +417,7 @@ describe("createSession integration", () => {
 
     const session = await createSession({
       agentName: "TestAgent",
-      threadId: "thread-1",
+      thread: { mode: "new", threadId: "thread-1" },
       runAgent: createScriptedRunAgent([
         {
           message: "bad call",
@@ -451,15 +455,14 @@ describe("createSession integration", () => {
     expect(errorConfig?.content).toContain("Invalid tool call");
   });
 
-  // --- continueThread ---
+  // --- Thread fork mode ---
 
-  it("forks thread when continueThread is set", async () => {
+  it("forks thread when thread mode is fork", async () => {
     const { ops, log } = createMockThreadOps();
 
     const session = await createSession({
       agentName: "TestAgent",
-      threadId: "source-thread",
-      continueThread: true,
+      thread: { mode: "fork", threadId: "source-thread" },
       runAgent: createScriptedRunAgent([
         { message: "continued", toolCalls: [] },
       ]),
@@ -490,9 +493,9 @@ describe("createSession integration", () => {
     const sandboxLog: string[] = [];
 
     const sandboxOps: SandboxOps = {
-      createSandbox: async (options) => {
-        sandboxLog.push(`create:${options?.id ?? "unknown"}`);
-        return { sandboxId: `sb-${options?.id ?? "unknown"}` };
+      createSandbox: async () => {
+        sandboxLog.push("create");
+        return { sandboxId: "sb-1" };
       },
       destroySandbox: async (sandboxId: string) => {
         sandboxLog.push(`destroy:${sandboxId}`);
@@ -504,15 +507,16 @@ describe("createSession integration", () => {
         createdAt: new Date().toISOString(),
       }),
       forkSandbox: async () => "forked-sandbox-id",
+      pauseSandbox: async () => {},
     };
 
     const session = await createSession({
       agentName: "TestAgent",
-      threadId: "thread-1",
+      thread: { mode: "new", threadId: "thread-1" },
       runAgent: createScriptedRunAgent([{ message: "done", toolCalls: [] }]),
       threadOps: ops,
       buildContextMessage: () => "go",
-      sandbox: sandboxOps,
+      sandboxOps,
     });
 
     const stateManager = createAgentStateManager({
@@ -521,8 +525,8 @@ describe("createSession integration", () => {
 
     await session.runSession({ stateManager });
 
-    expect(sandboxLog).toContain("create:thread-1");
-    expect(sandboxLog).toContain("destroy:sb-thread-1");
+    expect(sandboxLog).toContain("create");
+    expect(sandboxLog).toContain("destroy:sb-1");
   });
 
   it("does not create or destroy sandbox when sandboxId is inherited", async () => {
@@ -544,16 +548,17 @@ describe("createSession integration", () => {
         createdAt: new Date().toISOString(),
       }),
       forkSandbox: async () => "forked-sandbox-id",
+      pauseSandbox: async () => {},
     };
 
     const session = await createSession({
       agentName: "TestAgent",
-      threadId: "thread-1",
+      thread: { mode: "new", threadId: "thread-1" },
       runAgent: createScriptedRunAgent([{ message: "done", toolCalls: [] }]),
       threadOps: ops,
       buildContextMessage: () => "go",
-      sandbox: sandboxOps,
-      sandboxId: "inherited-sb",
+      sandboxOps,
+      sandbox: { mode: "inherit", sandboxId: "inherited-sb" },
     });
 
     const stateManager = createAgentStateManager({
@@ -581,9 +586,22 @@ describe("createSession integration", () => {
       },
     });
 
+    const sandboxOps: SandboxOps = {
+      createSandbox: async () => ({ sandboxId: "sb" }),
+      destroySandbox: async () => {},
+      pauseSandbox: async () => {},
+      snapshotSandbox: async () => ({
+        sandboxId: "sb",
+        providerId: "test",
+        data: null,
+        createdAt: new Date().toISOString(),
+      }),
+      forkSandbox: async () => "forked-sb",
+    };
+
     const session = await createSession({
       agentName: "TestAgent",
-      threadId: "thread-1",
+      thread: { mode: "new", threadId: "thread-1" },
       runAgent: createScriptedRunAgent([
         {
           message: "spy",
@@ -594,7 +612,8 @@ describe("createSession integration", () => {
       threadOps: ops,
       tools: { Spy: spyTool },
       buildContextMessage: () => "go",
-      sandboxId: "my-sandbox",
+      sandbox: { mode: "inherit", sandboxId: "my-sandbox" },
+      sandboxOps,
     });
 
     const stateManager = createAgentStateManager({
@@ -614,7 +633,7 @@ describe("createSession integration", () => {
 
     const session = await createSession({
       agentName: "TestAgent",
-      threadId: "thread-1",
+      thread: { mode: "new", threadId: "thread-1" },
       runAgent: async () => {
         throw new Error("LLM went down");
       },
@@ -646,7 +665,7 @@ describe("createSession integration", () => {
 
     const session = await createSession({
       agentName: "TestAgent",
-      threadId: "thread-1",
+      thread: { mode: "new", threadId: "thread-1" },
       runAgent: createScriptedRunAgent([
         {
           message: "call echo",
@@ -716,7 +735,7 @@ describe("createSession integration", () => {
 
     const session = await createSession({
       agentName: "TestAgent",
-      threadId: "thread-1",
+      thread: { mode: "new", threadId: "thread-1" },
       runAgent: createScriptedRunAgent([
         {
           message: "computing",
@@ -752,7 +771,7 @@ describe("createSession integration", () => {
 
     const session = await createSession({
       agentName: "TestAgent",
-      threadId: "thread-1",
+      thread: { mode: "new", threadId: "thread-1" },
       runAgent: createScriptedRunAgent([{ message: "done", toolCalls: [] }]),
       threadOps: ops,
       buildContextMessage: async () => {
@@ -789,15 +808,16 @@ describe("createSession integration", () => {
         createdAt: new Date().toISOString(),
       }),
       forkSandbox: async () => "forked-sandbox-id",
+      pauseSandbox: async () => {},
     };
 
     const session = await createSession({
       agentName: "TestAgent",
-      threadId: "thread-1",
+      thread: { mode: "new", threadId: "thread-1" },
       runAgent: createScriptedRunAgent([{ message: "done", toolCalls: [] }]),
       threadOps: ops,
       buildContextMessage: () => "go",
-      sandbox: sandboxOps,
+      sandboxOps,
     });
 
     const stateManager = createAgentStateManager<{ customField: string }>({
@@ -827,7 +847,7 @@ describe("createSession integration", () => {
 
     const session = await createSession({
       agentName: "TestAgent",
-      threadId: "thread-1",
+      thread: { mode: "new", threadId: "thread-1" },
       runAgent: createScriptedRunAgent([
         {
           message: "t1",

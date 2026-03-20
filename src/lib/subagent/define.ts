@@ -3,6 +3,7 @@ import type {
   SubagentConfig,
   SubagentDefinition,
   SubagentHooks,
+  SubagentSandboxConfig,
   SubagentWorkflow,
 } from "./types";
 import type { SubagentArgs } from "./tool";
@@ -19,8 +20,8 @@ import type { SubagentArgs } from "./tool";
  *
  * // With parent-specific overrides
  * export const researcher = defineSubagent(researcherWorkflow, {
- *   allowThreadContinuation: true,
- *   sandbox: "own",
+ *   thread: "fork",
+ *   sandbox: { source: "own", shutdown: "pause" },
  *   hooks: {
  *     onPostExecution: ({ result }) => console.log(result),
  *   },
@@ -42,8 +43,8 @@ export function defineSubagent<
     hooks?: SubagentHooks<SubagentArgs, z.infer<TResult>>;
     enabled?: boolean | (() => boolean);
     taskQueue?: string;
-    allowThreadContinuation?: boolean;
-    sandbox?: "inherit" | "own";
+    thread?: "new" | "fork" | "continue";
+    sandbox?: SubagentSandboxConfig;
   },
 ): SubagentConfig<TResult> {
   return {
