@@ -20,6 +20,7 @@ describe("defineWorkflow", () => {
 
     expect(capturedSession).toEqual({
       agentName: "test-workflow",
+      sandboxOnExit: "destroy",
       threadId: "prev-42",
       continueThread: true,
     });
@@ -37,6 +38,7 @@ describe("defineWorkflow", () => {
 
     expect(capturedSession).toEqual({
       agentName: "test-workflow",
+      sandboxOnExit: "destroy",
       sandboxId: "sb-123",
     });
   });
@@ -53,13 +55,14 @@ describe("defineWorkflow", () => {
 
     expect(capturedSession).toEqual({
       agentName: "test-workflow",
+      sandboxOnExit: "destroy",
       threadId: "prev-1",
       continueThread: true,
       sandboxId: "sb-1",
     });
   });
 
-  it("returns empty sessionInput when no previousThreadId or sandboxId", async () => {
+  it("defaults sandboxOnExit to destroy when no workflowInput", async () => {
     let capturedSession: WorkflowSessionInput | undefined;
 
     const workflow = defineWorkflow(cfg, async (_input, sessionInput) => {
@@ -69,7 +72,76 @@ describe("defineWorkflow", () => {
 
     await workflow({});
 
-    expect(capturedSession).toEqual({ agentName: "test-workflow" });
+    expect(capturedSession).toEqual({
+      agentName: "test-workflow",
+      sandboxOnExit: "destroy",
+    });
+  });
+
+  it("maps previousSandboxId from workflowInput", async () => {
+    let capturedSession: WorkflowSessionInput | undefined;
+
+    const workflow = defineWorkflow(cfg, async (_input, sessionInput) => {
+      capturedSession = sessionInput;
+      return { ok: true };
+    });
+
+    await workflow({}, { previousSandboxId: "prev-sb-1" });
+
+    expect(capturedSession).toEqual({
+      agentName: "test-workflow",
+      sandboxOnExit: "destroy",
+      previousSandboxId: "prev-sb-1",
+    });
+  });
+
+  it("uses sandboxOnExit from config", async () => {
+    let capturedSession: WorkflowSessionInput | undefined;
+
+    const workflow = defineWorkflow(
+      { name: "test-workflow", sandboxOnExit: "pause" },
+      async (_input, sessionInput) => {
+        capturedSession = sessionInput;
+        return { ok: true };
+      }
+    );
+
+    await workflow({});
+
+    expect(capturedSession).toEqual({
+      agentName: "test-workflow",
+      sandboxOnExit: "pause",
+    });
+  });
+
+  it("maps all continuation fields together", async () => {
+    let capturedSession: WorkflowSessionInput | undefined;
+
+    const workflow = defineWorkflow(
+      { name: "test-workflow", sandboxOnExit: "pause" },
+      async (_input, sessionInput) => {
+        capturedSession = sessionInput;
+        return { ok: true };
+      }
+    );
+
+    await workflow(
+      {},
+      {
+        previousThreadId: "prev-t",
+        sandboxId: "sb-1",
+        previousSandboxId: "prev-sb-1",
+      }
+    );
+
+    expect(capturedSession).toEqual({
+      agentName: "test-workflow",
+      sandboxOnExit: "pause",
+      threadId: "prev-t",
+      continueThread: true,
+      sandboxId: "sb-1",
+      previousSandboxId: "prev-sb-1",
+    });
   });
 
   it("passes full input as first argument", async () => {
@@ -121,6 +193,7 @@ describe("defineWorkflow", () => {
     expect(capturedInput).toEqual({ prompt: "go" });
     expect(capturedSession).toEqual({
       agentName: "test-workflow",
+      sandboxOnExit: "destroy",
       threadId: "prev",
       continueThread: true,
       sandboxId: "sb",
