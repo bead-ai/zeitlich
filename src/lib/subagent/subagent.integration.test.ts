@@ -750,7 +750,7 @@ describe("createSubagentHandler", () => {
     expect(workflowInput.thread).toBeUndefined();
   });
 
-  it("adds fork-mode subagent to pendingDestroys", async () => {
+  it("does not signal destroy for fork-mode subagent without pause-until-parent-close", async () => {
     const { startChild } = await import("@temporalio/workflow");
     const startMock = startChild as ReturnType<typeof vi.fn>;
 
@@ -770,15 +770,17 @@ describe("createSubagentHandler", () => {
       { threadId: "t", toolCallId: "tc", toolName: "Subagent" }
     );
 
-    await destroySubagentSandboxes();
-
     const lastResult = startMock.mock.results.at(-1);
     if (!lastResult) throw new Error("expected startChild call");
     const childHandle = await lastResult.value;
-    expect(childHandle.signal).toHaveBeenCalled();
+    childHandle.signal.mockClear();
+
+    await destroySubagentSandboxes();
+
+    expect(childHandle.signal).not.toHaveBeenCalled();
   });
 
-  it("signals destroy and awaits result for sandbox=own subagents at cleanup", async () => {
+  it("does not signal destroy for sandbox=own with default shutdown", async () => {
     const { startChild } = await import("@temporalio/workflow");
     const startMock = startChild as ReturnType<typeof vi.fn>;
 
@@ -787,6 +789,36 @@ describe("createSubagentHandler", () => {
       description: "Own sandbox",
       workflow: mockWorkflow(),
       sandbox: "own",
+    };
+
+    const { handler, destroySubagentSandboxes } = createSubagentHandler([
+      ownSubagent,
+    ]);
+
+    await handler(
+      { subagent: "own-agent", description: "test", prompt: "run" },
+      { threadId: "t", toolCallId: "tc", toolName: "Subagent" }
+    );
+
+    const lastResult = startMock.mock.results.at(-1);
+    if (!lastResult) throw new Error("expected startChild call");
+    const childHandle = await lastResult.value;
+    childHandle.signal.mockClear();
+
+    await destroySubagentSandboxes();
+
+    expect(childHandle.signal).not.toHaveBeenCalled();
+  });
+
+  it("signals destroy for sandbox=own with pause-until-parent-close shutdown", async () => {
+    const { startChild } = await import("@temporalio/workflow");
+    const startMock = startChild as ReturnType<typeof vi.fn>;
+
+    const ownSubagent: SubagentConfig = {
+      agentName: "own-agent",
+      description: "Own sandbox",
+      workflow: mockWorkflow(),
+      sandbox: { source: "own", shutdown: "pause-until-parent-close" },
     };
 
     const { handler, destroySubagentSandboxes } = createSubagentHandler([

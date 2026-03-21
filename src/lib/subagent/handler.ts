@@ -142,10 +142,12 @@ export function createSubagentHandler<
 
     const childHandle = await startChild(config.workflow, childOpts);
 
-    const usesOwnSandbox =
-      sandboxCfg.source === "own" || (allowsContinuation && sandboxCfg.source !== "inherit");
+    const effectiveShutdown = sandboxCfg.shutdown ?? "destroy";
+    const shouldDeferDestroy =
+      effectiveShutdown === "pause-until-parent-close" &&
+      (sandboxCfg.source === "own" || (allowsContinuation && sandboxCfg.source !== "inherit"));
 
-    if (usesOwnSandbox) {
+    if (shouldDeferDestroy) {
       pendingDestroys.set(childWorkflowId, childHandle);
     }
 
