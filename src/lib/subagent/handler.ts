@@ -3,6 +3,7 @@ import {
   workflowInfo,
   setHandler,
   condition,
+  log,
 } from "@temporalio/workflow";
 import { getShortId } from "../thread/id";
 import type { ToolHandlerResponse, RouterContext } from "../tool-router";
@@ -230,8 +231,14 @@ export function createSubagentHandler<
     pendingDestroys.clear();
     await Promise.all(
       handles.map(async (handle) => {
-        await handle.signal(destroySandboxSignal);
-        await handle.result();
+        try {
+          await handle.signal(destroySandboxSignal);
+          await handle.result();
+        } catch (err) {
+          log.warn("Failed to signal destroySandbox to child workflow", {
+            error: err,
+          });
+        }
       })
     );
   };
