@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.25](https://github.com/bead-ai/zeitlich/compare/v0.2.24...v0.2.25) (2026-03-21)
+
+
+### Features
+
+* add toToolPath method for workspace-relative path resolution ([207363c](https://github.com/bead-ai/zeitlich/commit/207363cae6194ff13d02fc14fde0783f26a060ce))
+* enhance path normalization in BedrockSandboxFileSystem ([0d47e7f](https://github.com/bead-ai/zeitlich/commit/0d47e7f0b9c5bf5f4216fba3e0653575b4c5e55e))
+
+
+### Miscellaneous Chores
+
+* release 0.2.25 ([670420f](https://github.com/bead-ai/zeitlich/commit/670420f125cb7eb04dedfdc7e98ae27ec125ef79))
+
 ## [0.2.24](https://github.com/bead-ai/zeitlich/compare/v0.2.23...v0.2.24) (2026-03-20)
 
 
