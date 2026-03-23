@@ -1,4 +1,5 @@
 import type { ToolResultConfig } from "../types";
+import type { JsonValue } from "../state/types";
 import type { ActivityToolHandler, RouterContext } from "./types";
 import { v4 as uuidv4 } from "uuid";
 
@@ -33,9 +34,10 @@ export function withAutoAppend<
   TArgs,
   TResult,
   TContext extends RouterContext = RouterContext,
+  TToolResponse = JsonValue,
 >(
   threadHandler: (id: string, config: ToolResultConfig) => Promise<void>,
-  handler: ActivityToolHandler<TArgs, TResult, TContext>
+  handler: ActivityToolHandler<TArgs, TResult, TContext, TToolResponse>
 ): ActivityToolHandler<TArgs, TResult, TContext> {
   return async (args: TArgs, context: TContext) => {
     const response = await handler(args, context);
@@ -45,7 +47,7 @@ export function withAutoAppend<
       ...(context.threadKey && { threadKey: context.threadKey }),
       toolCallId: context.toolCallId,
       toolName: context.toolName,
-      content: response.toolResponse,
+      content: response.toolResponse as JsonValue,
     });
 
     return {

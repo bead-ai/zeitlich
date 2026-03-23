@@ -31,11 +31,12 @@ export interface ToolWithHandler<
   TSchema extends z.ZodType = z.ZodType,
   TResult = unknown,
   TContext extends RouterContext = RouterContext,
+  TToolResponse = JsonValue,
 > {
   name: TName;
   description: string;
   schema: TSchema;
-  handler: ToolHandler<z.infer<TSchema>, TResult, TContext>;
+  handler: ToolHandler<z.infer<TSchema>, TResult, TContext, TToolResponse>;
   strict?: boolean;
   max_uses?: number;
   /** Whether this tool is available to the agent (default: true). Disabled tools are excluded from definitions and rejected at parse time. */
@@ -59,7 +60,7 @@ export type ToolMap = Record<
     description: string | (() => string);
     schema: z.ZodType | (() => z.ZodType);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    handler: ToolHandler<any, any, any>;
+    handler: ToolHandler<any, any, any, any>;
     strict?: boolean;
     max_uses?: number;
     enabled?: boolean | (() => boolean);
@@ -123,9 +124,9 @@ export type AppendToolResultFn = ActivityFunctionWithOptions<
  * Tools that don't return additional data should use `data: null` (TResult defaults to null).
  * Tools that may fail to produce data should type TResult as `SomeType | null`.
  */
-export interface ToolHandlerResponse<TResult = null> {
+export interface ToolHandlerResponse<TResult = null, TToolResponse = JsonValue> {
   /** Content sent back to the LLM as the tool call response */
-  toolResponse: JsonValue;
+  toolResponse: TToolResponse;
   /** Data returned to the workflow and hooks for further processing */
   data: TResult;
   /**
@@ -169,10 +170,11 @@ export type ToolHandler<
   TArgs,
   TResult,
   TContext extends RouterContext = RouterContext,
+  TToolResponse = JsonValue,
 > = (
   args: TArgs,
   context: TContext
-) => ToolHandlerResponse<TResult> | Promise<ToolHandlerResponse<TResult>>;
+) => ToolHandlerResponse<TResult, TToolResponse> | Promise<ToolHandlerResponse<TResult, TToolResponse>>;
 
 /**
  * Activity-compatible tool handler that always returns a Promise.
@@ -194,7 +196,8 @@ export type ActivityToolHandler<
   TArgs,
   TResult,
   TContext extends RouterContext = RouterContext,
-> = (args: TArgs, context: TContext) => Promise<ToolHandlerResponse<TResult>>;
+  TToolResponse = JsonValue,
+> = (args: TArgs, context: TContext) => Promise<ToolHandlerResponse<TResult, TToolResponse>>;
 
 /**
  * Extract the args type for a specific tool name from a tool map.
@@ -210,7 +213,9 @@ export type ToolResult<T extends ToolMap, TName extends ToolNames<T>> =
   Extract<T[keyof T], { name: TName }>["handler"] extends ToolHandler<
     unknown,
     infer R,
-    RouterContext
+    RouterContext,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    any
   >
     ? Awaited<R>
     : never;
@@ -242,6 +247,7 @@ export type InferToolResults<T extends ToolMap> = {
   [K in keyof T as T[K]["name"]]: T[K]["handler"] extends ToolHandler<
     any,
     infer R,
+    any,
     any
   >
     ? /* eslint-enable @typescript-eslint/no-explicit-any */

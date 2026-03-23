@@ -2,6 +2,11 @@ import type Redis from "ioredis";
 import type Anthropic from "@anthropic-ai/sdk";
 import type { ToolResultConfig } from "../../../lib/types";
 import type {
+  ActivityToolHandler,
+  RouterContext,
+  ToolHandlerResponse,
+} from "../../../lib/tool-router/types";
+import type {
   ThreadOps,
   PrefixedThreadOps,
   ScopedPrefix,
@@ -30,6 +35,17 @@ export interface AnthropicAdapterConfig {
   maxTokens?: number;
 }
 
+/**
+ * Tool response type accepted by the Anthropic adapter.
+ *
+ * Handlers can return:
+ * - **`string`** — plain text content for the tool result.
+ * - **`Anthropic.Messages.ToolResultBlockParam["content"]`** — array of content blocks
+ *   (e.g. `{ type: "text", text: "..." }`, `{ type: "image", source: { ... } }`).
+ *   Passed through as-is to the `tool_result` block.
+ */
+export type AnthropicToolResponse = Anthropic.Messages.ToolResultBlockParam["content"];
+
 export interface AnthropicAdapter {
   /** Model invoker using the default model (only available when `model` was provided) */
   invoker: ModelInvoker<Anthropic.Messages.Message>;
@@ -56,6 +72,17 @@ export interface AnthropicAdapter {
   createActivities<S extends string = "">(
     scope?: S,
   ): AnthropicThreadOps<S>;
+
+  /**
+   * Identity wrapper that types a tool handler for this adapter.
+   * Constrains `toolResponse` to {@link AnthropicToolResponse}.
+   */
+  wrapHandler<TArgs, TResult, TContext extends RouterContext = RouterContext>(
+    handler: (
+      args: TArgs,
+      context: TContext,
+    ) => Promise<ToolHandlerResponse<TResult, AnthropicToolResponse>>,
+  ): ActivityToolHandler<TArgs, TResult, TContext, AnthropicToolResponse>;
 }
 
 /**
@@ -191,5 +218,6 @@ export function createAnthropicAdapter(
     createActivities,
     invoker,
     createModelInvoker: makeInvoker,
+    wrapHandler: (handler) => handler,
   };
 }

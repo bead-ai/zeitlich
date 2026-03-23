@@ -21,6 +21,7 @@ export {
   type LangChainAdapter,
   type LangChainAdapterConfig,
   type LangChainThreadOps,
+  type LangChainToolResponse,
 } from "./activities";
 
 // Thread manager

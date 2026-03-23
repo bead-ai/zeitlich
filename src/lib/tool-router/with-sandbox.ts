@@ -1,4 +1,5 @@
 import type { Sandbox } from "../sandbox/types";
+import type { JsonValue } from "../state/types";
 import type { ActivityToolHandler, RouterContext, ToolHandlerResponse } from "./types";
 
 /**
@@ -50,13 +51,13 @@ export interface SandboxContext extends RouterContext {
  * });
  * ```
  */
-export function withSandbox<TArgs, TResult, TSandbox extends Sandbox = Sandbox>(
+export function withSandbox<TArgs, TResult, TSandbox extends Sandbox = Sandbox, TToolResponse = JsonValue>(
   manager: { getSandbox(id: string): Promise<TSandbox> },
   handler: (
     args: TArgs,
     context: RouterContext & { sandbox: TSandbox; sandboxId: string },
-  ) => Promise<ToolHandlerResponse<TResult>>,
-): ActivityToolHandler<TArgs, TResult | null> {
+  ) => Promise<ToolHandlerResponse<TResult, TToolResponse>>,
+): ActivityToolHandler<TArgs, TResult | null, RouterContext, TToolResponse | string> {
   return async (args, context) => {
     if (!context.sandboxId) {
       return {

@@ -1,6 +1,11 @@
 import type Redis from "ioredis";
-import type { GoogleGenAI, Content } from "@google/genai";
+import type { GoogleGenAI, Content, Part } from "@google/genai";
 import type { ToolResultConfig } from "../../../lib/types";
+import type {
+  ActivityToolHandler,
+  RouterContext,
+  ToolHandlerResponse,
+} from "../../../lib/tool-router/types";
 import type {
   ThreadOps,
   PrefixedThreadOps,
@@ -25,6 +30,30 @@ export interface GoogleGenAIAdapterConfig {
   model?: string;
 }
 
+/**
+ * Tool response type accepted by the Google GenAI adapter.
+ *
+ * Handlers can return:
+ * - **`string`** — plain text, wrapped in a `functionResponse` part.
+ * - **`Record<string, unknown>`** — structured object used as `functionResponse.response`.
+ * - **`Part[]`** — pre-built parts used directly as `Content.parts`.
+ *   The handler is responsible for building correct Part objects (e.g. `functionResponse`,
+ *   `inlineData`, `text`). Use `context.toolCallId` and `context.toolName` to construct
+ *   `functionResponse` parts.
+ *
+ * @example
+ * ```typescript
+ * adapter.wrapHandler(async (args, ctx) => ({
+ *   toolResponse: [
+ *     { functionResponse: { id: ctx.toolCallId, name: ctx.toolName, response: { result: "done" } } },
+ *     { inlineData: { data: base64, mimeType: "image/png" } },
+ *   ],
+ *   data: null,
+ * }));
+ * ```
+ */
+export type GoogleGenAIToolResponse = string | Record<string, unknown> | Part[];
+
 export interface GoogleGenAIAdapter {
   /** Model invoker using the default model (only available when `model` was provided) */
   invoker: ModelInvoker<Content>;
@@ -48,6 +77,17 @@ export interface GoogleGenAIAdapter {
   createActivities<S extends string = "">(
     scope?: S,
   ): GoogleGenAIThreadOps<S>;
+
+  /**
+   * Identity wrapper that types a tool handler for this adapter.
+   * Constrains `toolResponse` to {@link GoogleGenAIToolResponse}.
+   */
+  wrapHandler<TArgs, TResult, TContext extends RouterContext = RouterContext>(
+    handler: (
+      args: TArgs,
+      context: TContext,
+    ) => Promise<ToolHandlerResponse<TResult, GoogleGenAIToolResponse>>,
+  ): ActivityToolHandler<TArgs, TResult, TContext, GoogleGenAIToolResponse>;
 }
 
 /**
@@ -170,5 +210,6 @@ export function createGoogleGenAIAdapter(
     createActivities,
     invoker,
     createModelInvoker: makeInvoker,
+    wrapHandler: (handler) => handler,
   };
 }

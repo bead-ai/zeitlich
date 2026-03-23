@@ -1,5 +1,11 @@
 import type Redis from "ioredis";
 import type { ToolResultConfig } from "../../../lib/types";
+import type { MessageContent } from "@langchain/core/messages";
+import type {
+  ActivityToolHandler,
+  RouterContext,
+  ToolHandlerResponse,
+} from "../../../lib/tool-router/types";
 import type {
   ThreadOps,
   PrefixedThreadOps,
@@ -26,6 +32,15 @@ export interface LangChainAdapterConfig {
   model?: BaseChatModel<any>;
 }
 
+/**
+ * Tool response type accepted by the LangChain adapter.
+ *
+ * Content is passed directly to `ToolMessage` as `MessageContent`.
+ * Handlers can return a string or an array of content blocks
+ * (e.g. `{ type: "text", text: "..." }`, `{ type: "image_url", image_url: { ... } }`).
+ */
+export type LangChainToolResponse = MessageContent;
+
 export interface LangChainAdapter {
   /** Model invoker using the default model (only available when `model` was provided) */
   invoker: ModelInvoker<StoredMessage>;
@@ -46,6 +61,17 @@ export interface LangChainAdapter {
   createActivities<S extends string = "">(
     scope?: S,
   ): LangChainThreadOps<S>;
+
+  /**
+   * Identity wrapper that types a tool handler for this adapter.
+   * Constrains `toolResponse` to {@link LangChainToolResponse}.
+   */
+  wrapHandler<TArgs, TResult, TContext extends RouterContext = RouterContext>(
+    handler: (
+      args: TArgs,
+      context: TContext,
+    ) => Promise<ToolHandlerResponse<TResult, LangChainToolResponse>>,
+  ): ActivityToolHandler<TArgs, TResult, TContext, LangChainToolResponse>;
 }
 
 /**
@@ -166,5 +192,6 @@ export function createLangChainAdapter(
     createActivities,
     invoker,
     createModelInvoker: makeInvoker,
+    wrapHandler: (handler) => handler,
   };
 }

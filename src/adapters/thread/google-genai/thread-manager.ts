@@ -48,20 +48,10 @@ function toParts(content: GoogleGenAIContent): Part[] {
   return content;
 }
 
-/** Convert JsonValue into a Record suitable for functionResponse */
+/** Convert a scalar or object JsonValue into a Record suitable for functionResponse.response */
 function toFunctionResponse(content: JsonValue): Record<string, unknown> {
   if (typeof content === "object" && content !== null && !Array.isArray(content)) {
     return content as Record<string, unknown>;
-  }
-  if (typeof content === "string") {
-    try {
-      const parsed: unknown = JSON.parse(content);
-      return typeof parsed === "object" && parsed !== null
-        ? (parsed as Record<string, unknown>)
-        : { result: content };
-    } catch {
-      return { result: content };
-    }
   }
   return { result: content };
 }
@@ -133,18 +123,19 @@ export function createGoogleGenAIThreadManager(
       toolName: string,
       content: JsonValue,
     ): Promise<void> {
-      await base.append([{
-        id,
-        content: {
-          role: "user",
-          parts: [{
+      const parts: Part[] = Array.isArray(content)
+        ? content as Part[]
+        : [{
             functionResponse: {
               id: toolCallId,
               name: toolName,
               response: toFunctionResponse(content),
             },
-          }],
-        },
+          }];
+
+      await base.append([{
+        id,
+        content: { role: "user", parts },
       }]);
     },
 

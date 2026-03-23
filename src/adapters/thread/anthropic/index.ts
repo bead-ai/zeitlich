@@ -23,6 +23,7 @@ export {
   type AnthropicAdapter,
   type AnthropicAdapterConfig,
   type AnthropicThreadOps,
+  type AnthropicToolResponse,
 } from "./activities";
 
 // Thread manager

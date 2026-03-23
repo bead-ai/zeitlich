@@ -1,4 +1,5 @@
 import type { z } from "zod";
+import type { JsonValue } from "../state/types";
 import type {
   ToolHandlerResponse,
   PreToolUseHookResult,
@@ -11,8 +12,8 @@ import type {
 } from "../lifecycle";
 
 /** ToolHandlerResponse with threadId required (subagents must always surface their thread) */
-export type SubagentHandlerResponse<TResult = null> =
-  ToolHandlerResponse<TResult> & { threadId: string; sandboxId?: string };
+export type SubagentHandlerResponse<TResult = null, TToolResponse = JsonValue> =
+  ToolHandlerResponse<TResult, TToolResponse> & { threadId: string; sandboxId?: string };
 
 /**
  * Raw workflow input fields passed from parent to child workflow.

@@ -23,6 +23,7 @@ export {
   type GoogleGenAIAdapter,
   type GoogleGenAIAdapterConfig,
   type GoogleGenAIThreadOps,
+  type GoogleGenAIToolResponse,
 } from "./activities";
 
 // Thread manager

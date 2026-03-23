@@ -245,7 +245,7 @@ export function createToolRouter<T extends ToolMap>(
           routerContext as Parameters<typeof tool.handler>[1]
         );
         result = response.data;
-        content = response.toolResponse;
+        content = response.toolResponse as JsonValue;
         resultAppended = response.resultAppended === true;
         metadata = response.metadata;
       } else {
@@ -417,7 +417,7 @@ export function createToolRouter<T extends ToolMap>(
                 threadKey: options.threadKey,
                 toolCallId: toolCall.id,
                 toolName: toolCall.name,
-                content: response.toolResponse,
+                content: response.toolResponse as JsonValue,
               },
             ]
           );
@@ -495,9 +495,10 @@ export function defineTool<
   TSchema extends z.ZodType,
   TResult,
   TContext extends RouterContext = RouterContext,
+  TToolResponse = JsonValue,
 >(
-  tool: ToolWithHandler<TName, TSchema, TResult, TContext>
-): ToolWithHandler<TName, TSchema, TResult, TContext> {
+  tool: ToolWithHandler<TName, TSchema, TResult, TContext, TToolResponse>
+): ToolWithHandler<TName, TSchema, TResult, TContext, TToolResponse> {
   return tool;
 }
 

@@ -1,6 +1,7 @@
 import { Context } from "@temporalio/activity";
 import type { WorkflowClient } from "@temporalio/client";
 import type { BaseAgentState, RunAgentConfig } from "./types";
+import type { JsonValue } from "./state/types";
 import type {
   ActivityToolHandler,
   RouterContext,
@@ -73,13 +74,13 @@ export interface AgentStateContext<S extends BaseAgentState = BaseAgentState> ex
  * );
  * ```
  */
-export function withParentWorkflowState<TArgs, TResult, S extends BaseAgentState = BaseAgentState>(
+export function withParentWorkflowState<TArgs, TResult, S extends BaseAgentState = BaseAgentState, TToolResponse = JsonValue>(
   client: WorkflowClient,
   handler: (
     args: TArgs,
     context: AgentStateContext<S>,
-  ) => Promise<ToolHandlerResponse<TResult>>,
-): ActivityToolHandler<TArgs, TResult> {
+  ) => Promise<ToolHandlerResponse<TResult, TToolResponse>>,
+): ActivityToolHandler<TArgs, TResult, RouterContext, TToolResponse> {
   return async (args, context) => {
     const state = await queryParentWorkflowState<S>(client);
     return handler(args, { ...context, state });
