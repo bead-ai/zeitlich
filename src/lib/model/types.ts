@@ -24,6 +24,8 @@ export type RunAgentActivity<M = unknown> = (
  */
 export interface ModelInvokerConfig {
   threadId: string;
+  /** Redis key suffix for thread storage. Defaults to 'messages'. */
+  threadKey?: string;
   agentName: string;
   state: BaseAgentState;
   metadata?: Record<string, unknown>;

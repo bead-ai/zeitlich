@@ -53,9 +53,9 @@ export function createGoogleGenAIModelInvoker({
   return async function invokeGoogleGenAIModel(
     config: ModelInvokerConfig,
   ): Promise<AgentResponse<Content>> {
-    const { threadId, state } = config;
+    const { threadId, threadKey, state } = config;
 
-    const thread = createGoogleGenAIThreadManager({ redis, threadId });
+    const thread = createGoogleGenAIThreadManager({ redis, threadId, key: threadKey });
     const { contents, systemInstruction } =
       await thread.prepareForInvocation();
 

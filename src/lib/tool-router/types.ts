@@ -409,6 +409,8 @@ export interface ToolRouterOptions<T extends ToolMap> {
   tools: T;
   /** Thread ID for appending tool results */
   threadId: string;
+  /** Redis key suffix for thread storage. Defaults to 'messages'. */
+  threadKey?: string;
   /** Function to append tool results to the thread (called automatically after each handler).
    *  Accepts a Temporal activity proxy with {@link ActivityFunctionWithOptions}. */
   appendToolResult: AppendToolResultFn;

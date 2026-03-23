@@ -27,12 +27,13 @@ import type { ThreadInit, SandboxInit, SubagentSandboxShutdown } from "../lifecy
  */
 export interface ThreadOps<TContent = string> {
   /** Initialize an empty thread */
-  initializeThread(threadId: string): Promise<void>;
+  initializeThread(threadId: string, threadKey?: string): Promise<void>;
   /** Append a human message to the thread */
   appendHumanMessage(
     threadId: string,
     id: string,
-    content: TContent
+    content: TContent,
+    threadKey?: string,
   ): Promise<void>;
   /** Append a tool result to the thread */
   appendToolResult(id: string, config: ToolResultConfig): Promise<void>;
@@ -40,10 +41,11 @@ export interface ThreadOps<TContent = string> {
   appendSystemMessage(
     threadId: string,
     id: string,
-    content: string
+    content: string,
+    threadKey?: string,
   ): Promise<void>;
   /** Copy all messages from sourceThreadId into a new thread at targetThreadId */
-  forkThread(sourceThreadId: string, targetThreadId: string): Promise<void>;
+  forkThread(sourceThreadId: string, targetThreadId: string, threadKey?: string): Promise<void>;
 }
 
 /**
@@ -128,6 +130,14 @@ export interface SessionConfig<T extends ToolMap, M = unknown, TContent = string
    * - `{ mode: "fork", threadId: "..." }` — fork an existing thread and continue in the copy.
    */
   thread?: ThreadInit;
+  /**
+   * Redis key suffix for thread storage. Defaults to `"messages"`.
+   *
+   * Controls the Redis key layout: `thread:${threadId}:${threadKey}`.
+   * Use different keys to isolate storage across sessions sharing the
+   * same adapter instance.
+   */
+  threadKey?: string;
 
   // ---------------------------------------------------------------------------
   // Sandbox lifecycle

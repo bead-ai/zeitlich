@@ -81,6 +81,8 @@ export interface SerializableToolDefinition {
 export interface RunAgentConfig extends AgentConfig {
   /** The thread ID to use for the session */
   threadId: string;
+  /** Redis key suffix for thread storage. Defaults to 'messages'. */
+  threadKey?: string;
   /** Metadata for the session */
   metadata?: Record<string, unknown>;
 }
@@ -90,6 +92,8 @@ export interface RunAgentConfig extends AgentConfig {
  */
 export interface ToolResultConfig {
   threadId: string;
+  /** Redis key suffix for thread storage. Defaults to 'messages'. */
+  threadKey?: string;
   toolCallId: string;
   /** The name of the tool that produced this result */
   toolName: string;

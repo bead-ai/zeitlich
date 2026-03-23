@@ -86,6 +86,7 @@ export async function createSession<T extends ToolMap, M = unknown, TContent = s
   hooks = {},
   appendSystemPrompt = true,
   waitForInputTimeout = "48h",
+  threadKey,
   sandboxOps,
   thread: threadInit,
   sandbox: sandboxInit,
@@ -139,6 +140,7 @@ export async function createSession<T extends ToolMap, M = unknown, TContent = s
     tools,
     appendToolResult,
     threadId,
+    threadKey,
     hooks,
     plugins,
     parallel: processToolsInParallel,
@@ -174,7 +176,7 @@ export async function createSession<T extends ToolMap, M = unknown, TContent = s
               threadId,
             });
           }
-          await appendHumanMessage(threadId, uuid4(), message);
+          await appendHumanMessage(threadId, uuid4(), message, threadKey);
           if (hooks.onPostHumanMessageAppend) {
             await hooks.onPostHumanMessageAppend({
               message,
@@ -249,7 +251,7 @@ export async function createSession<T extends ToolMap, M = unknown, TContent = s
 
       // --- Thread lifecycle: new, continue, or fork ----------------------
       if (threadMode === "fork" && sourceThreadId) {
-        await forkThread(sourceThreadId, threadId);
+        await forkThread(sourceThreadId, threadId, threadKey);
       } else if (threadMode === "continue") {
         // "continue" — thread already exists, just append the new message
       } else {
@@ -260,12 +262,12 @@ export async function createSession<T extends ToolMap, M = unknown, TContent = s
               nonRetryable: true,
             });
           }
-          await appendSystemMessage(threadId, uuid4(), systemPrompt);
+          await appendSystemMessage(threadId, uuid4(), systemPrompt, threadKey);
         } else {
-          await initializeThread(threadId);
+          await initializeThread(threadId, threadKey);
         }
       }
-      await appendHumanMessage(threadId, uuid4(), await buildContextMessage());
+      await appendHumanMessage(threadId, uuid4(), await buildContextMessage(), threadKey);
 
       let exitReason: SessionExitReason = "completed";
 
@@ -282,6 +284,7 @@ export async function createSession<T extends ToolMap, M = unknown, TContent = s
 
           const { message, rawToolCalls, usage } = await runAgent({
             threadId,
+            threadKey,
             agentName,
             metadata,
           });
@@ -309,6 +312,7 @@ export async function createSession<T extends ToolMap, M = unknown, TContent = s
             } catch (error) {
               await appendToolResult(uuid4(), {
                 threadId,
+                threadKey,
                 toolCallId: tc.id ?? "",
                 toolName: tc.name,
                 content: JSON.stringify({

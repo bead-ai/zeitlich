@@ -37,9 +37,9 @@ export function createLangChainModelInvoker<TModel extends BaseChatModel<any> = 
   return async function invokeLangChainModel(
     config: ModelInvokerConfig,
   ): Promise<AgentResponse<StoredMessage>> {
-    const { threadId, agentName, state, metadata } = config;
+    const { threadId, threadKey, agentName, state, metadata } = config;
 
-    const thread = createLangChainThreadManager({ redis, threadId });
+    const thread = createLangChainThreadManager({ redis, threadId, key: threadKey });
     const runId = uuidv4();
 
     const { messages } = await thread.prepareForInvocation();

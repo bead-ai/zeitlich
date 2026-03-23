@@ -89,8 +89,8 @@ export function createLangChainAdapter(
   const { redis } = config;
 
   const threadOps: ThreadOps<LangChainContent> = {
-    async initializeThread(threadId: string): Promise<void> {
-      const thread = createLangChainThreadManager({ redis, threadId });
+    async initializeThread(threadId: string, threadKey?: string): Promise<void> {
+      const thread = createLangChainThreadManager({ redis, threadId, key: threadKey });
       await thread.initialize();
     },
 
@@ -98,8 +98,9 @@ export function createLangChainAdapter(
       threadId: string,
       id: string,
       content: LangChainContent,
+      threadKey?: string,
     ): Promise<void> {
-      const thread = createLangChainThreadManager({ redis, threadId });
+      const thread = createLangChainThreadManager({ redis, threadId, key: threadKey });
       await thread.appendUserMessage(id, content);
     },
 
@@ -107,24 +108,27 @@ export function createLangChainAdapter(
       threadId: string,
       id: string,
       content: string,
+      threadKey?: string,
     ): Promise<void> {
-      const thread = createLangChainThreadManager({ redis, threadId });
+      const thread = createLangChainThreadManager({ redis, threadId, key: threadKey });
       await thread.appendSystemMessage(id, content);
     },
 
     async appendToolResult(id: string, cfg: ToolResultConfig): Promise<void> {
-      const { threadId, toolCallId, content } = cfg;
-      const thread = createLangChainThreadManager({ redis, threadId });
+      const { threadId, threadKey, toolCallId, content } = cfg;
+      const thread = createLangChainThreadManager({ redis, threadId, key: threadKey });
       await thread.appendToolResult(id, toolCallId, "", content);
     },
 
     async forkThread(
       sourceThreadId: string,
       targetThreadId: string,
+      threadKey?: string,
     ): Promise<void> {
       const thread = createLangChainThreadManager({
         redis,
         threadId: sourceThreadId,
+        key: threadKey,
       });
       await thread.fork(targetThreadId);
     },

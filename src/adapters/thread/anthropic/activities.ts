@@ -104,8 +104,8 @@ export function createAnthropicAdapter(
   const { redis, client } = config;
 
   const threadOps: ThreadOps<AnthropicContent> = {
-    async initializeThread(threadId: string): Promise<void> {
-      const thread = createAnthropicThreadManager({ redis, threadId });
+    async initializeThread(threadId: string, threadKey?: string): Promise<void> {
+      const thread = createAnthropicThreadManager({ redis, threadId, key: threadKey });
       await thread.initialize();
     },
 
@@ -113,8 +113,9 @@ export function createAnthropicAdapter(
       threadId: string,
       id: string,
       content: AnthropicContent,
+      threadKey?: string,
     ): Promise<void> {
-      const thread = createAnthropicThreadManager({ redis, threadId });
+      const thread = createAnthropicThreadManager({ redis, threadId, key: threadKey });
       await thread.appendUserMessage(id, content);
     },
 
@@ -122,24 +123,27 @@ export function createAnthropicAdapter(
       threadId: string,
       id: string,
       content: string,
+      threadKey?: string,
     ): Promise<void> {
-      const thread = createAnthropicThreadManager({ redis, threadId });
+      const thread = createAnthropicThreadManager({ redis, threadId, key: threadKey });
       await thread.appendSystemMessage(id, content);
     },
 
     async appendToolResult(id: string, cfg: ToolResultConfig): Promise<void> {
-      const { threadId, toolCallId, toolName, content } = cfg;
-      const thread = createAnthropicThreadManager({ redis, threadId });
+      const { threadId, threadKey, toolCallId, toolName, content } = cfg;
+      const thread = createAnthropicThreadManager({ redis, threadId, key: threadKey });
       await thread.appendToolResult(id, toolCallId, toolName, content);
     },
 
     async forkThread(
       sourceThreadId: string,
       targetThreadId: string,
+      threadKey?: string,
     ): Promise<void> {
       const thread = createAnthropicThreadManager({
         redis,
         threadId: sourceThreadId,
+        key: threadKey,
       });
       await thread.fork(targetThreadId);
     },

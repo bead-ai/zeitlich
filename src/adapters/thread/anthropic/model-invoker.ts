@@ -56,9 +56,9 @@ export function createAnthropicModelInvoker({
   return async function invokeAnthropicModel(
     config: ModelInvokerConfig,
   ): Promise<AgentResponse<Anthropic.Messages.Message>> {
-    const { threadId, state } = config;
+    const { threadId, threadKey, state } = config;
 
-    const thread = createAnthropicThreadManager({ redis, threadId });
+    const thread = createAnthropicThreadManager({ redis, threadId, key: threadKey });
     const { messages, system } = await thread.prepareForInvocation();
 
     const anthropicTools = toAnthropicTools(state.tools);

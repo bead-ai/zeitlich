@@ -211,6 +211,7 @@ export function createToolRouter<T extends ToolMap>(
     if (preResult.skip) {
       await appendToolResult(uuid4(), {
         threadId: options.threadId,
+        threadKey: options.threadKey,
         toolCallId: toolCall.id,
         toolName: toolCall.name,
         content: JSON.stringify({
@@ -265,6 +266,7 @@ export function createToolRouter<T extends ToolMap>(
     if (!resultAppended) {
       const config = {
         threadId: options.threadId,
+        threadKey: options.threadKey,
         toolCallId: toolCall.id,
         toolName: toolCall.name,
         content,
@@ -409,6 +411,7 @@ export function createToolRouter<T extends ToolMap>(
               uuid4(),
               {
                 threadId: options.threadId,
+                threadKey: options.threadKey,
                 toolCallId: toolCall.id,
                 toolName: toolCall.name,
                 content: response.toolResponse,
