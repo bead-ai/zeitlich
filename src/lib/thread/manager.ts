@@ -1,7 +1,4 @@
-import type {
-  ThreadManagerConfig,
-  BaseThreadManager,
-} from "./types";
+import type { ThreadManagerConfig, BaseThreadManager } from "./types";
 
 const THREAD_TTL_SECONDS = 60 * 60 * 24 * 90; // 90 days
 
@@ -27,7 +24,7 @@ return 1
 `;
 
 function getThreadKey(threadId: string, key: string): string {
-  return `thread:${threadId}:${key}`;
+  return `${key}:thread:${threadId}`;
 }
 
 /**
@@ -35,7 +32,7 @@ function getThreadKey(threadId: string, key: string): string {
  * Framework-agnostic — works with any serializable message type.
  */
 export function createThreadManager<T>(
-  config: ThreadManagerConfig<T>,
+  config: ThreadManagerConfig<T>
 ): BaseThreadManager<T> {
   const {
     redis,
@@ -80,7 +77,7 @@ export function createThreadManager<T>(
           dedupKey,
           redisKey,
           String(THREAD_TTL_SECONDS),
-          ...messages.map(serialize),
+          ...messages.map(serialize)
         );
       } else {
         await redis.rpush(redisKey, ...messages.map(serialize));
