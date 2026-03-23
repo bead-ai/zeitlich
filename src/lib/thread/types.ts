@@ -54,14 +54,17 @@ export interface BaseThreadManager<T> {
  * @typeParam TStored - The stored message envelope (includes id + SDK payload)
  * @typeParam TContent - SDK-native content type for human messages
  */
-export interface ProviderThreadManager<TStored, TContent = string>
-  extends BaseThreadManager<TStored> {
+export interface ProviderThreadManager<
+  TStored,
+  TContent = string,
+  TToolContent = JsonValue,
+> extends BaseThreadManager<TStored> {
   appendUserMessage(id: string, content: TContent): Promise<void>;
   appendSystemMessage(id: string, content: string): Promise<void>;
   appendToolResult(
     id: string,
     toolCallId: string,
     toolName: string,
-    content: JsonValue,
+    content: TToolContent,
   ): Promise<void>;
 }
