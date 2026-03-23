@@ -21,11 +21,14 @@ import { createGoogleGenAIModelInvoker } from "./model-invoker";
 const ADAPTER_PREFIX = "googleGenAI" as const;
 
 export type GoogleGenAIThreadOps<TScope extends string = ""> =
-  PrefixedThreadOps<ScopedPrefix<TScope, typeof ADAPTER_PREFIX>, GoogleGenAIContent>;
+  PrefixedThreadOps<
+    ScopedPrefix<TScope, typeof ADAPTER_PREFIX>,
+    GoogleGenAIContent
+  >;
 
 export interface GoogleGenAIAdapterConfig {
   redis: Redis;
-  client: GoogleGenAI;
+  client?: GoogleGenAI;
   /** Default model name (e.g. 'gemini-2.5-flash'). If omitted, use `createModelInvoker()` */
   model?: string;
 }
@@ -58,7 +61,7 @@ export interface GoogleGenAIAdapter {
   /** Model invoker using the default model (only available when `model` was provided) */
   invoker: ModelInvoker<Content>;
   /** Create an invoker for a specific model name (for multi-model setups) */
-  createModelInvoker(model: string): ModelInvoker<Content>;
+  createModelInvoker(model: string, client: GoogleGenAI): ModelInvoker<Content>;
   /**
    * Create prefixed thread activities for registration on the worker.
    *
@@ -74,9 +77,7 @@ export interface GoogleGenAIAdapter {
    * // → { googleGenAIResearchAgentInitializeThread, … }
    * ```
    */
-  createActivities<S extends string = "">(
-    scope?: S,
-  ): GoogleGenAIThreadOps<S>;
+  createActivities<S extends string = "">(scope?: S): GoogleGenAIThreadOps<S>;
 
   /**
    * Identity wrapper that types a tool handler for this adapter.
@@ -85,8 +86,8 @@ export interface GoogleGenAIAdapter {
   wrapHandler<TArgs, TResult, TContext extends RouterContext = RouterContext>(
     handler: (
       args: TArgs,
-      context: TContext,
-    ) => Promise<ToolHandlerResponse<TResult, GoogleGenAIToolResponse>>,
+      context: TContext
+    ) => Promise<ToolHandlerResponse<TResult, GoogleGenAIToolResponse>>
   ): ActivityToolHandler<TArgs, TResult, TContext, GoogleGenAIToolResponse>;
 }
 
@@ -131,13 +132,20 @@ export interface GoogleGenAIAdapter {
  * ```
  */
 export function createGoogleGenAIAdapter(
-  config: GoogleGenAIAdapterConfig,
+  config: GoogleGenAIAdapterConfig
 ): GoogleGenAIAdapter {
-  const { redis, client } = config;
+  const { redis } = config;
 
   const threadOps: ThreadOps<GoogleGenAIContent> = {
-    async initializeThread(threadId: string, threadKey?: string): Promise<void> {
-      const thread = createGoogleGenAIThreadManager({ redis, threadId, key: threadKey });
+    async initializeThread(
+      threadId: string,
+      threadKey?: string
+    ): Promise<void> {
+      const thread = createGoogleGenAIThreadManager({
+        redis,
+        threadId,
+        key: threadKey,
+      });
       await thread.initialize();
     },
 
@@ -145,9 +153,13 @@ export function createGoogleGenAIAdapter(
       threadId: string,
       id: string,
       content: GoogleGenAIContent,
-      threadKey?: string,
+      threadKey?: string
     ): Promise<void> {
-      const thread = createGoogleGenAIThreadManager({ redis, threadId, key: threadKey });
+      const thread = createGoogleGenAIThreadManager({
+        redis,
+        threadId,
+        key: threadKey,
+      });
       await thread.appendUserMessage(id, content);
     },
 
@@ -155,22 +167,35 @@ export function createGoogleGenAIAdapter(
       threadId: string,
       id: string,
       content: string,
-      threadKey?: string,
+      threadKey?: string
     ): Promise<void> {
-      const thread = createGoogleGenAIThreadManager({ redis, threadId, key: threadKey });
+      const thread = createGoogleGenAIThreadManager({
+        redis,
+        threadId,
+        key: threadKey,
+      });
       await thread.appendSystemMessage(id, content);
     },
 
     async appendToolResult(id: string, cfg: ToolResultConfig): Promise<void> {
       const { threadId, threadKey, toolCallId, toolName, content } = cfg;
-      const thread = createGoogleGenAIThreadManager({ redis, threadId, key: threadKey });
-      await thread.appendToolResult(id, toolCallId, toolName, content);
+      const thread = createGoogleGenAIThreadManager({
+        redis,
+        threadId,
+        key: threadKey,
+      });
+      await thread.appendToolResult(
+        id,
+        toolCallId,
+        toolName,
+        content as GoogleGenAIToolResponse
+      );
     },
 
     async forkThread(
       sourceThreadId: string,
       targetThreadId: string,
-      threadKey?: string,
+      threadKey?: string
     ): Promise<void> {
       const thread = createGoogleGenAIThreadManager({
         redis,
@@ -182,29 +207,32 @@ export function createGoogleGenAIAdapter(
   };
 
   function createActivities<S extends string = "">(
-    scope?: S,
+    scope?: S
   ): GoogleGenAIThreadOps<S> {
     const prefix = scope
       ? `${ADAPTER_PREFIX}${scope.charAt(0).toUpperCase()}${scope.slice(1)}`
       : ADAPTER_PREFIX;
-    const cap = (s: string): string =>
-      s.charAt(0).toUpperCase() + s.slice(1);
+    const cap = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1);
     return Object.fromEntries(
-      Object.entries(threadOps).map(([k, v]) => [`${prefix}${cap(k)}`, v]),
+      Object.entries(threadOps).map(([k, v]) => [`${prefix}${cap(k)}`, v])
     ) as GoogleGenAIThreadOps<S>;
   }
 
-  const makeInvoker = (model: string): ModelInvoker<Content> =>
+  const makeInvoker = (
+    model: string,
+    client: GoogleGenAI
+  ): ModelInvoker<Content> =>
     createGoogleGenAIModelInvoker({ redis, client, model });
 
-  const invoker: ModelInvoker<Content> = config.model
-    ? makeInvoker(config.model)
-    : ((() => {
-        throw new Error(
-          "No default model provided to createGoogleGenAIAdapter. " +
-            "Either pass `model` in the config or use `createModelInvoker(model)` instead.",
-        );
-      }) as unknown as ModelInvoker<Content>);
+  const invoker: ModelInvoker<Content> =
+    config.model && config.client
+      ? makeInvoker(config.model, config.client)
+      : ((() => {
+          throw new Error(
+            "No default model provided to createGoogleGenAIAdapter. " +
+              "Either pass `model` in the config or use `createModelInvoker(model)` instead."
+          );
+        }) as unknown as ModelInvoker<Content>);
 
   return {
     createActivities,

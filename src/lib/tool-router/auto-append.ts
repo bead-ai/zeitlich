@@ -34,7 +34,7 @@ export function withAutoAppend<
   TArgs,
   TResult,
   TContext extends RouterContext = RouterContext,
-  TToolResponse = JsonValue,
+  TToolResponse = unknown,
 >(
   threadHandler: (id: string, config: ToolResultConfig) => Promise<void>,
   handler: ActivityToolHandler<TArgs, TResult, TContext, TToolResponse>
