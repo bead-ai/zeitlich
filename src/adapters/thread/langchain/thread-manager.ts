@@ -1,4 +1,5 @@
 import type Redis from "ioredis";
+import type { JsonValue } from "../../../lib/state/types";
 import {
   AIMessage,
   type BaseMessage,
@@ -96,10 +97,10 @@ export function createLangChainThreadManager(
       id: string,
       _toolCallId: string,
       _toolName: string,
-      content: string,
+      content: JsonValue,
     ): Promise<void> {
       await base.append([
-        new ToolMessage({ id, content, tool_call_id: _toolCallId }).toDict(),
+        new ToolMessage({ id, content: content as MessageContent, tool_call_id: _toolCallId }).toDict(),
       ]);
     },
 

@@ -18,6 +18,7 @@ import type {
   ToolWithHandler,
 } from "./types";
 
+import type { JsonValue } from "../state/types";
 import type { z } from "zod";
 import { uuid4 } from "@temporalio/workflow";
 
@@ -117,7 +118,7 @@ export function createToolRouter<T extends ToolMap>(
     error: unknown,
     effectiveArgs: unknown,
     turn: number
-  ): Promise<{ content: string; result: unknown }> {
+  ): Promise<{ content: JsonValue; result: unknown }> {
     const err = error instanceof Error ? error : new Error(String(error));
     const errorStr = String(error);
 
@@ -225,7 +226,7 @@ export function createToolRouter<T extends ToolMap>(
 
     // --- Execute handler ---
     let result: unknown;
-    let content!: string;
+    let content!: JsonValue;
     let resultAppended = false;
     let metadata: Record<string, unknown> | undefined;
 

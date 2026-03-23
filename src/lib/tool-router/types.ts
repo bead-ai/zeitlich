@@ -2,6 +2,7 @@ import type {
   TokenUsage,
   ToolResultConfig,
 } from "../types";
+import type { JsonValue } from "../state/types";
 import type { z } from "zod";
 import type { ActivityFunctionWithOptions } from "@temporalio/workflow";
 
@@ -127,7 +128,7 @@ export type AppendToolResultFn = ActivityFunctionWithOptions<
  */
 export interface ToolHandlerResponse<TResult = null> {
   /** Content sent back to the LLM as the tool call response */
-  toolResponse: string;
+  toolResponse: JsonValue;
   /** Data returned to the workflow and hooks for further processing */
   data: TResult;
   /**
@@ -287,7 +288,7 @@ export interface PreToolUseHookResult {
  */
 export interface PostToolUseFailureHookResult {
   /** Provide a fallback result instead of throwing */
-  fallbackContent?: string;
+  fallbackContent?: JsonValue;
   /** Whether to suppress the error (still logs, but continues) */
   suppress?: boolean;
 }

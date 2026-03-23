@@ -1,3 +1,5 @@
+import type { JsonValue } from "./state/types";
+
 // ============================================================================
 // Agent core types
 // ============================================================================
@@ -97,8 +99,8 @@ export interface ToolResultConfig {
   toolCallId: string;
   /** The name of the tool that produced this result */
   toolName: string;
-  /** Content for the tool message (JSON-serialized result) */
-  content: string;
+  /** Content for the tool result — string, object, or array. The adapter converts to its SDK-native format. */
+  content: JsonValue;
 }
 
 // ============================================================================

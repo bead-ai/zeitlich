@@ -1,5 +1,6 @@
 import type Redis from "ioredis";
 import type { Content, Part } from "@google/genai";
+import type { JsonValue } from "../../../lib/state/types";
 import {
   createThreadManager,
   type ProviderThreadManager,
@@ -47,16 +48,22 @@ function toParts(content: GoogleGenAIContent): Part[] {
   return content;
 }
 
-/** Parse tool response string into a Record suitable for functionResponse */
-function parseToolResponse(content: string): Record<string, unknown> {
-  try {
-    const parsed: unknown = JSON.parse(content);
-    return typeof parsed === "object" && parsed !== null
-      ? (parsed as Record<string, unknown>)
-      : { result: content };
-  } catch {
-    return { result: content };
+/** Convert JsonValue into a Record suitable for functionResponse */
+function toFunctionResponse(content: JsonValue): Record<string, unknown> {
+  if (typeof content === "object" && content !== null && !Array.isArray(content)) {
+    return content as Record<string, unknown>;
   }
+  if (typeof content === "string") {
+    try {
+      const parsed: unknown = JSON.parse(content);
+      return typeof parsed === "object" && parsed !== null
+        ? (parsed as Record<string, unknown>)
+        : { result: content };
+    } catch {
+      return { result: content };
+    }
+  }
+  return { result: content };
 }
 
 /**
@@ -124,7 +131,7 @@ export function createGoogleGenAIThreadManager(
       id: string,
       toolCallId: string,
       toolName: string,
-      content: string,
+      content: JsonValue,
     ): Promise<void> {
       await base.append([{
         id,
@@ -134,7 +141,7 @@ export function createGoogleGenAIThreadManager(
             functionResponse: {
               id: toolCallId,
               name: toolName,
-              response: parseToolResponse(content),
+              response: toFunctionResponse(content),
             },
           }],
         },

@@ -7,6 +7,7 @@ import {
 } from "@temporalio/workflow";
 import { getShortId } from "../thread/id";
 import type { ToolHandlerResponse, RouterContext } from "../tool-router";
+import type { JsonValue } from "../state/types";
 import type {
   InferSubagentResult,
   SubagentConfig,
@@ -207,10 +208,13 @@ export function createSubagentHandler<
       };
     }
 
-    let finalToolResponse: string = toolResponse;
+    let finalToolResponse: JsonValue = toolResponse;
 
     if (allowsContinuation && childThreadId) {
-      finalToolResponse = `${toolResponse}\n\n[${config.agentName} Thread ID: ${childThreadId}]`;
+      const responseStr = typeof toolResponse === "string"
+        ? toolResponse
+        : JSON.stringify(toolResponse);
+      finalToolResponse = `${responseStr}\n\n[${config.agentName} Thread ID: ${childThreadId}]`;
     }
 
     return {

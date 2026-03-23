@@ -1,5 +1,6 @@
 import type Redis from "ioredis";
 import type Anthropic from "@anthropic-ai/sdk";
+import type { JsonValue } from "../../../lib/state/types";
 import {
   createThreadManager,
   type ProviderThreadManager,
@@ -141,8 +142,14 @@ export function createAnthropicThreadManager(
       id: string,
       toolCallId: string,
       _toolName: string,
-      content: string,
+      content: JsonValue,
     ): Promise<void> {
+      const toolContent =
+        typeof content === "string"
+          ? content
+          : Array.isArray(content)
+            ? (content as unknown as Anthropic.Messages.ToolResultBlockParam["content"])
+            : JSON.stringify(content);
       await base.append([{
         id,
         message: {
@@ -150,7 +157,7 @@ export function createAnthropicThreadManager(
           content: [{
             type: "tool_result" as const,
             tool_use_id: toolCallId,
-            content,
+            content: toolContent,
           }],
         },
       }]);
