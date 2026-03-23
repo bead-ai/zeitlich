@@ -1,5 +1,4 @@
 import type {
-  ToolMessageContent,
   TokenUsage,
   ToolResultConfig,
 } from "../types";
@@ -128,7 +127,7 @@ export type AppendToolResultFn = ActivityFunctionWithOptions<
  */
 export interface ToolHandlerResponse<TResult = null> {
   /** Content sent back to the LLM as the tool call response */
-  toolResponse: ToolMessageContent;
+  toolResponse: string;
   /** Data returned to the workflow and hooks for further processing */
   data: TResult;
   /**
@@ -288,7 +287,7 @@ export interface PreToolUseHookResult {
  */
 export interface PostToolUseFailureHookResult {
   /** Provide a fallback result instead of throwing */
-  fallbackContent?: ToolMessageContent;
+  fallbackContent?: string;
   /** Whether to suppress the error (still logs, but continues) */
   suppress?: boolean;
 }

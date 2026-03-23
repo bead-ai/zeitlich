@@ -2,10 +2,14 @@ import type Redis from "ioredis";
 import type Anthropic from "@anthropic-ai/sdk";
 import {
   createThreadManager,
-  type BaseThreadManager,
+  type ProviderThreadManager,
   type ThreadManagerConfig,
 } from "../../../lib/thread";
-import type { MessageContent, ToolMessageContent } from "../../../lib/types";
+
+/** SDK-native content type for Anthropic human messages */
+export type AnthropicContent =
+  | string
+  | Anthropic.Messages.ContentBlockParam[];
 
 /** A MessageParam with a unique ID for idempotent Redis storage */
 export interface StoredMessage {
@@ -22,80 +26,65 @@ export interface AnthropicThreadManagerConfig {
   key?: string;
 }
 
+/** Prepared payload ready to send to the Anthropic API */
+export interface AnthropicInvocationPayload {
+  messages: Anthropic.Messages.MessageParam[];
+  system?: string;
+}
+
 /** Thread manager with Anthropic MessageParam convenience helpers */
 export interface AnthropicThreadManager
-  extends BaseThreadManager<StoredMessage> {
-  createUserMessage(
-    id: string,
-    content: string | MessageContent
-  ): StoredMessage;
-  createSystemMessage(id: string, content: string): StoredMessage;
-  createAssistantMessage(
-    id: string,
-    content: Anthropic.Messages.ContentBlock[]
-  ): StoredMessage;
-  createToolResultMessage(
-    id: string,
-    toolCallId: string,
-    toolName: string,
-    content: ToolMessageContent
-  ): StoredMessage;
-  appendUserMessage(
-    id: string,
-    content: string | MessageContent
-  ): Promise<void>;
-  appendSystemMessage(id: string, content: string): Promise<void>;
+  extends ProviderThreadManager<StoredMessage, AnthropicContent> {
   appendAssistantMessage(
     id: string,
-    content: Anthropic.Messages.ContentBlock[]
+    content: Anthropic.Messages.ContentBlock[],
   ): Promise<void>;
-  appendToolResult(
-    id: string,
-    toolCallId: string,
-    toolName: string,
-    content: ToolMessageContent
-  ): Promise<void>;
+  prepareForInvocation(): Promise<AnthropicInvocationPayload>;
 }
 
 function storedMessageId(msg: StoredMessage): string {
   return msg.id;
 }
 
-/** Convert zeitlich MessageContent to Anthropic content blocks */
-export function messageContentToBlocks(
-  content: string | MessageContent
+/** Normalise content into an array of ContentBlockParam */
+function toContentBlocks(
+  content: AnthropicContent,
 ): Anthropic.Messages.ContentBlockParam[] {
   if (typeof content === "string") {
     return [{ type: "text", text: content }];
   }
-  if (Array.isArray(content)) {
-    return content.map((part) => {
-      if (part.type === "text") {
-        return { type: "text" as const, text: part.text as string };
-      }
-      if (part.type === "image") {
-        return part as unknown as Anthropic.Messages.ContentBlockParam;
-      }
-      return part as unknown as Anthropic.Messages.ContentBlockParam;
-    });
-  }
-  return [{ type: "text", text: String(content) }];
+  return content;
 }
 
-/** Convert ToolMessageContent to Anthropic tool result content */
-function toolContentToBlocks(
-  content: ToolMessageContent
-): string | Anthropic.Messages.TextBlockParam[] {
-  if (typeof content === "string") {
-    return content;
+/**
+ * Merge consecutive messages with the same role.
+ * The Anthropic API requires alternating user/assistant turns; without
+ * merging, multiple sequential tool-result messages would violate this.
+ */
+function mergeConsecutiveMessages(
+  messages: Anthropic.Messages.MessageParam[],
+): Anthropic.Messages.MessageParam[] {
+  const merged: Anthropic.Messages.MessageParam[] = [];
+  for (const msg of messages) {
+    const last = merged[merged.length - 1];
+    if (last && last.role === msg.role) {
+      const lastContent = Array.isArray(last.content)
+        ? last.content
+        : [{ type: "text" as const, text: last.content }];
+      const msgContent = Array.isArray(msg.content)
+        ? msg.content
+        : [{ type: "text" as const, text: msg.content }];
+      last.content = [...lastContent, ...msgContent];
+    } else {
+      merged.push({
+        ...msg,
+        content: Array.isArray(msg.content)
+          ? [...msg.content]
+          : msg.content,
+      });
+    }
   }
-  if (Array.isArray(content)) {
-    return content.map((part) => ({
-      type: "text" as const,
-      text: part.type === "text" ? (part.text as string) : JSON.stringify(part),
-    }));
-  }
-  return String(content);
+  return merged;
 }
 
 /**
@@ -104,7 +93,7 @@ function toolContentToBlocks(
  * appending typed messages.
  */
 export function createAnthropicThreadManager(
-  config: AnthropicThreadManagerConfig
+  config: AnthropicThreadManagerConfig,
 ): AnthropicThreadManager {
   const baseConfig: ThreadManagerConfig<StoredMessage> = {
     redis: config.redis,
@@ -115,90 +104,79 @@ export function createAnthropicThreadManager(
 
   const base = createThreadManager(baseConfig);
 
-  const helpers = {
-    createUserMessage(
+  const helpers: Omit<AnthropicThreadManager, keyof typeof base> = {
+    async appendUserMessage(
       id: string,
-      content: string | MessageContent
-    ): StoredMessage {
-      return {
+      content: AnthropicContent,
+    ): Promise<void> {
+      await base.append([{
         id,
-        message: {
-          role: "user",
-          content: messageContentToBlocks(content),
-        },
-      };
+        message: { role: "user", content: toContentBlocks(content) },
+      }]);
     },
 
-    createSystemMessage(id: string, content: string): StoredMessage {
-      return {
+    async appendSystemMessage(id: string, content: string): Promise<void> {
+      await base.initialize();
+      await base.append([{
         id,
-        message: { role: "user", content: content },
+        message: { role: "user", content },
         isSystem: true,
-      };
+      }]);
     },
 
-    createAssistantMessage(
+    async appendAssistantMessage(
       id: string,
-      content: Anthropic.Messages.ContentBlock[]
-    ): StoredMessage {
-      return {
+      content: Anthropic.Messages.ContentBlock[],
+    ): Promise<void> {
+      await base.append([{
         id,
         message: {
           role: "assistant",
           content: content as unknown as Anthropic.Messages.ContentBlockParam[],
         },
-      };
-    },
-
-    createToolResultMessage(
-      id: string,
-      toolCallId: string,
-      _toolName: string,
-      content: ToolMessageContent
-    ): StoredMessage {
-      return {
-        id,
-        message: {
-          role: "user",
-          content: [
-            {
-              type: "tool_result" as const,
-              tool_use_id: toolCallId,
-              content: toolContentToBlocks(content),
-            },
-          ],
-        },
-      };
-    },
-
-    async appendUserMessage(
-      id: string,
-      content: string | MessageContent
-    ): Promise<void> {
-      await base.append([helpers.createUserMessage(id, content)]);
-    },
-
-    async appendSystemMessage(id: string, content: string): Promise<void> {
-      await base.initialize();
-      await base.append([helpers.createSystemMessage(id, content)]);
-    },
-
-    async appendAssistantMessage(
-      id: string,
-      content: Anthropic.Messages.ContentBlock[]
-    ): Promise<void> {
-      await base.append([helpers.createAssistantMessage(id, content)]);
+      }]);
     },
 
     async appendToolResult(
       id: string,
       toolCallId: string,
-      toolName: string,
-      content: ToolMessageContent
+      _toolName: string,
+      content: string,
     ): Promise<void> {
-      await base.append([
-        helpers.createToolResultMessage(id, toolCallId, toolName, content),
-      ]);
+      await base.append([{
+        id,
+        message: {
+          role: "user",
+          content: [{
+            type: "tool_result" as const,
+            tool_use_id: toolCallId,
+            content,
+          }],
+        },
+      }]);
+    },
+
+    async prepareForInvocation(): Promise<AnthropicInvocationPayload> {
+      const stored = await base.load();
+
+      let system: string | undefined;
+      const conversationMessages: Anthropic.Messages.MessageParam[] = [];
+
+      for (const item of stored) {
+        if (item.isSystem) {
+          system =
+            typeof item.message.content === "string"
+              ? item.message.content
+              : undefined;
+        } else {
+          conversationMessages.push(item.message);
+        }
+      }
+
+      return {
+        messages: mergeConsecutiveMessages(conversationMessages),
+        ...(system ? { system } : {}),
+      };
     },
   };
 

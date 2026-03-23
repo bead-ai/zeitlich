@@ -2,10 +2,12 @@ import type Redis from "ioredis";
 import type { Content, Part } from "@google/genai";
 import {
   createThreadManager,
-  type BaseThreadManager,
+  type ProviderThreadManager,
   type ThreadManagerConfig,
 } from "../../../lib/thread";
-import type { MessageContent, ToolMessageContent } from "../../../lib/types";
+
+/** SDK-native content type for Google GenAI human messages */
+export type GoogleGenAIContent = string | Part[];
 
 /** A Content with a unique ID for idempotent Redis storage */
 export interface StoredContent {
@@ -20,71 +22,59 @@ export interface GoogleGenAIThreadManagerConfig {
   key?: string;
 }
 
+/** Prepared payload ready to send to the Google GenAI API */
+export interface GoogleGenAIInvocationPayload {
+  contents: Content[];
+  systemInstruction?: string;
+}
+
 /** Thread manager with Google GenAI Content convenience helpers */
-export interface GoogleGenAIThreadManager extends BaseThreadManager<StoredContent> {
-  createUserContent(
-    id: string,
-    content: string | MessageContent
-  ): StoredContent;
-  createSystemContent(id: string, content: string): StoredContent;
-  createModelContent(id: string, parts: Part[]): StoredContent;
-  createToolResponseContent(
-    id: string,
-    toolCallId: string,
-    toolName: string,
-    content: ToolMessageContent
-  ): StoredContent;
-  appendUserMessage(
-    id: string,
-    content: string | MessageContent
-  ): Promise<void>;
-  appendSystemMessage(id: string, content: string): Promise<void>;
+export interface GoogleGenAIThreadManager
+  extends ProviderThreadManager<StoredContent, GoogleGenAIContent> {
   appendModelContent(id: string, parts: Part[]): Promise<void>;
-  appendToolResult(
-    id: string,
-    toolCallId: string,
-    toolName: string,
-    content: ToolMessageContent
-  ): Promise<void>;
+  prepareForInvocation(): Promise<GoogleGenAIInvocationPayload>;
 }
 
 function storedContentId(msg: StoredContent): string {
   return msg.id;
 }
 
-/** Convert zeitlich MessageContent to Google GenAI Part[] */
-export function messageContentToParts(
-  content: string | MessageContent
-): Part[] {
+/** Normalise content into Part[] */
+function toParts(content: GoogleGenAIContent): Part[] {
   if (typeof content === "string") {
     return [{ text: content }];
   }
-  if (Array.isArray(content)) {
-    return content.map((part) => {
-      if (part.type === "text") {
-        return { text: part.text as string };
-      }
-      return part as unknown as Part;
-    });
-  }
-  return [{ text: String(content) }];
+  return content;
 }
 
-/** Parse ToolMessageContent into a Record suitable for functionResponse */
-function parseToolResponse(
-  content: ToolMessageContent
-): Record<string, unknown> {
-  if (typeof content === "string") {
-    try {
-      const parsed: unknown = JSON.parse(content);
-      return typeof parsed === "object" && parsed !== null
-        ? (parsed as Record<string, unknown>)
-        : { result: content };
-    } catch {
-      return { result: content };
+/** Parse tool response string into a Record suitable for functionResponse */
+function parseToolResponse(content: string): Record<string, unknown> {
+  try {
+    const parsed: unknown = JSON.parse(content);
+    return typeof parsed === "object" && parsed !== null
+      ? (parsed as Record<string, unknown>)
+      : { result: content };
+  } catch {
+    return { result: content };
+  }
+}
+
+/**
+ * Merge consecutive Content objects sharing the same role.
+ * The Gemini API requires alternating user/model turns; without
+ * merging, multiple sequential tool-result messages would violate this.
+ */
+function mergeConsecutiveContents(contents: Content[]): Content[] {
+  const merged: Content[] = [];
+  for (const content of contents) {
+    const last = merged[merged.length - 1];
+    if (last && last.role === content.role) {
+      last.parts = [...(last.parts ?? []), ...(content.parts ?? [])];
+    } else {
+      merged.push({ ...content, parts: [...(content.parts ?? [])] });
     }
   }
-  return { result: content };
+  return merged;
 }
 
 /**
@@ -93,7 +83,7 @@ function parseToolResponse(
  * appending typed Content messages.
  */
 export function createGoogleGenAIThreadManager(
-  config: GoogleGenAIThreadManagerConfig
+  config: GoogleGenAIThreadManagerConfig,
 ): GoogleGenAIThreadManager {
   const baseConfig: ThreadManagerConfig<StoredContent> = {
     redis: config.redis,
@@ -104,79 +94,71 @@ export function createGoogleGenAIThreadManager(
 
   const base = createThreadManager(baseConfig);
 
-  const helpers = {
-    createUserContent(
-      id: string,
-      content: string | MessageContent
-    ): StoredContent {
-      return {
-        id,
-        content: { role: "user", parts: messageContentToParts(content) },
-      };
-    },
-
-    createSystemContent(id: string, content: string): StoredContent {
-      return {
-        id,
-        content: { role: "system", parts: [{ text: content }] },
-      };
-    },
-
-    createModelContent(id: string, parts: Part[]): StoredContent {
-      return {
-        id,
-        content: { role: "model", parts },
-      };
-    },
-
-    createToolResponseContent(
-      id: string,
-      toolCallId: string,
-      toolName: string,
-      content: ToolMessageContent
-    ): StoredContent {
-      return {
-        id,
-        content: {
-          role: "user",
-          parts: [
-            {
-              functionResponse: {
-                id: toolCallId,
-                name: toolName,
-                response: parseToolResponse(content),
-              },
-            },
-          ],
-        },
-      };
-    },
-
+  const helpers: Omit<GoogleGenAIThreadManager, keyof typeof base> = {
     async appendUserMessage(
       id: string,
-      content: string | MessageContent
+      content: GoogleGenAIContent,
     ): Promise<void> {
-      await base.append([helpers.createUserContent(id, content)]);
+      await base.append([{
+        id,
+        content: { role: "user", parts: toParts(content) },
+      }]);
     },
 
     async appendSystemMessage(id: string, content: string): Promise<void> {
       await base.initialize();
-      await base.append([helpers.createSystemContent(id, content)]);
+      await base.append([{
+        id,
+        content: { role: "system", parts: [{ text: content }] },
+      }]);
     },
 
     async appendModelContent(id: string, parts: Part[]): Promise<void> {
-      await base.append([helpers.createModelContent(id, parts)]);
+      await base.append([{
+        id,
+        content: { role: "model", parts },
+      }]);
     },
 
     async appendToolResult(
       id: string,
       toolCallId: string,
       toolName: string,
-      content: ToolMessageContent
+      content: string,
     ): Promise<void> {
-      await base.append([
-        helpers.createToolResponseContent(id, toolCallId, toolName, content),
-      ]);
+      await base.append([{
+        id,
+        content: {
+          role: "user",
+          parts: [{
+            functionResponse: {
+              id: toolCallId,
+              name: toolName,
+              response: parseToolResponse(content),
+            },
+          }],
+        },
+      }]);
+    },
+
+    async prepareForInvocation(): Promise<GoogleGenAIInvocationPayload> {
+      const stored = await base.load();
+
+      let systemInstruction: string | undefined;
+      const conversationContents: Content[] = [];
+
+      for (const item of stored) {
+        if (item.content.role === "system") {
+          systemInstruction = item.content.parts?.[0]?.text;
+        } else {
+          conversationContents.push(item.content);
+        }
+      }
+
+      return {
+        contents: mergeConsecutiveContents(conversationContents),
+        ...(systemInstruction ? { systemInstruction } : {}),
+      };
     },
   };
 

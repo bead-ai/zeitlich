@@ -14,44 +14,13 @@ export interface AnthropicModelInvokerConfig {
 }
 
 function toAnthropicTools(
-  tools: SerializableToolDefinition[]
+  tools: SerializableToolDefinition[],
 ): Anthropic.Messages.Tool[] {
   return tools.map((t) => ({
     name: t.name,
     description: t.description,
     input_schema: t.schema as Anthropic.Messages.Tool.InputSchema,
   }));
-}
-
-/**
- * Merge consecutive messages with the same role.
- * The Anthropic API requires alternating user/assistant turns; without
- * merging, multiple sequential tool-result messages would violate this.
- */
-function mergeConsecutiveMessages(
-  messages: Anthropic.Messages.MessageParam[]
-): Anthropic.Messages.MessageParam[] {
-  const merged: Anthropic.Messages.MessageParam[] = [];
-  for (const msg of messages) {
-    const last = merged[merged.length - 1];
-    if (last && last.role === msg.role) {
-      const lastContent = Array.isArray(last.content)
-        ? last.content
-        : [{ type: "text" as const, text: last.content }];
-      const msgContent = Array.isArray(msg.content)
-        ? msg.content
-        : [{ type: "text" as const, text: msg.content }];
-      last.content = [...lastContent, ...msgContent];
-    } else {
-      merged.push({
-        ...msg,
-        content: Array.isArray(msg.content)
-          ? [...msg.content]
-          : msg.content,
-      });
-    }
-  }
-  return merged;
 }
 
 /**
@@ -85,28 +54,12 @@ export function createAnthropicModelInvoker({
   maxTokens = 16384,
 }: AnthropicModelInvokerConfig) {
   return async function invokeAnthropicModel(
-    config: ModelInvokerConfig
+    config: ModelInvokerConfig,
   ): Promise<AgentResponse<Anthropic.Messages.Message>> {
     const { threadId, state } = config;
 
     const thread = createAnthropicThreadManager({ redis, threadId });
-    const stored = await thread.load();
-
-    let system: string | undefined;
-    const conversationMessages: Anthropic.Messages.MessageParam[] = [];
-
-    for (const item of stored) {
-      if (item.isSystem) {
-        system =
-          typeof item.message.content === "string"
-            ? item.message.content
-            : undefined;
-      } else {
-        conversationMessages.push(item.message);
-      }
-    }
-
-    const messages = mergeConsecutiveMessages(conversationMessages);
+    const { messages, system } = await thread.prepareForInvocation();
 
     const anthropicTools = toAnthropicTools(state.tools);
     const tools = anthropicTools.length > 0 ? anthropicTools : undefined;
@@ -123,7 +76,7 @@ export function createAnthropicModelInvoker({
 
     const toolCalls = response.content.filter(
       (block): block is Anthropic.Messages.ToolUseBlock =>
-        block.type === "tool_use"
+        block.type === "tool_use",
     );
 
     return {

@@ -1,4 +1,3 @@
-import type { ToolMessageContent } from "../types";
 import type {
   ToolMap,
   ToolDefinition,
@@ -118,7 +117,7 @@ export function createToolRouter<T extends ToolMap>(
     error: unknown,
     effectiveArgs: unknown,
     turn: number
-  ): Promise<{ content: ToolMessageContent; result: unknown }> {
+  ): Promise<{ content: string; result: unknown }> {
     const err = error instanceof Error ? error : new Error(String(error));
     const errorStr = String(error);
 
@@ -225,7 +224,7 @@ export function createToolRouter<T extends ToolMap>(
 
     // --- Execute handler ---
     let result: unknown;
-    let content!: ToolMessageContent;
+    let content!: string;
     let resultAppended = false;
     let metadata: Record<string, unknown> | undefined;
 

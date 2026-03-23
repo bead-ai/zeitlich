@@ -1,6 +1,5 @@
 import type Redis from "ioredis";
 import type { ToolResultConfig } from "../../../lib/types";
-import type { MessageContent } from "@langchain/core/messages";
 import type {
   ThreadOps,
   PrefixedThreadOps,
@@ -9,13 +8,16 @@ import type {
 import type { ModelInvoker } from "../../../lib/model";
 import type { StoredMessage } from "@langchain/core/messages";
 import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
-import { createLangChainThreadManager } from "./thread-manager";
+import {
+  createLangChainThreadManager,
+  type LangChainContent,
+} from "./thread-manager";
 import { createLangChainModelInvoker } from "./model-invoker";
 
 const ADAPTER_PREFIX = "langChain" as const;
 
 export type LangChainThreadOps<TScope extends string = ""> =
-  PrefixedThreadOps<ScopedPrefix<TScope, typeof ADAPTER_PREFIX>>;
+  PrefixedThreadOps<ScopedPrefix<TScope, typeof ADAPTER_PREFIX>, LangChainContent>;
 
 export interface LangChainAdapterConfig {
   redis: Redis;
@@ -42,7 +44,7 @@ export interface LangChainAdapter {
    * ```
    */
   createActivities<S extends string = "">(
-    scope?: S
+    scope?: S,
   ): LangChainThreadOps<S>;
 }
 
@@ -82,11 +84,11 @@ export interface LangChainAdapter {
  * ```
  */
 export function createLangChainAdapter(
-  config: LangChainAdapterConfig
+  config: LangChainAdapterConfig,
 ): LangChainAdapter {
   const { redis } = config;
 
-  const threadOps: ThreadOps = {
+  const threadOps: ThreadOps<LangChainContent> = {
     async initializeThread(threadId: string): Promise<void> {
       const thread = createLangChainThreadManager({ redis, threadId });
       await thread.initialize();
@@ -95,16 +97,16 @@ export function createLangChainAdapter(
     async appendHumanMessage(
       threadId: string,
       id: string,
-      content: string | MessageContent
+      content: LangChainContent,
     ): Promise<void> {
       const thread = createLangChainThreadManager({ redis, threadId });
-      await thread.appendHumanMessage(id, content);
+      await thread.appendUserMessage(id, content);
     },
 
     async appendSystemMessage(
       threadId: string,
       id: string,
-      content: string
+      content: string,
     ): Promise<void> {
       const thread = createLangChainThreadManager({ redis, threadId });
       await thread.appendSystemMessage(id, content);
@@ -113,12 +115,12 @@ export function createLangChainAdapter(
     async appendToolResult(id: string, cfg: ToolResultConfig): Promise<void> {
       const { threadId, toolCallId, content } = cfg;
       const thread = createLangChainThreadManager({ redis, threadId });
-      await thread.appendToolMessage(id, content, toolCallId);
+      await thread.appendToolResult(id, toolCallId, "", content);
     },
 
     async forkThread(
       sourceThreadId: string,
-      targetThreadId: string
+      targetThreadId: string,
     ): Promise<void> {
       const thread = createLangChainThreadManager({
         redis,
@@ -129,7 +131,7 @@ export function createLangChainAdapter(
   };
 
   function createActivities<S extends string = "">(
-    scope?: S
+    scope?: S,
   ): LangChainThreadOps<S> {
     const prefix = scope
       ? `${ADAPTER_PREFIX}${scope.charAt(0).toUpperCase()}${scope.slice(1)}`
@@ -137,13 +139,13 @@ export function createLangChainAdapter(
     const cap = (s: string): string =>
       s.charAt(0).toUpperCase() + s.slice(1);
     return Object.fromEntries(
-      Object.entries(threadOps).map(([k, v]) => [`${prefix}${cap(k)}`, v])
+      Object.entries(threadOps).map(([k, v]) => [`${prefix}${cap(k)}`, v]),
     ) as LangChainThreadOps<S>;
   }
 
   const makeInvoker = (
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    model: BaseChatModel<any>
+    model: BaseChatModel<any>,
   ): ModelInvoker<StoredMessage> =>
     createLangChainModelInvoker({ redis, model });
 
@@ -152,7 +154,7 @@ export function createLangChainAdapter(
     : () => {
         throw new Error(
           "No default model provided to createLangChainAdapter. " +
-            "Either pass `model` in the config or use `createModelInvoker(model)` instead."
+            "Either pass `model` in the config or use `createModelInvoker(model)` instead.",
         );
       };
 

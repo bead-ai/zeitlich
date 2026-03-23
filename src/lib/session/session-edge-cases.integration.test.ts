@@ -60,7 +60,7 @@ type TurnScript = {
  * Wraps every method on a ThreadOps object so it also has `.executeWithOptions()`,
  * matching Temporal's `ActivityInterfaceFor<ThreadOps>` shape.
  */
-function toActivityInterface(raw: ThreadOps): ActivityInterfaceFor<ThreadOps> {
+function toActivityInterface<TContent = string>(raw: ThreadOps<TContent>): ActivityInterfaceFor<ThreadOps<TContent>> {
   const result = {} as Record<string, unknown>;
   for (const [key, fn] of Object.entries(raw)) {
     const wrapped = (...args: unknown[]) =>
@@ -69,7 +69,7 @@ function toActivityInterface(raw: ThreadOps): ActivityInterfaceFor<ThreadOps> {
       (fn as (...a: unknown[]) => unknown)(...args);
     result[key] = wrapped;
   }
-  return result as ActivityInterfaceFor<ThreadOps>;
+  return result as ActivityInterfaceFor<ThreadOps<TContent>>;
 }
 
 function createMockThreadOps() {
@@ -733,12 +733,30 @@ describe("createSession edge cases", () => {
     ).toBe(true);
   });
 
-  // --- buildContextMessage returns ContentPart[] ---
+  // --- buildContextMessage returns SDK-native content (non-string) ---
 
-  it("handles buildContextMessage returning ContentPart array", async () => {
-    const { ops, log } = createMockThreadOps();
+  it("handles buildContextMessage returning SDK-native content array", async () => {
+    type TestContent = string | { type: string; [key: string]: unknown }[];
+    const log: { op: string; args: unknown[] }[] = [];
+    const ops = toActivityInterface<TestContent>({
+      initializeThread: async (threadId) => {
+        log.push({ op: "initializeThread", args: [threadId] });
+      },
+      appendHumanMessage: async (threadId, id, content) => {
+        log.push({ op: "appendHumanMessage", args: [threadId, id, content] });
+      },
+      appendToolResult: async (id, config) => {
+        log.push({ op: "appendToolResult", args: [id, config] });
+      },
+      appendSystemMessage: async (threadId, id, content) => {
+        log.push({ op: "appendSystemMessage", args: [threadId, id, content] });
+      },
+      forkThread: async (source, target) => {
+        log.push({ op: "forkThread", args: [source, target] });
+      },
+    });
 
-    const session = await createSession({
+    const session = await createSession<Record<string, never>, unknown, TestContent>({
       agentName: "TestAgent",
       thread: { mode: "new", threadId: "thread-1" },
       runAgent: createScriptedRunAgent([{ message: "done", toolCalls: [] }]),

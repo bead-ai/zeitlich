@@ -28,9 +28,10 @@ export {
 // Thread manager
 export {
   createGoogleGenAIThreadManager,
-  messageContentToParts,
   type GoogleGenAIThreadManager,
   type GoogleGenAIThreadManagerConfig,
+  type GoogleGenAIContent,
+  type GoogleGenAIInvocationPayload,
   type StoredContent,
 } from "./thread-manager";
 

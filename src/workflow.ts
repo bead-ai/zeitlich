@@ -95,10 +95,6 @@ export type {
 
 // Core types
 export type {
-  // Message types (framework-agnostic)
-  ContentPart,
-  MessageContent,
-  ToolMessageContent,
   TokenUsage,
   // Agent types
   AgentStatus,

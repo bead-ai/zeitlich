@@ -7,7 +7,6 @@ import {
 } from "@temporalio/workflow";
 import { getShortId } from "../thread/id";
 import type { ToolHandlerResponse, RouterContext } from "../tool-router";
-import type { ToolMessageContent } from "../types";
 import type {
   InferSubagentResult,
   SubagentConfig,
@@ -208,13 +207,10 @@ export function createSubagentHandler<
       };
     }
 
-    let finalToolResponse: ToolMessageContent = toolResponse;
+    let finalToolResponse: string = toolResponse;
 
     if (allowsContinuation && childThreadId) {
-      finalToolResponse =
-        typeof toolResponse === "string"
-          ? `${toolResponse}\n\n[${config.agentName} Thread ID: ${childThreadId}]`
-          : toolResponse;
+      finalToolResponse = `${toolResponse}\n\n[${config.agentName} Thread ID: ${childThreadId}]`;
     }
 
     return {

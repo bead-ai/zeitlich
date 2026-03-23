@@ -1,4 +1,4 @@
-import type { MessageContent, SessionExitReason } from "../types";
+import type { SessionExitReason } from "../types";
 import type {
   ToolMap,
   ToolRouterHooks,
@@ -49,31 +49,31 @@ export type SessionEndHook = (
 /**
  * Context for PreHumanMessageAppend hook - called before each human message is appended to the thread
  */
-export interface PreHumanMessageAppendHookContext {
-  message: MessageContent;
+export interface PreHumanMessageAppendHookContext<TContent = unknown> {
+  message: TContent;
   threadId: string;
 }
 
 /**
  * PreHumanMessageAppend hook - called before each human message is appended to the thread
  */
-export type PreHumanMessageAppendHook = (
-  ctx: PreHumanMessageAppendHookContext
+export type PreHumanMessageAppendHook<TContent = unknown> = (
+  ctx: PreHumanMessageAppendHookContext<TContent>
 ) => void | Promise<void>;
 
 /**
  * Context for PostHumanMessageAppend hook - called after each human message is appended to the thread
  */
-export interface PostHumanMessageAppendHookContext {
-  message: MessageContent;
+export interface PostHumanMessageAppendHookContext<TContent = unknown> {
+  message: TContent;
   threadId: string;
 }
 
 /**
  * PostHumanMessageAppend hook - called after each human message is appended to the thread
  */
-export type PostHumanMessageAppendHook = (
-  ctx: PostHumanMessageAppendHookContext
+export type PostHumanMessageAppendHook<TContent = unknown> = (
+  ctx: PostHumanMessageAppendHookContext<TContent>
 ) => void | Promise<void>;
 
 // ============================================================================
@@ -85,12 +85,12 @@ export type PostHumanMessageAppendHook = (
  * (consumed by the router) with session/message lifecycle hooks
  * (consumed directly by the session).
  */
-export interface Hooks<T extends ToolMap, TResult = unknown>
+export interface Hooks<T extends ToolMap, TResult = unknown, TContent = unknown>
   extends ToolRouterHooks<T, TResult> {
   /** Called before each human message is appended to the thread */
-  onPreHumanMessageAppend?: PreHumanMessageAppendHook;
+  onPreHumanMessageAppend?: PreHumanMessageAppendHook<TContent>;
   /** Called after each human message is appended to the thread */
-  onPostHumanMessageAppend?: PostHumanMessageAppendHook;
+  onPostHumanMessageAppend?: PostHumanMessageAppendHook<TContent>;
   /** Called when session starts */
   onSessionStart?: SessionStartHook;
   /** Called when session ends */

@@ -1,6 +1,5 @@
 import type { Duration } from "@temporalio/common";
 import type {
-  MessageContent,
   ToolResultConfig,
   SessionExitReason,
 } from "../types";
@@ -21,15 +20,19 @@ import type { ThreadInit, SandboxInit, SubagentSandboxShutdown } from "../lifecy
 /**
  * Thread operations required by a session.
  * Consumers provide these — typically by wrapping Temporal activities.
+ *
+ * `TContent` is the SDK-native content type for human messages.
+ * Each adapter supplies its own type (e.g. Anthropic ContentBlockParam[],
+ * Google GenAI Part[], LangChain MessageContent). Defaults to `string`.
  */
-export interface ThreadOps {
+export interface ThreadOps<TContent = string> {
   /** Initialize an empty thread */
   initializeThread(threadId: string): Promise<void>;
   /** Append a human message to the thread */
   appendHumanMessage(
     threadId: string,
     id: string,
-    content: string | MessageContent
+    content: TContent
   ): Promise<void>;
   /** Append a tool result to the thread */
   appendToolResult(id: string, config: ToolResultConfig): Promise<void>;
@@ -70,14 +73,18 @@ export type ScopedPrefix<
  * // → { googleGenAIInitializeThread, googleGenAIAppendHumanMessage, … }
  * ```
  */
-export type PrefixedThreadOps<TPrefix extends string> = {
-  [K in keyof ThreadOps as `${TPrefix}${Capitalize<K & string>}`]: ThreadOps[K];
+export type PrefixedThreadOps<TPrefix extends string, TContent = string> = {
+  [K in keyof ThreadOps<TContent> as `${TPrefix}${Capitalize<K & string>}`]: ThreadOps<TContent>[K];
 };
 
 /**
- * Configuration for a Zeitlich agent session
+ * Configuration for a Zeitlich agent session.
+ *
+ * @typeParam T - Tool map
+ * @typeParam M - SDK-native message type returned by the model invoker
+ * @typeParam TContent - SDK-native content type for human messages (defaults to `string`)
  */
-export interface SessionConfig<T extends ToolMap, M = unknown> {
+export interface SessionConfig<T extends ToolMap, M = unknown, TContent = string> {
   /** The name of the agent, should be unique within the workflows */
   agentName: string;
   /** Metadata for the session */
@@ -89,7 +96,7 @@ export interface SessionConfig<T extends ToolMap, M = unknown> {
   /** Workflow-specific runAgent activity (with tools pre-bound) */
   runAgent: RunAgentActivity<M>;
   /** Thread operations (initialize, append messages, parse tool calls) */
-  threadOps: ActivityInterfaceFor<ThreadOps>;
+  threadOps: ActivityInterfaceFor<ThreadOps<TContent>>;
   /** Tool router for processing tool calls (optional if agent has no tools) */
   tools?: T;
   /** Subagent configurations */
@@ -97,14 +104,14 @@ export interface SessionConfig<T extends ToolMap, M = unknown> {
   /** Skills available to this agent (metadata + instructions, loaded before session creation) */
   skills?: Skill[];
   /** Session lifecycle hooks */
-  hooks?: Hooks<T, ToolCallResultUnion<InferToolResults<T>>>;
+  hooks?: Hooks<T, ToolCallResultUnion<InferToolResults<T>>, TContent>;
   /** Whether to process tools in parallel */
   processToolsInParallel?: boolean;
   /**
    * Build context message content from agent-specific context.
-   * Returns MessageContent array for the initial HumanMessage.
+   * Returns SDK-native content for the initial human message.
    */
-  buildContextMessage: () => MessageContent | Promise<MessageContent>;
+  buildContextMessage: () => TContent | Promise<TContent>;
   /** How long to wait for input before cancelling the workflow */
   waitForInputTimeout?: Duration;
 

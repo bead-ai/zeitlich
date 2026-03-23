@@ -1,17 +1,4 @@
 // ============================================================================
-// Framework-agnostic message types
-// ============================================================================
-
-/** A single content part within a structured message (text, image, etc.) */
-export type ContentPart = { type: string; [key: string]: unknown };
-
-/** Message content — plain string or an array of structured content parts */
-export type MessageContent = string | ContentPart[];
-
-/** Content returned by a tool handler */
-export type ToolMessageContent = MessageContent;
-
-// ============================================================================
 // Agent core types
 // ============================================================================
 
@@ -106,8 +93,8 @@ export interface ToolResultConfig {
   toolCallId: string;
   /** The name of the tool that produced this result */
   toolName: string;
-  /** Content for the tool message (string or complex content parts) */
-  content: ToolMessageContent;
+  /** Content for the tool message (JSON-serialized result) */
+  content: string;
 }
 
 // ============================================================================

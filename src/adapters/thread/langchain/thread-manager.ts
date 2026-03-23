@@ -1,24 +1,22 @@
 import type Redis from "ioredis";
 import {
-  type $InferMessageContent,
   AIMessage,
+  type BaseMessage,
   HumanMessage,
   type MessageContent,
-  type MessageStructure,
   type StoredMessage,
   SystemMessage,
   ToolMessage,
+  mapStoredMessagesToChatMessages,
 } from "@langchain/core/messages";
 import {
   createThreadManager,
-  type BaseThreadManager,
+  type ProviderThreadManager,
   type ThreadManagerConfig,
 } from "../../../lib/thread";
 
-export type LangChainToolMessageContent = $InferMessageContent<
-  MessageStructure,
-  "tool"
->;
+/** SDK-native content type for LangChain human messages */
+export type LangChainContent = string | MessageContent;
 
 export interface LangChainThreadManagerConfig {
   redis: Redis;
@@ -27,34 +25,16 @@ export interface LangChainThreadManagerConfig {
   key?: string;
 }
 
+/** Prepared payload ready to send to a LangChain chat model */
+export interface LangChainInvocationPayload {
+  messages: BaseMessage[];
+}
+
 /** Thread manager with LangChain StoredMessage convenience helpers */
-export interface LangChainThreadManager extends BaseThreadManager<StoredMessage> {
-  createHumanMessage(
-    id: string,
-    content: string | MessageContent
-  ): StoredMessage;
-  createSystemMessage(id: string, content: string): StoredMessage;
-  createAIMessage(
-    id: string,
-    content: string | MessageContent,
-    kwargs?: { header?: string; options?: string[]; multiSelect?: boolean }
-  ): StoredMessage;
-  createToolMessage(
-    id: string,
-    content: LangChainToolMessageContent,
-    toolCallId: string
-  ): StoredMessage;
-  appendHumanMessage(
-    id: string,
-    content: string | MessageContent
-  ): Promise<void>;
-  appendSystemMessage(id: string, content: string): Promise<void>;
-  appendToolMessage(
-    id: string,
-    content: LangChainToolMessageContent,
-    toolCallId: string
-  ): Promise<void>;
+export interface LangChainThreadManager
+  extends ProviderThreadManager<StoredMessage, LangChainContent> {
   appendAIMessage(id: string, content: string | MessageContent): Promise<void>;
+  prepareForInvocation(): Promise<LangChainInvocationPayload>;
 }
 
 function storedMessageId(msg: StoredMessage): string {
@@ -75,7 +55,7 @@ function storedMessageId(msg: StoredMessage): string {
  * appending typed LangChain messages.
  */
 export function createLangChainThreadManager(
-  config: LangChainThreadManagerConfig
+  config: LangChainThreadManagerConfig,
 ): LangChainThreadManager {
   const baseConfig: ThreadManagerConfig<StoredMessage> = {
     redis: config.redis,
@@ -86,83 +66,48 @@ export function createLangChainThreadManager(
 
   const base = createThreadManager(baseConfig);
 
-  const helpers = {
-    createHumanMessage(
+  const helpers: Omit<LangChainThreadManager, keyof typeof base> = {
+    async appendUserMessage(
       id: string,
-      content: string | MessageContent
-    ): StoredMessage {
-      return new HumanMessage({
-        id,
-        content: content as string,
-      }).toDict();
-    },
-
-    createSystemMessage(id: string, content: string): StoredMessage {
-      return new SystemMessage({
-        id,
-        content: content as string,
-      }).toDict();
-    },
-
-    createAIMessage(
-      id: string,
-      content: string,
-      kwargs?: { header?: string; options?: string[]; multiSelect?: boolean }
-    ): StoredMessage {
-      return new AIMessage({
-        id,
-        content,
-        additional_kwargs: kwargs
-          ? {
-              header: kwargs.header,
-              options: kwargs.options,
-              multiSelect: kwargs.multiSelect,
-            }
-          : undefined,
-      }).toDict();
-    },
-
-    createToolMessage(
-      id: string,
-      content: LangChainToolMessageContent,
-      toolCallId: string
-    ): StoredMessage {
-      return new ToolMessage({
-        id,
-        content: content as MessageContent,
-        tool_call_id: toolCallId,
-      }).toDict();
-    },
-
-    async appendHumanMessage(
-      id: string,
-      content: string | MessageContent
+      content: LangChainContent,
     ): Promise<void> {
-      const message = helpers.createHumanMessage(id, content);
-      await base.append([message]);
+      await base.append([
+        new HumanMessage({ id, content: content as MessageContent }).toDict(),
+      ]);
     },
 
-    async appendToolMessage(
-      id: string,
-      content: LangChainToolMessageContent,
-      toolCallId: string
-    ): Promise<void> {
-      const message = helpers.createToolMessage(id, content, toolCallId);
-      await base.append([message]);
+    async appendSystemMessage(id: string, content: string): Promise<void> {
+      await base.initialize();
+      await base.append([
+        new SystemMessage({ id, content }).toDict(),
+      ]);
     },
 
     async appendAIMessage(
       id: string,
-      content: string | MessageContent
+      content: string | MessageContent,
     ): Promise<void> {
-      const message = helpers.createAIMessage(id, content as string);
-      await base.append([message]);
+      await base.append([
+        new AIMessage({ id, content: content as MessageContent }).toDict(),
+      ]);
     },
 
-    async appendSystemMessage(id: string, content: string): Promise<void> {
-      const message = helpers.createSystemMessage(id, content);
-      await base.initialize();
-      await base.append([message]);
+    async appendToolResult(
+      id: string,
+      _toolCallId: string,
+      _toolName: string,
+      content: string,
+    ): Promise<void> {
+      await base.append([
+        new ToolMessage({ id, content, tool_call_id: _toolCallId }).toDict(),
+      ]);
+    },
+
+    async prepareForInvocation(): Promise<LangChainInvocationPayload> {
+      const stored = await base.load();
+      return {
+        messages: mapStoredMessagesToChatMessages(stored),
+      };
     },
   };
 

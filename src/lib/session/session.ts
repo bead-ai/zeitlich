@@ -4,7 +4,7 @@ import {
   setHandler,
   ApplicationFailure,
 } from "@temporalio/workflow";
-import type { SessionExitReason, MessageContent } from "../types";
+import type { SessionExitReason } from "../types";
 import type { SessionConfig, ZeitlichSession } from "./types";
 import type { SandboxOps } from "../sandbox/types";
 import { type AgentStateManager, type JsonSerializable } from "../state/types";
@@ -66,13 +66,13 @@ function collectSkillFiles(
  * const { finalMessage, exitReason } = await session.runSession({ stateManager });
  * ```
  */
-export async function createSession<T extends ToolMap, M = unknown>(
-  config: SessionConfig<T, M> & { sandboxOps: SandboxOps }
+export async function createSession<T extends ToolMap, M = unknown, TContent = string>(
+  config: SessionConfig<T, M, TContent> & { sandboxOps: SandboxOps }
 ): Promise<ZeitlichSession<M, true>>;
-export async function createSession<T extends ToolMap, M = unknown>(
-  config: SessionConfig<T, M>
+export async function createSession<T extends ToolMap, M = unknown, TContent = string>(
+  config: SessionConfig<T, M, TContent>
 ): Promise<ZeitlichSession<M, false>>;
-export async function createSession<T extends ToolMap, M = unknown>({
+export async function createSession<T extends ToolMap, M = unknown, TContent = string>({
   agentName,
   maxTurns = 50,
   metadata = {},
@@ -90,7 +90,7 @@ export async function createSession<T extends ToolMap, M = unknown>({
   thread: threadInit,
   sandbox: sandboxInit,
   sandboxShutdown = "destroy",
-}: SessionConfig<T, M>): Promise<ZeitlichSession<M, boolean>> {
+}: SessionConfig<T, M, TContent>): Promise<ZeitlichSession<M, boolean>> {
   // ---------------------------------------------------------------------------
   // Thread resolution
   // ---------------------------------------------------------------------------
@@ -166,8 +166,8 @@ export async function createSession<T extends ToolMap, M = unknown>({
       stateManager: AgentStateManager<TState>;
     }) => {
       setHandler(
-        defineUpdate<unknown, [MessageContent]>(`add${agentName}Message`),
-        async (message: MessageContent) => {
+        defineUpdate<unknown, [TContent]>(`add${agentName}Message`),
+        async (message: TContent) => {
           if (hooks.onPreHumanMessageAppend) {
             await hooks.onPreHumanMessageAppend({
               message,

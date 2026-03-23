@@ -37,3 +37,30 @@ export interface BaseThreadManager<T> {
   /** Delete the thread */
   delete(): Promise<void>;
 }
+
+/**
+ * Shared contract for provider-specific thread managers.
+ *
+ * Extends {@link BaseThreadManager} with the append operations that the
+ * session layer calls via {@link ThreadOps} activities. Each adapter
+ * implements this interface to translate generic append calls into
+ * SDK-native stored messages.
+ *
+ * `appendAssistantMessage` / `appendModelContent` are intentionally NOT
+ * part of this interface — they are adapter-specific and only called by
+ * the model invoker inside the adapter.
+ *
+ * @typeParam TStored - The stored message envelope (includes id + SDK payload)
+ * @typeParam TContent - SDK-native content type for human messages
+ */
+export interface ProviderThreadManager<TStored, TContent = string>
+  extends BaseThreadManager<TStored> {
+  appendUserMessage(id: string, content: TContent): Promise<void>;
+  appendSystemMessage(id: string, content: string): Promise<void>;
+  appendToolResult(
+    id: string,
+    toolCallId: string,
+    toolName: string,
+    content: string,
+  ): Promise<void>;
+}

@@ -425,18 +425,18 @@ describe("createToolRouter edge cases", () => {
     expect(results).toEqual([]);
   });
 
-  // --- Tool handler returning complex ToolMessageContent ---
+  // --- Tool handler returning JSON-serialized content ---
 
-  it("handles tool response as ContentPart array", async () => {
+  it("handles tool response as JSON string", async () => {
     const complexTool = defineTool({
       name: "Complex" as const,
       description: "returns complex content",
       schema: z.object({}),
       handler: async () => ({
-        toolResponse: [
+        toolResponse: JSON.stringify([
           { type: "text", text: "Part 1" },
           { type: "text", text: "Part 2" },
-        ],
+        ]),
         data: null,
       }),
     });
@@ -455,7 +455,11 @@ describe("createToolRouter edge cases", () => {
     await router.processToolCalls([parsed]);
 
     const appended = at(appendSpy.calls, 0);
-    expect(Array.isArray(appended.content)).toBe(true);
+    expect(typeof appended.content).toBe("string");
+    expect(JSON.parse(appended.content as string)).toEqual([
+      { type: "text", text: "Part 1" },
+      { type: "text", text: "Part 2" },
+    ]);
   });
 
   // --- Synchronous handler ---

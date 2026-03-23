@@ -28,9 +28,10 @@ export {
 // Thread manager
 export {
   createAnthropicThreadManager,
-  messageContentToBlocks,
   type AnthropicThreadManager,
   type AnthropicThreadManagerConfig,
+  type AnthropicContent,
+  type AnthropicInvocationPayload,
   type StoredMessage,
 } from "./thread-manager";
 

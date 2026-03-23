@@ -1,8 +1,7 @@
 import type Redis from "ioredis";
 import type { GoogleGenAI, Content, FunctionDeclaration } from "@google/genai";
 import type { SerializableToolDefinition } from "../../../lib/types";
-import type { AgentResponse } from "../../../lib/model";
-import type { ModelInvokerConfig } from "../../../lib/model";
+import type { AgentResponse, ModelInvokerConfig } from "../../../lib/model";
 import { createGoogleGenAIThreadManager } from "./thread-manager";
 import { v4 as uuidv4 } from "uuid";
 
@@ -13,31 +12,13 @@ export interface GoogleGenAIModelInvokerConfig {
 }
 
 function toFunctionDeclarations(
-  tools: SerializableToolDefinition[]
+  tools: SerializableToolDefinition[],
 ): FunctionDeclaration[] {
   return tools.map((t) => ({
     name: t.name,
     description: t.description,
     parametersJsonSchema: t.schema,
   }));
-}
-
-/**
- * Merge consecutive Content objects sharing the same role.
- * The Gemini API requires alternating user/model turns; without
- * merging, multiple sequential tool-result messages would violate this.
- */
-function mergeConsecutiveContents(contents: Content[]): Content[] {
-  const merged: Content[] = [];
-  for (const content of contents) {
-    const last = merged[merged.length - 1];
-    if (last && last.role === content.role) {
-      last.parts = [...(last.parts ?? []), ...(content.parts ?? [])];
-    } else {
-      merged.push({ ...content, parts: [...(content.parts ?? [])] });
-    }
-  }
-  return merged;
 }
 
 /**
@@ -70,27 +51,13 @@ export function createGoogleGenAIModelInvoker({
   model,
 }: GoogleGenAIModelInvokerConfig) {
   return async function invokeGoogleGenAIModel(
-    config: ModelInvokerConfig
+    config: ModelInvokerConfig,
   ): Promise<AgentResponse<Content>> {
     const { threadId, state } = config;
 
     const thread = createGoogleGenAIThreadManager({ redis, threadId });
-    const stored = await thread.load();
-
-    // Separate system instructions from conversation content.
-    // Google GenAI takes system instructions via config, not in the contents array.
-    let systemInstruction: string | undefined;
-    const conversationContents: Content[] = [];
-
-    for (const item of stored) {
-      if (item.content.role === "system") {
-        systemInstruction = item.content.parts?.[0]?.text;
-      } else {
-        conversationContents.push(item.content);
-      }
-    }
-
-    const contents = mergeConsecutiveContents(conversationContents);
+    const { contents, systemInstruction } =
+      await thread.prepareForInvocation();
 
     const functionDeclarations = toFunctionDeclarations(state.tools);
     const tools =

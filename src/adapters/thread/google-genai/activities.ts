@@ -1,20 +1,22 @@
 import type Redis from "ioredis";
 import type { GoogleGenAI, Content } from "@google/genai";
 import type { ToolResultConfig } from "../../../lib/types";
-import type { MessageContent } from "../../../lib/types";
 import type {
   ThreadOps,
   PrefixedThreadOps,
   ScopedPrefix,
 } from "../../../lib/session/types";
 import type { ModelInvoker } from "../../../lib/model";
-import { createGoogleGenAIThreadManager } from "./thread-manager";
+import {
+  createGoogleGenAIThreadManager,
+  type GoogleGenAIContent,
+} from "./thread-manager";
 import { createGoogleGenAIModelInvoker } from "./model-invoker";
 
 const ADAPTER_PREFIX = "googleGenAI" as const;
 
 export type GoogleGenAIThreadOps<TScope extends string = ""> =
-  PrefixedThreadOps<ScopedPrefix<TScope, typeof ADAPTER_PREFIX>>;
+  PrefixedThreadOps<ScopedPrefix<TScope, typeof ADAPTER_PREFIX>, GoogleGenAIContent>;
 
 export interface GoogleGenAIAdapterConfig {
   redis: Redis;
@@ -44,7 +46,7 @@ export interface GoogleGenAIAdapter {
    * ```
    */
   createActivities<S extends string = "">(
-    scope?: S
+    scope?: S,
   ): GoogleGenAIThreadOps<S>;
 }
 
@@ -89,11 +91,11 @@ export interface GoogleGenAIAdapter {
  * ```
  */
 export function createGoogleGenAIAdapter(
-  config: GoogleGenAIAdapterConfig
+  config: GoogleGenAIAdapterConfig,
 ): GoogleGenAIAdapter {
   const { redis, client } = config;
 
-  const threadOps: ThreadOps = {
+  const threadOps: ThreadOps<GoogleGenAIContent> = {
     async initializeThread(threadId: string): Promise<void> {
       const thread = createGoogleGenAIThreadManager({ redis, threadId });
       await thread.initialize();
@@ -102,7 +104,7 @@ export function createGoogleGenAIAdapter(
     async appendHumanMessage(
       threadId: string,
       id: string,
-      content: string | MessageContent
+      content: GoogleGenAIContent,
     ): Promise<void> {
       const thread = createGoogleGenAIThreadManager({ redis, threadId });
       await thread.appendUserMessage(id, content);
@@ -111,7 +113,7 @@ export function createGoogleGenAIAdapter(
     async appendSystemMessage(
       threadId: string,
       id: string,
-      content: string
+      content: string,
     ): Promise<void> {
       const thread = createGoogleGenAIThreadManager({ redis, threadId });
       await thread.appendSystemMessage(id, content);
@@ -125,7 +127,7 @@ export function createGoogleGenAIAdapter(
 
     async forkThread(
       sourceThreadId: string,
-      targetThreadId: string
+      targetThreadId: string,
     ): Promise<void> {
       const thread = createGoogleGenAIThreadManager({
         redis,
@@ -136,7 +138,7 @@ export function createGoogleGenAIAdapter(
   };
 
   function createActivities<S extends string = "">(
-    scope?: S
+    scope?: S,
   ): GoogleGenAIThreadOps<S> {
     const prefix = scope
       ? `${ADAPTER_PREFIX}${scope.charAt(0).toUpperCase()}${scope.slice(1)}`
@@ -144,7 +146,7 @@ export function createGoogleGenAIAdapter(
     const cap = (s: string): string =>
       s.charAt(0).toUpperCase() + s.slice(1);
     return Object.fromEntries(
-      Object.entries(threadOps).map(([k, v]) => [`${prefix}${cap(k)}`, v])
+      Object.entries(threadOps).map(([k, v]) => [`${prefix}${cap(k)}`, v]),
     ) as GoogleGenAIThreadOps<S>;
   }
 
@@ -156,7 +158,7 @@ export function createGoogleGenAIAdapter(
     : ((() => {
         throw new Error(
           "No default model provided to createGoogleGenAIAdapter. " +
-            "Either pass `model` in the config or use `createModelInvoker(model)` instead."
+            "Either pass `model` in the config or use `createModelInvoker(model)` instead.",
         );
       }) as unknown as ModelInvoker<Content>);
 

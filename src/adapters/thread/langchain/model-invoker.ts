@@ -1,7 +1,5 @@
 import type Redis from "ioredis";
-import type { AgentResponse } from "../../../lib/model";
-import type { ModelInvokerConfig } from "../../../lib/model";
-import { mapStoredMessagesToChatMessages } from "@langchain/core/messages";
+import type { AgentResponse, ModelInvokerConfig } from "../../../lib/model";
 import type { StoredMessage } from "@langchain/core/messages";
 import { v4 as uuidv4 } from "uuid";
 import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
@@ -37,22 +35,22 @@ export function createLangChainModelInvoker<TModel extends BaseChatModel<any> = 
   { redis, model }: LangChainModelInvokerConfig<TModel>,
 ) {
   return async function invokeLangChainModel(
-    config: ModelInvokerConfig
+    config: ModelInvokerConfig,
   ): Promise<AgentResponse<StoredMessage>> {
     const { threadId, agentName, state, metadata } = config;
 
     const thread = createLangChainThreadManager({ redis, threadId });
     const runId = uuidv4();
 
-    const messages = await thread.load();
+    const { messages } = await thread.prepareForInvocation();
     const response = await model.invoke(
-      [...mapStoredMessagesToChatMessages(messages)],
+      messages,
       {
         runName: agentName,
         runId,
         metadata: { thread_id: `${agentName}-${threadId}`, ...metadata },
         tools: state.tools,
-      }
+      },
     );
 
     await thread.append([response.toDict()]);

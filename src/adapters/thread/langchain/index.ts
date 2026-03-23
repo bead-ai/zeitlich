@@ -28,7 +28,8 @@ export {
   createLangChainThreadManager,
   type LangChainThreadManager,
   type LangChainThreadManagerConfig,
-  type LangChainToolMessageContent,
+  type LangChainContent,
+  type LangChainInvocationPayload,
 } from "./thread-manager";
 
 // Model invoker (for advanced use — prefer adapter.createModelInvoker)

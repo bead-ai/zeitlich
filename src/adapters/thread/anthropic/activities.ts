@@ -1,14 +1,16 @@
 import type Redis from "ioredis";
 import type Anthropic from "@anthropic-ai/sdk";
 import type { ToolResultConfig } from "../../../lib/types";
-import type { MessageContent } from "../../../lib/types";
 import type {
   ThreadOps,
   PrefixedThreadOps,
   ScopedPrefix,
 } from "../../../lib/session/types";
 import type { ModelInvoker } from "../../../lib/model";
-import { createAnthropicThreadManager } from "./thread-manager";
+import {
+  createAnthropicThreadManager,
+  type AnthropicContent,
+} from "./thread-manager";
 import {
   createAnthropicModelInvoker,
   type AnthropicModelInvokerConfig,
@@ -17,7 +19,7 @@ import {
 const ADAPTER_PREFIX = "anthropic" as const;
 
 export type AnthropicThreadOps<TScope extends string = ""> =
-  PrefixedThreadOps<ScopedPrefix<TScope, typeof ADAPTER_PREFIX>>;
+  PrefixedThreadOps<ScopedPrefix<TScope, typeof ADAPTER_PREFIX>, AnthropicContent>;
 
 export interface AnthropicAdapterConfig {
   redis: Redis;
@@ -34,7 +36,7 @@ export interface AnthropicAdapter {
   /** Create an invoker for a specific model name (for multi-model setups) */
   createModelInvoker(
     model: string,
-    maxTokens?: number
+    maxTokens?: number,
   ): ModelInvoker<Anthropic.Messages.Message>;
   /**
    * Create prefixed thread activities for registration on the worker.
@@ -52,7 +54,7 @@ export interface AnthropicAdapter {
    * ```
    */
   createActivities<S extends string = "">(
-    scope?: S
+    scope?: S,
   ): AnthropicThreadOps<S>;
 }
 
@@ -97,11 +99,11 @@ export interface AnthropicAdapter {
  * ```
  */
 export function createAnthropicAdapter(
-  config: AnthropicAdapterConfig
+  config: AnthropicAdapterConfig,
 ): AnthropicAdapter {
   const { redis, client } = config;
 
-  const threadOps: ThreadOps = {
+  const threadOps: ThreadOps<AnthropicContent> = {
     async initializeThread(threadId: string): Promise<void> {
       const thread = createAnthropicThreadManager({ redis, threadId });
       await thread.initialize();
@@ -110,7 +112,7 @@ export function createAnthropicAdapter(
     async appendHumanMessage(
       threadId: string,
       id: string,
-      content: string | MessageContent
+      content: AnthropicContent,
     ): Promise<void> {
       const thread = createAnthropicThreadManager({ redis, threadId });
       await thread.appendUserMessage(id, content);
@@ -119,7 +121,7 @@ export function createAnthropicAdapter(
     async appendSystemMessage(
       threadId: string,
       id: string,
-      content: string
+      content: string,
     ): Promise<void> {
       const thread = createAnthropicThreadManager({ redis, threadId });
       await thread.appendSystemMessage(id, content);
@@ -133,7 +135,7 @@ export function createAnthropicAdapter(
 
     async forkThread(
       sourceThreadId: string,
-      targetThreadId: string
+      targetThreadId: string,
     ): Promise<void> {
       const thread = createAnthropicThreadManager({
         redis,
@@ -144,7 +146,7 @@ export function createAnthropicAdapter(
   };
 
   function createActivities<S extends string = "">(
-    scope?: S
+    scope?: S,
   ): AnthropicThreadOps<S> {
     const prefix = scope
       ? `${ADAPTER_PREFIX}${scope.charAt(0).toUpperCase()}${scope.slice(1)}`
@@ -152,13 +154,13 @@ export function createAnthropicAdapter(
     const cap = (s: string): string =>
       s.charAt(0).toUpperCase() + s.slice(1);
     return Object.fromEntries(
-      Object.entries(threadOps).map(([k, v]) => [`${prefix}${cap(k)}`, v])
+      Object.entries(threadOps).map(([k, v]) => [`${prefix}${cap(k)}`, v]),
     ) as AnthropicThreadOps<S>;
   }
 
   const makeInvoker = (
     model: string,
-    maxTokens?: number
+    maxTokens?: number,
   ): ModelInvoker<Anthropic.Messages.Message> => {
     const invokerConfig: AnthropicModelInvokerConfig = {
       redis,
@@ -177,7 +179,7 @@ export function createAnthropicAdapter(
     : ((() => {
         throw new Error(
           "No default model provided to createAnthropicAdapter. " +
-            "Either pass `model` in the config or use `createModelInvoker(model)` instead."
+            "Either pass `model` in the config or use `createModelInvoker(model)` instead.",
         );
       }) as unknown as ModelInvoker<Anthropic.Messages.Message>);
 
