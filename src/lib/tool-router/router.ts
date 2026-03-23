@@ -234,6 +234,7 @@ export function createToolRouter<T extends ToolMap>(
       if (tool) {
         const routerContext: RouterContext = {
           threadId: options.threadId,
+          ...(options.threadKey && { threadKey: options.threadKey }),
           toolCallId: toolCall.id,
           toolName: toolCall.name,
           ...(sandboxId !== undefined && { sandboxId }),
@@ -392,6 +393,7 @@ export function createToolRouter<T extends ToolMap>(
       ): Promise<ToolCallResult<TName, TResult>> => {
         const routerContext: RouterContext = {
           threadId: options.threadId,
+          ...(options.threadKey && { threadKey: options.threadKey }),
           toolCallId: toolCall.id,
           toolName: toolCall.name as TName,
           ...(context?.sandboxId !== undefined && {

@@ -117,6 +117,60 @@ describe("withAutoAppend", () => {
       content: "result content",
     });
   });
+
+  it("forwards threadKey when present in context", async () => {
+    let capturedConfig: ToolResultConfig | null = null;
+    const threadHandler = async (_id: string, config: ToolResultConfig) => {
+      capturedConfig = config;
+    };
+
+    const innerHandler = async (): Promise<ToolHandlerResponse<null>> => ({
+      toolResponse: "content",
+      data: null,
+    });
+
+    const wrapped = withAutoAppend(threadHandler, innerHandler);
+
+    await wrapped(
+      {},
+      {
+        threadId: "t-1",
+        threadKey: "custom-key",
+        toolCallId: "tc-1",
+        toolName: "Tool",
+      }
+    );
+
+    expect(capturedConfig).toEqual({
+      threadId: "t-1",
+      threadKey: "custom-key",
+      toolCallId: "tc-1",
+      toolName: "Tool",
+      content: "content",
+    });
+  });
+
+  it("omits threadKey from config when not in context", async () => {
+    let capturedConfig: ToolResultConfig | null = null;
+    const threadHandler = async (_id: string, config: ToolResultConfig) => {
+      capturedConfig = config;
+    };
+
+    const innerHandler = async (): Promise<ToolHandlerResponse<null>> => ({
+      toolResponse: "content",
+      data: null,
+    });
+
+    const wrapped = withAutoAppend(threadHandler, innerHandler);
+
+    await wrapped(
+      {},
+      { threadId: "t-1", toolCallId: "tc-1", toolName: "Tool" }
+    );
+
+    expect(capturedConfig).not.toBeNull();
+    expect(capturedConfig).not.toHaveProperty("threadKey");
+  });
 });
 
 // ---------------------------------------------------------------------------

@@ -1,7 +1,4 @@
-import type {
-  TokenUsage,
-  ToolResultConfig,
-} from "../types";
+import type { TokenUsage, ToolResultConfig } from "../types";
 import type { JsonValue } from "../state/types";
 import type { z } from "zod";
 import type { ActivityFunctionWithOptions } from "@temporalio/workflow";
@@ -154,6 +151,8 @@ export interface ToolHandlerResponse<TResult = null> {
  */
 export interface RouterContext {
   threadId: string;
+  /** Redis key suffix for thread storage. Defaults to 'messages'. */
+  threadKey?: string;
   toolCallId: string;
   toolName: string;
   sandboxId?: string;

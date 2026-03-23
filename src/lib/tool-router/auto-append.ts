@@ -42,6 +42,7 @@ export function withAutoAppend<
 
     await threadHandler(uuidv4(), {
       threadId: context.threadId,
+      ...(context.threadKey && { threadKey: context.threadKey }),
       toolCallId: context.toolCallId,
       toolName: context.toolName,
       content: response.toolResponse,
