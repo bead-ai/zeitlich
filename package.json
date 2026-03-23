@@ -67,6 +67,26 @@
         "default": "./dist/adapters/thread/google-genai/workflow.js"
       }
     },
+    "./adapters/thread/anthropic": {
+      "import": {
+        "types": "./dist/adapters/thread/anthropic/index.d.ts",
+        "default": "./dist/adapters/thread/anthropic/index.js"
+      },
+      "require": {
+        "types": "./dist/adapters/thread/anthropic/index.d.ts",
+        "default": "./dist/adapters/thread/anthropic/index.js"
+      }
+    },
+    "./adapters/thread/anthropic/workflow": {
+      "import": {
+        "types": "./dist/adapters/thread/anthropic/workflow.d.ts",
+        "default": "./dist/adapters/thread/anthropic/workflow.js"
+      },
+      "require": {
+        "types": "./dist/adapters/thread/anthropic/workflow.d.ts",
+        "default": "./dist/adapters/thread/anthropic/workflow.js"
+      }
+    },
     "./adapters/sandbox/inmemory": {
       "import": {
         "types": "./dist/adapters/sandbox/inmemory/index.d.ts",
@@ -190,6 +210,7 @@
     "node": ">=18"
   },
   "devDependencies": {
+    "@anthropic-ai/sdk": "^0.80.0",
     "@aws-sdk/client-bedrock-agentcore": "^3.900.0",
     "@daytonaio/sdk": "^0.149.0",
     "@e2b/code-interpreter": "^2.3.3",
@@ -210,6 +231,7 @@
     "vitest": "^4.0.18"
   },
   "peerDependencies": {
+    "@anthropic-ai/sdk": ">=0.50.0",
     "@aws-sdk/client-bedrock-agentcore": "^3.900.0",
     "@daytonaio/sdk": ">=0.153.0",
     "@e2b/code-interpreter": "^2.3.3",
@@ -223,6 +245,9 @@
       "optional": true
     },
     "@daytonaio/sdk": {
+      "optional": true
+    },
+    "@anthropic-ai/sdk": {
       "optional": true
     },
     "@google/genai": {

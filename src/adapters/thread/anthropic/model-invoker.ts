@@ -1,0 +1,171 @@
+import type Redis from "ioredis";
+import type Anthropic from "@anthropic-ai/sdk";
+import type { SerializableToolDefinition } from "../../../lib/types";
+import type { AgentResponse, ModelInvokerConfig } from "../../../lib/model";
+import { createAnthropicThreadManager } from "./thread-manager";
+import { v4 as uuidv4 } from "uuid";
+
+export interface AnthropicModelInvokerConfig {
+  redis: Redis;
+  client: Anthropic;
+  model: string;
+  /** Maximum tokens to generate. Defaults to 16384. */
+  maxTokens?: number;
+}
+
+function toAnthropicTools(
+  tools: SerializableToolDefinition[]
+): Anthropic.Messages.Tool[] {
+  return tools.map((t) => ({
+    name: t.name,
+    description: t.description,
+    input_schema: t.schema as Anthropic.Messages.Tool.InputSchema,
+  }));
+}
+
+/**
+ * Merge consecutive messages with the same role.
+ * The Anthropic API requires alternating user/assistant turns; without
+ * merging, multiple sequential tool-result messages would violate this.
+ */
+function mergeConsecutiveMessages(
+  messages: Anthropic.Messages.MessageParam[]
+): Anthropic.Messages.MessageParam[] {
+  const merged: Anthropic.Messages.MessageParam[] = [];
+  for (const msg of messages) {
+    const last = merged[merged.length - 1];
+    if (last && last.role === msg.role) {
+      const lastContent = Array.isArray(last.content)
+        ? last.content
+        : [{ type: "text" as const, text: last.content }];
+      const msgContent = Array.isArray(msg.content)
+        ? msg.content
+        : [{ type: "text" as const, text: msg.content }];
+      last.content = [...lastContent, ...msgContent];
+    } else {
+      merged.push({
+        ...msg,
+        content: Array.isArray(msg.content)
+          ? [...msg.content]
+          : msg.content,
+      });
+    }
+  }
+  return merged;
+}
+
+/**
+ * Creates an Anthropic model invoker that satisfies the generic
+ * `ModelInvoker<Anthropic.Messages.Message>` contract.
+ *
+ * Loads the conversation thread from Redis, invokes the Claude model via
+ * `client.messages.create`, appends the AI response, and returns
+ * a normalised AgentResponse.
+ *
+ * @example
+ * ```typescript
+ * import { createAnthropicModelInvoker } from 'zeitlich/adapters/thread/anthropic';
+ * import { createRunAgentActivity } from 'zeitlich';
+ * import Anthropic from '@anthropic-ai/sdk';
+ *
+ * const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+ * const invoker = createAnthropicModelInvoker({
+ *   redis,
+ *   client,
+ *   model: 'claude-sonnet-4-20250514',
+ * });
+ *
+ * return { runAgent: createRunAgentActivity(client, invoker) };
+ * ```
+ */
+export function createAnthropicModelInvoker({
+  redis,
+  client,
+  model,
+  maxTokens = 16384,
+}: AnthropicModelInvokerConfig) {
+  return async function invokeAnthropicModel(
+    config: ModelInvokerConfig
+  ): Promise<AgentResponse<Anthropic.Messages.Message>> {
+    const { threadId, state } = config;
+
+    const thread = createAnthropicThreadManager({ redis, threadId });
+    const stored = await thread.load();
+
+    let system: string | undefined;
+    const conversationMessages: Anthropic.Messages.MessageParam[] = [];
+
+    for (const item of stored) {
+      if (item.isSystem) {
+        system =
+          typeof item.message.content === "string"
+            ? item.message.content
+            : undefined;
+      } else {
+        conversationMessages.push(item.message);
+      }
+    }
+
+    const messages = mergeConsecutiveMessages(conversationMessages);
+
+    const anthropicTools = toAnthropicTools(state.tools);
+    const tools = anthropicTools.length > 0 ? anthropicTools : undefined;
+
+    const response = await client.messages.create({
+      model,
+      max_tokens: maxTokens,
+      messages,
+      ...(system ? { system } : {}),
+      ...(tools ? { tools } : {}),
+    });
+
+    await thread.appendAssistantMessage(uuidv4(), response.content);
+
+    const toolCalls = response.content.filter(
+      (block): block is Anthropic.Messages.ToolUseBlock =>
+        block.type === "tool_use"
+    );
+
+    return {
+      message: response,
+      rawToolCalls: toolCalls.map((tc) => ({
+        id: tc.id,
+        name: tc.name,
+        args: (tc.input as Record<string, unknown>) ?? {},
+      })),
+      usage: {
+        inputTokens: response.usage.input_tokens,
+        outputTokens: response.usage.output_tokens,
+        cachedWriteTokens: response.usage.cache_creation_input_tokens ?? undefined,
+        cachedReadTokens: response.usage.cache_read_input_tokens ?? undefined,
+      },
+    };
+  };
+}
+
+/**
+ * Standalone function for one-shot Anthropic model invocation.
+ * Convenience wrapper around createAnthropicModelInvoker for cases
+ * where you don't need to reuse the invoker.
+ */
+export async function invokeAnthropicModel({
+  redis,
+  client,
+  model,
+  maxTokens,
+  config,
+}: {
+  redis: Redis;
+  client: Anthropic;
+  model: string;
+  maxTokens?: number;
+  config: ModelInvokerConfig;
+}): Promise<AgentResponse<Anthropic.Messages.Message>> {
+  const invoker = createAnthropicModelInvoker({
+    redis,
+    client,
+    model,
+    maxTokens,
+  });
+  return invoker(config);
+}

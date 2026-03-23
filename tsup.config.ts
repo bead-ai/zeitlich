@@ -10,6 +10,10 @@ export default defineConfig({
       "src/adapters/thread/google-genai/index.ts",
     "adapters/thread/google-genai/workflow":
       "src/adapters/thread/google-genai/proxy.ts",
+    "adapters/thread/anthropic/index":
+      "src/adapters/thread/anthropic/index.ts",
+    "adapters/thread/anthropic/workflow":
+      "src/adapters/thread/anthropic/proxy.ts",
     "adapters/sandbox/inmemory/index": "src/adapters/sandbox/inmemory/index.ts",
     "adapters/sandbox/inmemory/workflow": "src/adapters/sandbox/inmemory/proxy.ts",
     "adapters/sandbox/daytona/index": "src/adapters/sandbox/daytona/index.ts",
@@ -30,6 +34,7 @@ export default defineConfig({
     /^@temporalio\//,
     /^@langchain\//,
     /^@google\//,
+    /^@anthropic-ai\//,
     /^@daytonaio\//,
     /^@aws-sdk\//,
     "ioredis",
