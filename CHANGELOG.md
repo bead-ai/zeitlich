@@ -2,6 +2,33 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.26](https://github.com/bead-ai/zeitlich/compare/v0.2.25...v0.2.26) (2026-03-23)
+
+
+### Features
+
+* add support for Anthropic adapter in configuration ([bdc8366](https://github.com/bead-ai/zeitlich/commit/bdc8366f2993394d55e28f330d26154d1525062e))
+* add threadKey support for enhanced thread storage management ([6501ef7](https://github.com/bead-ai/zeitlich/commit/6501ef79edd64e7688f575ea75e9487c30269f29))
+* enhance threadKey handling in tool router and integration tests ([a132d49](https://github.com/bead-ai/zeitlich/commit/a132d49848014e1c3da01b9711fd522c85f83f34))
+* enhance threadKey handling in tool router and integration tests ([fed4ecb](https://github.com/bead-ai/zeitlich/commit/fed4ecb207c995c49cfc90c2db20da3144171301))
+
+
+### Bug Fixes
+
+* add error handling for sandbox destruction signaling ([29697fb](https://github.com/bead-ai/zeitlich/commit/29697fbe91f1d4883401b449cf15e2c2156e55c2))
+
+
+### Code Refactoring
+
+* enhance ProviderThreadManager to support generic tool content types ([dd3b9a7](https://github.com/bead-ai/zeitlich/commit/dd3b9a71c13e5d0cc422488e51717dc7496ada7b))
+* improve type handling in ProviderThreadManager and related interfaces ([2ae83ce](https://github.com/bead-ai/zeitlich/commit/2ae83ce5dac43d1e9ca1a04b421e40069a1cc6c8))
+* update content types to JsonValue for improved flexibility ([63d8c83](https://github.com/bead-ai/zeitlich/commit/63d8c83fa79dda2f49c6a37fe89e333c7e3d0866))
+
+
+### Miscellaneous Chores
+
+* release 0.2.26 ([524dbac](https://github.com/bead-ai/zeitlich/commit/524dbac768a9edbabacd530f0249e0593e3ed7f1))
+
 ## [0.2.25](https://github.com/bead-ai/zeitlich/compare/v0.2.24...v0.2.25) (2026-03-21)
 
 
