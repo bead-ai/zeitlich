@@ -14,16 +14,20 @@ import {
   createThreadManager,
   type ProviderThreadManager,
   type ThreadManagerConfig,
+  type ThreadManagerHooks,
 } from "../../../lib/thread";
 
 /** SDK-native content type for LangChain human messages */
 export type LangChainContent = string | MessageContent;
+
+export type LangChainThreadManagerHooks = ThreadManagerHooks<StoredMessage>;
 
 export interface LangChainThreadManagerConfig {
   redis: Redis;
   threadId: string;
   /** Thread key, defaults to 'messages' */
   key?: string;
+  hooks?: LangChainThreadManagerHooks;
 }
 
 /** Prepared payload ready to send to a LangChain chat model */
@@ -106,8 +110,12 @@ export function createLangChainThreadManager(
 
     async prepareForInvocation(): Promise<LangChainInvocationPayload> {
       const stored = await base.load();
+      const onPrepareMessage = config.hooks?.onPrepareMessage;
+      const mapped = onPrepareMessage
+        ? stored.map((msg, i) => onPrepareMessage(msg, i, stored))
+        : stored;
       return {
-        messages: mapStoredMessagesToChatMessages(stored),
+        messages: mapStoredMessagesToChatMessages(mapped),
       };
     },
   };

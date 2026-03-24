@@ -5,6 +5,7 @@ import {
   createThreadManager,
   type ProviderThreadManager,
   type ThreadManagerConfig,
+  type ThreadManagerHooks,
 } from "../../../lib/thread";
 
 /** SDK-native content type for Anthropic human messages */
@@ -20,11 +21,14 @@ export interface StoredMessage {
   isSystem?: boolean;
 }
 
+export type AnthropicThreadManagerHooks = ThreadManagerHooks<StoredMessage>;
+
 export interface AnthropicThreadManagerConfig {
   redis: Redis;
   threadId: string;
   /** Thread key, defaults to 'messages' */
   key?: string;
+  hooks?: AnthropicThreadManagerHooks;
 }
 
 /** Prepared payload ready to send to the Anthropic API */
@@ -165,11 +169,15 @@ export function createAnthropicThreadManager(
 
     async prepareForInvocation(): Promise<AnthropicInvocationPayload> {
       const stored = await base.load();
+      const onPrepareMessage = config.hooks?.onPrepareMessage;
+      const mapped = onPrepareMessage
+        ? stored.map((msg, i) => onPrepareMessage(msg, i, stored))
+        : stored;
 
       let system: string | undefined;
       const conversationMessages: Anthropic.Messages.MessageParam[] = [];
 
-      for (const item of stored) {
+      for (const item of mapped) {
         if (item.isSystem) {
           system =
             typeof item.message.content === "string"

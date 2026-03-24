@@ -4,6 +4,7 @@ import {
   createThreadManager,
   type ProviderThreadManager,
   type ThreadManagerConfig,
+  type ThreadManagerHooks,
 } from "../../../lib/thread";
 import type { GoogleGenAIToolResponse } from "./activities";
 
@@ -16,11 +17,14 @@ export interface StoredContent {
   content: Content;
 }
 
+export type GoogleGenAIThreadManagerHooks = ThreadManagerHooks<StoredContent>;
+
 export interface GoogleGenAIThreadManagerConfig {
   redis: Redis;
   threadId: string;
   /** Thread key, defaults to 'messages' */
   key?: string;
+  hooks?: GoogleGenAIThreadManagerHooks;
 }
 
 /** Prepared payload ready to send to the Google GenAI API */
@@ -141,11 +145,15 @@ export function createGoogleGenAIThreadManager(
 
     async prepareForInvocation(): Promise<GoogleGenAIInvocationPayload> {
       const stored = await base.load();
+      const onPrepareMessage = config.hooks?.onPrepareMessage;
+      const mapped = onPrepareMessage
+        ? stored.map((msg, i) => onPrepareMessage(msg, i, stored))
+        : stored;
 
       let systemInstruction: string | undefined;
       const conversationContents: Content[] = [];
 
-      for (const item of stored) {
+      for (const item of mapped) {
         if (item.content.role === "system") {
           systemInstruction = item.content.parts?.[0]?.text;
         } else {

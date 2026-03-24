@@ -5,4 +5,5 @@ export type {
   ThreadManagerConfig,
   BaseThreadManager,
   ProviderThreadManager,
+  ThreadManagerHooks,
 } from "./types";

@@ -3,12 +3,13 @@ import type { AgentResponse, ModelInvokerConfig } from "../../../lib/model";
 import type { StoredMessage } from "@langchain/core/messages";
 import { v4 as uuidv4 } from "uuid";
 import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
-import { createLangChainThreadManager } from "./thread-manager";
+import { createLangChainThreadManager, type LangChainThreadManagerHooks } from "./thread-manager";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export interface LangChainModelInvokerConfig<TModel extends BaseChatModel<any> = BaseChatModel<any>> {
   redis: Redis;
   model: TModel;
+  hooks?: LangChainThreadManagerHooks;
 }
 
 /**
@@ -32,14 +33,14 @@ export interface LangChainModelInvokerConfig<TModel extends BaseChatModel<any> =
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function createLangChainModelInvoker<TModel extends BaseChatModel<any> = BaseChatModel<any>>(
-  { redis, model }: LangChainModelInvokerConfig<TModel>,
+  { redis, model, hooks }: LangChainModelInvokerConfig<TModel>,
 ) {
   return async function invokeLangChainModel(
     config: ModelInvokerConfig,
   ): Promise<AgentResponse<StoredMessage>> {
     const { threadId, threadKey, agentName, state, metadata } = config;
 
-    const thread = createLangChainThreadManager({ redis, threadId, key: threadKey });
+    const thread = createLangChainThreadManager({ redis, threadId, key: threadKey, hooks });
     const runId = uuidv4();
 
     const { messages } = await thread.prepareForInvocation();
@@ -86,12 +87,14 @@ export function createLangChainModelInvoker<TModel extends BaseChatModel<any> = 
 export async function invokeLangChainModel<TModel extends BaseChatModel<any> = BaseChatModel<any>>({
   redis,
   model,
+  hooks,
   config,
 }: {
   redis: Redis;
   config: ModelInvokerConfig;
   model: TModel;
+  hooks?: LangChainThreadManagerHooks;
 }): Promise<AgentResponse<StoredMessage>> {
-  const invoker = createLangChainModelInvoker({ redis, model });
+  const invoker = createLangChainModelInvoker({ redis, model, hooks });
   return invoker(config);
 }

@@ -54,6 +54,19 @@ export interface BaseThreadManager<T> {
  * @typeParam TStored - The stored message envelope (includes id + SDK payload)
  * @typeParam TContent - SDK-native content type for human messages
  */
+/**
+ * Lifecycle hooks for provider-specific thread managers.
+ *
+ * @typeParam TStored - The stored message envelope (e.g. StoredMessage, StoredContent)
+ * @typeParam TPrepared - The SDK-native message type after preparation (e.g. BaseMessage, MessageParam, Content)
+ */
+export interface ThreadManagerHooks<TStored, TPrepared = TStored> {
+  /** Called for each stored message before SDK-specific processing (system extraction, role merging, format conversion) */
+  onPrepareMessage?: (message: TStored, index: number, thread: readonly TStored[]) => TStored;
+  /** Called for each SDK-native message after all processing, right before the payload is returned */
+  onPreparedMessage?: (message: TPrepared, index: number, messages: readonly TPrepared[]) => TPrepared;
+}
+
 export interface ProviderThreadManager<
   TStored,
   TContent = string,

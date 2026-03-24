@@ -2,7 +2,7 @@ import type Redis from "ioredis";
 import type Anthropic from "@anthropic-ai/sdk";
 import type { SerializableToolDefinition } from "../../../lib/types";
 import type { AgentResponse, ModelInvokerConfig } from "../../../lib/model";
-import { createAnthropicThreadManager } from "./thread-manager";
+import { createAnthropicThreadManager, type AnthropicThreadManagerHooks } from "./thread-manager";
 import { v4 as uuidv4 } from "uuid";
 
 export interface AnthropicModelInvokerConfig {
@@ -11,6 +11,7 @@ export interface AnthropicModelInvokerConfig {
   model: string;
   /** Maximum tokens to generate. Defaults to 16384. */
   maxTokens?: number;
+  hooks?: AnthropicThreadManagerHooks;
 }
 
 function toAnthropicTools(
@@ -52,13 +53,14 @@ export function createAnthropicModelInvoker({
   client,
   model,
   maxTokens = 16384,
+  hooks,
 }: AnthropicModelInvokerConfig) {
   return async function invokeAnthropicModel(
     config: ModelInvokerConfig,
   ): Promise<AgentResponse<Anthropic.Messages.Message>> {
     const { threadId, threadKey, state } = config;
 
-    const thread = createAnthropicThreadManager({ redis, threadId, key: threadKey });
+    const thread = createAnthropicThreadManager({ redis, threadId, key: threadKey, hooks });
     const { messages, system } = await thread.prepareForInvocation();
 
     const anthropicTools = toAnthropicTools(state.tools);
@@ -106,12 +108,14 @@ export async function invokeAnthropicModel({
   client,
   model,
   maxTokens,
+  hooks,
   config,
 }: {
   redis: Redis;
   client: Anthropic;
   model: string;
   maxTokens?: number;
+  hooks?: AnthropicThreadManagerHooks;
   config: ModelInvokerConfig;
 }): Promise<AgentResponse<Anthropic.Messages.Message>> {
   const invoker = createAnthropicModelInvoker({
@@ -119,6 +123,7 @@ export async function invokeAnthropicModel({
     client,
     model,
     maxTokens,
+    hooks,
   });
   return invoker(config);
 }
