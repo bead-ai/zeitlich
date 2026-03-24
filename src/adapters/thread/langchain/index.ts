@@ -39,3 +39,6 @@ export {
   invokeLangChainModel,
   type LangChainModelInvokerConfig,
 } from "./model-invoker";
+
+// Hooks / utilities
+export { appendCachePoint } from "./hooks";
