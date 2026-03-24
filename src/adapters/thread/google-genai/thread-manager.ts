@@ -17,7 +17,7 @@ export interface StoredContent {
   content: Content;
 }
 
-export type GoogleGenAIThreadManagerHooks = ThreadManagerHooks<StoredContent>;
+export type GoogleGenAIThreadManagerHooks = ThreadManagerHooks<StoredContent, Content>;
 
 export interface GoogleGenAIThreadManagerConfig {
   redis: Redis;
@@ -145,7 +145,7 @@ export function createGoogleGenAIThreadManager(
 
     async prepareForInvocation(): Promise<GoogleGenAIInvocationPayload> {
       const stored = await base.load();
-      const onPrepareMessage = config.hooks?.onPrepareMessage;
+      const { onPrepareMessage, onPreparedMessage } = config.hooks ?? {};
       const mapped = onPrepareMessage
         ? stored.map((msg, i) => onPrepareMessage(msg, i, stored))
         : stored;
@@ -161,8 +161,11 @@ export function createGoogleGenAIThreadManager(
         }
       }
 
+      const contents = mergeConsecutiveContents(conversationContents);
       return {
-        contents: mergeConsecutiveContents(conversationContents),
+        contents: onPreparedMessage
+          ? contents.map((msg, i) => onPreparedMessage(msg, i, contents))
+          : contents,
         ...(systemInstruction ? { systemInstruction } : {}),
       };
     },

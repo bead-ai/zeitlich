@@ -21,7 +21,7 @@ export interface StoredMessage {
   isSystem?: boolean;
 }
 
-export type AnthropicThreadManagerHooks = ThreadManagerHooks<StoredMessage>;
+export type AnthropicThreadManagerHooks = ThreadManagerHooks<StoredMessage, Anthropic.Messages.MessageParam>;
 
 export interface AnthropicThreadManagerConfig {
   redis: Redis;
@@ -169,7 +169,7 @@ export function createAnthropicThreadManager(
 
     async prepareForInvocation(): Promise<AnthropicInvocationPayload> {
       const stored = await base.load();
-      const onPrepareMessage = config.hooks?.onPrepareMessage;
+      const { onPrepareMessage, onPreparedMessage } = config.hooks ?? {};
       const mapped = onPrepareMessage
         ? stored.map((msg, i) => onPrepareMessage(msg, i, stored))
         : stored;
@@ -188,8 +188,11 @@ export function createAnthropicThreadManager(
         }
       }
 
+      const messages = mergeConsecutiveMessages(conversationMessages);
       return {
-        messages: mergeConsecutiveMessages(conversationMessages),
+        messages: onPreparedMessage
+          ? messages.map((msg, i) => onPreparedMessage(msg, i, messages))
+          : messages,
         ...(system ? { system } : {}),
       };
     },
