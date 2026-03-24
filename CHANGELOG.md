@@ -2,6 +2,24 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.27](https://github.com/bead-ai/zeitlich/compare/v0.2.26...v0.2.27) (2026-03-24)
+
+
+### Features
+
+* add appendCachePoint utility to LangChain index ([0a5f8e0](https://github.com/bead-ai/zeitlich/commit/0a5f8e09283f2329bfb6dd09f8464d50c779a701))
+* add hooks support to model invokers and thread managers ([f82503e](https://github.com/bead-ai/zeitlich/commit/f82503ed858d2df1bc387a3eed4794ff399fb5c1))
+
+
+### Code Refactoring
+
+* enhance thread manager hooks to support additional message types ([0a4262c](https://github.com/bead-ai/zeitlich/commit/0a4262c536ffd8ae74cfd41c925f0ed6f1cac4dd))
+
+
+### Miscellaneous Chores
+
+* release 0.2.27 ([b5459fa](https://github.com/bead-ai/zeitlich/commit/b5459faa2305618e99061b641830c0e239309d4f))
+
 ## [0.2.26](https://github.com/bead-ai/zeitlich/compare/v0.2.25...v0.2.26) (2026-03-23)
 
 
