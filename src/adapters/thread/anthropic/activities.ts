@@ -15,6 +15,7 @@ import type { ModelInvoker } from "../../../lib/model";
 import {
   createAnthropicThreadManager,
   type AnthropicContent,
+  type AnthropicThreadManagerHooks,
 } from "./thread-manager";
 import {
   createAnthropicModelInvoker,
@@ -33,6 +34,7 @@ export interface AnthropicAdapterConfig {
   model?: string;
   /** Maximum tokens to generate. Defaults to 16384. */
   maxTokens?: number;
+  hooks?: AnthropicThreadManagerHooks;
 }
 
 /**
@@ -201,6 +203,7 @@ export function createAnthropicAdapter(
       ...(config.maxTokens !== undefined && maxTokens === undefined
         ? { maxTokens: config.maxTokens }
         : {}),
+      hooks: config.hooks,
     };
     return createAnthropicModelInvoker(invokerConfig);
   };

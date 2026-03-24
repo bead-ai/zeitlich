@@ -15,6 +15,7 @@ import type { ModelInvoker } from "../../../lib/model";
 import {
   createGoogleGenAIThreadManager,
   type GoogleGenAIContent,
+  type GoogleGenAIThreadManagerHooks,
 } from "./thread-manager";
 import { createGoogleGenAIModelInvoker } from "./model-invoker";
 
@@ -31,6 +32,7 @@ export interface GoogleGenAIAdapterConfig {
   client?: GoogleGenAI;
   /** Default model name (e.g. 'gemini-2.5-flash'). If omitted, use `createModelInvoker()` */
   model?: string;
+  hooks?: GoogleGenAIThreadManagerHooks;
 }
 
 /**
@@ -222,7 +224,7 @@ export function createGoogleGenAIAdapter(
     model: string,
     client: GoogleGenAI
   ): ModelInvoker<Content> =>
-    createGoogleGenAIModelInvoker({ redis, client, model });
+    createGoogleGenAIModelInvoker({ redis, client, model, hooks: config.hooks });
 
   const invoker: ModelInvoker<Content> =
     config.model && config.client

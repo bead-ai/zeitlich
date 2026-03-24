@@ -17,6 +17,7 @@ import type { BaseChatModel } from "@langchain/core/language_models/chat_models"
 import {
   createLangChainThreadManager,
   type LangChainContent,
+  type LangChainThreadManagerHooks,
 } from "./thread-manager";
 import { createLangChainModelInvoker } from "./model-invoker";
 
@@ -30,6 +31,7 @@ export interface LangChainAdapterConfig {
   /** Optional default model — if omitted, use `createModelInvoker()` to create invokers later */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   model?: BaseChatModel<any>;
+  hooks?: LangChainThreadManagerHooks;
 }
 
 /**
@@ -177,7 +179,7 @@ export function createLangChainAdapter(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     model: BaseChatModel<any>,
   ): ModelInvoker<StoredMessage> =>
-    createLangChainModelInvoker({ redis, model });
+    createLangChainModelInvoker({ redis, model, hooks: config.hooks });
 
   const invoker: ModelInvoker<StoredMessage> = config.model
     ? makeInvoker(config.model)
