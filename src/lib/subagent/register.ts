@@ -20,7 +20,10 @@ import { createSubagentHandler } from "./handler";
  * Returns null if no subagents are configured.
  */
 export function buildSubagentRegistration(
-  subagents: SubagentConfig[]
+  subagents: SubagentConfig[],
+  options?: {
+    getSandboxStateForInheritance?: () => Record<string, unknown> | undefined;
+  },
 ): {
   registration: ToolMap[string];
   destroySubagentSandboxes: () => Promise<void>;
@@ -40,7 +43,9 @@ export function buildSubagentRegistration(
   const resolveSubagentName = (args: unknown): string =>
     (args as SubagentArgs).subagent;
 
-  const { handler, destroySubagentSandboxes } = createSubagentHandler(subagents);
+  const { handler, destroySubagentSandboxes } = createSubagentHandler(subagents, {
+    getSandboxStateForInheritance: options?.getSandboxStateForInheritance,
+  });
 
   const registration: ToolMap[string] = {
     name: SUBAGENT_TOOL_NAME,

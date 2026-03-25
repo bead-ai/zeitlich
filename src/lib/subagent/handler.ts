@@ -45,7 +45,9 @@ function resolveSandboxConfig(config?: SubagentSandboxConfig): {
  */
 export function createSubagentHandler<
   const T extends readonly SubagentConfig[],
->(subagents: [...T]): {
+>(subagents: [...T], options?: {
+  getSandboxStateForInheritance?: () => Record<string, unknown> | undefined;
+}): {
   handler: (
     args: SubagentArgs,
     context: RouterContext
@@ -104,10 +106,11 @@ export function createSubagentHandler<
     // --- Build sandbox init ---
     let sandbox: SandboxInit | undefined;
     if (sandboxCfg.source === "inherit" && parentSandboxId) {
+      const stateUpdate = options?.getSandboxStateForInheritance?.();
       sandbox = {
         mode: "inherit",
         sandboxId: parentSandboxId,
-        ...(context.sandboxStateUpdate && { stateUpdate: context.sandboxStateUpdate }),
+        ...(stateUpdate && { stateUpdate }),
       };
     } else if (sandboxCfg.source === "own") {
       const prevSbId = continuationThreadId

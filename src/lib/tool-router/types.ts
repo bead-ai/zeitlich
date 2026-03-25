@@ -157,8 +157,6 @@ export interface RouterContext {
   toolCallId: string;
   toolName: string;
   sandboxId?: string;
-  /** Sandbox state update from the provider (passed through for subagent inheritance) */
-  sandboxStateUpdate?: Record<string, unknown>;
 }
 
 /**
@@ -270,8 +268,6 @@ export interface ProcessToolCallsContext {
   turn?: number;
   /** Active sandbox ID (when a sandbox is configured for this session) */
   sandboxId?: string;
-  /** Sandbox state update from the provider (threaded to subagent handler for inheritance) */
-  sandboxStateUpdate?: Record<string, unknown>;
 }
 
 // ============================================================================

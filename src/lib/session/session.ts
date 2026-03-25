@@ -124,8 +124,11 @@ export async function createSession<T extends ToolMap, M = unknown, TContent = s
 
   const plugins: ToolMap[string][] = [];
   let destroySubagentSandboxes: (() => Promise<void>) | undefined;
+  let sandboxStateGetter: (() => Record<string, unknown> | undefined) | undefined;
   if (subagents) {
-    const result = buildSubagentRegistration(subagents);
+    const result = buildSubagentRegistration(subagents, {
+      getSandboxStateForInheritance: () => sandboxStateGetter?.(),
+    });
     if (result) {
       plugins.push(result.registration);
       destroySubagentSandboxes = result.destroySubagentSandboxes;
@@ -191,13 +194,23 @@ export async function createSession<T extends ToolMap, M = unknown, TContent = s
       const sandboxMode = sandboxInit?.mode;
       let sandboxId: string | undefined;
       let sandboxOwned = false;
-      let sandboxStateUpdate: Record<string, unknown> | undefined;
+
+      sandboxStateGetter = () => {
+        const fileTree = stateManager.get("fileTree" as keyof TState);
+        const resolverContext = stateManager.get("resolverContext" as keyof TState);
+        const workspaceBase = stateManager.get("workspaceBase" as keyof TState);
+        if (!fileTree && !resolverContext && !workspaceBase) return undefined;
+        return {
+          ...(fileTree !== undefined && { fileTree }),
+          ...(resolverContext !== undefined && { resolverContext }),
+          ...(workspaceBase !== undefined && { workspaceBase }),
+        };
+      };
 
       if (sandboxMode === "inherit") {
         const inheritInit = sandboxInit as { mode: "inherit"; sandboxId: string; stateUpdate?: Record<string, unknown> };
         sandboxId = inheritInit.sandboxId;
         if (inheritInit.stateUpdate) {
-          sandboxStateUpdate = inheritInit.stateUpdate;
           stateManager.mergeUpdate(inheritInit.stateUpdate as Partial<TState>);
         }
         if (!sandboxOps) {
@@ -234,7 +247,6 @@ export async function createSession<T extends ToolMap, M = unknown, TContent = s
         sandboxId = result.sandboxId;
         sandboxOwned = true;
         if (result.stateUpdate) {
-          sandboxStateUpdate = result.stateUpdate;
           stateManager.mergeUpdate(result.stateUpdate as Partial<TState>);
         }
       }
@@ -327,7 +339,6 @@ export async function createSession<T extends ToolMap, M = unknown, TContent = s
             {
               turn: currentTurn,
               ...(sandboxId !== undefined && { sandboxId }),
-              ...(sandboxStateUpdate && { sandboxStateUpdate }),
             }
           );
 
