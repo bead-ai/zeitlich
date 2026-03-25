@@ -147,6 +147,26 @@
         "default": "./dist/adapters/sandbox/daytona/workflow.js"
       }
     },
+    "./adapters/sandbox/e2b": {
+      "import": {
+        "types": "./dist/adapters/sandbox/e2b/index.d.ts",
+        "default": "./dist/adapters/sandbox/e2b/index.js"
+      },
+      "require": {
+        "types": "./dist/adapters/sandbox/e2b/index.d.ts",
+        "default": "./dist/adapters/sandbox/e2b/index.js"
+      }
+    },
+    "./adapters/sandbox/e2b/workflow": {
+      "import": {
+        "types": "./dist/adapters/sandbox/e2b/workflow.d.ts",
+        "default": "./dist/adapters/sandbox/e2b/workflow.js"
+      },
+      "require": {
+        "types": "./dist/adapters/sandbox/e2b/workflow.d.ts",
+        "default": "./dist/adapters/sandbox/e2b/workflow.js"
+      }
+    },
     "./adapters/sandbox/bedrock": {
       "import": {
         "types": "./dist/adapters/sandbox/bedrock/index.d.ts",
