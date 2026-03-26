@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.28](https://github.com/bead-ai/zeitlich/compare/v0.2.27...v0.2.28) (2026-03-26)
+
+
+### Features
+
+* add `maxBlocks` to `appendCachePoint` and enforce it ([90e0d2a](https://github.com/bead-ai/zeitlich/commit/90e0d2a91072011371bd6e44b90e4a92823b9d7c))
+* add E2B sandbox adapter and proxy functionality ([0cadd25](https://github.com/bead-ai/zeitlich/commit/0cadd250186551e3ae0827eb19600c9b210e2bf3))
+* add E2B sandbox adapter and proxy functionality ([befbc88](https://github.com/bead-ai/zeitlich/commit/befbc88404a9e8938155b99e2ce1f0e1cd922ce2))
+* enhance subagent registration and sandbox state management ([7de25cb](https://github.com/bead-ai/zeitlich/commit/7de25cb56effd1120e6b341e6d12cb9de0897b12))
+
+
+### Miscellaneous Chores
+
+* release 0.2.28 ([207d73d](https://github.com/bead-ai/zeitlich/commit/207d73d1068c1b14cd0d25079ec71e2330eb8bd0))
+
 ## [0.2.27](https://github.com/bead-ai/zeitlich/compare/v0.2.26...v0.2.27) (2026-03-24)
 
 
