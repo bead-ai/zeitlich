@@ -11,6 +11,7 @@ vi.mock("@temporalio/workflow", () => {
     setHandler: (_def: unknown, _handler: unknown) => {},
     uuid4: () =>
       `00000000-0000-0000-0000-${String(++idCounter).padStart(12, "0")}`,
+    log: { trace: () => {}, debug: () => {}, info: () => {}, warn: () => {}, error: () => {} },
   };
 });
 

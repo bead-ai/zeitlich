@@ -20,7 +20,7 @@ import type {
 
 import type { JsonValue } from "../state/types";
 import type { z } from "zod";
-import { uuid4 } from "@temporalio/workflow";
+import { uuid4, log } from "@temporalio/workflow";
 
 /**
  * Creates a tool router for declarative tool call processing.
@@ -223,6 +223,12 @@ export function createToolRouter<T extends ToolMap>(
     }
     const effectiveArgs = preResult.args;
 
+    log.debug("tool call dispatched", {
+      toolName: toolCall.name,
+      toolCallId: toolCall.id,
+      turn,
+    });
+
     // --- Execute handler ---
     let result: unknown;
     let content!: JsonValue;
@@ -251,6 +257,13 @@ export function createToolRouter<T extends ToolMap>(
         content = JSON.stringify(result, null, 2);
       }
     } catch (error) {
+      log.warn("tool call failed", {
+        toolName: toolCall.name,
+        toolCallId: toolCall.id,
+        turn,
+        durationMs: Date.now() - startTime,
+        error: error instanceof Error ? error.message : String(error),
+      });
       const recovery = await runFailureHooks(
         toolCall,
         tool,
@@ -279,12 +292,21 @@ export function createToolRouter<T extends ToolMap>(
       );
     }
 
+    const durationMs = Date.now() - startTime;
+
     const toolResult = {
       toolCallId: toolCall.id,
       name: toolCall.name,
       data: result,
       ...(metadata && { metadata }),
     } as ToolCallResultUnion<TResults>;
+
+    log.debug("tool call completed", {
+      toolName: toolCall.name,
+      toolCallId: toolCall.id,
+      turn,
+      durationMs,
+    });
 
     // --- Post-hooks ---
     await runPostHooks(
@@ -293,7 +315,7 @@ export function createToolRouter<T extends ToolMap>(
       toolResult,
       effectiveArgs,
       turn,
-      Date.now() - startTime
+      durationMs
     );
 
     return toolResult;

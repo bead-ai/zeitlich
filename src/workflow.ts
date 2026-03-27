@@ -93,6 +93,20 @@ export type {
   PostHumanMessageAppendHookContext,
 } from "./lib/hooks";
 
+// Observability
+export {
+  createObservabilityHooks,
+  composeHooks,
+} from "./lib/observability";
+export type {
+  ObservabilityHooks,
+  ZeitlichObservabilitySinks,
+  SessionStartedEvent,
+  SessionEndedEvent,
+  TurnCompletedEvent,
+  ToolExecutedEvent,
+} from "./lib/observability";
+
 // Core types
 export type {
   TokenUsage,

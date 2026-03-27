@@ -144,6 +144,13 @@ export function createSubagentHandler<
       taskQueue: config.taskQueue ?? parentTaskQueue,
     };
 
+    log.info("subagent spawned", {
+      subagent: config.agentName,
+      childWorkflowId,
+      threadMode,
+      sandboxSource: sandboxCfg.source,
+    });
+
     const childHandle = await startChild(config.workflow, childOpts);
 
     const effectiveShutdown = sandboxCfg.shutdown ?? "destroy";
@@ -168,11 +175,21 @@ export function createSubagentHandler<
     childResults.delete(childWorkflowId);
 
     if (!childResult) {
+      log.warn("subagent returned no result", {
+        subagent: config.agentName,
+        childWorkflowId,
+      });
       return {
         toolResponse: "Subagent workflow did not signal a result",
         data: null,
       };
     }
+
+    log.info("subagent completed", {
+      subagent: config.agentName,
+      childWorkflowId,
+      ...(childResult.usage && { usage: childResult.usage }),
+    });
 
     const {
       toolResponse,

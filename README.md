@@ -991,6 +991,120 @@ Framework-agnostic utilities for activities, worker setup, and Node.js code:
                     └─────────────────┘
 ```
 
+## Observability
+
+Zeitlich emits structured, replay-safe logs at key lifecycle points (session start/end, each turn, tool execution, subagent spawn/completion). These flow through Temporal's built-in workflow logger with zero configuration.
+
+### Logging
+
+All log messages are emitted via `@temporalio/workflow`'s `log` and automatically routed to whatever logger you configure on the Temporal Runtime. By default they go to `STDERR` via `console.error`.
+
+**Custom logger (e.g. winston):**
+
+```typescript
+import { Runtime, makeTelemetryFilterString } from "@temporalio/worker";
+import winston from "winston";
+
+const logger = winston.createLogger({
+  level: "info",
+  format: winston.format.json(),
+  transports: [new winston.transports.File({ filename: "worker.log" })],
+});
+
+Runtime.install({
+  logger,
+  telemetryOptions: {
+    logging: {
+      filter: makeTelemetryFilterString({ core: "INFO", other: "INFO" }),
+      forward: {},
+    },
+  },
+});
+```
+
+### Metrics via Sinks
+
+For custom metrics (Prometheus, Datadog, OpenTelemetry, etc.), zeitlich provides `ZeitlichObservabilitySinks` — a typed Temporal Sinks interface that bridges agent events from the workflow sandbox to your Node.js metrics backend.
+
+**1. Register sinks on the Worker:**
+
+```typescript
+import { Worker, InjectedSinks } from "@temporalio/worker";
+import type { ZeitlichObservabilitySinks } from "zeitlich/workflow";
+
+const sinks: InjectedSinks<ZeitlichObservabilitySinks> = {
+  zeitlichMetrics: {
+    sessionStarted: {
+      fn(_workflowInfo, event) {
+        sessionCounter.inc({ agent: event.agentName });
+      },
+      callDuringReplay: false,
+    },
+    sessionEnded: {
+      fn(_workflowInfo, event) {
+        sessionDuration.observe(event.durationMs);
+        tokenCounter.inc({ type: "input" }, event.usage.inputTokens ?? 0);
+      },
+      callDuringReplay: false,
+    },
+    turnCompleted: {
+      fn(_workflowInfo, event) {
+        turnGauge.set({ agent: event.agentName }, event.turn);
+      },
+      callDuringReplay: false,
+    },
+    toolExecuted: {
+      fn(_workflowInfo, event) {
+        toolDuration.observe({ tool: event.toolName }, event.durationMs);
+        if (!event.success) toolErrors.inc({ tool: event.toolName });
+      },
+      callDuringReplay: false,
+    },
+  },
+};
+
+const worker = await Worker.create({ sinks, /* ... */ });
+```
+
+**2. Wire hooks in your workflow:**
+
+```typescript
+import { createSession, createObservabilityHooks } from "zeitlich/workflow";
+
+const session = await createSession({
+  agentName: "myAgent",
+  hooks: createObservabilityHooks("myAgent"),
+  // ...
+});
+```
+
+Use `composeHooks()` to combine observability hooks with your own:
+
+```typescript
+import { createObservabilityHooks, composeHooks } from "zeitlich/workflow";
+
+const obs = createObservabilityHooks("myAgent");
+
+const session = await createSession({
+  hooks: {
+    ...obs,
+    onSessionEnd: composeHooks(obs.onSessionEnd, (ctx) => {
+      // your custom session-end logic
+    }),
+  },
+});
+```
+
+### Tracing with OpenTelemetry
+
+For distributed tracing across client, workflow, and activities, use Temporal's OpenTelemetry interceptor package:
+
+```bash
+npm install @temporalio/interceptors-opentelemetry @opentelemetry/sdk-node
+```
+
+See [Temporal's tracing docs](https://docs.temporal.io/develop/typescript/observability#set-up-tracing) and the [`interceptors-opentelemetry` sample](https://github.com/temporalio/samples-typescript/tree/main/interceptors-opentelemetry) for setup.
+
 ## Requirements
 
 - Node.js >= 18
