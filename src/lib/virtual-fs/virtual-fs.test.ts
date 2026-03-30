@@ -1,10 +1,9 @@
 import { describe, expect, it, beforeEach } from "vitest";
 import type { FileEntry, FileResolver } from "./types";
-import { VirtualSandboxFileSystem } from "./filesystem";
-import { createVirtualSandbox } from "./index";
+import { VirtualFileSystem } from "./filesystem";
 import { applyVirtualTreeMutations } from "./mutations";
-import { VirtualSandboxProvider } from "./provider";
-import { SandboxNotSupportedError } from "../../../lib/sandbox/types";
+import { createVirtualFsActivities } from "./manager";
+import { SandboxNotSupportedError } from "../sandbox/types";
 
 // ============================================================================
 // Mock resolver
@@ -112,15 +111,15 @@ const sampleTree: FileEntry[] = [
 const ctx: TestCtx = { projectId: "proj-42" };
 
 // ============================================================================
-// VirtualSandboxFileSystem
+// VirtualFileSystem
 // ============================================================================
 
-describe("VirtualSandboxFileSystem", () => {
-  let fs: VirtualSandboxFileSystem<TestCtx>;
+describe("VirtualFileSystem", () => {
+  let fs: VirtualFileSystem<TestCtx>;
 
   beforeEach(() => {
     const { resolver } = createMockResolver();
-    fs = new VirtualSandboxFileSystem(sampleTree, resolver, ctx);
+    fs = new VirtualFileSystem(sampleTree, resolver, ctx);
   });
 
   // --- exists / stat ---
@@ -327,132 +326,18 @@ describe("VirtualSandboxFileSystem", () => {
 });
 
 // ============================================================================
-// createVirtualSandbox
+// createVirtualFsActivities
 // ============================================================================
 
-describe("createVirtualSandbox", () => {
-  it("creates a sandbox with correct capabilities", () => {
+describe("createVirtualFsActivities", () => {
+  it("creates prefixed activity with resolveFileTree", async () => {
     const { resolver } = createMockResolver();
-    const sandbox = createVirtualSandbox("test-id", sampleTree, resolver, ctx);
-    expect(sandbox.capabilities.filesystem).toBe(true);
-    expect(sandbox.capabilities.execution).toBe(false);
-    expect(sandbox.capabilities.persistence).toBe(true);
-  });
+    const activities = createVirtualFsActivities(resolver, "codingAgent");
 
-  it("exec throws SandboxNotSupportedError", async () => {
-    const { resolver } = createMockResolver();
-    const sandbox = createVirtualSandbox("test-id", sampleTree, resolver, ctx);
-    await expect(sandbox.exec("ls")).rejects.toThrow(SandboxNotSupportedError);
-  });
-
-  it("fs operations work through the sandbox", async () => {
-    const { resolver } = createMockResolver();
-    const sandbox = createVirtualSandbox("test-id", sampleTree, resolver, ctx);
-    const content = await sandbox.fs.readFile("/README.md");
-    expect(content).toBe("# README\nThis is a readme.");
-  });
-
-  it("getMutations is accessible", async () => {
-    const { resolver } = createMockResolver();
-    const sandbox = createVirtualSandbox("test-id", sampleTree, resolver, ctx);
-    await sandbox.fs.writeFile("/new.txt", "hi");
-    expect(sandbox.fs.getMutations()).toHaveLength(1);
-  });
-});
-
-// ============================================================================
-// VirtualSandboxProvider
-// ============================================================================
-
-describe("VirtualSandboxProvider", () => {
-  it("create resolves entries and returns sandbox + stateUpdate", async () => {
-    const { resolver } = createMockResolver();
-    const provider = new VirtualSandboxProvider(resolver);
-    const { sandbox, stateUpdate } = await provider.create({
-      resolverContext: ctx,
-    });
-    expect(sandbox.capabilities.filesystem).toBe(true);
-    expect(sandbox.capabilities.execution).toBe(false);
-    const content = await sandbox.fs.readFile("/resolved/file-1.txt");
-    expect(content).toBe('console.log("hello");');
-
-    expect(stateUpdate).toBeDefined();
-    expect(stateUpdate?.resolverContext).toEqual(ctx);
-    expect(Array.isArray(stateUpdate?.fileTree)).toBe(true);
-    expect((stateUpdate?.fileTree as FileEntry[]).length).toBe(3);
-  });
-
-  it("create uses provided id as sandbox id", async () => {
-    const { resolver } = createMockResolver();
-    const provider = new VirtualSandboxProvider(resolver);
-    const { sandbox, stateUpdate } = await provider.create({
-      id: "my-sandbox",
-      resolverContext: ctx,
-    });
-    expect(sandbox.id).toBe("my-sandbox");
-    expect(stateUpdate?.sandboxId).toBe("my-sandbox");
-  });
-
-  it("get throws (state lives in workflow)", async () => {
-    const { resolver } = createMockResolver();
-    const provider = new VirtualSandboxProvider(resolver);
-    await expect(provider.get()).rejects.toThrow("Sandbox does not support");
-  });
-
-  it("snapshot throws (state lives in workflow)", async () => {
-    const { resolver } = createMockResolver();
-    const provider = new VirtualSandboxProvider(resolver);
-    await expect(provider.snapshot()).rejects.toThrow(
-      "Sandbox does not support",
-    );
-  });
-
-  it("restore throws (state lives in workflow)", async () => {
-    const { resolver } = createMockResolver();
-    const provider = new VirtualSandboxProvider(resolver);
-    await expect(provider.restore()).rejects.toThrow(
-      "Sandbox does not support",
-    );
-  });
-
-  it("destroy is a no-op", async () => {
-    const { resolver } = createMockResolver();
-    const provider = new VirtualSandboxProvider(resolver);
-    await expect(provider.destroy()).resolves.not.toThrow();
-  });
-
-  it("create throws without required options", async () => {
-    const { resolver } = createMockResolver();
-    const provider = new VirtualSandboxProvider(resolver);
-    await expect(provider.create()).rejects.toThrow(
-      "requires resolverContext",
-    );
-  });
-
-  it("create seeds initialFiles via writeFile into sandbox and fileTree", async () => {
-    const { resolver } = createMockResolver();
-    const provider = new VirtualSandboxProvider(resolver);
-    const { sandbox, stateUpdate } = await provider.create({
-      resolverContext: ctx,
-      initialFiles: {
-        "/skills/my-skill/SKILL.md": "---\nname: my-skill\n---\nDo things.",
-        "/skills/my-skill/references/guide.md": "# Guide\nStep 1...",
-      },
-    });
-
-    expect(await sandbox.fs.readFile("/skills/my-skill/SKILL.md")).toBe(
-      "---\nname: my-skill\n---\nDo things.",
-    );
-    expect(await sandbox.fs.readFile("/skills/my-skill/references/guide.md")).toBe(
-      "# Guide\nStep 1...",
-    );
-    expect(await sandbox.fs.exists("/skills/my-skill")).toBe(true);
-    expect(await sandbox.fs.exists("/skills/my-skill/references")).toBe(true);
-
-    const tree = stateUpdate?.fileTree as FileEntry[];
-    expect(tree.find((e) => e.path === "/skills/my-skill/SKILL.md")).toBeDefined();
-    expect(tree.find((e) => e.path === "/skills/my-skill/references/guide.md")).toBeDefined();
-    expect(stateUpdate).not.toHaveProperty("localFiles");
+    expect(activities).toHaveProperty("codingAgentResolveFileTree");
+    const result = await activities.codingAgentResolveFileTree(ctx);
+    expect(result.fileTree).toHaveLength(3);
+    expect(result.fileTree[0]?.path).toMatch(/^\/resolved\//);
   });
 });
 

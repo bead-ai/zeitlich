@@ -18,8 +18,6 @@ export default defineConfig({
     "adapters/sandbox/inmemory/workflow": "src/adapters/sandbox/inmemory/proxy.ts",
     "adapters/sandbox/daytona/index": "src/adapters/sandbox/daytona/index.ts",
     "adapters/sandbox/daytona/workflow": "src/adapters/sandbox/daytona/proxy.ts",
-    "adapters/sandbox/virtual/index": "src/adapters/sandbox/virtual/index.ts",
-    "adapters/sandbox/virtual/workflow": "src/adapters/sandbox/virtual/proxy.ts",
     "adapters/sandbox/e2b/index": "src/adapters/sandbox/e2b/index.ts",
     "adapters/sandbox/e2b/workflow": "src/adapters/sandbox/e2b/proxy.ts",
     "adapters/sandbox/bedrock/index": "src/adapters/sandbox/bedrock/index.ts",

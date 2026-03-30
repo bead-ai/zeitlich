@@ -9,7 +9,7 @@
  * // In your workflow file
  * import { createSession, defineWorkflow, defineTool, bashTool } from 'zeitlich/workflow';
  * import { proxyLangChainThreadOps } from 'zeitlich/adapters/thread/langchain/workflow';
- * import { proxyVirtualSandboxOps } from 'zeitlich/adapters/sandbox/virtual/workflow';
+ * import { proxyVirtualFsOps } from 'zeitlich/workflow';
  * ```
  */
 
@@ -152,24 +152,27 @@ export {
   SandboxNotSupportedError,
 } from "./lib/sandbox/types";
 
-// Virtual sandbox (workflow-safe — imported from leaf modules to avoid
-// pulling activity-side code like VirtualSandboxFileSystem / Provider).
-export { applyVirtualTreeMutations } from "./adapters/sandbox/virtual/mutations";
-export { formatVirtualFileTree } from "./adapters/sandbox/virtual/tree";
+// Virtual filesystem (workflow-safe — imported from leaf modules to avoid
+// pulling activity-side code like VirtualFileSystem).
+export { applyVirtualTreeMutations } from "./lib/virtual-fs/mutations";
+export { formatVirtualFileTree } from "./lib/virtual-fs/tree";
 export {
   hasFileWithMimeType,
   filesWithMimeType,
   hasDirectory,
-} from "./adapters/sandbox/virtual/queries";
+} from "./lib/virtual-fs/queries";
+export { proxyVirtualFsOps } from "./lib/virtual-fs/proxy";
 
 export type {
   FileEntry,
   FileEntryMetadata,
   FileResolver,
   VirtualFileTree,
-  VirtualSandboxState,
+  VirtualFsOps,
+  PrefixedVirtualFsOps,
+  VirtualFsState,
   TreeMutation,
-} from "./adapters/sandbox/virtual/types";
+} from "./lib/virtual-fs/types";
 
 // Subagent support
 export type { SubagentArgs } from "./lib/subagent";

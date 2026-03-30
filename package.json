@@ -107,26 +107,6 @@
         "default": "./dist/adapters/sandbox/inmemory/workflow.js"
       }
     },
-    "./adapters/sandbox/virtual": {
-      "import": {
-        "types": "./dist/adapters/sandbox/virtual/index.d.ts",
-        "default": "./dist/adapters/sandbox/virtual/index.js"
-      },
-      "require": {
-        "types": "./dist/adapters/sandbox/virtual/index.d.ts",
-        "default": "./dist/adapters/sandbox/virtual/index.js"
-      }
-    },
-    "./adapters/sandbox/virtual/workflow": {
-      "import": {
-        "types": "./dist/adapters/sandbox/virtual/workflow.d.ts",
-        "default": "./dist/adapters/sandbox/virtual/workflow.js"
-      },
-      "require": {
-        "types": "./dist/adapters/sandbox/virtual/workflow.d.ts",
-        "default": "./dist/adapters/sandbox/virtual/workflow.js"
-      }
-    },
     "./adapters/sandbox/daytona": {
       "import": {
         "types": "./dist/adapters/sandbox/daytona/index.d.ts",
