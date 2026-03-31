@@ -80,9 +80,9 @@ export class SandboxManager<
    * manager.createActivities("CodingAgent");
    * // registers: inMemoryCodingAgentCreateSandbox, inMemoryCodingAgentDestroySandbox, …
    *
-   * const vmgr = new SandboxManager(new VirtualSandboxProvider(resolver));
-   * vmgr.createActivities("CodingAgent");
-   * // registers: virtualCodingAgentCreateSandbox, …
+   * const dmgr = new SandboxManager(new DaytonaSandboxProvider(config));
+   * dmgr.createActivities("CodingAgent");
+   * // registers: daytonaCodingAgentCreateSandbox, …
    * ```
    */
   createActivities<S extends string>(

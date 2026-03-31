@@ -58,7 +58,7 @@ A sandbox adapter provides filesystem access for tools like `Bash`, `Read`, `Wri
 | Adapter | Import | Use case |
 |---------|--------|----------|
 | In-memory | `zeitlich/adapters/sandbox/inmemory` | Tests and lightweight agents |
-| Virtual | `zeitlich/adapters/sandbox/virtual` | Custom resolvers with path-only ops |
+| Virtual FS | `zeitlich` / `zeitlich/workflow` | Built-in virtual filesystem with custom resolvers |
 | Daytona | `zeitlich/adapters/sandbox/daytona` | Remote Daytona workspaces |
 | E2B | `zeitlich/adapters/sandbox/e2b` | E2B cloud sandboxes |
 | Bedrock | `zeitlich/adapters/sandbox/bedrock` | AWS Bedrock AgentCore Code Interpreter |
@@ -774,22 +774,16 @@ This means `readFile("a/b.txt")` is treated as `/a/b.txt` across adapters.
 
 Each `fs` instance also exposes `workspaceBase`, which is the base used for relative paths.
 
-**Virtual sandbox example (path-only calls):**
+**Virtual filesystem example (path-only calls):**
 
 ```typescript
-import { createVirtualSandbox, VirtualSandboxProvider } from "zeitlich";
+import { VirtualFileSystem } from "zeitlich";
 
-const provider = new VirtualSandboxProvider(resolver);
-const { sandbox } = await provider.create({
-  resolverContext: { projectId: "p1" },
-  workspaceBase: "/repo",
-});
+const virtualFs = new VirtualFileSystem(fileTree, resolver, { projectId: "p1" }, "/repo");
+console.log(virtualFs.workspaceBase); // "/repo"
 
-const fs = sandbox.fs;
-console.log(fs.workspaceBase); // "/repo"
-
-await fs.writeFile("src/index.ts", 'export const ok = true;\n');
-const content = await fs.readFile("src/index.ts"); // reads /repo/src/index.ts
+await virtualFs.writeFile("src/index.ts", 'export const ok = true;\n');
+const content = await virtualFs.readFile("src/index.ts"); // reads /repo/src/index.ts
 ```
 
 **Daytona sandbox example (base `/home/daytona`):**

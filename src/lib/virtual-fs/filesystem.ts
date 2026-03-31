@@ -2,8 +2,8 @@ import type {
   SandboxFileSystem,
   DirentEntry,
   FileStat,
-} from "../../../lib/sandbox/types";
-import { SandboxNotSupportedError } from "../../../lib/sandbox/types";
+} from "../sandbox/types";
+import { SandboxNotSupportedError } from "../sandbox/types";
 import { posix } from "node:path";
 import type {
   FileEntry,
@@ -45,13 +45,13 @@ function inferDirectories(
 }
 
 /**
- * Ephemeral {@link SandboxFileSystem} backed by a {@link FileResolver}.
+ * Ephemeral virtual filesystem backed by a {@link FileResolver}.
  *
  * Created fresh for each tool invocation from the current workflow file tree.
  * Directory structure is inferred from file paths. All mutations are tracked
  * and can be retrieved via {@link getMutations} after the handler completes.
  */
-export class VirtualSandboxFileSystem<
+export class VirtualFileSystem<
   TCtx = unknown,
   TMeta = FileEntryMetadata,
 > implements SandboxFileSystem {

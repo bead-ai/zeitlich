@@ -59,6 +59,13 @@ export type { AgentStateContext } from "./lib/activity";
 export { SandboxManager } from "./lib/sandbox/manager";
 export { NodeFsSandboxFileSystem } from "./lib/sandbox/node-fs";
 
+// Virtual filesystem (activity-side)
+export { VirtualFileSystem } from "./lib/virtual-fs/filesystem";
+export { withVirtualFs } from "./lib/virtual-fs/with-virtual-fs";
+export { createVirtualFsActivities } from "./lib/virtual-fs/manager";
+export type { FileTreeAccessor } from "./lib/virtual-fs/queries";
+export type { VirtualFsContext } from "./lib/virtual-fs/types";
+
 // Tool handlers (activity implementations)
 // Wrap sandbox handlers with withSandbox(manager, handler) at registration time
 export { bashHandler } from "./tools/bash/handler";

@@ -1,6 +1,5 @@
-import type { Sandbox, SandboxCreateOptions } from "../../../lib/sandbox/types";
-import type { RouterContext } from "../../../lib/tool-router/types";
-import type { VirtualSandboxFileSystem } from "./filesystem";
+import type { RouterContext } from "../tool-router/types";
+import type { VirtualFileSystem } from "./filesystem";
 
 // ============================================================================
 // File Entry
@@ -15,7 +14,7 @@ export type FileEntryMetadata = Record<
 /** JSON-serializable metadata for a single file in the virtual tree. */
 export interface FileEntry<TMeta = FileEntryMetadata> {
   id: string;
-  /** Virtual path inside the sandbox, e.g. "/src/index.ts" */
+  /** Virtual path, e.g. "/src/index.ts" */
   path: string;
   size: number;
   /** ISO-8601 date string (JSON-safe) */
@@ -73,63 +72,74 @@ export interface FileResolver<TCtx = unknown, TMeta = FileEntryMetadata> {
 }
 
 // ============================================================================
-// Create Options
+// VirtualFsOps — workflow-side activity interface
 // ============================================================================
 
 /**
- * Options for {@link VirtualSandboxProvider.create}.
- * Extends base options with resolver context.
+ * Workflow-side operations for the virtual filesystem.
+ *
+ * Unlike {@link SandboxOps}, this only exposes what is actually needed:
+ * resolving the initial file tree from the consumer's data layer.
  */
-export interface VirtualSandboxCreateOptions<
-  TCtx,
-> extends SandboxCreateOptions {
-  resolverContext: TCtx;
-  /** Base path for resolving relative filesystem paths (default "/"). */
-  workspaceBase?: string;
+export interface VirtualFsOps<
+  TCtx = unknown,
+  TMeta = FileEntryMetadata,
+> {
+  resolveFileTree(
+    ctx: TCtx,
+  ): Promise<{
+    fileTree: FileEntry<TMeta>[];
+    stateUpdate?: Record<string, unknown>;
+  }>;
 }
+
+/**
+ * Maps generic {@link VirtualFsOps} method names to scope-prefixed names.
+ *
+ * @example
+ * ```typescript
+ * type Ops = PrefixedVirtualFsOps<"codingAgent">;
+ * // → { codingAgentResolveFileTree: ... }
+ * ```
+ */
+export type PrefixedVirtualFsOps<
+  TPrefix extends string,
+  TCtx = unknown,
+  TMeta = FileEntryMetadata,
+> = {
+  [K in keyof VirtualFsOps<TCtx, TMeta> as `${TPrefix}${Capitalize<K & string>}`]: VirtualFsOps<TCtx, TMeta>[K];
+};
 
 // ============================================================================
 // Workflow State Shape
 // ============================================================================
 
 /**
- * The portion of workflow `AgentState` that the virtual sandbox reads via
+ * The portion of workflow `AgentState` that the virtual filesystem reads via
  * {@link queryParentWorkflowState}. Populated automatically by the session
- * from the provider's `stateUpdate` after `createSandbox`.
+ * when `virtualFs` config is provided.
  */
-export interface VirtualSandboxState<
+export interface VirtualFsState<
   TCtx = unknown,
   TMeta = FileEntryMetadata,
 > {
-  sandboxId: string;
   fileTree: FileEntry<TMeta>[];
   resolverContext: TCtx;
   workspaceBase?: string;
 }
 
 // ============================================================================
-// VirtualSandbox instance type
-// ============================================================================
-
-/**
- * A {@link Sandbox} whose filesystem is backed by a {@link VirtualSandboxFileSystem}.
- */
-export type VirtualSandbox<
-  TCtx = unknown,
-  TMeta = FileEntryMetadata,
-> = Sandbox & { fs: VirtualSandboxFileSystem<TCtx, TMeta> };
-
-// ============================================================================
 // Handler Context
 // ============================================================================
 
 /**
- * Extended router context injected by {@link withVirtualSandbox}.
- * Guarantees a live (ephemeral) sandbox built from the workflow file tree.
+ * Extended router context injected by {@link withVirtualFs}.
+ * Guarantees a live (ephemeral) virtual filesystem built from the workflow
+ * file tree.
  */
-export interface VirtualSandboxContext<
+export interface VirtualFsContext<
   TCtx = unknown,
   TMeta = FileEntryMetadata,
 > extends RouterContext {
-  sandbox: VirtualSandbox<TCtx, TMeta>;
+  virtualFs: VirtualFileSystem<TCtx, TMeta>;
 }

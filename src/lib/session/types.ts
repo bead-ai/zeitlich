@@ -12,6 +12,7 @@ import type { Hooks } from "../hooks/types";
 import type { SubagentConfig } from "../subagent/types";
 import type { Skill } from "../skills/types";
 import type { SandboxOps } from "../sandbox/types";
+import type { VirtualFsOps } from "../virtual-fs/types";
 import type { RunAgentActivity } from "../model/types";
 import type { AgentStateManager, JsonSerializable } from "../state/types";
 import type { ActivityInterfaceFor } from "@temporalio/workflow";
@@ -163,6 +164,26 @@ export interface SessionConfig<T extends ToolMap, M = unknown, TContent = string
    * Has no effect when the sandbox is inherited (`sandbox.mode === "inherit"`).
    */
   sandboxShutdown?: SubagentSandboxShutdown;
+
+  // ---------------------------------------------------------------------------
+  // Virtual filesystem
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Virtual filesystem configuration (optional — independent of sandbox).
+   *
+   * When provided, the session resolves the file tree on start and merges
+   * `fileTree`, `resolverContext`, and `workspaceBase` into `AgentState`.
+   * Tool handlers wrapped with `withVirtualFs` can then read this state.
+   *
+   * Can be used alongside `sandboxOps` for agents that need both a real
+   * sandbox (e.g. for execution) and a virtual filesystem.
+   */
+  virtualFs?: {
+    ops: VirtualFsOps;
+    resolverContext: unknown;
+    workspaceBase?: string;
+  };
 }
 
 export type SessionResult<

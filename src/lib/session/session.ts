@@ -92,6 +92,7 @@ export async function createSession<T extends ToolMap, M = unknown, TContent = s
   thread: threadInit,
   sandbox: sandboxInit,
   sandboxShutdown = "destroy",
+  virtualFs: virtualFsConfig,
 }: SessionConfig<T, M, TContent>): Promise<ZeitlichSession<M, boolean>> {
   // ---------------------------------------------------------------------------
   // Thread resolution
@@ -250,6 +251,19 @@ export async function createSession<T extends ToolMap, M = unknown, TContent = s
         if (result.stateUpdate) {
           stateManager.mergeUpdate(result.stateUpdate as Partial<TState>);
         }
+      }
+
+      // --- Virtual filesystem init (independent of sandbox) ----------------
+      if (virtualFsConfig) {
+        const result = await virtualFsConfig.ops.resolveFileTree(
+          virtualFsConfig.resolverContext,
+        );
+        stateManager.mergeUpdate({
+          fileTree: result.fileTree,
+          resolverContext: virtualFsConfig.resolverContext,
+          workspaceBase: virtualFsConfig.workspaceBase ?? "/",
+          ...result.stateUpdate,
+        } as unknown as Partial<TState>);
       }
 
       if (hooks.onSessionStart) {
