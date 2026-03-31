@@ -10,12 +10,12 @@ import {
   ToolMessage,
   mapStoredMessagesToChatMessages,
 } from "@langchain/core/messages";
-import {
-  createThreadManager,
-  type ProviderThreadManager,
-  type ThreadManagerConfig,
-  type ThreadManagerHooks,
-} from "../../../lib/thread";
+import { createThreadManager } from "../../../lib/thread/manager";
+import type {
+  ProviderThreadManager,
+  ThreadManagerConfig,
+  ThreadManagerHooks,
+} from "../../../lib/thread/types";
 
 /** SDK-native content type for LangChain human messages */
 export type LangChainContent = string | MessageContent;

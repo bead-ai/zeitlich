@@ -1,12 +1,12 @@
 import type Redis from "ioredis";
 import type Anthropic from "@anthropic-ai/sdk";
 import type { JsonValue } from "../../../lib/state/types";
-import {
-  createThreadManager,
-  type ProviderThreadManager,
-  type ThreadManagerConfig,
-  type ThreadManagerHooks,
-} from "../../../lib/thread";
+import { createThreadManager } from "../../../lib/thread/manager";
+import type {
+  ProviderThreadManager,
+  ThreadManagerConfig,
+  ThreadManagerHooks,
+} from "../../../lib/thread/types";
 
 /** SDK-native content type for Anthropic human messages */
 export type AnthropicContent =

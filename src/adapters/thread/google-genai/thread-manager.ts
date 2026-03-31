@@ -1,11 +1,11 @@
 import type Redis from "ioredis";
 import type { Content, Part } from "@google/genai";
-import {
-  createThreadManager,
-  type ProviderThreadManager,
-  type ThreadManagerConfig,
-  type ThreadManagerHooks,
-} from "../../../lib/thread";
+import { createThreadManager } from "../../../lib/thread/manager";
+import type {
+  ProviderThreadManager,
+  ThreadManagerConfig,
+  ThreadManagerHooks,
+} from "../../../lib/thread/types";
 import type { GoogleGenAIToolResponse } from "./activities";
 
 /** SDK-native content type for Google GenAI human messages */
