@@ -142,10 +142,11 @@ export interface SandboxProvider<
 
 export interface SandboxOps<
   TOptions extends SandboxCreateOptions = SandboxCreateOptions,
+  TCtx = unknown,
 > {
   createSandbox(
     options?: TOptions,
-    ctx?: unknown
+    ctx?: TCtx
   ): Promise<{ sandboxId: string } | null>;
   destroySandbox(sandboxId: string): Promise<void>;
   pauseSandbox(sandboxId: string): Promise<void>;
@@ -165,8 +166,9 @@ export interface SandboxOps<
 export type PrefixedSandboxOps<
   TPrefix extends string,
   TOptions extends SandboxCreateOptions = SandboxCreateOptions,
+  TCtx = unknown,
 > = {
-  [K in keyof SandboxOps<TOptions> as `${TPrefix}${Capitalize<K & string>}`]: SandboxOps<TOptions>[K];
+  [K in keyof SandboxOps<TOptions, TCtx> as `${TPrefix}${Capitalize<K & string>}`]: SandboxOps<TOptions, TCtx>[K];
 };
 
 // ============================================================================

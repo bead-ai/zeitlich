@@ -31,6 +31,7 @@ export interface PreCreateHookResult<
  */
 export interface SandboxManagerHooks<
   TOptions extends SandboxCreateOptions = SandboxCreateOptions,
+  TCtx = unknown,
 > {
   /**
    * Called before sandbox creation.
@@ -44,7 +45,7 @@ export interface SandboxManagerHooks<
    */
   onPreCreate?: (
     options: TOptions,
-    ctx?: unknown
+    ctx?: TCtx
   ) => Promise<PreCreateHookResult<TOptions> | undefined>;
 
   /**
@@ -98,19 +99,20 @@ export class SandboxManager<
   TOptions extends SandboxCreateOptions = SandboxCreateOptions,
   TSandbox extends Sandbox = Sandbox,
   TId extends string = string,
+  TCtx = unknown,
 > {
-  private hooks: SandboxManagerHooks<TOptions>;
+  private hooks: SandboxManagerHooks<TOptions, TCtx>;
 
   constructor(
     private provider: SandboxProvider<TOptions, TSandbox> & {
       readonly id: TId;
     },
-    options?: { hooks?: SandboxManagerHooks<TOptions> }
+    options?: { hooks?: SandboxManagerHooks<TOptions, TCtx> }
   ) {
     this.hooks = options?.hooks ?? {};
   }
 
-  async create(options?: TOptions, ctx?: unknown): Promise<{
+  async create(options?: TOptions, ctx?: TCtx): Promise<{
     sandboxId: string;
   } | null> {
     let providerOptions = options;
@@ -197,12 +199,12 @@ export class SandboxManager<
    */
   createActivities<S extends string>(
     scope: S
-  ): PrefixedSandboxOps<`${TId}${Capitalize<S>}`, TOptions> {
+  ): PrefixedSandboxOps<`${TId}${Capitalize<S>}`, TOptions, TCtx> {
     const prefix = `${this.provider.id}${scope.charAt(0).toUpperCase()}${scope.slice(1)}`;
-    const ops: SandboxOps<TOptions> = {
+    const ops: SandboxOps<TOptions, TCtx> = {
       createSandbox: async (
         options?: TOptions,
-        ctx?: unknown
+        ctx?: TCtx
       ): Promise<{
         sandboxId: string;
       } | null> => {
@@ -227,6 +229,6 @@ export class SandboxManager<
     const cap = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1);
     return Object.fromEntries(
       Object.entries(ops).map(([k, v]) => [`${prefix}${cap(k)}`, v])
-    ) as PrefixedSandboxOps<`${TId}${Capitalize<S>}`, TOptions>;
+    ) as PrefixedSandboxOps<`${TId}${Capitalize<S>}`, TOptions, TCtx>;
   }
 }
