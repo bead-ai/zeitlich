@@ -16,7 +16,7 @@ import { VirtualFileSystem } from "./filesystem";
  * the parent workflow for the current file tree and resolver context.
  *
  * On each invocation the wrapper:
- * 1. Queries the workflow's `AgentState` for `fileTree`, `resolverContext`, and `workspaceBase`
+ * 1. Queries the workflow's `AgentState` for `fileTree`, `ctx`, and `workspaceBase`
  * 2. Creates an ephemeral {@link VirtualFileSystem} from tree + resolver
  * 3. Runs the inner handler
  * 4. Returns the handler's result together with any {@link TreeMutation}s
@@ -66,7 +66,7 @@ export function withVirtualFs<
     const state =
       await queryParentWorkflowState<VirtualFsState<TCtx, TMeta>>(client);
 
-    const { fileTree, resolverContext, workspaceBase } = state;
+    const { fileTree, ctx, workspaceBase } = state;
     if (!fileTree) {
       return {
         toolResponse: `Error: No fileTree in agent state. The ${context.toolName} tool requires a virtual filesystem.`,
@@ -77,8 +77,8 @@ export function withVirtualFs<
     const virtualFs = new VirtualFileSystem(
       fileTree,
       resolver,
-      resolverContext,
-      workspaceBase ?? "/",
+      ctx,
+      workspaceBase ?? "/"
     );
     const response = await handler(args, { ...context, virtualFs });
     const mutations = virtualFs.getMutations();

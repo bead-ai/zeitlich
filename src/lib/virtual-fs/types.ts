@@ -81,13 +81,8 @@ export interface FileResolver<TCtx = unknown, TMeta = FileEntryMetadata> {
  * Unlike {@link SandboxOps}, this only exposes what is actually needed:
  * resolving the initial file tree from the consumer's data layer.
  */
-export interface VirtualFsOps<
-  TCtx = unknown,
-  TMeta = FileEntryMetadata,
-> {
-  resolveFileTree(
-    ctx: TCtx,
-  ): Promise<{
+export interface VirtualFsOps<TCtx = unknown, TMeta = FileEntryMetadata> {
+  resolveFileTree(ctx: TCtx): Promise<{
     fileTree: FileEntry<TMeta>[];
     stateUpdate?: Record<string, unknown>;
   }>;
@@ -107,7 +102,10 @@ export type PrefixedVirtualFsOps<
   TCtx = unknown,
   TMeta = FileEntryMetadata,
 > = {
-  [K in keyof VirtualFsOps<TCtx, TMeta> as `${TPrefix}${Capitalize<K & string>}`]: VirtualFsOps<TCtx, TMeta>[K];
+  [K in keyof VirtualFsOps<
+    TCtx,
+    TMeta
+  > as `${TPrefix}${Capitalize<K & string>}`]: VirtualFsOps<TCtx, TMeta>[K];
 };
 
 // ============================================================================
@@ -119,12 +117,9 @@ export type PrefixedVirtualFsOps<
  * {@link queryParentWorkflowState}. Populated automatically by the session
  * when `virtualFs` config is provided.
  */
-export interface VirtualFsState<
-  TCtx = unknown,
-  TMeta = FileEntryMetadata,
-> {
+export interface VirtualFsState<TCtx = unknown, TMeta = FileEntryMetadata> {
   fileTree: FileEntry<TMeta>[];
-  resolverContext: TCtx;
+  ctx: TCtx;
   workspaceBase?: string;
 }
 

@@ -1,5 +1,5 @@
 export { SandboxManager } from "./manager";
-export type { SandboxCreateResolver } from "./manager";
+export type { SandboxManagerHooks, PreCreateHookResult } from "./manager";
 export { toTree } from "./tree";
 export type {
   Sandbox,
@@ -14,7 +14,4 @@ export type {
   DirentEntry,
   FileStat,
 } from "./types";
-export {
-  SandboxNotFoundError,
-  SandboxNotSupportedError,
-} from "./types";
+export { SandboxNotFoundError, SandboxNotSupportedError } from "./types";

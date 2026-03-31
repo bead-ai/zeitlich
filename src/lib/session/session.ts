@@ -23,7 +23,7 @@ import { uuid4 } from "@temporalio/workflow";
  * Returns undefined when no skills carry resource contents.
  */
 function collectSkillFiles(
-  skills: Skill[],
+  skills: Skill[]
 ): Record<string, string> | undefined {
   let files: Record<string, string> | undefined;
   for (const skill of skills) {
@@ -67,13 +67,23 @@ function collectSkillFiles(
  * const { finalMessage, exitReason } = await session.runSession({ stateManager });
  * ```
  */
-export async function createSession<T extends ToolMap, M = unknown, TContent = string>(
+export async function createSession<
+  T extends ToolMap,
+  M = unknown,
+  TContent = string,
+>(
   config: SessionConfig<T, M, TContent> & { sandboxOps: SandboxOps }
 ): Promise<ZeitlichSession<M, true>>;
-export async function createSession<T extends ToolMap, M = unknown, TContent = string>(
-  config: SessionConfig<T, M, TContent>
-): Promise<ZeitlichSession<M, false>>;
-export async function createSession<T extends ToolMap, M = unknown, TContent = string>({
+export async function createSession<
+  T extends ToolMap,
+  M = unknown,
+  TContent = string,
+>(config: SessionConfig<T, M, TContent>): Promise<ZeitlichSession<M, false>>;
+export async function createSession<
+  T extends ToolMap,
+  M = unknown,
+  TContent = string,
+>({
   agentName,
   maxTurns = 50,
   metadata = {},
@@ -103,15 +113,18 @@ export async function createSession<T extends ToolMap, M = unknown, TContent = s
 
   switch (threadMode) {
     case "new":
-      threadId = threadInit?.mode === "new" && threadInit.threadId
-        ? threadInit.threadId
-        : getShortId();
+      threadId =
+        threadInit?.mode === "new" && threadInit.threadId
+          ? threadInit.threadId
+          : getShortId();
       break;
     case "continue":
-      threadId = (threadInit as { mode: "continue"; threadId: string }).threadId;
+      threadId = (threadInit as { mode: "continue"; threadId: string })
+        .threadId;
       break;
     case "fork":
-      sourceThreadId = (threadInit as { mode: "fork"; threadId: string }).threadId;
+      sourceThreadId = (threadInit as { mode: "fork"; threadId: string })
+        .threadId;
       threadId = getShortId();
       break;
   }
@@ -126,7 +139,9 @@ export async function createSession<T extends ToolMap, M = unknown, TContent = s
 
   const plugins: ToolMap[string][] = [];
   let destroySubagentSandboxes: (() => Promise<void>) | undefined;
-  let sandboxStateGetter: (() => Record<string, unknown> | undefined) | undefined;
+  let sandboxStateGetter:
+    | (() => Record<string, unknown> | undefined)
+    | undefined;
   if (subagents) {
     const result = buildSubagentRegistration(subagents, {
       getSandboxStateForInheritance: () => sandboxStateGetter?.(),
@@ -199,25 +214,30 @@ export async function createSession<T extends ToolMap, M = unknown, TContent = s
 
       sandboxStateGetter = () => {
         const fileTree = stateManager.get("fileTree" as keyof TState);
-        const resolverContext = stateManager.get("resolverContext" as keyof TState);
+        const ctx = stateManager.get("ctx" as keyof TState);
         const workspaceBase = stateManager.get("workspaceBase" as keyof TState);
-        if (!fileTree && !resolverContext && !workspaceBase) return undefined;
+        if (!fileTree && !ctx && !workspaceBase) return undefined;
         return {
           ...(fileTree !== undefined && { fileTree }),
-          ...(resolverContext !== undefined && { resolverContext }),
+          ...(ctx !== undefined && { ctx }),
           ...(workspaceBase !== undefined && { workspaceBase }),
         };
       };
 
       if (sandboxMode === "inherit") {
-        const inheritInit = sandboxInit as { mode: "inherit"; sandboxId: string; stateUpdate?: Record<string, unknown> };
+        const inheritInit = sandboxInit as {
+          mode: "inherit";
+          sandboxId: string;
+          stateUpdate?: Record<string, unknown>;
+        };
         sandboxId = inheritInit.sandboxId;
         if (inheritInit.stateUpdate) {
           stateManager.mergeUpdate(inheritInit.stateUpdate as Partial<TState>);
         }
         if (!sandboxOps) {
           throw ApplicationFailure.create({
-            message: "sandboxId provided but no sandboxOps — cannot manage sandbox lifecycle",
+            message:
+              "sandboxId provided but no sandboxOps — cannot manage sandbox lifecycle",
             nonRetryable: true,
           });
         }
@@ -228,7 +248,8 @@ export async function createSession<T extends ToolMap, M = unknown, TContent = s
             nonRetryable: true,
           });
         }
-        sandboxId = (sandboxInit as { mode: "continue"; sandboxId: string }).sandboxId;
+        sandboxId = (sandboxInit as { mode: "continue"; sandboxId: string })
+          .sandboxId;
         sandboxOwned = true;
       } else if (sandboxMode === "fork") {
         if (!sandboxOps) {
@@ -243,30 +264,33 @@ export async function createSession<T extends ToolMap, M = unknown, TContent = s
         sandboxOwned = true;
       } else if (sandboxOps) {
         const skillFiles = skills ? collectSkillFiles(skills) : undefined;
-        const resolverContext = (sandboxInit as { mode: "new"; resolverContext?: unknown } | undefined)?.resolverContext;
+        const ctx = (sandboxInit as { mode: "new"; ctx?: unknown } | undefined)
+          ?.ctx;
         const createOptions =
-          skillFiles || resolverContext !== undefined
+          skillFiles || ctx !== undefined
             ? {
-                ...(resolverContext !== undefined && { resolverContext }),
+                ...(ctx !== undefined && { ctx }),
                 ...(skillFiles && { initialFiles: skillFiles }),
               }
             : undefined;
         const result = await sandboxOps.createSandbox(createOptions);
-        sandboxId = result.sandboxId;
-        sandboxOwned = true;
-        if (result.stateUpdate) {
-          stateManager.mergeUpdate(result.stateUpdate as Partial<TState>);
+        if (result) {
+          sandboxId = result.sandboxId;
+          sandboxOwned = true;
+          if (result.stateUpdate) {
+            stateManager.mergeUpdate(result.stateUpdate as Partial<TState>);
+          }
         }
       }
 
       // --- Virtual filesystem init (independent of sandbox) ----------------
       if (virtualFsConfig) {
         const result = await virtualFsConfig.ops.resolveFileTree(
-          virtualFsConfig.resolverContext,
+          virtualFsConfig.ctx
         );
         stateManager.mergeUpdate({
           fileTree: result.fileTree,
-          resolverContext: virtualFsConfig.resolverContext,
+          ctx: virtualFsConfig.ctx,
           workspaceBase: virtualFsConfig.workspaceBase ?? "/",
           ...result.stateUpdate,
         } as unknown as Partial<TState>);
@@ -309,7 +333,12 @@ export async function createSession<T extends ToolMap, M = unknown, TContent = s
           await initializeThread(threadId, threadKey);
         }
       }
-      await appendHumanMessage(threadId, uuid4(), await buildContextMessage(), threadKey);
+      await appendHumanMessage(
+        threadId,
+        uuid4(),
+        await buildContextMessage(),
+        threadKey
+      );
 
       let exitReason: SessionExitReason = "completed";
 

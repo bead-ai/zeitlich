@@ -8,16 +8,47 @@ import type {
 } from "./types";
 
 /**
- * Async resolver that turns an opaque `resolverContext` into partial
- * creation options (e.g. initial files loaded from an external data source).
+ * Result returned by {@link SandboxManagerHooks.onPreCreate}.
  *
- * Registered once on the {@link SandboxManager} and invoked automatically
- * inside the `createSandbox` activity when `resolverContext` is present —
- * no additional activity registration required.
+ * - Set `skip: true` to prevent sandbox creation entirely.
+ * - Set `modifiedOptions` to override/extend the creation options that will
+ *   be forwarded to the provider. Fields in `modifiedOptions` are merged on
+ *   top of the original options (`initialFiles` and `env` are shallow-merged;
+ *   everything else is overwritten).
  */
-export type SandboxCreateResolver<
+export interface PreCreateHookResult<
   TOptions extends SandboxCreateOptions = SandboxCreateOptions,
-> = (ctx: unknown) => Promise<Partial<TOptions>>;
+> {
+  skip?: boolean;
+  modifiedOptions?: Partial<TOptions>;
+}
+
+/**
+ * Lifecycle hooks for {@link SandboxManager}.
+ *
+ * Hooks run inside the existing `createSandbox` activity — no additional
+ * activity registration required.
+ */
+export interface SandboxManagerHooks<
+  TOptions extends SandboxCreateOptions = SandboxCreateOptions,
+> {
+  /**
+   * Called before sandbox creation.
+   *
+   * Receives the raw options (including `ctx` when passed from
+   * the workflow). Return `{ skip: true }` to prevent creation, or
+   * `{ modifiedOptions }` to alter the options before they reach the
+   * provider.
+   */
+  onPreCreate?: (
+    options: TOptions | undefined
+  ) => Promise<PreCreateHookResult<TOptions> | undefined>;
+
+  /**
+   * Called after a sandbox has been successfully created.
+   */
+  onPostCreate?: (sandboxId: string) => Promise<void>;
+}
 
 /**
  * Stateless facade over a {@link SandboxProvider}.
@@ -25,11 +56,10 @@ export type SandboxCreateResolver<
  * Delegates all lifecycle operations to the provider, which is responsible
  * for its own instance management strategy (e.g. in-memory map, remote API).
  *
- * An optional {@link SandboxCreateResolver} can be passed at construction time.
- * When the `createSandbox` activity receives a `resolverContext`, the resolver
- * is called and its output is merged into the creation options before they
- * reach the provider. This allows workflows to derive sandbox options (e.g.
- * initial files) from workflow arguments without an extra activity.
+ * Optional {@link SandboxManagerHooks} can be passed at construction time.
+ * The `onPreCreate` hook runs inside the `createSandbox` activity, giving it
+ * access to `ctx` from workflow arguments without an extra
+ * activity. It can modify options or skip creation entirely.
  *
  * @example
  * ```typescript
@@ -46,11 +76,16 @@ export type SandboxCreateResolver<
  * const manager = new SandboxManager(
  *   new DaytonaSandboxProvider(config),
  *   {
- *     resolver: async (ctx) => {
- *       const { projectId, filePaths } = ctx as { projectId: string; filePaths: string[] };
- *       const files: Record<string, string> = {};
- *       for (const p of filePaths) files[p] = await db.readFile(projectId, p);
- *       return { initialFiles: files };
+ *     hooks: {
+ *       onPreCreate: async (options) => {
+ *         const { projectId, filePaths } = options?.ctx as { projectId: string; filePaths: string[] };
+ *         const files: Record<string, string> = {};
+ *         for (const p of filePaths) files[p] = await db.readFile(projectId, p);
+ *         return { modifiedOptions: { initialFiles: files } };
+ *       },
+ *       onPostCreate: async (sandboxId) => {
+ *         console.log("Sandbox created:", sandboxId);
+ *       },
  *     },
  *   },
  * );
@@ -61,42 +96,57 @@ export class SandboxManager<
   TSandbox extends Sandbox = Sandbox,
   TId extends string = string,
 > {
-  private resolver?: SandboxCreateResolver<TOptions>;
+  private hooks: SandboxManagerHooks<TOptions>;
 
   constructor(
-    private provider: SandboxProvider<TOptions, TSandbox> & { readonly id: TId },
-    options?: { resolver?: SandboxCreateResolver<TOptions> },
+    private provider: SandboxProvider<TOptions, TSandbox> & {
+      readonly id: TId;
+    },
+    options?: { hooks?: SandboxManagerHooks<TOptions> }
   ) {
-    this.resolver = options?.resolver;
+    this.hooks = options?.hooks ?? {};
   }
 
-  async create(
-    options?: TOptions
-  ): Promise<{ sandboxId: string; stateUpdate?: Record<string, unknown> }> {
+  async create(options?: TOptions): Promise<{
+    sandboxId: string;
+    stateUpdate?: Record<string, unknown>;
+  } | null> {
     let providerOptions = options;
 
-    if (options?.resolverContext !== undefined && this.resolver) {
-      const resolved = await this.resolver(options.resolverContext);
+    if (this.hooks.onPreCreate) {
+      const hookResult = await this.hooks.onPreCreate(options);
+      if (hookResult?.skip) return null;
 
-      const { resolverContext: _rc, ...passthrough } = options;
-      providerOptions = {
-        ...resolved,
-        ...passthrough,
-        initialFiles: {
-          ...resolved.initialFiles,
-          ...passthrough.initialFiles,
-        },
-        env: {
-          ...resolved.env,
-          ...passthrough.env,
-        },
-      } as TOptions;
-    } else if (options?.resolverContext !== undefined) {
-      const { resolverContext: _rc2, ...passthrough } = options;
+      if (hookResult?.modifiedOptions) {
+        const orig = options ?? ({} as TOptions);
+        const mod = hookResult.modifiedOptions;
+        providerOptions = {
+          ...mod,
+          ...orig,
+          initialFiles: {
+            ...mod.initialFiles,
+            ...orig.initialFiles,
+          },
+          env: {
+            ...mod.env,
+            ...orig.env,
+          },
+        } as TOptions;
+      }
+    }
+
+    if (providerOptions?.ctx !== undefined) {
+      const { ctx: _rc, ...passthrough } = providerOptions;
       providerOptions = passthrough as TOptions;
     }
 
-    const { sandbox, stateUpdate } = await this.provider.create(providerOptions);
+    const { sandbox, stateUpdate } =
+      await this.provider.create(providerOptions);
+
+    if (this.hooks.onPostCreate) {
+      await this.hooks.onPostCreate(sandbox.id);
+    }
+
     return { sandboxId: sandbox.id, ...(stateUpdate && { stateUpdate }) };
   }
 
@@ -156,7 +206,7 @@ export class SandboxManager<
       ): Promise<{
         sandboxId: string;
         stateUpdate?: Record<string, unknown>;
-      }> => {
+      } | null> => {
         return this.create(options);
       },
       destroySandbox: async (sandboxId: string): Promise<void> => {

@@ -21,7 +21,8 @@ describe("bash handler with sandbox", () => {
     const result = await manager.create({
       initialFiles: { "/home/user/hello.txt": "world" },
     });
-    sandboxId = result.sandboxId;
+    expect(result).not.toBeNull();
+    sandboxId = (result as NonNullable<typeof result>).sandboxId;
     handler = withSandbox(manager, bashHandler);
   });
 

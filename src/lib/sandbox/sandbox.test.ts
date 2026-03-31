@@ -1,7 +1,20 @@
 import { describe, expect, it, beforeEach } from "vitest";
 import { SandboxManager } from "./manager";
 import { InMemorySandboxProvider } from "../../adapters/sandbox/inmemory/index";
-import { SandboxNotFoundError, type Sandbox, type SandboxCreateOptions } from "./types";
+import {
+  SandboxNotFoundError,
+  type Sandbox,
+  type SandboxCreateOptions,
+} from "./types";
+
+async function mustCreate<T extends SandboxCreateOptions, TId extends string>(
+  mgr: SandboxManager<T, Sandbox, TId>,
+  options?: T
+): Promise<{ sandboxId: string; stateUpdate?: Record<string, unknown> }> {
+  const result = await mgr.create(options);
+  expect(result).not.toBeNull();
+  return result as NonNullable<typeof result>;
+}
 
 describe("SandboxManager", () => {
   let manager: SandboxManager<SandboxCreateOptions, Sandbox, "inMemory">;
@@ -11,34 +24,36 @@ describe("SandboxManager", () => {
   });
 
   it("creates a sandbox and returns an id", async () => {
-    const { sandboxId } = await manager.create();
+    const { sandboxId } = await mustCreate(manager);
     expect(sandboxId).toBeTruthy();
     const sandbox = await manager.getSandbox(sandboxId);
     expect(sandbox.id).toBe(sandboxId);
   });
 
   it("creates a sandbox with a custom id", async () => {
-    const { sandboxId } = await manager.create({ id: "my-sandbox" });
+    const { sandboxId } = await mustCreate(manager, { id: "my-sandbox" });
     expect(sandboxId).toBe("my-sandbox");
   });
 
   it("gets an existing sandbox", async () => {
-    const { sandboxId } = await manager.create();
+    const { sandboxId } = await mustCreate(manager);
     const sandbox = await manager.getSandbox(sandboxId);
     expect(sandbox.id).toBe(sandboxId);
   });
 
   it("throws SandboxNotFoundError for unknown id", async () => {
     await expect(manager.getSandbox("nonexistent")).rejects.toThrow(
-      SandboxNotFoundError,
+      SandboxNotFoundError
     );
   });
 
   it("destroys a sandbox", async () => {
-    const { sandboxId } = await manager.create();
+    const { sandboxId } = await mustCreate(manager);
     await manager.getSandbox(sandboxId);
     await manager.destroy(sandboxId);
-    await expect(manager.getSandbox(sandboxId)).rejects.toThrow(SandboxNotFoundError);
+    await expect(manager.getSandbox(sandboxId)).rejects.toThrow(
+      SandboxNotFoundError
+    );
   });
 
   it("destroy is idempotent for unknown ids", async () => {
@@ -46,7 +61,7 @@ describe("SandboxManager", () => {
   });
 
   it("snapshots and restores a sandbox", async () => {
-    const { sandboxId } = await manager.create({
+    const { sandboxId } = await mustCreate(manager, {
       initialFiles: { "/data.txt": "hello" },
     });
     const sandbox = await manager.getSandbox(sandboxId);
@@ -57,7 +72,9 @@ describe("SandboxManager", () => {
     expect(snapshot.providerId).toBe("inMemory");
 
     await manager.destroy(sandboxId);
-    await expect(manager.getSandbox(sandboxId)).rejects.toThrow(SandboxNotFoundError);
+    await expect(manager.getSandbox(sandboxId)).rejects.toThrow(
+      SandboxNotFoundError
+    );
 
     const restoredId = await manager.restore(snapshot);
     expect(restoredId).toBe(sandboxId);
@@ -68,17 +85,22 @@ describe("SandboxManager", () => {
     expect(extra).toBe("world");
   });
 
-  it("invokes resolver and merges options on create when resolverContext is present", async () => {
-    const resolver = async (ctx: unknown) => {
-      const { paths } = ctx as { paths: string[] };
-      const files: Record<string, string> = {};
-      for (const p of paths) files[p] = `content of ${p}`;
-      return { initialFiles: files, env: { RESOLVED: "true" } };
-    };
-    const mgr = new SandboxManager(new InMemorySandboxProvider(), { resolver });
+  it("onPreCreate hook merges modifiedOptions into create options", async () => {
+    const mgr = new SandboxManager(new InMemorySandboxProvider(), {
+      hooks: {
+        onPreCreate: async (options) => {
+          const { paths } = options?.ctx as { paths: string[] };
+          const files: Record<string, string> = {};
+          for (const p of paths) files[p] = `content of ${p}`;
+          return {
+            modifiedOptions: { initialFiles: files, env: { RESOLVED: "true" } },
+          };
+        },
+      },
+    });
 
-    const { sandboxId } = await mgr.create({
-      resolverContext: { paths: ["/a.txt", "/b.txt"] },
+    const { sandboxId } = await mustCreate(mgr, {
+      ctx: { paths: ["/a.txt", "/b.txt"] },
       initialFiles: { "/extra.txt": "extra" },
     });
 
@@ -88,29 +110,74 @@ describe("SandboxManager", () => {
     expect(await sandbox.fs.readFile("/extra.txt")).toBe("extra");
   });
 
-  it("strips resolverContext before passing to provider when no resolver registered", async () => {
-    const { sandboxId } = await manager.create({
-      resolverContext: { foo: "bar" },
+  it("strips ctx before passing to provider when no hooks registered", async () => {
+    const { sandboxId } = await mustCreate(manager, {
+      ctx: { foo: "bar" },
       initialFiles: { "/test.txt": "ok" },
     });
     const sandbox = await manager.getSandbox(sandboxId);
     expect(await sandbox.fs.readFile("/test.txt")).toBe("ok");
   });
 
-  it("explicit options take precedence over resolved options", async () => {
-    const resolver = async () => ({
-      initialFiles: { "/file.txt": "from-resolver" },
-      env: { KEY: "resolved" },
+  it("onPreCreate hook can skip sandbox creation", async () => {
+    const mgr = new SandboxManager(new InMemorySandboxProvider(), {
+      hooks: {
+        onPreCreate: async () => ({ skip: true }),
+      },
     });
-    const mgr = new SandboxManager(new InMemorySandboxProvider(), { resolver });
 
-    const { sandboxId } = await mgr.create({
-      resolverContext: {},
+    const result = await mgr.create({ ctx: { skip: true } });
+    expect(result).toBeNull();
+  });
+
+  it("original options take precedence over hook modifiedOptions", async () => {
+    const mgr = new SandboxManager(new InMemorySandboxProvider(), {
+      hooks: {
+        onPreCreate: async () => ({
+          modifiedOptions: {
+            initialFiles: { "/file.txt": "from-hook" },
+            env: { KEY: "hook" },
+          },
+        }),
+      },
+    });
+
+    const { sandboxId } = await mustCreate(mgr, {
+      ctx: {},
       initialFiles: { "/file.txt": "explicit" },
     });
 
     const sandbox = await mgr.getSandbox(sandboxId);
     expect(await sandbox.fs.readFile("/file.txt")).toBe("explicit");
+  });
+
+  it("onPostCreate hook receives sandboxId", async () => {
+    let capturedId: string | undefined;
+    const mgr = new SandboxManager(new InMemorySandboxProvider(), {
+      hooks: {
+        onPostCreate: async (sandboxId) => {
+          capturedId = sandboxId;
+        },
+      },
+    });
+
+    const { sandboxId } = await mustCreate(mgr);
+    expect(capturedId).toBe(sandboxId);
+  });
+
+  it("onPostCreate hook does not run when creation is skipped", async () => {
+    let postCalled = false;
+    const mgr = new SandboxManager(new InMemorySandboxProvider(), {
+      hooks: {
+        onPreCreate: async () => ({ skip: true }),
+        onPostCreate: async () => {
+          postCalled = true;
+        },
+      },
+    });
+
+    await mgr.create();
+    expect(postCalled).toBe(false);
   });
 
   it("createActivities returns prefixed SandboxOps-shaped object", async () => {
@@ -120,12 +187,14 @@ describe("SandboxManager", () => {
     expect(activities.inMemoryTestDestroySandbox).toBeTypeOf("function");
     expect(activities.inMemoryTestSnapshotSandbox).toBeTypeOf("function");
 
-    const { sandboxId } = await activities.inMemoryTestCreateSandbox();
+    const result = await activities.inMemoryTestCreateSandbox();
+    expect(result).not.toBeNull();
+    const { sandboxId } = result as NonNullable<typeof result>;
     await expect(manager.getSandbox(sandboxId)).resolves.toBeTruthy();
 
     await activities.inMemoryTestDestroySandbox(sandboxId);
     await expect(manager.getSandbox(sandboxId)).rejects.toThrow(
-      SandboxNotFoundError,
+      SandboxNotFoundError
     );
   });
 });
@@ -138,7 +207,7 @@ describe("InMemorySandboxProvider", () => {
   });
 
   it("creates sandbox with initial files", async () => {
-    const { sandboxId } = await manager.create({
+    const { sandboxId } = await mustCreate(manager, {
       initialFiles: {
         "/src/index.ts": 'console.log("hello");',
         "/README.md": "# Hello",
@@ -150,7 +219,7 @@ describe("InMemorySandboxProvider", () => {
   });
 
   it("supports filesystem operations", async () => {
-    const { sandboxId } = await manager.create();
+    const { sandboxId } = await mustCreate(manager);
     const { fs } = await manager.getSandbox(sandboxId);
 
     await fs.writeFile("/test.txt", "hello");
@@ -169,7 +238,7 @@ describe("InMemorySandboxProvider", () => {
   });
 
   it("supports shell execution", async () => {
-    const { sandboxId } = await manager.create({
+    const { sandboxId } = await mustCreate(manager, {
       initialFiles: { "/data.txt": "hello world" },
     });
     const sandbox = await manager.getSandbox(sandboxId);
@@ -180,7 +249,7 @@ describe("InMemorySandboxProvider", () => {
   });
 
   it("reports correct capabilities", async () => {
-    const { sandboxId } = await manager.create();
+    const { sandboxId } = await mustCreate(manager);
     const sandbox = await manager.getSandbox(sandboxId);
     expect(sandbox.capabilities).toEqual({
       filesystem: true,
@@ -190,7 +259,7 @@ describe("InMemorySandboxProvider", () => {
   });
 
   it("readdirWithFileTypes works", async () => {
-    const { sandboxId } = await manager.create({
+    const { sandboxId } = await mustCreate(manager, {
       initialFiles: {
         "/dir/a.txt": "a",
         "/dir/b.txt": "b",

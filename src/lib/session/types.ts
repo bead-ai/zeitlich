@@ -1,8 +1,5 @@
 import type { Duration } from "@temporalio/common";
-import type {
-  ToolResultConfig,
-  SessionExitReason,
-} from "../types";
+import type { ToolResultConfig, SessionExitReason } from "../types";
 import type {
   ToolMap,
   ToolCallResultUnion,
@@ -16,7 +13,11 @@ import type { VirtualFsOps } from "../virtual-fs/types";
 import type { RunAgentActivity } from "../model/types";
 import type { AgentStateManager, JsonSerializable } from "../state/types";
 import type { ActivityInterfaceFor } from "@temporalio/workflow";
-import type { ThreadInit, SandboxInit, SubagentSandboxShutdown } from "../lifecycle";
+import type {
+  ThreadInit,
+  SandboxInit,
+  SubagentSandboxShutdown,
+} from "../lifecycle";
 
 /**
  * Thread operations required by a session.
@@ -34,7 +35,7 @@ export interface ThreadOps<TContent = string> {
     threadId: string,
     id: string,
     content: TContent,
-    threadKey?: string,
+    threadKey?: string
   ): Promise<void>;
   /** Append a tool result to the thread */
   appendToolResult(id: string, config: ToolResultConfig): Promise<void>;
@@ -43,10 +44,14 @@ export interface ThreadOps<TContent = string> {
     threadId: string,
     id: string,
     content: string,
-    threadKey?: string,
+    threadKey?: string
   ): Promise<void>;
   /** Copy all messages from sourceThreadId into a new thread at targetThreadId */
-  forkThread(sourceThreadId: string, targetThreadId: string, threadKey?: string): Promise<void>;
+  forkThread(
+    sourceThreadId: string,
+    targetThreadId: string,
+    threadKey?: string
+  ): Promise<void>;
 }
 
 /**
@@ -87,7 +92,11 @@ export type PrefixedThreadOps<TPrefix extends string, TContent = string> = {
  * @typeParam M - SDK-native message type returned by the model invoker
  * @typeParam TContent - SDK-native content type for human messages (defaults to `string`)
  */
-export interface SessionConfig<T extends ToolMap, M = unknown, TContent = string> {
+export interface SessionConfig<
+  T extends ToolMap,
+  M = unknown,
+  TContent = string,
+> {
   /** The name of the agent, should be unique within the workflows */
   agentName: string;
   /** Metadata for the session */
@@ -173,7 +182,7 @@ export interface SessionConfig<T extends ToolMap, M = unknown, TContent = string
    * Virtual filesystem configuration (optional — independent of sandbox).
    *
    * When provided, the session resolves the file tree on start and merges
-   * `fileTree`, `resolverContext`, and `workspaceBase` into `AgentState`.
+   * `fileTree`, `ctx`, and `workspaceBase` into `AgentState`.
    * Tool handlers wrapped with `withVirtualFs` can then read this state.
    *
    * Can be used alongside `sandboxOps` for agents that need both a real
@@ -181,7 +190,7 @@ export interface SessionConfig<T extends ToolMap, M = unknown, TContent = string
    */
   virtualFs?: {
     ops: VirtualFsOps;
-    resolverContext: unknown;
+    ctx: unknown;
     workspaceBase?: string;
   };
 }

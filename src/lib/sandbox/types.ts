@@ -121,7 +121,7 @@ export interface SandboxCreateOptions {
    *
    * Consumed by the manager — never forwarded to the {@link SandboxProvider}.
    */
-  resolverContext?: unknown;
+  ctx?: unknown;
 }
 
 export interface SandboxCreateResult {
@@ -153,9 +153,10 @@ export interface SandboxProvider<
 export interface SandboxOps<
   TOptions extends SandboxCreateOptions = SandboxCreateOptions,
 > {
-  createSandbox(
-    options?: TOptions
-  ): Promise<{ sandboxId: string; stateUpdate?: Record<string, unknown> }>;
+  createSandbox(options?: TOptions): Promise<{
+    sandboxId: string;
+    stateUpdate?: Record<string, unknown>;
+  } | null>;
   destroySandbox(sandboxId: string): Promise<void>;
   pauseSandbox(sandboxId: string): Promise<void>;
   snapshotSandbox(sandboxId: string): Promise<SandboxSnapshot>;
