@@ -81,6 +81,7 @@ vi.mock("@temporalio/workflow", () => {
       ).join("");
       return `${bytes.slice(0, 8)}-${bytes.slice(8, 12)}-${bytes.slice(12, 16)}-${bytes.slice(16, 20)}-${bytes.slice(20, 32)}`;
     },
+    log: { trace: () => {}, debug: () => {}, info: () => {}, warn: () => {}, error: () => {} },
   };
 });
 

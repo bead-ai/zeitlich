@@ -42,6 +42,7 @@ vi.mock("@temporalio/workflow", () => {
     uuid4: () =>
       `00000000-0000-0000-0000-${String(++idCounter).padStart(12, "0")}`,
     ApplicationFailure: MockApplicationFailure,
+    log: { trace: () => {}, debug: () => {}, info: () => {}, warn: () => {}, error: () => {} },
   };
 });
 

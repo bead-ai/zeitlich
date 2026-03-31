@@ -22,9 +22,11 @@ vi.mock("@temporalio/workflow", () => {
       return err;
     }
   }
+  const noop = () => {};
   return {
     ApplicationFailure: MockApplicationFailure,
     uuid4: () => "00000000-0000-0000-0000-000000000000",
+    log: { trace: noop, debug: noop, info: noop, warn: noop, error: noop },
   };
 });
 

@@ -3,6 +3,7 @@ import {
   defineUpdate,
   setHandler,
   ApplicationFailure,
+  log,
 } from "@temporalio/workflow";
 import type { SessionExitReason } from "../types";
 import type { SessionConfig, ZeitlichSession } from "./types";
@@ -259,6 +260,15 @@ export async function createSession<T extends ToolMap, M = unknown, TContent = s
         });
       }
 
+      log.info("session started", {
+        agentName,
+        threadId,
+        threadMode,
+        maxTurns,
+        ...(sandboxId && { sandboxId }),
+      });
+
+      const sessionStartMs = Date.now();
       const systemPrompt = stateManager.getSystemPrompt();
 
       // --- Thread lifecycle: new, continue, or fork ----------------------
@@ -292,6 +302,8 @@ export async function createSession<T extends ToolMap, M = unknown, TContent = s
           stateManager.incrementTurns();
           const currentTurn = stateManager.getTurns();
 
+          log.debug("turn started", { agentName, threadId, turn: currentTurn });
+
           stateManager.setTools(toolRouter.getToolDefinitions());
 
           const { message, rawToolCalls, usage } = await runAgent({
@@ -305,9 +317,25 @@ export async function createSession<T extends ToolMap, M = unknown, TContent = s
             stateManager.updateUsage(usage);
           }
 
+          log.debug("model response received", {
+            agentName,
+            threadId,
+            turn: currentTurn,
+            toolCallCount: rawToolCalls.length,
+            ...(usage && { usage }),
+          });
+
           if (!toolRouter.hasTools() || rawToolCalls.length === 0) {
             stateManager.complete();
             exitReason = "completed";
+            log.info("session ended", {
+              agentName,
+              threadId,
+              exitReason,
+              turns: currentTurn,
+              durationMs: Date.now() - sessionStartMs,
+              usage: stateManager.getTotalUsage(),
+            });
             return {
               threadId,
               finalMessage: message,
@@ -364,9 +392,21 @@ export async function createSession<T extends ToolMap, M = unknown, TContent = s
 
         if (stateManager.getTurns() >= maxTurns && stateManager.isRunning()) {
           exitReason = "max_turns";
+          log.warn("session hit max turns", {
+            agentName,
+            threadId,
+            maxTurns,
+          });
         }
       } catch (error) {
         exitReason = "failed";
+        log.error("session failed", {
+          agentName,
+          threadId,
+          turns: stateManager.getTurns(),
+          durationMs: Date.now() - sessionStartMs,
+          error: error instanceof Error ? error.message : String(error),
+        });
         throw ApplicationFailure.fromError(error);
       } finally {
         await callSessionEnd(exitReason, stateManager.getTurns());
@@ -389,6 +429,15 @@ export async function createSession<T extends ToolMap, M = unknown, TContent = s
           await destroySubagentSandboxes();
         }
       }
+
+      log.info("session ended", {
+        agentName,
+        threadId,
+        exitReason,
+        turns: stateManager.getTurns(),
+        durationMs: Date.now() - sessionStartMs,
+        usage: stateManager.getTotalUsage(),
+      });
 
       return {
         threadId,
