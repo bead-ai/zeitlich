@@ -2,6 +2,28 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.29](https://github.com/bead-ai/zeitlich/compare/v0.2.28...v0.2.29) (2026-03-31)
+
+
+### ⚠ BREAKING CHANGES
+
+* the virtual sandbox adapter has been removed and replaced with a built-in virtual filesystem module.
+
+### Features
+
+* implement observability logging for session and tool execution ([d2e7458](https://github.com/bead-ai/zeitlich/commit/d2e74584ddc1768dc78890eca39c2af9b970408f))
+* implement observability logging for session and tool execution ([1ccd965](https://github.com/bead-ai/zeitlich/commit/1ccd965b7582a106694d75055f273c22d7125083))
+
+
+### Code Refactoring
+
+* replace virtual sandbox with built-in virtual filesystem ([#72](https://github.com/bead-ai/zeitlich/issues/72)) ([565bc40](https://github.com/bead-ai/zeitlich/commit/565bc40612271314087f4409f1f39813643b0aa1))
+
+
+### Miscellaneous Chores
+
+* release 0.2.29 ([cdd46a4](https://github.com/bead-ai/zeitlich/commit/cdd46a4b324b7d4ac3cb6803cf502c1221499c6e))
+
 ## [0.2.28](https://github.com/bead-ai/zeitlich/compare/v0.2.27...v0.2.28) (2026-03-26)
 
 
