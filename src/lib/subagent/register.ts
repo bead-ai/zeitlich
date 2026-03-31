@@ -6,7 +6,11 @@ import type {
 } from "../tool-router/types";
 import type { SubagentConfig, SubagentHooks } from "./types";
 import type { z } from "zod";
-import { createSubagentTool, SUBAGENT_TOOL_NAME, type SubagentArgs } from "./tool";
+import {
+  createSubagentTool,
+  SUBAGENT_TOOL_NAME,
+  type SubagentArgs,
+} from "./tool";
 import { createSubagentHandler } from "./handler";
 
 /**
@@ -19,12 +23,7 @@ import { createSubagentHandler } from "./handler";
  *
  * Returns null if no subagents are configured.
  */
-export function buildSubagentRegistration(
-  subagents: SubagentConfig[],
-  options?: {
-    getSandboxStateForInheritance?: () => Record<string, unknown> | undefined;
-  },
-): {
+export function buildSubagentRegistration(subagents: SubagentConfig[]): {
   registration: ToolMap[string];
   destroySubagentSandboxes: () => Promise<void>;
 } | null {
@@ -32,7 +31,7 @@ export function buildSubagentRegistration(
 
   const getEnabled = (): SubagentConfig[] =>
     subagents.filter((s) =>
-      typeof s.enabled === "function" ? s.enabled() : (s.enabled ?? true),
+      typeof s.enabled === "function" ? s.enabled() : (s.enabled ?? true)
     );
 
   const subagentHooksMap = new Map<string, SubagentHooks>();
@@ -43,15 +42,15 @@ export function buildSubagentRegistration(
   const resolveSubagentName = (args: unknown): string =>
     (args as SubagentArgs).subagent;
 
-  const { handler, destroySubagentSandboxes } = createSubagentHandler(subagents, {
-    getSandboxStateForInheritance: options?.getSandboxStateForInheritance,
-  });
+  const { handler, destroySubagentSandboxes } =
+    createSubagentHandler(subagents);
 
   const registration: ToolMap[string] = {
     name: SUBAGENT_TOOL_NAME,
     enabled: (): boolean => getEnabled().length > 0,
     description: (): string => createSubagentTool(getEnabled()).description,
-    schema: (): z.ZodObject<z.ZodRawShape> => createSubagentTool(getEnabled()).schema,
+    schema: (): z.ZodObject<z.ZodRawShape> =>
+      createSubagentTool(getEnabled()).schema,
     handler,
     ...(subagentHooksMap.size > 0 && {
       hooks: {

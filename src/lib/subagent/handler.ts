@@ -17,7 +17,11 @@ import type {
 } from "./types";
 import type { SubagentArgs } from "./tool";
 import type { z } from "zod";
-import type { ThreadInit, SandboxInit, SubagentSandboxShutdown } from "../lifecycle";
+import type {
+  ThreadInit,
+  SandboxInit,
+  SubagentSandboxShutdown,
+} from "../lifecycle";
 import { childResultSignal, destroySandboxSignal } from "./signals";
 
 /**
@@ -45,9 +49,9 @@ function resolveSandboxConfig(config?: SubagentSandboxConfig): {
  */
 export function createSubagentHandler<
   const T extends readonly SubagentConfig[],
->(subagents: [...T], options?: {
-  getSandboxStateForInheritance?: () => Record<string, unknown> | undefined;
-}): {
+>(
+  subagents: [...T]
+): {
   handler: (
     args: SubagentArgs,
     context: RouterContext
@@ -99,18 +103,18 @@ export function createSubagentHandler<
     // --- Build thread init ---
     let thread: ThreadInit | undefined;
     if (continuationThreadId) {
-      thread = { mode: threadMode as "fork" | "continue", threadId: continuationThreadId };
-
+      thread = {
+        mode: threadMode as "fork" | "continue",
+        threadId: continuationThreadId,
+      };
     }
 
     // --- Build sandbox init ---
     let sandbox: SandboxInit | undefined;
     if (sandboxCfg.source === "inherit" && parentSandboxId) {
-      const stateUpdate = options?.getSandboxStateForInheritance?.();
       sandbox = {
         mode: "inherit",
         sandboxId: parentSandboxId,
-        ...(stateUpdate && { stateUpdate }),
       };
     } else if (sandboxCfg.source === "own") {
       const prevSbId = continuationThreadId
@@ -156,7 +160,8 @@ export function createSubagentHandler<
     const effectiveShutdown = sandboxCfg.shutdown ?? "destroy";
     const shouldDeferDestroy =
       effectiveShutdown === "pause-until-parent-close" &&
-      (sandboxCfg.source === "own" || (allowsContinuation && sandboxCfg.source !== "inherit"));
+      (sandboxCfg.source === "own" ||
+        (allowsContinuation && sandboxCfg.source !== "inherit"));
 
     if (shouldDeferDestroy) {
       pendingDestroys.set(childWorkflowId, childHandle);
@@ -231,9 +236,10 @@ export function createSubagentHandler<
     let finalToolResponse: JsonValue = toolResponse;
 
     if (allowsContinuation && childThreadId) {
-      const responseStr = typeof toolResponse === "string"
-        ? toolResponse
-        : JSON.stringify(toolResponse);
+      const responseStr =
+        typeof toolResponse === "string"
+          ? toolResponse
+          : JSON.stringify(toolResponse);
       finalToolResponse = `${responseStr}\n\n[${config.agentName} Thread ID: ${childThreadId}]`;
     }
 
