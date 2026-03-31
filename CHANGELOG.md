@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.31](https://github.com/bead-ai/zeitlich/compare/v0.2.30...v0.2.31) (2026-03-31)
+
+
+### Features
+
+* add support for inline skill files in session management ([a21405d](https://github.com/bead-ai/zeitlich/commit/a21405d7ee69a3aa643c7581e7aabccf23941b86))
+
+
+### Miscellaneous Chores
+
+* release 0.2.31 ([0bc8102](https://github.com/bead-ai/zeitlich/commit/0bc81025aeeb61c9ccd5e6a38a3256441dc505c7))
+
 ## [0.2.30](https://github.com/bead-ai/zeitlich/compare/v0.2.29...v0.2.30) (2026-03-31)
 
 
