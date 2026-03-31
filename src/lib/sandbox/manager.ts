@@ -41,7 +41,7 @@ export interface SandboxManagerHooks<
    * provider.
    */
   onPreCreate?: (
-    options: TOptions | undefined
+    options: TOptions,
   ) => Promise<PreCreateHookResult<TOptions> | undefined>;
 
   /**
@@ -114,7 +114,7 @@ export class SandboxManager<
     let providerOptions = options;
 
     if (this.hooks.onPreCreate) {
-      const hookResult = await this.hooks.onPreCreate(options);
+      const hookResult = await this.hooks.onPreCreate(options ?? ({} as TOptions));
       if (hookResult?.skip) return null;
 
       if (hookResult?.modifiedOptions) {
