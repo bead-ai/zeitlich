@@ -45,7 +45,7 @@ export interface SandboxManagerHooks<
    */
   onPreCreate?: (
     options: TOptions,
-    ctx?: TCtx
+    ctx: TCtx
   ) => Promise<PreCreateHookResult<TOptions> | undefined>;
 
   /**
@@ -112,7 +112,10 @@ export class SandboxManager<
     this.hooks = options?.hooks ?? {};
   }
 
-  async create(options?: TOptions, ctx?: TCtx): Promise<{
+  async create(
+    options?: TOptions,
+    ctx?: TCtx
+  ): Promise<{
     sandboxId: string;
   } | null> {
     let providerOptions = options;
@@ -120,7 +123,7 @@ export class SandboxManager<
     if (this.hooks.onPreCreate) {
       const hookResult = await this.hooks.onPreCreate(
         options ?? ({} as TOptions),
-        ctx
+        ctx ?? ({} as TCtx)
       );
       if (hookResult?.skip) return null;
 
