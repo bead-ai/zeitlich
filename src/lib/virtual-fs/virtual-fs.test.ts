@@ -326,6 +326,70 @@ describe("VirtualFileSystem", () => {
 });
 
 // ============================================================================
+// VirtualFileSystem — inlineFiles
+// ============================================================================
+
+describe("VirtualFileSystem — inlineFiles", () => {
+  const skillEntry: FileEntry = {
+    id: "skill:code-review:checklist.md",
+    path: "/skills/code-review/checklist.md",
+    size: 18,
+    mtime: "2025-01-01T00:00:00.000Z",
+    metadata: {},
+  };
+
+  const inlineFiles: Record<string, string> = {
+    "/skills/code-review/checklist.md": "# Review checklist",
+  };
+
+  function createFsWithInline() {
+    const { resolver } = createMockResolver();
+    return new VirtualFileSystem(
+      [...sampleTree, skillEntry],
+      resolver,
+      ctx,
+      "/",
+      inlineFiles,
+    );
+  }
+
+  it("readFile returns inline content instead of hitting the resolver", async () => {
+    const fs = createFsWithInline();
+    const content = await fs.readFile("/skills/code-review/checklist.md");
+    expect(content).toBe("# Review checklist");
+  });
+
+  it("readFileBuffer returns inline content as Uint8Array", async () => {
+    const fs = createFsWithInline();
+    const buf = await fs.readFileBuffer("/skills/code-review/checklist.md");
+    expect(new TextDecoder().decode(buf)).toBe("# Review checklist");
+  });
+
+  it("inline files are visible in readdir", async () => {
+    const fs = createFsWithInline();
+    const names = await fs.readdir("/skills/code-review");
+    expect(names).toContain("checklist.md");
+  });
+
+  it("inline file directories are inferred", async () => {
+    const fs = createFsWithInline();
+    expect(await fs.exists("/skills")).toBe(true);
+    expect(await fs.exists("/skills/code-review")).toBe(true);
+  });
+
+  it("readFile still falls back to resolver for non-inline files", async () => {
+    const fs = createFsWithInline();
+    const content = await fs.readFile("/src/index.ts");
+    expect(content).toBe('console.log("hello");');
+  });
+
+  it("readFile throws ENOENT for paths not in tree or inline", async () => {
+    const fs = createFsWithInline();
+    await expect(fs.readFile("/nope.txt")).rejects.toThrow("ENOENT");
+  });
+});
+
+// ============================================================================
 // createVirtualFsActivities
 // ============================================================================
 
