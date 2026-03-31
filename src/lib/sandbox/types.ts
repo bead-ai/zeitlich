@@ -114,14 +114,6 @@ export interface SandboxCreateOptions {
   initialFiles?: Record<string, string | Uint8Array>;
   /** Environment variables available inside the sandbox */
   env?: Record<string, string>;
-  /**
-   * Opaque context passed from the workflow to the {@link SandboxManager}'s
-   * resolver. The manager calls the resolver with this value to produce
-   * additional creation options (e.g. initial files derived from workflow args).
-   *
-   * Consumed by the manager — never forwarded to the {@link SandboxProvider}.
-   */
-  ctx?: unknown;
 }
 
 export interface SandboxCreateResult {
@@ -151,7 +143,10 @@ export interface SandboxProvider<
 export interface SandboxOps<
   TOptions extends SandboxCreateOptions = SandboxCreateOptions,
 > {
-  createSandbox(options?: TOptions): Promise<{ sandboxId: string } | null>;
+  createSandbox(
+    options?: TOptions,
+    ctx?: unknown
+  ): Promise<{ sandboxId: string } | null>;
   destroySandbox(sandboxId: string): Promise<void>;
   pauseSandbox(sandboxId: string): Promise<void>;
   snapshotSandbox(sandboxId: string): Promise<SandboxSnapshot>;

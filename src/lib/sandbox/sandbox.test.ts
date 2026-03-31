@@ -88,8 +88,8 @@ describe("SandboxManager", () => {
   it("onPreCreate hook merges modifiedOptions into create options", async () => {
     const mgr = new SandboxManager(new InMemorySandboxProvider(), {
       hooks: {
-        onPreCreate: async (options) => {
-          const { paths } = options?.ctx as { paths: string[] };
+        onPreCreate: async (_options, ctx) => {
+          const { paths } = ctx as { paths: string[] };
           const files: Record<string, string> = {};
           for (const p of paths) files[p] = `content of ${p}`;
           return {
@@ -99,10 +99,12 @@ describe("SandboxManager", () => {
       },
     });
 
-    const { sandboxId } = await mustCreate(mgr, {
-      ctx: { paths: ["/a.txt", "/b.txt"] },
-      initialFiles: { "/extra.txt": "extra" },
-    });
+    const result = await mgr.create(
+      { initialFiles: { "/extra.txt": "extra" } },
+      { paths: ["/a.txt", "/b.txt"] }
+    );
+    expect(result).not.toBeNull();
+    const { sandboxId } = result as NonNullable<typeof result>;
 
     const sandbox = await mgr.getSandbox(sandboxId);
     expect(await sandbox.fs.readFile("/a.txt")).toBe("content of /a.txt");
@@ -110,11 +112,13 @@ describe("SandboxManager", () => {
     expect(await sandbox.fs.readFile("/extra.txt")).toBe("extra");
   });
 
-  it("strips ctx before passing to provider when no hooks registered", async () => {
-    const { sandboxId } = await mustCreate(manager, {
-      ctx: { foo: "bar" },
-      initialFiles: { "/test.txt": "ok" },
-    });
+  it("ctx is not forwarded to provider when no hooks registered", async () => {
+    const result = await manager.create(
+      { initialFiles: { "/test.txt": "ok" } },
+      { foo: "bar" }
+    );
+    expect(result).not.toBeNull();
+    const { sandboxId } = result as NonNullable<typeof result>;
     const sandbox = await manager.getSandbox(sandboxId);
     expect(await sandbox.fs.readFile("/test.txt")).toBe("ok");
   });
@@ -126,7 +130,7 @@ describe("SandboxManager", () => {
       },
     });
 
-    const result = await mgr.create({ ctx: { skip: true } });
+    const result = await mgr.create(undefined, { skip: true });
     expect(result).toBeNull();
   });
 
@@ -142,10 +146,12 @@ describe("SandboxManager", () => {
       },
     });
 
-    const { sandboxId } = await mustCreate(mgr, {
-      ctx: {},
-      initialFiles: { "/file.txt": "explicit" },
-    });
+    const result = await mgr.create(
+      { initialFiles: { "/file.txt": "explicit" } },
+      {}
+    );
+    expect(result).not.toBeNull();
+    const { sandboxId } = result as NonNullable<typeof result>;
 
     const sandbox = await mgr.getSandbox(sandboxId);
     expect(await sandbox.fs.readFile("/file.txt")).toBe("explicit");

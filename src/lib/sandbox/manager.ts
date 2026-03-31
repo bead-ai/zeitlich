@@ -35,13 +35,16 @@ export interface SandboxManagerHooks<
   /**
    * Called before sandbox creation.
    *
-   * Receives the raw options (including `ctx` when passed from
-   * the workflow). Return `{ skip: true }` to prevent creation, or
-   * `{ modifiedOptions }` to alter the options before they reach the
-   * provider.
+   * Receives the provider options and an opaque `ctx` value set from the
+   * workflow's {@link SandboxInit}. Use `ctx` to derive additional creation
+   * options (e.g. initial files from workflow arguments).
+   *
+   * Return `{ skip: true }` to prevent creation, or `{ modifiedOptions }`
+   * to alter the options before they reach the provider.
    */
   onPreCreate?: (
-    options: TOptions
+    options: TOptions,
+    ctx?: unknown
   ) => Promise<PreCreateHookResult<TOptions> | undefined>;
 
   /**
@@ -57,9 +60,9 @@ export interface SandboxManagerHooks<
  * for its own instance management strategy (e.g. in-memory map, remote API).
  *
  * Optional {@link SandboxManagerHooks} can be passed at construction time.
- * The `onPreCreate` hook runs inside the `createSandbox` activity, giving it
- * access to `ctx` from workflow arguments without an extra
- * activity. It can modify options or skip creation entirely.
+ * The `onPreCreate` hook runs inside the `createSandbox` activity, receiving
+ * the provider options and an opaque `ctx` value from the workflow's
+ * {@link SandboxInit}. It can modify options or skip creation entirely.
  *
  * @example
  * ```typescript
@@ -77,8 +80,8 @@ export interface SandboxManagerHooks<
  *   new DaytonaSandboxProvider(config),
  *   {
  *     hooks: {
- *       onPreCreate: async (options) => {
- *         const { projectId, filePaths } = options?.ctx as { projectId: string; filePaths: string[] };
+ *       onPreCreate: async (options, ctx) => {
+ *         const { projectId, filePaths } = ctx as { projectId: string; filePaths: string[] };
  *         const files: Record<string, string> = {};
  *         for (const p of filePaths) files[p] = await db.readFile(projectId, p);
  *         return { modifiedOptions: { initialFiles: files } };
@@ -107,14 +110,15 @@ export class SandboxManager<
     this.hooks = options?.hooks ?? {};
   }
 
-  async create(options?: TOptions): Promise<{
+  async create(options?: TOptions, ctx?: unknown): Promise<{
     sandboxId: string;
   } | null> {
     let providerOptions = options;
 
     if (this.hooks.onPreCreate) {
       const hookResult = await this.hooks.onPreCreate(
-        options ?? ({} as TOptions)
+        options ?? ({} as TOptions),
+        ctx
       );
       if (hookResult?.skip) return null;
 
@@ -134,11 +138,6 @@ export class SandboxManager<
           },
         } as TOptions;
       }
-    }
-
-    if (providerOptions?.ctx !== undefined) {
-      const { ctx: _rc, ...passthrough } = providerOptions;
-      providerOptions = passthrough as TOptions;
     }
 
     const { sandbox } = await this.provider.create(providerOptions);
@@ -202,11 +201,12 @@ export class SandboxManager<
     const prefix = `${this.provider.id}${scope.charAt(0).toUpperCase()}${scope.slice(1)}`;
     const ops: SandboxOps<TOptions> = {
       createSandbox: async (
-        options?: TOptions
+        options?: TOptions,
+        ctx?: unknown
       ): Promise<{
         sandboxId: string;
       } | null> => {
-        return this.create(options);
+        return this.create(options, ctx);
       },
       destroySandbox: async (sandboxId: string): Promise<void> => {
         await this.destroy(sandboxId);

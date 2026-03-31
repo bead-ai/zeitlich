@@ -251,14 +251,10 @@ export async function createSession<
         const skillFiles = skills ? collectSkillFiles(skills) : undefined;
         const ctx = (sandboxInit as { mode: "new"; ctx?: unknown } | undefined)
           ?.ctx;
-        const createOptions =
-          skillFiles || ctx !== undefined
-            ? {
-                ...(ctx !== undefined && { ctx }),
-                ...(skillFiles && { initialFiles: skillFiles }),
-              }
-            : undefined;
-        const result = await sandboxOps.createSandbox(createOptions);
+        const createOptions = skillFiles
+          ? { initialFiles: skillFiles }
+          : undefined;
+        const result = await sandboxOps.createSandbox(createOptions, ctx);
         if (result) {
           sandboxId = result.sandboxId;
           sandboxOwned = true;
