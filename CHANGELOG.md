@@ -2,6 +2,32 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.30](https://github.com/bead-ai/zeitlich/compare/v0.2.29...v0.2.30) (2026-03-31)
+
+
+### Features
+
+* enhance sandbox creation with resolver context support ([6bdccd6](https://github.com/bead-ai/zeitlich/commit/6bdccd68965690de4e34fcb9b994248f17f74626))
+* enhance sandbox creation with resolver context support ([5d7eb61](https://github.com/bead-ai/zeitlich/commit/5d7eb618072b80750097af5c4d5630e99c3ff0ee))
+* enhance sandbox creation with resolver context support ([95b715d](https://github.com/bead-ai/zeitlich/commit/95b715d0df3976b4a9cbdc9001375394abba0590))
+
+
+### Bug Fixes
+
+* ensure options are always defined in onPreCreate hook ([51c5409](https://github.com/bead-ai/zeitlich/commit/51c5409950675abaae7b545c426617255fbe359f))
+* make ctx required ([6fee20c](https://github.com/bead-ai/zeitlich/commit/6fee20cca5c4122397da3de7851b5bf844a0d452))
+
+
+### Code Refactoring
+
+* enhance type safety for sandbox operations and hooks ([a829623](https://github.com/bead-ai/zeitlich/commit/a8296230c63729d71322d464d9aaabbf656051a5))
+* streamline sandbox creation options handling ([9c2d2f5](https://github.com/bead-ai/zeitlich/commit/9c2d2f5c863dc1002d972b01b56b6af836b6a3f6))
+
+
+### Miscellaneous Chores
+
+* release 0.2.30 ([3efa1d3](https://github.com/bead-ai/zeitlich/commit/3efa1d33a9de6ee887cc350b333a876c533547fa))
+
 ## [0.2.29](https://github.com/bead-ai/zeitlich/compare/v0.2.28...v0.2.29) (2026-03-31)
 
 
