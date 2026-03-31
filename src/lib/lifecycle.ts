@@ -22,7 +22,9 @@ export type ThreadInit =
 /**
  * Sandbox initialization strategy.
  *
- * - `"new"` — create a fresh sandbox.
+ * - `"new"` — create a fresh sandbox. Optionally pass `resolverContext` to
+ *   have the {@link SandboxManager}'s resolver produce creation options
+ *   (e.g. initial files) from workflow arguments.
  * - `"continue"` — resume a previously-paused sandbox (this session takes
  *   ownership and the shutdown policy applies on exit).
  * - `"fork"` — fork from an existing (or paused) sandbox; a new sandbox is
@@ -31,7 +33,7 @@ export type ThreadInit =
  *   The session will **not** manage its lifecycle on exit.
  */
 export type SandboxInit =
-  | { mode: "new" }
+  | { mode: "new"; resolverContext?: unknown }
   | { mode: "continue"; sandboxId: string }
   | { mode: "fork"; sandboxId: string }
   | { mode: "inherit"; sandboxId: string; stateUpdate?: Record<string, unknown> };

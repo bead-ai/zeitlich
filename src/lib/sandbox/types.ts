@@ -114,6 +114,14 @@ export interface SandboxCreateOptions {
   initialFiles?: Record<string, string | Uint8Array>;
   /** Environment variables available inside the sandbox */
   env?: Record<string, string>;
+  /**
+   * Opaque context passed from the workflow to the {@link SandboxManager}'s
+   * resolver. The manager calls the resolver with this value to produce
+   * additional creation options (e.g. initial files derived from workflow args).
+   *
+   * Consumed by the manager — never forwarded to the {@link SandboxProvider}.
+   */
+  resolverContext?: unknown;
 }
 
 export interface SandboxCreateResult {

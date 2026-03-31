@@ -243,9 +243,15 @@ export async function createSession<T extends ToolMap, M = unknown, TContent = s
         sandboxOwned = true;
       } else if (sandboxOps) {
         const skillFiles = skills ? collectSkillFiles(skills) : undefined;
-        const result = await sandboxOps.createSandbox(
-          skillFiles ? { initialFiles: skillFiles } : undefined,
-        );
+        const resolverContext = (sandboxInit as { mode: "new"; resolverContext?: unknown } | undefined)?.resolverContext;
+        const createOptions =
+          skillFiles || resolverContext !== undefined
+            ? {
+                ...(resolverContext !== undefined && { resolverContext }),
+                ...(skillFiles && { initialFiles: skillFiles }),
+              }
+            : undefined;
+        const result = await sandboxOps.createSandbox(createOptions);
         sandboxId = result.sandboxId;
         sandboxOwned = true;
         if (result.stateUpdate) {

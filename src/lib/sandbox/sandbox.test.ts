@@ -68,6 +68,51 @@ describe("SandboxManager", () => {
     expect(extra).toBe("world");
   });
 
+  it("invokes resolver and merges options on create when resolverContext is present", async () => {
+    const resolver = async (ctx: unknown) => {
+      const { paths } = ctx as { paths: string[] };
+      const files: Record<string, string> = {};
+      for (const p of paths) files[p] = `content of ${p}`;
+      return { initialFiles: files, env: { RESOLVED: "true" } };
+    };
+    const mgr = new SandboxManager(new InMemorySandboxProvider(), { resolver });
+
+    const { sandboxId } = await mgr.create({
+      resolverContext: { paths: ["/a.txt", "/b.txt"] },
+      initialFiles: { "/extra.txt": "extra" },
+    });
+
+    const sandbox = await mgr.getSandbox(sandboxId);
+    expect(await sandbox.fs.readFile("/a.txt")).toBe("content of /a.txt");
+    expect(await sandbox.fs.readFile("/b.txt")).toBe("content of /b.txt");
+    expect(await sandbox.fs.readFile("/extra.txt")).toBe("extra");
+  });
+
+  it("strips resolverContext before passing to provider when no resolver registered", async () => {
+    const { sandboxId } = await manager.create({
+      resolverContext: { foo: "bar" },
+      initialFiles: { "/test.txt": "ok" },
+    });
+    const sandbox = await manager.getSandbox(sandboxId);
+    expect(await sandbox.fs.readFile("/test.txt")).toBe("ok");
+  });
+
+  it("explicit options take precedence over resolved options", async () => {
+    const resolver = async () => ({
+      initialFiles: { "/file.txt": "from-resolver" },
+      env: { KEY: "resolved" },
+    });
+    const mgr = new SandboxManager(new InMemorySandboxProvider(), { resolver });
+
+    const { sandboxId } = await mgr.create({
+      resolverContext: {},
+      initialFiles: { "/file.txt": "explicit" },
+    });
+
+    const sandbox = await mgr.getSandbox(sandboxId);
+    expect(await sandbox.fs.readFile("/file.txt")).toBe("explicit");
+  });
+
   it("createActivities returns prefixed SandboxOps-shaped object", async () => {
     // provider.id is "inMemory", scope is "Test" → prefix "inMemoryTest"
     const activities = manager.createActivities("Test");
