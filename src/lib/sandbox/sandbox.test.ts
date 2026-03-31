@@ -10,7 +10,7 @@ import {
 async function mustCreate<T extends SandboxCreateOptions, TId extends string>(
   mgr: SandboxManager<T, Sandbox, TId>,
   options?: T
-): Promise<{ sandboxId: string; stateUpdate?: Record<string, unknown> }> {
+): Promise<{ sandboxId: string }> {
   const result = await mgr.create(options);
   expect(result).not.toBeNull();
   return result as NonNullable<typeof result>;

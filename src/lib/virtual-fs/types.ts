@@ -84,7 +84,6 @@ export interface FileResolver<TCtx = unknown, TMeta = FileEntryMetadata> {
 export interface VirtualFsOps<TCtx = unknown, TMeta = FileEntryMetadata> {
   resolveFileTree(ctx: TCtx): Promise<{
     fileTree: FileEntry<TMeta>[];
-    stateUpdate?: Record<string, unknown>;
   }>;
 }
 

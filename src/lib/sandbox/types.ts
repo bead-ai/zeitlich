@@ -126,8 +126,6 @@ export interface SandboxCreateOptions {
 
 export interface SandboxCreateResult {
   sandbox: Sandbox;
-  /** Optional state to merge into the workflow's `AgentState` via the session. */
-  stateUpdate?: Record<string, unknown>;
 }
 
 export interface SandboxProvider<
@@ -153,10 +151,7 @@ export interface SandboxProvider<
 export interface SandboxOps<
   TOptions extends SandboxCreateOptions = SandboxCreateOptions,
 > {
-  createSandbox(options?: TOptions): Promise<{
-    sandboxId: string;
-    stateUpdate?: Record<string, unknown>;
-  } | null>;
+  createSandbox(options?: TOptions): Promise<{ sandboxId: string } | null>;
   destroySandbox(sandboxId: string): Promise<void>;
   pauseSandbox(sandboxId: string): Promise<void>;
   snapshotSandbox(sandboxId: string): Promise<SandboxSnapshot>;

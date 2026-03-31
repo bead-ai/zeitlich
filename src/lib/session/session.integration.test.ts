@@ -46,7 +46,13 @@ vi.mock("@temporalio/workflow", () => {
     uuid4: () =>
       `00000000-0000-0000-0000-${String(++idCounter).padStart(12, "0")}`,
     ApplicationFailure: MockApplicationFailure,
-    log: { trace: () => {}, debug: () => {}, info: () => {}, warn: () => {}, error: () => {} },
+    log: {
+      trace: () => {},
+      debug: () => {},
+      info: () => {},
+      warn: () => {},
+      error: () => {},
+    },
   };
 });
 
@@ -789,45 +795,6 @@ describe("createSession integration", () => {
 
     const humanOps = log.filter((l) => l.op === "appendHumanMessage");
     expect(at(humanOps, 0).args[2]).toBe("async context");
-  });
-
-  // --- Sandbox stateUpdate merge ---
-
-  it("merges sandbox stateUpdate into state manager", async () => {
-    const { ops } = createMockThreadOps();
-
-    const sandboxOps: SandboxOps = {
-      createSandbox: async () => ({
-        sandboxId: "sb-1",
-        stateUpdate: { customField: "from-sandbox" },
-      }),
-      destroySandbox: async () => {},
-      snapshotSandbox: async () => ({
-        sandboxId: "sb-1",
-        providerId: "test",
-        data: null,
-        createdAt: new Date().toISOString(),
-      }),
-      forkSandbox: async () => "forked-sandbox-id",
-      pauseSandbox: async () => {},
-    };
-
-    const session = await createSession({
-      agentName: "TestAgent",
-      thread: { mode: "new", threadId: "thread-1" },
-      runAgent: createScriptedRunAgent([{ message: "done", toolCalls: [] }]),
-      threadOps: ops,
-      buildContextMessage: () => "go",
-      sandboxOps,
-    });
-
-    const stateManager = createAgentStateManager<{ customField: string }>({
-      initialState: { systemPrompt: "test", customField: "" },
-    });
-
-    await session.runSession({ stateManager });
-
-    expect(stateManager.get("customField")).toBe("from-sandbox");
   });
 
   // --- Skill resourceContents seeded as initialFiles ---

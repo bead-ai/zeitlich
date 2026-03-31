@@ -178,6 +178,8 @@ export interface SessionConfig<
   // Virtual filesystem
   // ---------------------------------------------------------------------------
 
+  virtualFsOps?: VirtualFsOps;
+
   /**
    * Virtual filesystem configuration (optional — independent of sandbox).
    *
@@ -189,9 +191,7 @@ export interface SessionConfig<
    * sandbox (e.g. for execution) and a virtual filesystem.
    */
   virtualFs?: {
-    ops: VirtualFsOps;
     ctx: unknown;
-    workspaceBase?: string;
   };
 }
 

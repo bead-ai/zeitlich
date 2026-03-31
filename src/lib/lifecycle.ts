@@ -39,7 +39,6 @@ export type SandboxInit =
   | {
       mode: "inherit";
       sandboxId: string;
-      stateUpdate?: Record<string, unknown>;
     };
 
 /**

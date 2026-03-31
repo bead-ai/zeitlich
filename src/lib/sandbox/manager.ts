@@ -41,7 +41,7 @@ export interface SandboxManagerHooks<
    * provider.
    */
   onPreCreate?: (
-    options: TOptions,
+    options: TOptions
   ) => Promise<PreCreateHookResult<TOptions> | undefined>;
 
   /**
@@ -109,12 +109,13 @@ export class SandboxManager<
 
   async create(options?: TOptions): Promise<{
     sandboxId: string;
-    stateUpdate?: Record<string, unknown>;
   } | null> {
     let providerOptions = options;
 
     if (this.hooks.onPreCreate) {
-      const hookResult = await this.hooks.onPreCreate(options ?? ({} as TOptions));
+      const hookResult = await this.hooks.onPreCreate(
+        options ?? ({} as TOptions)
+      );
       if (hookResult?.skip) return null;
 
       if (hookResult?.modifiedOptions) {
@@ -140,14 +141,13 @@ export class SandboxManager<
       providerOptions = passthrough as TOptions;
     }
 
-    const { sandbox, stateUpdate } =
-      await this.provider.create(providerOptions);
+    const { sandbox } = await this.provider.create(providerOptions);
 
     if (this.hooks.onPostCreate) {
       await this.hooks.onPostCreate(sandbox.id);
     }
 
-    return { sandboxId: sandbox.id, ...(stateUpdate && { stateUpdate }) };
+    return { sandboxId: sandbox.id };
   }
 
   async getSandbox(id: string): Promise<TSandbox> {
@@ -205,7 +205,6 @@ export class SandboxManager<
         options?: TOptions
       ): Promise<{
         sandboxId: string;
-        stateUpdate?: Record<string, unknown>;
       } | null> => {
         return this.create(options);
       },

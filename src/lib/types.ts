@@ -1,4 +1,5 @@
 import type { JsonValue } from "./state/types";
+import type { FileEntry } from "./virtual-fs/types";
 
 // ============================================================================
 // Agent core types
@@ -23,6 +24,7 @@ export interface BaseAgentState {
   version: number;
   turns: number;
   tasks: Map<string, WorkflowTask>;
+  fileTree: FileEntry[];
   systemPrompt?: string;
   totalInputTokens: number;
   totalOutputTokens: number;

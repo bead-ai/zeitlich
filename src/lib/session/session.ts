@@ -8,7 +8,11 @@ import {
 import type { SessionExitReason } from "../types";
 import type { SessionConfig, ZeitlichSession } from "./types";
 import type { SandboxOps } from "../sandbox/types";
-import { type AgentStateManager, type JsonSerializable } from "../state/types";
+import type {
+  AgentState,
+  AgentStateManager,
+  JsonSerializable,
+} from "../state/types";
 import { createToolRouter } from "../tool-router/router";
 import type { ParsedToolCallUnion, ToolMap } from "../tool-router/types";
 import { getShortId } from "../thread/id";
@@ -103,6 +107,7 @@ export async function createSession<
   sandbox: sandboxInit,
   sandboxShutdown = "destroy",
   virtualFs: virtualFsConfig,
+  virtualFsOps,
 }: SessionConfig<T, M, TContent>): Promise<ZeitlichSession<M, boolean>> {
   // ---------------------------------------------------------------------------
   // Thread resolution
@@ -257,23 +262,21 @@ export async function createSession<
         if (result) {
           sandboxId = result.sandboxId;
           sandboxOwned = true;
-          if (result.stateUpdate) {
-            stateManager.mergeUpdate(result.stateUpdate as Partial<TState>);
-          }
         }
       }
 
       // --- Virtual filesystem init (independent of sandbox) ----------------
       if (virtualFsConfig) {
-        const result = await virtualFsConfig.ops.resolveFileTree(
-          virtualFsConfig.ctx
-        );
+        if (!virtualFsOps) {
+          throw ApplicationFailure.create({
+            message: "No virtualFsOps provided — cannot resolve file tree",
+            nonRetryable: true,
+          });
+        }
+        const result = await virtualFsOps.resolveFileTree(virtualFsConfig.ctx);
         stateManager.mergeUpdate({
           fileTree: result.fileTree,
-          ctx: virtualFsConfig.ctx,
-          workspaceBase: virtualFsConfig.workspaceBase ?? "/",
-          ...result.stateUpdate,
-        } as unknown as Partial<TState>);
+        } as Partial<AgentState<TState>>);
       }
 
       if (hooks.onSessionStart) {

@@ -1,8 +1,11 @@
-import type {
-  QueryDefinition,
-} from "@temporalio/workflow";
+import type { QueryDefinition } from "@temporalio/workflow";
 import type { UpdateDefinition } from "@temporalio/common/lib/interfaces";
-import type { AgentStatus, BaseAgentState, TokenUsage, WorkflowTask } from "../types";
+import type {
+  AgentStatus,
+  BaseAgentState,
+  TokenUsage,
+  WorkflowTask,
+} from "../types";
 import type { ToolDefinition } from "../tool-router/types";
 
 /**
@@ -98,8 +101,8 @@ export interface AgentStateManager<TCustom extends JsonSerializable<TCustom>> {
   /** Set a custom state value by key */
   set<K extends keyof TCustom>(key: K, value: TCustom[K]): void;
 
-  /** Bulk-merge a partial update into custom state (e.g. from sandbox stateUpdate) */
-  mergeUpdate(update: Partial<TCustom>): void;
+  /** Bulk-merge a partial update into custom state */
+  mergeUpdate(update: Partial<AgentState<TCustom>>): void;
 
   /** Get full state for query handler */
   getCurrentState(): AgentState<TCustom>;
