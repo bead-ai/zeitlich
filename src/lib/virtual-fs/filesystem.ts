@@ -60,17 +60,28 @@ export class VirtualFileSystem<
   private directories: Set<string>;
   private mutations: TreeMutation<TMeta>[] = [];
 
+  private inlineFiles: Map<string, string>;
+
   constructor(
     tree: FileEntry<TMeta>[],
     private resolver: FileResolver<TCtx, TMeta>,
     private ctx: TCtx,
     workspaceBase = "/",
+    inlineFiles?: Record<string, string>,
   ) {
     this.workspaceBase = normalisePath(workspaceBase);
     this.entries = new Map(
       tree.map((e) => [normalisePath(e.path, this.workspaceBase), e])
     );
     this.directories = inferDirectories(tree, this.workspaceBase);
+    this.inlineFiles = new Map(
+      inlineFiles
+        ? Object.entries(inlineFiles).map(([p, c]) => [
+            normalisePath(p, this.workspaceBase),
+            c,
+          ])
+        : []
+    );
   }
 
   /** Return all mutations accumulated during this invocation. */
@@ -89,6 +100,8 @@ export class VirtualFileSystem<
 
   async readFile(path: string): Promise<string> {
     const norm = normalisePath(path, this.workspaceBase);
+    const inline = this.inlineFiles.get(norm);
+    if (inline !== undefined) return inline;
     const entry = this.entries.get(norm);
     if (!entry) throw new Error(`ENOENT: no such file: ${path}`);
     return this.resolver.readFile(entry.id, this.ctx, entry.metadata);
@@ -96,6 +109,8 @@ export class VirtualFileSystem<
 
   async readFileBuffer(path: string): Promise<Uint8Array> {
     const norm = normalisePath(path, this.workspaceBase);
+    const inline = this.inlineFiles.get(norm);
+    if (inline !== undefined) return new TextEncoder().encode(inline);
     const entry = this.entries.get(norm);
     if (!entry) throw new Error(`ENOENT: no such file: ${path}`);
     return this.resolver.readFileBuffer(entry.id, this.ctx, entry.metadata);

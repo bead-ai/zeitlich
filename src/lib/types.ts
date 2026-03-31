@@ -25,6 +25,8 @@ export interface BaseAgentState {
   turns: number;
   tasks: Map<string, WorkflowTask>;
   fileTree: FileEntry[];
+  /** In-memory file contents keyed by path, bypassing the resolver (e.g. skill resources). */
+  inlineFiles?: Record<string, string>;
   systemPrompt?: string;
   totalInputTokens: number;
   totalOutputTokens: number;

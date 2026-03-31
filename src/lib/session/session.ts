@@ -270,8 +270,22 @@ export async function createSession<
           });
         }
         const result = await virtualFsOps.resolveFileTree(virtualFsConfig.ctx);
+        const skillFiles = skills ? collectSkillFiles(skills) : undefined;
+        const fileTree = skillFiles
+          ? [
+              ...result.fileTree,
+              ...Object.entries(skillFiles).map(([path, content]) => ({
+                id: `skill:${path}`,
+                path,
+                size: content.length,
+                mtime: new Date().toISOString(),
+                metadata: {},
+              })),
+            ]
+          : result.fileTree;
         stateManager.mergeUpdate({
-          fileTree: result.fileTree,
+          fileTree,
+          ...(skillFiles && { inlineFiles: skillFiles }),
         } as Partial<AgentState<TState>>);
       }
 

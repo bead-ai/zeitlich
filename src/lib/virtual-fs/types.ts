@@ -120,6 +120,8 @@ export interface VirtualFsState<TCtx = unknown, TMeta = FileEntryMetadata> {
   fileTree: FileEntry<TMeta>[];
   ctx: TCtx;
   workspaceBase?: string;
+  /** In-memory file contents keyed by path, bypassing the resolver (e.g. skill resources). */
+  inlineFiles?: Record<string, string>;
 }
 
 // ============================================================================

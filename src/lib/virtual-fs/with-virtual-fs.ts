@@ -66,7 +66,7 @@ export function withVirtualFs<
     const state =
       await queryParentWorkflowState<VirtualFsState<TCtx, TMeta>>(client);
 
-    const { fileTree, ctx, workspaceBase } = state;
+    const { fileTree, ctx, workspaceBase, inlineFiles } = state;
     if (!fileTree) {
       return {
         toolResponse: `Error: No fileTree in agent state. The ${context.toolName} tool requires a virtual filesystem.`,
@@ -78,7 +78,8 @@ export function withVirtualFs<
       fileTree,
       resolver,
       ctx,
-      workspaceBase ?? "/"
+      workspaceBase ?? "/",
+      inlineFiles,
     );
     const response = await handler(args, { ...context, virtualFs });
     const mutations = virtualFs.getMutations();
