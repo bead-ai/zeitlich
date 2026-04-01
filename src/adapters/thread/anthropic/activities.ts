@@ -25,7 +25,7 @@ import {
 const ADAPTER_PREFIX = "anthropic" as const;
 
 export type AnthropicThreadOps<TScope extends string = ""> =
-  PrefixedThreadOps<ScopedPrefix<TScope, typeof ADAPTER_PREFIX>, AnthropicContent, Anthropic.Messages.Message>;
+  PrefixedThreadOps<ScopedPrefix<TScope, typeof ADAPTER_PREFIX>, AnthropicContent>;
 
 export interface AnthropicAdapterConfig {
   redis: Redis;
@@ -132,7 +132,7 @@ export function createAnthropicAdapter(
 ): AnthropicAdapter {
   const { redis, client } = config;
 
-  const threadOps: ThreadOps<AnthropicContent, Anthropic.Messages.Message> = {
+  const threadOps: ThreadOps<AnthropicContent> = {
     async initializeThread(threadId: string, threadKey?: string): Promise<void> {
       const thread = createAnthropicThreadManager({ redis, threadId, key: threadKey });
       await thread.initialize();

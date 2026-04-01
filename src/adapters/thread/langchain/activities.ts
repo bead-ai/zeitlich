@@ -24,7 +24,7 @@ import { createLangChainModelInvoker } from "./model-invoker";
 const ADAPTER_PREFIX = "langChain" as const;
 
 export type LangChainThreadOps<TScope extends string = ""> =
-  PrefixedThreadOps<ScopedPrefix<TScope, typeof ADAPTER_PREFIX>, LangChainContent, StoredMessage>;
+  PrefixedThreadOps<ScopedPrefix<TScope, typeof ADAPTER_PREFIX>, LangChainContent>;
 
 export interface LangChainAdapterConfig {
   redis: Redis;
@@ -116,7 +116,7 @@ export function createLangChainAdapter(
 ): LangChainAdapter {
   const { redis } = config;
 
-  const threadOps: ThreadOps<LangChainContent, StoredMessage> = {
+  const threadOps: ThreadOps<LangChainContent> = {
     async initializeThread(threadId: string, threadKey?: string): Promise<void> {
       const thread = createLangChainThreadManager({ redis, threadId, key: threadKey });
       await thread.initialize();

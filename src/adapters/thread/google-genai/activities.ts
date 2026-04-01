@@ -24,8 +24,7 @@ const ADAPTER_PREFIX = "googleGenAI" as const;
 export type GoogleGenAIThreadOps<TScope extends string = ""> =
   PrefixedThreadOps<
     ScopedPrefix<TScope, typeof ADAPTER_PREFIX>,
-    GoogleGenAIContent,
-    Content
+    GoogleGenAIContent
   >;
 
 export interface GoogleGenAIAdapterConfig {
@@ -139,7 +138,7 @@ export function createGoogleGenAIAdapter(
 ): GoogleGenAIAdapter {
   const { redis } = config;
 
-  const threadOps: ThreadOps<GoogleGenAIContent, Content> = {
+  const threadOps: ThreadOps<GoogleGenAIContent> = {
     async initializeThread(
       threadId: string,
       threadKey?: string

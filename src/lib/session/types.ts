@@ -26,11 +26,8 @@ import type {
  * `TContent` is the SDK-native content type for human messages.
  * Each adapter supplies its own type (e.g. Anthropic ContentBlockParam[],
  * Google GenAI Part[], LangChain MessageContent). Defaults to `string`.
- *
- * `TMessage` is the SDK-native agent message type returned by the model
- * invoker (e.g. StoredMessage, Anthropic.Messages.Message, Content).
  */
-export interface ThreadOps<TContent = string, TMessage = unknown> {
+export interface ThreadOps<TContent = string> {
   /** Initialize an empty thread */
   initializeThread(threadId: string, threadKey?: string): Promise<void>;
   /** Append a human message to the thread */
@@ -46,7 +43,7 @@ export interface ThreadOps<TContent = string, TMessage = unknown> {
   appendAgentMessage(
     threadId: string,
     id: string,
-    message: TMessage,
+    message: unknown,
     threadKey?: string
   ): Promise<void>;
   /** Append a system message to the thread */
@@ -91,8 +88,8 @@ export type ScopedPrefix<
  * // → { googleGenAIInitializeThread, googleGenAIAppendHumanMessage, … }
  * ```
  */
-export type PrefixedThreadOps<TPrefix extends string, TContent = string, TMessage = unknown> = {
-  [K in keyof ThreadOps<TContent, TMessage> as `${TPrefix}${Capitalize<K & string>}`]: ThreadOps<TContent, TMessage>[K];
+export type PrefixedThreadOps<TPrefix extends string, TContent = string> = {
+  [K in keyof ThreadOps<TContent> as `${TPrefix}${Capitalize<K & string>}`]: ThreadOps<TContent>[K];
 };
 
 /**
@@ -118,7 +115,7 @@ export interface SessionConfig<
   /** Workflow-specific runAgent activity (with tools pre-bound) */
   runAgent: RunAgentActivity<M>;
   /** Thread operations (initialize, append messages, parse tool calls) */
-  threadOps: ActivityInterfaceFor<ThreadOps<TContent, M>>;
+  threadOps: ActivityInterfaceFor<ThreadOps<TContent>>;
   /** Tool router for processing tool calls (optional if agent has no tools) */
   tools?: T;
   /** Subagent configurations */
