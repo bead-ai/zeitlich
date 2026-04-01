@@ -3,7 +3,6 @@ import type { GoogleGenAI, Content, FunctionDeclaration } from "@google/genai";
 import type { SerializableToolDefinition } from "../../../lib/types";
 import type { AgentResponse, ModelInvokerConfig } from "../../../lib/model";
 import { createGoogleGenAIThreadManager, type GoogleGenAIThreadManagerHooks } from "./thread-manager";
-import { v4 as uuidv4 } from "uuid";
 
 export interface GoogleGenAIModelInvokerConfig {
   redis: Redis;
@@ -27,8 +26,8 @@ function toFunctionDeclarations(
  * `ModelInvoker<Content>` contract.
  *
  * Loads the conversation thread from Redis, invokes the Gemini model via
- * `client.models.generateContent`, appends the AI response, and returns
- * a normalised AgentResponse.
+ * `client.models.generateContent`, and returns a normalised AgentResponse.
+ * The caller is responsible for appending the response to the thread.
  *
  * @example
  * ```typescript
@@ -76,8 +75,6 @@ export function createGoogleGenAIModelInvoker({
 
     const responseParts = response.candidates?.[0]?.content?.parts ?? [];
     const modelContent: Content = { role: "model", parts: responseParts };
-
-    await thread.appendModelContent(uuidv4(), responseParts);
 
     const functionCalls = response.functionCalls ?? [];
 

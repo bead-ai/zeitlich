@@ -139,6 +139,7 @@ export async function createSession<
     appendHumanMessage,
     initializeThread,
     appendSystemMessage,
+    appendAgentMessage,
     forkThread,
   } = threadOps;
 
@@ -354,6 +355,8 @@ export async function createSession<
             agentName,
             metadata,
           });
+
+          await appendAgentMessage(threadId, uuid4(), message, threadKey);
 
           if (usage) {
             stateManager.updateUsage(usage);

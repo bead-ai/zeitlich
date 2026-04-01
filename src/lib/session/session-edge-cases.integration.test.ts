@@ -88,6 +88,9 @@ function createMockThreadOps() {
     appendSystemMessage: async (threadId, id, content) => {
       log.push({ op: "appendSystemMessage", args: [threadId, id, content] });
     },
+    appendAgentMessage: async (threadId, id, message) => {
+      log.push({ op: "appendAgentMessage", args: [threadId, id, message] });
+    },
     forkThread: async (source, target) => {
       log.push({ op: "forkThread", args: [source, target] });
     },
@@ -751,6 +754,9 @@ describe("createSession edge cases", () => {
       },
       appendSystemMessage: async (threadId, id, content) => {
         log.push({ op: "appendSystemMessage", args: [threadId, id, content] });
+      },
+      appendAgentMessage: async (threadId, id, message) => {
+        log.push({ op: "appendAgentMessage", args: [threadId, id, message] });
       },
       forkThread: async (source, target) => {
         log.push({ op: "forkThread", args: [source, target] });

@@ -3,7 +3,6 @@ import type Anthropic from "@anthropic-ai/sdk";
 import type { SerializableToolDefinition } from "../../../lib/types";
 import type { AgentResponse, ModelInvokerConfig } from "../../../lib/model";
 import { createAnthropicThreadManager, type AnthropicThreadManagerHooks } from "./thread-manager";
-import { v4 as uuidv4 } from "uuid";
 
 export interface AnthropicModelInvokerConfig {
   redis: Redis;
@@ -29,8 +28,8 @@ function toAnthropicTools(
  * `ModelInvoker<Anthropic.Messages.Message>` contract.
  *
  * Loads the conversation thread from Redis, invokes the Claude model via
- * `client.messages.create`, appends the AI response, and returns
- * a normalised AgentResponse.
+ * `client.messages.create`, and returns a normalised AgentResponse.
+ * The caller is responsible for appending the response to the thread.
  *
  * @example
  * ```typescript
@@ -73,8 +72,6 @@ export function createAnthropicModelInvoker({
       ...(system ? { system } : {}),
       ...(tools ? { tools } : {}),
     });
-
-    await thread.appendAssistantMessage(uuidv4(), response.content);
 
     const toolCalls = response.content.filter(
       (block): block is Anthropic.Messages.ToolUseBlock =>

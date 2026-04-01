@@ -25,7 +25,7 @@ import {
 const ADAPTER_PREFIX = "anthropic" as const;
 
 export type AnthropicThreadOps<TScope extends string = ""> =
-  PrefixedThreadOps<ScopedPrefix<TScope, typeof ADAPTER_PREFIX>, AnthropicContent>;
+  PrefixedThreadOps<ScopedPrefix<TScope, typeof ADAPTER_PREFIX>, AnthropicContent, Anthropic.Messages.Message>;
 
 export interface AnthropicAdapterConfig {
   redis: Redis;
@@ -132,7 +132,7 @@ export function createAnthropicAdapter(
 ): AnthropicAdapter {
   const { redis, client } = config;
 
-  const threadOps: ThreadOps<AnthropicContent> = {
+  const threadOps: ThreadOps<AnthropicContent, Anthropic.Messages.Message> = {
     async initializeThread(threadId: string, threadKey?: string): Promise<void> {
       const thread = createAnthropicThreadManager({ redis, threadId, key: threadKey });
       await thread.initialize();
@@ -162,6 +162,16 @@ export function createAnthropicAdapter(
       const { threadId, threadKey, toolCallId, toolName, content } = cfg;
       const thread = createAnthropicThreadManager({ redis, threadId, key: threadKey });
       await thread.appendToolResult(id, toolCallId, toolName, content);
+    },
+
+    async appendAgentMessage(
+      threadId: string,
+      id: string,
+      message: Anthropic.Messages.Message,
+      threadKey?: string,
+    ): Promise<void> {
+      const thread = createAnthropicThreadManager({ redis, threadId, key: threadKey });
+      await thread.appendAssistantMessage(id, message.content);
     },
 
     async forkThread(
