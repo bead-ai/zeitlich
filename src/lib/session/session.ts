@@ -286,6 +286,7 @@ export async function createSession<
           : result.fileTree;
         stateManager.mergeUpdate({
           fileTree,
+          virtualFsCtx: virtualFsConfig.ctx,
           ...(skillFiles && { inlineFiles: skillFiles }),
         } as Partial<AgentState<TState>>);
       }

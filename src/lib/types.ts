@@ -27,6 +27,7 @@ export interface BaseAgentState {
   fileTree: FileEntry[];
   /** In-memory file contents keyed by path, bypassing the resolver (e.g. skill resources). */
   inlineFiles?: Record<string, string>;
+  virtualFsCtx?: unknown;
   systemPrompt?: string;
   totalInputTokens: number;
   totalOutputTokens: number;

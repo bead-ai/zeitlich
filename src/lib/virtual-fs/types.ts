@@ -118,8 +118,7 @@ export type PrefixedVirtualFsOps<
  */
 export interface VirtualFsState<TCtx = unknown, TMeta = FileEntryMetadata> {
   fileTree: FileEntry<TMeta>[];
-  ctx: TCtx;
-  workspaceBase?: string;
+  virtualFsCtx: TCtx;
   /** In-memory file contents keyed by path, bypassing the resolver (e.g. skill resources). */
   inlineFiles?: Record<string, string>;
 }
