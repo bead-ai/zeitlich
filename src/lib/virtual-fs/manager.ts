@@ -30,7 +30,7 @@ export function createVirtualFsActivities<
   TMeta = FileEntryMetadata,
 >(
   resolver: FileResolver<TCtx, TMeta>,
-  scope: S,
+  scope: S
 ): PrefixedVirtualFsOps<S, TCtx, TMeta> {
   const ops: VirtualFsOps<TCtx, TMeta> = {
     resolveFileTree: async (ctx: TCtx) => {
@@ -39,10 +39,10 @@ export function createVirtualFsActivities<
     },
   };
 
-  const prefix = scope;
+  const prefix = `virtualFs${scope.charAt(0).toUpperCase()}${scope.slice(1)}`;
   const cap = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1);
 
   return Object.fromEntries(
-    Object.entries(ops).map(([k, v]) => [`${prefix}${cap(k)}`, v]),
+    Object.entries(ops).map(([k, v]) => [`${prefix}${cap(k)}`, v])
   ) as PrefixedVirtualFsOps<S, TCtx, TMeta>;
 }
