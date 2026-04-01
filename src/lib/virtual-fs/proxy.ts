@@ -18,7 +18,7 @@ import type { VirtualFsOps } from "./types";
 
 export function proxyVirtualFsOps<TCtx = unknown>(
   scope?: string,
-  options?: Parameters<typeof proxyActivities>[0],
+  options?: Parameters<typeof proxyActivities>[0]
 ): VirtualFsOps<TCtx> {
   const resolvedScope = scope ?? workflowInfo().workflowType;
 
@@ -32,10 +32,10 @@ export function proxyVirtualFsOps<TCtx = unknown>(
         maximumInterval: "30s",
         backoffCoefficient: 2,
       },
-    },
+    }
   );
 
-  const prefix = resolvedScope;
+  const prefix = `virtualFs${resolvedScope.charAt(0).toUpperCase()}${resolvedScope.slice(1)}`;
   const p = (key: string): string =>
     `${prefix}${key.charAt(0).toUpperCase()}${key.slice(1)}`;
 
