@@ -42,6 +42,7 @@ export function createRunAgentActivity<R, S extends BaseAgentState = BaseAgentSt
 ): (config: RunAgentConfig) => Promise<R> {
   return async (config: RunAgentConfig) => {
     const state = await queryParentWorkflowState<S>(client);
+    Context.current().heartbeat({ agentName: config.agentName, threadId: config.threadId });
     return handler({ ...config, state });
   };
 }
