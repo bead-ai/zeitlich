@@ -27,6 +27,7 @@ export {
 // Thread manager
 export {
   createLangChainThreadManager,
+  sanitizeToolCallPairings,
   type LangChainThreadManager,
   type LangChainThreadManagerConfig,
   type LangChainContent,

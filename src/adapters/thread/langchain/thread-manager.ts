@@ -17,6 +17,84 @@ import type {
   ThreadManagerHooks,
 } from "../../../lib/thread/types";
 
+interface ToolCallRef {
+  id: string;
+  name: string;
+}
+
+/**
+ * Repairs broken tool_use / tool_result pairings caused by activity retries.
+ *
+ * When a Temporal activity is retried, a second AI message (with new tool_calls)
+ * can be appended before all tool_results from the first AI message have arrived.
+ * This produces an invalid sequence that model providers reject.
+ *
+ * For each AI message that contains tool_calls, this function checks that every
+ * tool_call id has a matching tool_result before the next non-tool message.
+ * Missing results get a synthetic ToolMessage injected so the sequence is valid.
+ */
+export function sanitizeToolCallPairings(
+  messages: StoredMessage[],
+): StoredMessage[] {
+  if (messages.length === 0) return messages;
+
+  const result: StoredMessage[] = [];
+  let pendingToolCallIds: Set<string> | null = null;
+  let toolCallById: Map<string, ToolCallRef> | null = null;
+
+  function flushSynthetics(): void {
+    if (!pendingToolCallIds || pendingToolCallIds.size === 0) return;
+    for (const missingId of pendingToolCallIds) {
+      const tc = toolCallById?.get(missingId);
+      result.push(
+        new ToolMessage({
+          content: "Tool call was not completed (activity retried)",
+          tool_call_id: missingId,
+          name: tc?.name,
+        }).toDict(),
+      );
+    }
+    pendingToolCallIds = null;
+    toolCallById = null;
+  }
+
+  for (const msg of messages) {
+    if (msg.type === "tool") {
+      if (pendingToolCallIds) {
+        const toolId = msg.data.tool_call_id;
+        if (toolId) pendingToolCallIds.delete(toolId);
+      }
+      result.push(msg);
+      continue;
+    }
+
+    flushSynthetics();
+    result.push(msg);
+
+    if (msg.type !== "ai") continue;
+    const data = msg.data as unknown as Record<string, unknown>;
+    const toolCalls: ToolCallRef[] =
+      (data.tool_calls as ToolCallRef[] | undefined) ?? [];
+    if (toolCalls.length === 0) continue;
+
+    pendingToolCallIds = new Set(
+      toolCalls.map((tc: ToolCallRef) => tc.id).filter(Boolean),
+    );
+    if (pendingToolCallIds.size === 0) {
+      pendingToolCallIds = null;
+      continue;
+    }
+    toolCallById = new Map(
+      toolCalls
+        .filter((tc: ToolCallRef) => tc.id)
+        .map((tc: ToolCallRef) => [tc.id, tc]),
+    );
+  }
+
+  flushSynthetics();
+  return result;
+}
+
 /** SDK-native content type for LangChain human messages */
 export type LangChainContent = string | MessageContent;
 
@@ -110,10 +188,11 @@ export function createLangChainThreadManager(
 
     async prepareForInvocation(): Promise<LangChainInvocationPayload> {
       const stored = await base.load();
+      const sanitized = sanitizeToolCallPairings(stored);
       const { onPrepareMessage, onPreparedMessage } = config.hooks ?? {};
       const mapped = onPrepareMessage
-        ? stored.map((msg, i) => onPrepareMessage(msg, i, stored))
-        : stored;
+        ? sanitized.map((msg, i) => onPrepareMessage(msg, i, sanitized))
+        : sanitized;
       const messages = mapStoredMessagesToChatMessages(mapped);
       return {
         messages: onPreparedMessage
