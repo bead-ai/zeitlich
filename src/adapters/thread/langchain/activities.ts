@@ -148,6 +148,17 @@ export function createLangChainAdapter(
       await thread.appendToolResult(id, toolCallId, "", content);
     },
 
+    async appendAgentMessage(
+      threadId: string,
+      id: string,
+      message: StoredMessage,
+      threadKey?: string,
+    ): Promise<void> {
+      const thread = createLangChainThreadManager({ redis, threadId, key: threadKey });
+      const patched = { ...message, data: { ...message.data, id } };
+      await thread.append([patched]);
+    },
+
     async forkThread(
       sourceThreadId: string,
       targetThreadId: string,

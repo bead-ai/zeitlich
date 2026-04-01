@@ -194,6 +194,20 @@ export function createGoogleGenAIAdapter(
       );
     },
 
+    async appendAgentMessage(
+      threadId: string,
+      id: string,
+      message: Content,
+      threadKey?: string,
+    ): Promise<void> {
+      const thread = createGoogleGenAIThreadManager({
+        redis,
+        threadId,
+        key: threadKey,
+      });
+      await thread.appendModelContent(id, message.parts ?? []);
+    },
+
     async forkThread(
       sourceThreadId: string,
       targetThreadId: string,

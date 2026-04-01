@@ -164,6 +164,16 @@ export function createAnthropicAdapter(
       await thread.appendToolResult(id, toolCallId, toolName, content);
     },
 
+    async appendAgentMessage(
+      threadId: string,
+      id: string,
+      message: Anthropic.Messages.Message,
+      threadKey?: string,
+    ): Promise<void> {
+      const thread = createAnthropicThreadManager({ redis, threadId, key: threadKey });
+      await thread.appendAssistantMessage(id, message.content);
+    },
+
     async forkThread(
       sourceThreadId: string,
       targetThreadId: string,

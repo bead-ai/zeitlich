@@ -17,7 +17,8 @@ export interface LangChainModelInvokerConfig<TModel extends BaseChatModel<any> =
  * `ModelInvoker<StoredMessage>` contract.
  *
  * Loads the conversation thread from Redis, invokes a LangChain chat model,
- * appends the AI response, and returns a normalised AgentResponse.
+ * and returns a normalised AgentResponse.
+ * The caller is responsible for appending the response to the thread.
  *
  * @example
  * ```typescript
@@ -53,8 +54,6 @@ export function createLangChainModelInvoker<TModel extends BaseChatModel<any> = 
         tools: state.tools,
       },
     );
-
-    await thread.append([response.toDict()]);
 
     const toolCalls = response.tool_calls ?? [];
 

@@ -39,6 +39,13 @@ export interface ThreadOps<TContent = string> {
   ): Promise<void>;
   /** Append a tool result to the thread */
   appendToolResult(id: string, config: ToolResultConfig): Promise<void>;
+  /** Append the model's response to the thread */
+  appendAgentMessage(
+    threadId: string,
+    id: string,
+    message: unknown,
+    threadKey?: string
+  ): Promise<void>;
   /** Append a system message to the thread */
   appendSystemMessage(
     threadId: string,

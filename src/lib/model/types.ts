@@ -33,8 +33,9 @@ export interface ModelInvokerConfig {
 
 /**
  * Generic model invocation contract.
- * Implementations load the thread, call the LLM, append the response,
- * and return a normalised AgentResponse.
+ * Implementations load the thread, call the LLM, and return a normalised
+ * AgentResponse. The caller (workflow) is responsible for appending the
+ * response to the thread with a deterministic ID.
  *
  * Framework adapters (e.g. `zeitlich/langchain`) provide concrete
  * implementations of this type.
