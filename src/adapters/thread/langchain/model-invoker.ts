@@ -54,8 +54,6 @@ export function createLangChainModelInvoker<TModel extends BaseChatModel<any> = 
       },
     );
 
-    await thread.append([response.toDict()]);
-
     const toolCalls = response.tool_calls ?? [];
 
     return {
