@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.32](https://github.com/bead-ai/zeitlich/compare/v0.2.31...v0.2.32) (2026-04-02)
+
+
+### Features
+
+* add inline file support to VirtualFileSystem tests ([b0d0657](https://github.com/bead-ai/zeitlich/commit/b0d06573913a6bcc750f9f5fb1b168c8f14b6bf7))
+* extract thread message appending from model invocations ([#78](https://github.com/bead-ai/zeitlich/issues/78)) ([85a085d](https://github.com/bead-ai/zeitlich/commit/85a085d509166e12e3870f0a4764bbc30acaf80c))
+
+
+### Bug Fixes
+
+* virtual fs ctx sharing ([8ab68ae](https://github.com/bead-ai/zeitlich/commit/8ab68ae46796e7efe01b6b491f318ad65261e142))
+* wrong naming for virtual fs activities ([fb65156](https://github.com/bead-ai/zeitlich/commit/fb65156ae4b3b9310bbdd1abd86edc4831bc9202))
+
+
+### Miscellaneous Chores
+
+* release 0.2.32 ([3ac7eef](https://github.com/bead-ai/zeitlich/commit/3ac7eef2573ed503c6d305cf007e1d980d5d7370))
+
 ## [0.2.31](https://github.com/bead-ai/zeitlich/compare/v0.2.30...v0.2.31) (2026-03-31)
 
 
