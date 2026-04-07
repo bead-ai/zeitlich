@@ -94,7 +94,7 @@ export interface LangChainAdapter {
  * export function createActivities(client: WorkflowClient) {
  *   return {
  *     ...adapter.createActivities("codingAgent"),
- *     runCodingAgent: createRunAgentActivity(client, adapter.invoker),
+ *     ...createRunAgentActivity(client, adapter.invoker, "codingAgent"),
  *   };
  * }
  * ```
@@ -105,8 +105,8 @@ export interface LangChainAdapter {
  *   return {
  *     ...adapter.createActivities("codingAgent"),
  *     ...adapter.createActivities("researchAgent"),
- *     runCodingAgent: createRunAgentActivity(client, adapter.invoker),
- *     runResearchAgent: createRunAgentActivity(client, adapter.createModelInvoker(claude)),
+ *     ...createRunAgentActivity(client, adapter.invoker, "codingAgent"),
+ *     ...createRunAgentActivity(client, adapter.createModelInvoker(claude), "researchAgent"),
  *   };
  * }
  * ```

@@ -107,7 +107,7 @@ export interface AnthropicAdapter {
  * export function createActivities(temporalClient: WorkflowClient) {
  *   return {
  *     ...adapter.createActivities("codingAgent"),
- *     runCodingAgent: createRunAgentActivity(temporalClient, adapter.invoker),
+ *     ...createRunAgentActivity(temporalClient, adapter.invoker, "codingAgent"),
  *   };
  * }
  * ```
@@ -118,10 +118,11 @@ export interface AnthropicAdapter {
  *   return {
  *     ...adapter.createActivities("codingAgent"),
  *     ...adapter.createActivities("researchAgent"),
- *     runCodingAgent: createRunAgentActivity(temporalClient, adapter.invoker),
- *     runResearchAgent: createRunAgentActivity(
+ *     ...createRunAgentActivity(temporalClient, adapter.invoker, "codingAgent"),
+ *     ...createRunAgentActivity(
  *       temporalClient,
  *       adapter.createModelInvoker('claude-sonnet-4-20250514'),
+ *       "researchAgent",
  *     ),
  *   };
  * }

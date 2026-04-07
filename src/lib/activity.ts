@@ -40,25 +40,36 @@ export async function queryParentWorkflowState<T>(
 }
 
 /**
- * Wraps a handler into a `RunAgentActivity` by auto-fetching the parent
- * workflow's agent state before each invocation.
+ * Wraps a handler into a scope-prefixed `RunAgentActivity` by auto-fetching
+ * the parent workflow's agent state before each invocation.
+ *
+ * Returns a `Record` with a single key `run<Scope>` so it can be spread
+ * into the activities object alongside adapter activities.
+ *
+ * @param scope - Workflow scope used to derive the activity name.
+ *   `"myAgentWorkflow"` produces `{ runMyAgentWorkflow: fn }`.
  *
  * @example
  * ```typescript
  * import { createRunAgentActivity } from 'zeitlich';
- * import { createLangChainModelInvoker } from 'zeitlich/adapters/thread/langchain';
  *
- * const invoker = createLangChainModelInvoker({ redis, model });
- * return { runAgent: createRunAgentActivity(client, invoker) };
+ * return {
+ *   ...adapter.createActivities("myAgentWorkflow"),
+ *   ...createRunAgentActivity(client, adapter.invoker, "myAgentWorkflow"),
+ * };
  * ```
  */
 export function createRunAgentActivity<R, S extends BaseAgentState = BaseAgentState>(
   client: WorkflowClient,
   handler: (config: RunAgentConfig & { state: S }) => Promise<R>,
-): (config: RunAgentConfig) => Promise<R> {
-  return async (config: RunAgentConfig) => {
-    const state = await queryParentWorkflowState<S>(client);
-    return handler({ ...config, state });
+  scope: string,
+): Record<string, (config: RunAgentConfig) => Promise<R>> {
+  const name = `run${scope.charAt(0).toUpperCase()}${scope.slice(1)}`;
+  return {
+    [name]: async (config: RunAgentConfig) => {
+      const state = await queryParentWorkflowState<S>(client);
+      return handler({ ...config, state });
+    },
   };
 }
 

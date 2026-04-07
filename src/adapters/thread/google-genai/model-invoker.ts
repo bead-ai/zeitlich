@@ -43,7 +43,7 @@ function toFunctionDeclarations(
  *   model: 'gemini-2.5-flash',
  * });
  *
- * return { runAgent: createRunAgentActivity(client, invoker) };
+ * return { ...createRunAgentActivity(client, invoker, "myAgent") };
  * ```
  */
 export function createGoogleGenAIModelInvoker({

@@ -37,7 +37,7 @@ export interface LangChainModelInvokerConfig<
  * const model = new ChatAnthropic({ model: "claude-sonnet-4-6" });
  * const invoker = createLangChainModelInvoker({ redis, model });
  *
- * return { runAgent: createRunAgentActivity(client, invoker) };
+ * return { ...createRunAgentActivity(client, invoker, "myAgent") };
  * ```
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

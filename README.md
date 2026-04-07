@@ -78,7 +78,7 @@ const adapter = createLangChainAdapter({
 export function createActivities(client: WorkflowClient) {
   return {
     ...adapter.createActivities("myAgentWorkflow"),
-    runAgent: createRunAgentActivity(client, adapter.invoker),
+    ...createRunAgentActivity(client, adapter.invoker, "myAgentWorkflow"),
   };
 }
 ```
@@ -182,7 +182,7 @@ import type { MyActivities } from "./activities";
 import { proxyLangChainThreadOps } from "zeitlich/adapters/thread/langchain/workflow";
 import { proxyInMemorySandboxOps } from "zeitlich/adapters/sandbox/inmemory/workflow";
 
-const runAgentActivity = proxyRunAgent("runAgentActivity");
+const runAgentActivity = proxyRunAgent();
 
 const {
   searchHandlerActivity,
@@ -286,7 +286,7 @@ export const createActivities = ({
   return {
     ...adapter.createActivities("myAgentWorkflow"),
     ...sandboxManager.createActivities("myAgentWorkflow"),
-    runAgentActivity: createRunAgentActivity(client, adapter.invoker),
+    ...createRunAgentActivity(client, adapter.invoker, "myAgentWorkflow"),
     searchHandlerActivity: async (args: { query: string }) => ({
       toolResponse: JSON.stringify(await performSearch(args.query)),
       data: null,
@@ -420,7 +420,7 @@ import {
 } from "zeitlich/workflow";
 import { proxyLangChainThreadOps } from "zeitlich/adapters/thread/langchain/workflow";
 
-const runResearcherActivity = proxyRunAgent("runResearcherActivity");
+const runResearcherActivity = proxyRunAgent();
 
 // Define the workflow — name, description (and optional resultSchema) live here
 export const researcherWorkflow = defineSubagentWorkflow(
@@ -889,7 +889,7 @@ Framework-agnostic utilities for activities, worker setup, and Node.js code:
 
 | Export                    | Description                                                                                   |
 | ------------------------- | --------------------------------------------------------------------------------------------- |
-| `createRunAgentActivity`  | Wraps a handler into a `RunAgentActivity` with auto-fetched parent workflow state             |
+| `createRunAgentActivity`  | Wraps a handler into a scope-prefixed `RunAgentActivity` with auto-fetched parent workflow state |
 | `withParentWorkflowState`  | Wraps a tool handler into an `ActivityToolHandler` with auto-fetched parent workflow state    |
 | `createThreadManager`     | Generic Redis-backed thread manager factory                                                   |
 | `toTree`                  | Generate file tree string from an `IFileSystem` instance                                      |

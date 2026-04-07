@@ -113,7 +113,7 @@ export interface GoogleGenAIAdapter {
  * export function createActivities(temporalClient: WorkflowClient) {
  *   return {
  *     ...adapter.createActivities("codingAgent"),
- *     runCodingAgent: createRunAgentActivity(temporalClient, adapter.invoker),
+ *     ...createRunAgentActivity(temporalClient, adapter.invoker, "codingAgent"),
  *   };
  * }
  * ```
@@ -124,10 +124,11 @@ export interface GoogleGenAIAdapter {
  *   return {
  *     ...adapter.createActivities("codingAgent"),
  *     ...adapter.createActivities("researchAgent"),
- *     runCodingAgent: createRunAgentActivity(temporalClient, adapter.invoker),
- *     runResearchAgent: createRunAgentActivity(
+ *     ...createRunAgentActivity(temporalClient, adapter.invoker, "codingAgent"),
+ *     ...createRunAgentActivity(
  *       temporalClient,
  *       adapter.createModelInvoker('gemini-2.5-pro'),
+ *       "researchAgent",
  *     ),
  *   };
  * }

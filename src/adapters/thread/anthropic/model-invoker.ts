@@ -45,7 +45,7 @@ function toAnthropicTools(
  *   model: 'claude-sonnet-4-20250514',
  * });
  *
- * return { runAgent: createRunAgentActivity(client, invoker) };
+ * return { ...createRunAgentActivity(client, invoker, "myAgent") };
  * ```
  */
 export function createAnthropicModelInvoker({
