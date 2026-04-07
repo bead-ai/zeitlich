@@ -78,7 +78,7 @@ const adapter = createLangChainAdapter({
 export function createActivities(client: WorkflowClient) {
   return {
     ...adapter.createActivities("myAgentWorkflow"),
-    runAgent: createRunAgentActivity(client, adapter.invoker),
+    ...createRunAgentActivity(client, adapter.invoker, "myAgentWorkflow"),
   };
 }
 ```
@@ -171,18 +171,21 @@ import {
   createAgentStateManager,
   createSession,
   defineWorkflow,
+  proxyRunAgent,
   askUserQuestionTool,
   bashTool,
   defineTool,
 } from "zeitlich/workflow";
 import { searchTool } from "./tools";
 import type { MyActivities } from "./activities";
+import type { StoredMessage } from "@langchain/core/messages";
 
 import { proxyLangChainThreadOps } from "zeitlich/adapters/thread/langchain/workflow";
 import { proxyInMemorySandboxOps } from "zeitlich/adapters/sandbox/inmemory/workflow";
 
+const runAgentActivity = proxyRunAgent<StoredMessage>();
+
 const {
-  runAgentActivity,
   searchHandlerActivity,
   bashHandlerActivity,
   askUserQuestionHandlerActivity,
@@ -194,7 +197,6 @@ const {
     maximumInterval: "15m",
     backoffCoefficient: 4,
   },
-  heartbeatTimeout: "5m",
 });
 
 export const myAgentWorkflow = defineWorkflow(
@@ -285,7 +287,7 @@ export const createActivities = ({
   return {
     ...adapter.createActivities("myAgentWorkflow"),
     ...sandboxManager.createActivities("myAgentWorkflow"),
-    runAgentActivity: createRunAgentActivity(client, adapter.invoker),
+    ...createRunAgentActivity(client, adapter.invoker, "myAgentWorkflow"),
     searchHandlerActivity: async (args: { query: string }) => ({
       toolResponse: JSON.stringify(await performSearch(args.query)),
       data: null,
@@ -411,18 +413,16 @@ Spawn child agents as Temporal child workflows. Use `defineSubagentWorkflow` to 
 
 ```typescript
 // researcher.workflow.ts
-import { proxyActivities } from "@temporalio/workflow";
 import {
   createAgentStateManager,
   createSession,
   defineSubagentWorkflow,
+  proxyRunAgent,
 } from "zeitlich/workflow";
 import { proxyLangChainThreadOps } from "zeitlich/adapters/thread/langchain/workflow";
-import type { createResearcherActivities } from "./activities";
+import type { StoredMessage } from "@langchain/core/messages";
 
-const { runResearcherActivity } = proxyActivities<
-  ReturnType<typeof createResearcherActivities>
->({ startToCloseTimeout: "30m", heartbeatTimeout: "5m" });
+const runResearcherActivity = proxyRunAgent<StoredMessage>();
 
 // Define the workflow — name, description (and optional resultSchema) live here
 export const researcherWorkflow = defineSubagentWorkflow(
@@ -876,6 +876,7 @@ Safe for use in Temporal workflow files:
 | `defineTool`                | Identity function for type-safe tool definition with handler and hooks                                 |
 | `defineSubagentWorkflow`    | Defines a subagent workflow with embedded name, description, and optional resultSchema                 |
 | `defineSubagent`            | Creates a `SubagentConfig` from a `SubagentDefinition` with optional parent-specific overrides         |
+| `proxyRunAgent`             | Workflow-safe proxy for `runAgent` activities with LLM-optimised defaults (heartbeat, timeouts, retries) |
 | `getShortId`                | Generate a compact, workflow-deterministic identifier (base-62, 12 chars)                              |
 | Tool definitions            | `askUserQuestionTool`, `globTool`, `grepTool`, `readFileTool`, `writeFileTool`, `editTool`, `bashTool` |
 | Task tools                  | `taskCreateTool`, `taskGetTool`, `taskListTool`, `taskUpdateTool` for workflow task management         |
@@ -890,7 +891,7 @@ Framework-agnostic utilities for activities, worker setup, and Node.js code:
 
 | Export                    | Description                                                                                   |
 | ------------------------- | --------------------------------------------------------------------------------------------- |
-| `createRunAgentActivity`  | Wraps a handler into a `RunAgentActivity` with auto-fetched parent workflow state             |
+| `createRunAgentActivity`  | Wraps a handler into a scope-prefixed `RunAgentActivity` with auto-fetched parent workflow state |
 | `withParentWorkflowState`  | Wraps a tool handler into an `ActivityToolHandler` with auto-fetched parent workflow state    |
 | `createThreadManager`     | Generic Redis-backed thread manager factory                                                   |
 | `toTree`                  | Generate file tree string from an `IFileSystem` instance                                      |

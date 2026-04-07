@@ -52,6 +52,7 @@ export {
   queryParentWorkflowState,
   createRunAgentActivity,
   withParentWorkflowState,
+  getActivityContext,
 } from "./lib/activity";
 export type { AgentStateContext } from "./lib/activity";
 

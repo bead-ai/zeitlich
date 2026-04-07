@@ -1,8 +1,9 @@
 import type Redis from "ioredis";
-import type { GoogleGenAI, Content, FunctionDeclaration } from "@google/genai";
+import type { GoogleGenAI, Content, FunctionDeclaration, Part, GenerateContentResponse } from "@google/genai";
 import type { SerializableToolDefinition } from "../../../lib/types";
 import type { AgentResponse, ModelInvokerConfig } from "../../../lib/model";
 import { createGoogleGenAIThreadManager, type GoogleGenAIThreadManagerHooks } from "./thread-manager";
+import { getActivityContext } from "../../../lib/activity";
 
 export interface GoogleGenAIModelInvokerConfig {
   redis: Redis;
@@ -25,8 +26,8 @@ function toFunctionDeclarations(
  * Creates a Google GenAI model invoker that satisfies the generic
  * `ModelInvoker<Content>` contract.
  *
- * Loads the conversation thread from Redis, invokes the Gemini model via
- * `client.models.generateContent`, and returns a normalised AgentResponse.
+ * Internally streams the response and emits Temporal heartbeats on each
+ * chunk so that long-running LLM calls remain visible to the scheduler.
  * The caller is responsible for appending the response to the thread.
  *
  * @example
@@ -42,7 +43,7 @@ function toFunctionDeclarations(
  *   model: 'gemini-2.5-flash',
  * });
  *
- * return { runAgent: createRunAgentActivity(client, invoker) };
+ * return { ...createRunAgentActivity(client, invoker, "myAgent") };
  * ```
  */
 export function createGoogleGenAIModelInvoker({
@@ -55,6 +56,7 @@ export function createGoogleGenAIModelInvoker({
     config: ModelInvokerConfig,
   ): Promise<AgentResponse<Content>> {
     const { threadId, threadKey, state } = config;
+    const { heartbeat, signal } = getActivityContext();
 
     const thread = createGoogleGenAIThreadManager({ redis, threadId, key: threadKey, hooks });
     const { contents, systemInstruction } =
@@ -64,19 +66,30 @@ export function createGoogleGenAIModelInvoker({
     const tools =
       functionDeclarations.length > 0 ? [{ functionDeclarations }] : undefined;
 
-    const response = await client.models.generateContent({
+    const stream = await client.models.generateContentStream({
       model,
       contents,
       config: {
         ...(systemInstruction ? { systemInstruction } : {}),
         ...(tools ? { tools } : {}),
+        abortSignal: signal,
       },
     });
 
-    const responseParts = response.candidates?.[0]?.content?.parts ?? [];
-    const modelContent: Content = { role: "model", parts: responseParts };
+    const allParts: Part[] = [];
+    let lastChunk: GenerateContentResponse | undefined;
+    for await (const chunk of stream) {
+      lastChunk = chunk;
+      allParts.push(...(chunk.candidates?.[0]?.content?.parts ?? []));
+      heartbeat?.();
+    }
 
-    const functionCalls = response.functionCalls ?? [];
+    if (!lastChunk) {
+      throw new Error("Google GenAI stream ended without producing any chunks");
+    }
+
+    const modelContent: Content = { role: "model", parts: allParts };
+    const functionCalls = lastChunk.functionCalls ?? [];
 
     return {
       message: modelContent,
@@ -86,9 +99,9 @@ export function createGoogleGenAIModelInvoker({
         args: fc.args ?? {},
       })),
       usage: {
-        inputTokens: response.usageMetadata?.promptTokenCount,
-        outputTokens: response.usageMetadata?.candidatesTokenCount,
-        cachedReadTokens: response.usageMetadata?.cachedContentTokenCount,
+        inputTokens: lastChunk.usageMetadata?.promptTokenCount,
+        outputTokens: lastChunk.usageMetadata?.candidatesTokenCount,
+        cachedReadTokens: lastChunk.usageMetadata?.cachedContentTokenCount,
       },
     };
   };
