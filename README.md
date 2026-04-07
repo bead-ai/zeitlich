@@ -171,6 +171,7 @@ import {
   createAgentStateManager,
   createSession,
   defineWorkflow,
+  proxyRunAgent,
   askUserQuestionTool,
   bashTool,
   defineTool,
@@ -181,8 +182,9 @@ import type { MyActivities } from "./activities";
 import { proxyLangChainThreadOps } from "zeitlich/adapters/thread/langchain/workflow";
 import { proxyInMemorySandboxOps } from "zeitlich/adapters/sandbox/inmemory/workflow";
 
+const runAgentActivity = proxyRunAgent("runAgentActivity");
+
 const {
-  runAgentActivity,
   searchHandlerActivity,
   bashHandlerActivity,
   askUserQuestionHandlerActivity,
@@ -194,7 +196,6 @@ const {
     maximumInterval: "15m",
     backoffCoefficient: 4,
   },
-  heartbeatTimeout: "5m",
 });
 
 export const myAgentWorkflow = defineWorkflow(
@@ -411,18 +412,15 @@ Spawn child agents as Temporal child workflows. Use `defineSubagentWorkflow` to 
 
 ```typescript
 // researcher.workflow.ts
-import { proxyActivities } from "@temporalio/workflow";
 import {
   createAgentStateManager,
   createSession,
   defineSubagentWorkflow,
+  proxyRunAgent,
 } from "zeitlich/workflow";
 import { proxyLangChainThreadOps } from "zeitlich/adapters/thread/langchain/workflow";
-import type { createResearcherActivities } from "./activities";
 
-const { runResearcherActivity } = proxyActivities<
-  ReturnType<typeof createResearcherActivities>
->({ startToCloseTimeout: "30m", heartbeatTimeout: "5m" });
+const runResearcherActivity = proxyRunAgent("runResearcherActivity");
 
 // Define the workflow — name, description (and optional resultSchema) live here
 export const researcherWorkflow = defineSubagentWorkflow(
@@ -876,6 +874,7 @@ Safe for use in Temporal workflow files:
 | `defineTool`                | Identity function for type-safe tool definition with handler and hooks                                 |
 | `defineSubagentWorkflow`    | Defines a subagent workflow with embedded name, description, and optional resultSchema                 |
 | `defineSubagent`            | Creates a `SubagentConfig` from a `SubagentDefinition` with optional parent-specific overrides         |
+| `proxyRunAgent`             | Workflow-safe proxy for `runAgent` activities with LLM-optimised defaults (heartbeat, timeouts, retries) |
 | `getShortId`                | Generate a compact, workflow-deterministic identifier (base-62, 12 chars)                              |
 | Tool definitions            | `askUserQuestionTool`, `globTool`, `grepTool`, `readFileTool`, `writeFileTool`, `editTool`, `bashTool` |
 | Task tools                  | `taskCreateTool`, `taskGetTool`, `taskListTool`, `taskUpdateTool` for workflow task management         |
