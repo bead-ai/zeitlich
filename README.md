@@ -640,7 +640,7 @@ The `sandbox` field controls how a sandbox is created or reused:
 | Mode | Description |
 |------|-------------|
 | `{ mode: "new" }` | Create a fresh sandbox (default when `sandboxOps` is provided). |
-| `{ mode: "continue", sandboxId }` | Resume a previously-paused sandbox. This session takes ownership. |
+| `{ mode: "continue", sandboxId }` | Take ownership of an existing sandbox (paused or running). Paused sandboxes are automatically resumed. |
 | `{ mode: "fork", sandboxId }` | Fork from an existing sandbox. A new sandbox is created and owned by this session. |
 | `{ mode: "inherit", sandboxId }` | Use a sandbox owned by someone else (e.g. a parent agent). Shutdown policy is ignored. |
 
@@ -654,7 +654,10 @@ The `sandboxShutdown` field controls what happens to the sandbox when the sessio
 | `"pause"` | Pause the sandbox so it can be resumed later. |
 | `"keep"` | Leave the sandbox running (no-op on exit). |
 
-Subagents also support `"pause-until-parent-close"` — pause on exit, then wait for the parent workflow to signal when to destroy it.
+Subagents also support two additional shutdown modes:
+
+- `"pause-until-parent-close"` — pause on exit, then wait for the parent workflow to signal when to destroy it.
+- `"keep-until-parent-close"` — leave the sandbox running on exit, then wait for the parent workflow to signal when to destroy it.
 
 #### Subagent Thread & Sandbox Config
 

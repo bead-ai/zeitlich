@@ -434,6 +434,7 @@ describe("createSession edge cases", () => {
       }),
       forkSandbox: async () => "forked-sandbox-id",
       pauseSandbox: async () => {},
+      resumeSandbox: async () => {},
     };
 
     const session = await createSession({
@@ -476,6 +477,7 @@ describe("createSession edge cases", () => {
       }),
       forkSandbox: async () => "forked-sandbox-id",
       pauseSandbox: async () => {},
+      resumeSandbox: async () => {},
     };
 
     const session = await createSession({
@@ -939,6 +941,7 @@ describe("createSession edge cases", () => {
       snapshotSandbox: snapshotSpy,
       forkSandbox: async () => "forked-sandbox-id",
       pauseSandbox: async () => {},
+      resumeSandbox: async () => {},
     };
 
     const session = await createSession({
@@ -1029,6 +1032,7 @@ describe("createSession edge cases", () => {
       createSandbox: async () => ({ sandboxId: "sb-created" }),
       destroySandbox: async () => {},
       pauseSandbox: async () => {},
+      resumeSandbox: async () => {},
       snapshotSandbox: async () => ({
         sandboxId: "sb-1",
         providerId: "test",
@@ -1062,6 +1066,7 @@ describe("createSession edge cases", () => {
       createSandbox: async () => ({ sandboxId: "sb" }),
       destroySandbox: async () => {},
       pauseSandbox: async () => {},
+      resumeSandbox: async () => {},
       snapshotSandbox: async () => ({
         sandboxId: "sb",
         providerId: "test",
@@ -1106,6 +1111,7 @@ describe("createSession edge cases", () => {
       pauseSandbox: async (id: string) => {
         sandboxLog.push(`pause:${id}`);
       },
+      resumeSandbox: async () => {},
       snapshotSandbox: async () => ({
         sandboxId: "sb-1",
         providerId: "test",
@@ -1149,6 +1155,7 @@ describe("createSession edge cases", () => {
         sandboxLog.push(`destroy:${id}`);
       },
       pauseSandbox: async () => {},
+      resumeSandbox: async () => {},
       snapshotSandbox: async () => ({
         sandboxId: "sb-1",
         providerId: "test",
@@ -1195,6 +1202,7 @@ describe("createSession edge cases", () => {
         sandboxLog.push(`destroy:${id}`);
       },
       pauseSandbox: async () => {},
+      resumeSandbox: async () => {},
       snapshotSandbox: async () => ({
         sandboxId: "sb-1",
         providerId: "test",
@@ -1237,6 +1245,7 @@ describe("createSession edge cases", () => {
       pauseSandbox: async (id: string) => {
         sandboxLog.push(`pause:${id}`);
       },
+      resumeSandbox: async () => {},
       snapshotSandbox: async () => ({
         sandboxId: "sb-1",
         providerId: "test",
@@ -1280,6 +1289,7 @@ describe("createSession edge cases", () => {
       pauseSandbox: async (id: string) => {
         sandboxLog.push(`pause:${id}`);
       },
+      resumeSandbox: async () => {},
       snapshotSandbox: async () => ({
         sandboxId: "sb-1",
         providerId: "test",
@@ -1395,6 +1405,7 @@ describe("createSession edge cases", () => {
       pauseSandbox: async (id: string) => {
         sandboxLog.push(`pause:${id}`);
       },
+      resumeSandbox: async () => {},
       snapshotSandbox: async () => ({
         sandboxId: "sb-1",
         providerId: "test",

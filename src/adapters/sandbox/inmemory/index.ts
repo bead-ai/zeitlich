@@ -163,6 +163,10 @@ export class InMemorySandboxProvider implements SandboxProvider {
     // In-memory: nothing to pause
   }
 
+  async resume(_sandboxId: string): Promise<void> {
+    // In-memory: nothing to resume
+  }
+
   async create(options?: SandboxCreateOptions): Promise<SandboxCreateResult> {
     const id = options?.id ?? getShortId();
     const initialFiles: InitialFiles = {};
