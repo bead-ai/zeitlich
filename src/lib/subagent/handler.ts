@@ -86,6 +86,8 @@ export function createSubagentHandler<
   const threadSandboxes = new Map<string, string>();
   /** Maps agentName → sandboxId for persistent sandboxes (init: once) */
   const persistentSandboxes = new Map<string, string>();
+  /** Tracks agents whose first lazy sandbox creation is in-flight (guards concurrent init) */
+  const persistentSandboxCreating = new Set<string>();
 
   setHandler(childResultSignal, ({ childWorkflowId, result }) => {
     childResults.set(childWorkflowId, result);
@@ -131,6 +133,7 @@ export function createSubagentHandler<
     // --- Build sandbox init ---
     let sandbox: SandboxInit | undefined;
     let sandboxShutdownOverride: SubagentSandboxShutdown | undefined;
+    let isLazyCreator = false;
 
     if (sandboxCfg.source === "inherit" && parentSandboxId) {
       if (sandboxCfg.continuation === "fork") {
@@ -141,10 +144,20 @@ export function createSubagentHandler<
     } else if (sandboxCfg.source === "own") {
       const isLazy = sandboxCfg.init === "once";
 
-      // Resolve the base sandbox to continue/fork from
       let baseSandboxId: string | undefined;
       if (isLazy) {
         baseSandboxId = persistentSandboxes.get(config.agentName);
+        if (!baseSandboxId) {
+          if (persistentSandboxCreating.has(config.agentName)) {
+            // Another call is already creating — wait for it to finish
+            await condition(() => persistentSandboxes.has(config.agentName));
+            baseSandboxId = persistentSandboxes.get(config.agentName);
+          } else {
+            // We're the first concurrent caller — claim the creator role
+            persistentSandboxCreating.add(config.agentName);
+            isLazyCreator = true;
+          }
+        }
       } else if (continuationThreadId) {
         baseSandboxId = threadSandboxes.get(continuationThreadId);
       }
@@ -155,20 +168,18 @@ export function createSubagentHandler<
           sandboxId: baseSandboxId,
         };
       }
-      // No base → first call (or per-call without threadId) → omit, child creates fresh
 
       // Force pause so the sandbox survives for future continuation/fork:
-      // - first lazy call: sandbox will be stored for reuse
+      // - first lazy call (creator): pause-until-parent-close so parent can clean up
       // - continuation=continue: sandbox must survive for next call
-      // - lazy+fork: template must survive for future forks
-      const isFirstLazyCall = isLazy && !baseSandboxId;
+      // - lazy+fork (non-creator): template must survive for future forks
       const mustSurvive =
-        isFirstLazyCall ||
+        isLazyCreator ||
         sandboxCfg.continuation === "continue" ||
         (isLazy && sandboxCfg.continuation === "fork");
 
       if (mustSurvive) {
-        sandboxShutdownOverride = isFirstLazyCall
+        sandboxShutdownOverride = isLazyCreator
           ? "pause-until-parent-close"
           : "pause";
       }
@@ -207,17 +218,11 @@ export function createSubagentHandler<
     const childHandle = await startChild(config.workflow, childOpts);
 
     // Track child handles that need signaling at parent shutdown.
-    // This covers both explicit pause-until-parent-close configs and
-    // first-call lazy sandboxes that must stay alive for cleanup.
     const effectiveShutdown =
       sandboxShutdownOverride ?? sandboxCfg.shutdown ?? "destroy";
-    const isFirstLazyCall =
-      sandboxCfg.source === "own" &&
-      sandboxCfg.init === "once" &&
-      !persistentSandboxes.has(config.agentName);
 
     if (effectiveShutdown === "pause-until-parent-close") {
-      const key = isFirstLazyCall
+      const key = isLazyCreator
         ? `persistent:${config.agentName}`
         : childWorkflowId;
       pendingDestroys.set(key, childHandle);
