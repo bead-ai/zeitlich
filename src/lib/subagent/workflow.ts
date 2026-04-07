@@ -14,7 +14,11 @@ import type {
   SubagentSessionInput,
 } from "./types";
 import type { SubagentSandboxShutdown } from "../lifecycle";
-import { childResultSignal, destroySandboxSignal } from "./signals";
+import {
+  childResultSignal,
+  childSandboxReadySignal,
+  destroySandboxSignal,
+} from "./signals";
 
 /**
  * Defines a subagent workflow with embedded metadata (name, description, resultSchema).
@@ -118,11 +122,26 @@ export function defineSubagentWorkflow(
     const effectiveShutdown =
       workflowInput.sandboxShutdown ?? config.sandboxShutdown ?? "destroy";
 
+    const { parent } = workflowInfo();
+    if (!parent) {
+      throw ApplicationFailure.create({
+        message: "Subagent workflow called without a parent workflow",
+        nonRetryable: true,
+      });
+    }
+    const parentHandle = getExternalWorkflowHandle(parent.workflowId);
+
     const sessionInput: SubagentSessionInput = {
       agentName: config.name,
       sandboxShutdown: effectiveShutdown,
       ...(workflowInput.thread && { thread: workflowInput.thread }),
       ...(workflowInput.sandbox && { sandbox: workflowInput.sandbox }),
+      onSandboxReady: (sandboxId: string) => {
+        void parentHandle.signal(childSandboxReadySignal, {
+          childWorkflowId: workflowInfo().workflowId,
+          sandboxId,
+        });
+      },
     };
     const { destroySandbox, ...result } = await fn(
       prompt,
@@ -148,15 +167,6 @@ export function defineSubagentWorkflow(
       }
     }
 
-    const { parent } = workflowInfo();
-    if (!parent) {
-      throw ApplicationFailure.create({
-        message: "Subagent workflow called without a parent workflow",
-        nonRetryable: true,
-      });
-    }
-
-    const parentHandle = getExternalWorkflowHandle(parent.workflowId);
     await parentHandle.signal(childResultSignal, {
       childWorkflowId: workflowInfo().workflowId,
       result,

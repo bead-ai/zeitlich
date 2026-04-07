@@ -1,9 +1,7 @@
 import { describe, expect, it, vi, afterEach } from "vitest";
 import { z } from "zod";
 
-let capturedSignalHandler:
-  | ((payload: { childWorkflowId: string; result: unknown }) => void)
-  | null = null;
+const capturedSignalHandlers = new Map<unknown, (...args: unknown[]) => void>();
 
 let nextStartChildResult: ((prompt: string) => unknown) | null = null;
 
@@ -35,10 +33,10 @@ vi.mock("@temporalio/workflow", () => {
       workflowId: "child-wf-1",
       parent: { workflowId: "parent-wf-1" },
     }),
-    defineSignal: vi.fn((_name: string) => ({ __signal: true })),
+    defineSignal: vi.fn((name: string) => ({ __signal: true, name })),
     setHandler: vi.fn(
-      (_signal: unknown, handler: (...a: unknown[]) => void) => {
-        capturedSignalHandler = handler as typeof capturedSignalHandler;
+      (signal: unknown, handler: (...a: unknown[]) => void) => {
+        capturedSignalHandlers.set(signal, handler);
       }
     ),
     condition: vi.fn(async (fn: () => boolean) => {
@@ -59,8 +57,10 @@ vi.mock("@temporalio/workflow", () => {
               usage: { inputTokens: 100, outputTokens: 50 },
             };
 
-        if (capturedSignalHandler) {
-          capturedSignalHandler({ childWorkflowId: opts.workflowId, result });
+        for (const [signal, handler] of capturedSignalHandlers.entries()) {
+          if ((signal as { name?: string }).name === "childResult") {
+            handler({ childWorkflowId: opts.workflowId, result });
+          }
         }
 
         return {
@@ -104,7 +104,7 @@ import type {
 } from "./types";
 afterEach(() => {
   nextStartChildResult = null;
-  capturedSignalHandler = null;
+  capturedSignalHandlers.clear();
 });
 
 function mockWorkflow(name?: string): SubagentWorkflow {
@@ -1730,6 +1730,7 @@ describe("defineSubagentWorkflow", () => {
       agentName: "test",
       sandboxShutdown: "destroy",
       thread: { mode: "fork", threadId: "prev-42" },
+      onSandboxReady: expect.any(Function),
     });
   });
 
@@ -1748,6 +1749,7 @@ describe("defineSubagentWorkflow", () => {
       agentName: "test",
       sandboxShutdown: "destroy",
       sandbox: { mode: "inherit", sandboxId: "sb-123" },
+      onSandboxReady: expect.any(Function),
     });
   });
 
@@ -1766,6 +1768,7 @@ describe("defineSubagentWorkflow", () => {
       agentName: "test",
       sandboxShutdown: "destroy",
       sandbox: { mode: "fork", sandboxId: "prev-sb-1" },
+      onSandboxReady: expect.any(Function),
     });
   });
 
@@ -1788,6 +1791,7 @@ describe("defineSubagentWorkflow", () => {
       sandboxShutdown: "destroy",
       thread: { mode: "fork", threadId: "prev-t" },
       sandbox: { mode: "fork", sandboxId: "prev-sb" },
+      onSandboxReady: expect.any(Function),
     });
   });
 
@@ -1857,6 +1861,7 @@ describe("defineSubagentWorkflow", () => {
     expect(capturedSession).toEqual({
       agentName: "test",
       sandboxShutdown: "destroy",
+      onSandboxReady: expect.any(Function),
     });
   });
 

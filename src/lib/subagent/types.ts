@@ -180,6 +180,12 @@ export interface ChildResultSignalPayload {
   result: SubagentHandlerResponse;
 }
 
+/** Payload sent by a child workflow as soon as its sandbox is ready */
+export interface ChildSandboxReadySignalPayload {
+  childWorkflowId: string;
+  sandboxId: string;
+}
+
 /**
  * Session config fields passed from parent to child workflow.
  */
@@ -192,4 +198,6 @@ export interface SubagentSessionInput {
   sandbox?: SandboxInit;
   /** Sandbox shutdown policy (default: "destroy") */
   sandboxShutdown?: SubagentSandboxShutdown;
+  /** Called by the session as soon as the sandbox is created, before the agent loop starts. */
+  onSandboxReady?: (sandboxId: string) => void;
 }

@@ -180,6 +180,11 @@ export interface SessionConfig<
    * Has no effect when the sandbox is inherited (`sandbox.mode === "inherit"`).
    */
   sandboxShutdown?: SubagentSandboxShutdown;
+  /**
+   * Called as soon as the sandbox is created (or resumed/forked), before the
+   * agent loop starts. Useful for signalling sandbox readiness to a parent.
+   */
+  onSandboxReady?: (sandboxId: string) => void;
 
   // ---------------------------------------------------------------------------
   // Virtual filesystem

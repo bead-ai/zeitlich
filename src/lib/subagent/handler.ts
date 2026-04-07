@@ -22,7 +22,11 @@ import type {
   SandboxInit,
   SubagentSandboxShutdown,
 } from "../lifecycle";
-import { childResultSignal, destroySandboxSignal } from "./signals";
+import {
+  childResultSignal,
+  childSandboxReadySignal,
+  destroySandboxSignal,
+} from "./signals";
 
 /** Normalized sandbox config after resolving the union. */
 interface ResolvedSandboxConfig {
@@ -88,10 +92,23 @@ export function createSubagentHandler<
   const persistentSandboxes = new Map<string, string>();
   /** Tracks agents whose first lazy sandbox creation is in-flight (guards concurrent init) */
   const persistentSandboxCreating = new Set<string>();
+  /** Reverse lookup: childWorkflowId → agentName for in-flight lazy creators */
+  const lazyCreatorAgent = new Map<string, string>();
 
   setHandler(childResultSignal, ({ childWorkflowId, result }) => {
     childResults.set(childWorkflowId, result);
   });
+
+  setHandler(
+    childSandboxReadySignal,
+    ({ childWorkflowId, sandboxId }) => {
+      const agentName = lazyCreatorAgent.get(childWorkflowId);
+      if (agentName && !persistentSandboxes.has(agentName)) {
+        persistentSandboxes.set(agentName, sandboxId);
+        lazyCreatorAgent.delete(childWorkflowId);
+      }
+    }
+  );
 
   const handler = async (
     args: SubagentArgs,
@@ -218,6 +235,10 @@ export function createSubagentHandler<
       taskQueue: config.taskQueue ?? parentTaskQueue,
     };
 
+    if (isLazyCreator) {
+      lazyCreatorAgent.set(childWorkflowId, config.agentName);
+    }
+
     log.info("subagent spawned", {
       subagent: config.agentName,
       childWorkflowId,
@@ -286,10 +307,16 @@ export function createSubagentHandler<
         sandboxCfg.init === "once" &&
         !persistentSandboxes.has(config.agentName)
       ) {
+        // Fallback: signal may have already set this via childSandboxReadySignal
         persistentSandboxes.set(config.agentName, childSandboxId);
       } else if (allowsContinuation && childThreadId) {
         threadSandboxes.set(childThreadId, childSandboxId);
       }
+    }
+
+    if (isLazyCreator) {
+      persistentSandboxCreating.delete(config.agentName);
+      lazyCreatorAgent.delete(childWorkflowId);
     }
 
     if (!toolResponse) {
