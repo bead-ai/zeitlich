@@ -24,17 +24,34 @@ import type {
 } from "../lifecycle";
 import { childResultSignal, destroySandboxSignal } from "./signals";
 
-/**
- * Resolve the shorthand/object `SubagentSandboxConfig` into a normalized form.
- */
-function resolveSandboxConfig(config?: SubagentSandboxConfig): {
+/** Normalized sandbox config after resolving the union. */
+interface ResolvedSandboxConfig {
   source: "none" | "inherit" | "own";
+  init: "per-call" | "once";
+  continuation: "continue" | "fork";
   shutdown?: SubagentSandboxShutdown;
-} {
-  if (!config || config === "none") return { source: "none" };
-  if (config === "inherit") return { source: "inherit" };
-  if (config === "own") return { source: "own" };
-  return { source: "own", shutdown: config.shutdown };
+}
+
+function resolveSandboxConfig(
+  config?: SubagentSandboxConfig
+): ResolvedSandboxConfig {
+  if (!config || config === "none") {
+    return { source: "none", init: "per-call", continuation: "fork" };
+  }
+  if (config.source === "inherit") {
+    return {
+      source: "inherit",
+      init: "per-call",
+      continuation: config.continuation,
+      shutdown: config.shutdown,
+    };
+  }
+  return {
+    source: "own",
+    init: config.init ?? "per-call",
+    continuation: config.continuation,
+    shutdown: config.shutdown,
+  };
 }
 
 /**
@@ -65,8 +82,10 @@ export function createSubagentHandler<
     string,
     Awaited<ReturnType<typeof startChild>>
   >();
-  /** Maps childThreadId → sandboxId for sandbox continuation across invocations */
+  /** Maps childThreadId → sandboxId for sandbox continuation across invocations (init: per-call) */
   const threadSandboxes = new Map<string, string>();
+  /** Maps agentName → sandboxId for persistent sandboxes (init: once) */
+  const persistentSandboxes = new Map<string, string>();
 
   setHandler(childResultSignal, ({ childWorkflowId, result }) => {
     childResults.set(childWorkflowId, result);
@@ -111,25 +130,55 @@ export function createSubagentHandler<
 
     // --- Build sandbox init ---
     let sandbox: SandboxInit | undefined;
+    let sandboxShutdownOverride: SubagentSandboxShutdown | undefined;
+
     if (sandboxCfg.source === "inherit" && parentSandboxId) {
-      sandbox = {
-        mode: "inherit",
-        sandboxId: parentSandboxId,
-      };
-    } else if (sandboxCfg.source === "own") {
-      const prevSbId = continuationThreadId
-        ? threadSandboxes.get(continuationThreadId)
-        : undefined;
-      if (prevSbId) {
-        sandbox = { mode: "fork", sandboxId: prevSbId };
+      if (sandboxCfg.continuation === "fork") {
+        sandbox = { mode: "fork", sandboxId: parentSandboxId };
+      } else {
+        sandbox = { mode: "inherit", sandboxId: parentSandboxId };
       }
-      // When no previous sandbox, omit — the child will create its own via sandboxOps
+    } else if (sandboxCfg.source === "own") {
+      const isLazy = sandboxCfg.init === "once";
+
+      // Resolve the base sandbox to continue/fork from
+      let baseSandboxId: string | undefined;
+      if (isLazy) {
+        baseSandboxId = persistentSandboxes.get(config.agentName);
+      } else if (continuationThreadId) {
+        baseSandboxId = threadSandboxes.get(continuationThreadId);
+      }
+
+      if (baseSandboxId) {
+        sandbox = {
+          mode: sandboxCfg.continuation === "continue" ? "continue" : "fork",
+          sandboxId: baseSandboxId,
+        };
+      }
+      // No base → first call (or per-call without threadId) → omit, child creates fresh
+
+      // Force pause so the sandbox survives for future continuation/fork:
+      // - first lazy call: sandbox will be stored for reuse
+      // - continuation=continue: sandbox must survive for next call
+      // - lazy+fork: template must survive for future forks
+      const isFirstLazyCall = isLazy && !baseSandboxId;
+      const mustSurvive =
+        isFirstLazyCall ||
+        sandboxCfg.continuation === "continue" ||
+        (isLazy && sandboxCfg.continuation === "fork");
+
+      if (mustSurvive) {
+        sandboxShutdownOverride = isFirstLazyCall
+          ? "pause-until-parent-close"
+          : "pause";
+      }
     }
 
     const workflowInput: SubagentWorkflowInput = {
       ...(thread && { thread }),
       ...(sandbox && { sandbox }),
-      ...(sandboxCfg.shutdown && { sandboxShutdown: sandboxCfg.shutdown }),
+      sandboxShutdown:
+        sandboxShutdownOverride ?? sandboxCfg.shutdown ?? undefined,
     };
 
     const resolvedContext =
@@ -157,14 +206,21 @@ export function createSubagentHandler<
 
     const childHandle = await startChild(config.workflow, childOpts);
 
-    const effectiveShutdown = sandboxCfg.shutdown ?? "destroy";
-    const shouldDeferDestroy =
-      effectiveShutdown === "pause-until-parent-close" &&
-      (sandboxCfg.source === "own" ||
-        (allowsContinuation && sandboxCfg.source !== "inherit"));
+    // Track child handles that need signaling at parent shutdown.
+    // This covers both explicit pause-until-parent-close configs and
+    // first-call lazy sandboxes that must stay alive for cleanup.
+    const effectiveShutdown =
+      sandboxShutdownOverride ?? sandboxCfg.shutdown ?? "destroy";
+    const isFirstLazyCall =
+      sandboxCfg.source === "own" &&
+      sandboxCfg.init === "once" &&
+      !persistentSandboxes.has(config.agentName);
 
-    if (shouldDeferDestroy) {
-      pendingDestroys.set(childWorkflowId, childHandle);
+    if (effectiveShutdown === "pause-until-parent-close") {
+      const key = isFirstLazyCall
+        ? `persistent:${config.agentName}`
+        : childWorkflowId;
+      pendingDestroys.set(key, childHandle);
     }
 
     // Wait for signal from child; race with child completion to propagate failures
@@ -205,8 +261,17 @@ export function createSubagentHandler<
       metadata,
     } = childResult;
 
-    if (allowsContinuation && childSandboxId && childThreadId) {
-      threadSandboxes.set(childThreadId, childSandboxId);
+    // Store sandbox ID for future continuation/fork
+    if (childSandboxId) {
+      if (
+        sandboxCfg.source === "own" &&
+        sandboxCfg.init === "once" &&
+        !persistentSandboxes.has(config.agentName)
+      ) {
+        persistentSandboxes.set(config.agentName, childSandboxId);
+      } else if (allowsContinuation && childThreadId) {
+        threadSandboxes.set(childThreadId, childSandboxId);
+      }
     }
 
     if (!toolResponse) {
