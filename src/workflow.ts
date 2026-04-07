@@ -133,6 +133,9 @@ export type {
   ModelInvokerConfig,
 } from "./lib/model";
 
+// Model proxy (workflow-safe proxy with LLM-optimised defaults)
+export { proxyRunAgent } from "./lib/model/proxy";
+
 // Subagent types
 export type {
   SubagentConfig,
