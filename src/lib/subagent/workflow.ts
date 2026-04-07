@@ -137,10 +137,13 @@ export function defineSubagentWorkflow(
       ...(workflowInput.thread && { thread: workflowInput.thread }),
       ...(workflowInput.sandbox && { sandbox: workflowInput.sandbox }),
       onSandboxReady: (sandboxId: string) => {
-        void parentHandle.signal(childSandboxReadySignal, {
-          childWorkflowId: workflowInfo().workflowId,
-          sandboxId,
-        });
+        const isReuse = workflowInput.sandbox?.mode === "continue";
+        if (!isReuse) {
+          void parentHandle.signal(childSandboxReadySignal, {
+            childWorkflowId: workflowInfo().workflowId,
+            sandboxId,
+          });
+        }
       },
     };
     const { destroySandbox, ...result } = await fn(

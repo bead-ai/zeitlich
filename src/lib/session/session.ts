@@ -266,7 +266,7 @@ export async function createSession<
         }
       }
 
-      if (sandboxId && onSandboxReady) {
+      if (sandboxId && sandboxOwned && onSandboxReady) {
         onSandboxReady(sandboxId);
       }
 
