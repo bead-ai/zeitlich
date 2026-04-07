@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.33](https://github.com/bead-ai/zeitlich/compare/v0.2.32...v0.2.33) (2026-04-07)
+
+
+### Features
+
+* switch to streaming + heatbeat when calling models ([#80](https://github.com/bead-ai/zeitlich/issues/80)) ([bd0c685](https://github.com/bead-ai/zeitlich/commit/bd0c6855ca27609712e239f819688e4c47008708))
+
+
+### Miscellaneous Chores
+
+* release 0.2.33 ([798e9d0](https://github.com/bead-ai/zeitlich/commit/798e9d0846e92a68f39b25350ecd7c524af676ee))
+
 ## [0.2.32](https://github.com/bead-ai/zeitlich/compare/v0.2.31...v0.2.32) (2026-04-02)
 
 
