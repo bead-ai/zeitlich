@@ -75,6 +75,9 @@ export function createLangChainModelInvoker<
 
       const toolCalls = response.tool_calls ?? [];
 
+      const providerUsage =
+        (response.response_metadata?.usage as Record<string, unknown>) ?? {};
+
       return {
         message: response.toDict(),
         rawToolCalls: toolCalls.map((tc) => ({
@@ -89,14 +92,10 @@ export function createLangChainModelInvoker<
             response.usage_metadata?.output_token_details?.reasoning,
           cachedWriteTokens:
             response.usage_metadata?.input_token_details?.cache_creation ||
-            (response.response_metadata.cacheWriteInputTokens as
-              | number
-              | undefined),
+            (providerUsage.cacheWriteInputTokens as number | undefined),
           cachedReadTokens:
             response.usage_metadata?.input_token_details?.cache_read ||
-            (response.response_metadata.cacheReadInputTokens as
-              | number
-              | undefined),
+            (providerUsage.cacheReadInputTokens as number | undefined),
         },
       };
     } finally {
