@@ -1438,4 +1438,138 @@ describe("createSession edge cases", () => {
     expect(sandboxLog).toContain("pause:sb-err");
     expect(sandboxLog).not.toContain("destroy:sb-err");
   });
+
+  // --- sandboxShutdown: "keep-until-parent-close" ---
+
+  it("keeps sandbox running on exit when sandboxShutdown is keep-until-parent-close", async () => {
+    const { ops } = createMockThreadOps();
+    const sandboxLog: string[] = [];
+
+    const sandboxOps: SandboxOps = {
+      createSandbox: async () => ({ sandboxId: "sb-keep-parent" }),
+      destroySandbox: async (id: string) => {
+        sandboxLog.push(`destroy:${id}`);
+      },
+      pauseSandbox: async (id: string) => {
+        sandboxLog.push(`pause:${id}`);
+      },
+      resumeSandbox: async () => {},
+      snapshotSandbox: async () => ({
+        sandboxId: "sb-1",
+        providerId: "test",
+        data: null,
+        createdAt: new Date().toISOString(),
+      }),
+      forkSandbox: async () => "forked-sb",
+    };
+
+    const session = await createSession({
+      agentName: "TestAgent",
+      thread: { mode: "new", threadId: "thread-1" },
+      runAgent: createScriptedRunAgent([{ message: "done", toolCalls: [] }]),
+      threadOps: ops,
+      buildContextMessage: () => "go",
+      sandboxOps,
+      sandboxShutdown: "keep-until-parent-close",
+    });
+
+    const stateManager = createAgentStateManager({
+      initialState: { systemPrompt: "test" },
+    });
+
+    await session.runSession({ stateManager });
+
+    expect(sandboxLog).not.toContain("pause:sb-keep-parent");
+    expect(sandboxLog).not.toContain("destroy:sb-keep-parent");
+  });
+
+  it("keeps sandbox running on error when sandboxShutdown is keep-until-parent-close", async () => {
+    const { ops } = createMockThreadOps();
+    const sandboxLog: string[] = [];
+
+    const sandboxOps: SandboxOps = {
+      createSandbox: async () => ({ sandboxId: "sb-keep-err" }),
+      destroySandbox: async (id: string) => {
+        sandboxLog.push(`destroy:${id}`);
+      },
+      pauseSandbox: async (id: string) => {
+        sandboxLog.push(`pause:${id}`);
+      },
+      resumeSandbox: async () => {},
+      snapshotSandbox: async () => ({
+        sandboxId: "sb-1",
+        providerId: "test",
+        data: null,
+        createdAt: new Date().toISOString(),
+      }),
+      forkSandbox: async () => "forked-sb",
+    };
+
+    const session = await createSession({
+      agentName: "TestAgent",
+      thread: { mode: "new", threadId: "thread-1" },
+      runAgent: async () => {
+        throw new Error("crash");
+      },
+      threadOps: ops,
+      buildContextMessage: () => "go",
+      sandboxOps,
+      sandboxShutdown: "keep-until-parent-close",
+    });
+
+    const stateManager = createAgentStateManager({
+      initialState: { systemPrompt: "test" },
+    });
+
+    await expect(session.runSession({ stateManager })).rejects.toThrow(
+      "crash"
+    );
+
+    expect(sandboxLog).not.toContain("pause:sb-keep-err");
+    expect(sandboxLog).not.toContain("destroy:sb-keep-err");
+  });
+
+  // --- sandbox continue calls resumeSandbox ---
+
+  it("calls resumeSandbox when sandbox mode is continue", async () => {
+    const { ops } = createMockThreadOps();
+    const sandboxLog: string[] = [];
+
+    const sandboxOps: SandboxOps = {
+      createSandbox: async () => ({ sandboxId: "new-sb" }),
+      destroySandbox: async (id: string) => {
+        sandboxLog.push(`destroy:${id}`);
+      },
+      pauseSandbox: async () => {},
+      resumeSandbox: async (id: string) => {
+        sandboxLog.push(`resume:${id}`);
+      },
+      snapshotSandbox: async () => ({
+        sandboxId: "sb-1",
+        providerId: "test",
+        data: null,
+        createdAt: new Date().toISOString(),
+      }),
+      forkSandbox: async () => "forked-sb",
+    };
+
+    const session = await createSession({
+      agentName: "TestAgent",
+      thread: { mode: "new", threadId: "thread-1" },
+      runAgent: createScriptedRunAgent([{ message: "done", toolCalls: [] }]),
+      threadOps: ops,
+      buildContextMessage: () => "go",
+      sandboxOps,
+      sandbox: { mode: "continue", sandboxId: "paused-sb" },
+    });
+
+    const stateManager = createAgentStateManager({
+      initialState: { systemPrompt: "test" },
+    });
+
+    await session.runSession({ stateManager });
+
+    expect(sandboxLog).toContain("resume:paused-sb");
+    expect(sandboxLog).toContain("destroy:paused-sb");
+  });
 });

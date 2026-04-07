@@ -1290,6 +1290,194 @@ describe("createSubagentHandler", () => {
 
     expect(result.metadata).toBeUndefined();
   });
+
+  // --- keep-until-parent-close ---
+
+  it("signals destroy for sandbox=own with keep-until-parent-close shutdown", async () => {
+    const { startChild } = await import("@temporalio/workflow");
+    const startMock = startChild as ReturnType<typeof vi.fn>;
+
+    const ownSubagent: SubagentConfig = {
+      agentName: "own-keep",
+      description: "Own sandbox kept",
+      workflow: mockWorkflow(),
+      sandbox: { source: "own", continuation: "fork", shutdown: "keep-until-parent-close" },
+    };
+
+    const { handler, destroySubagentSandboxes } = createSubagentHandler([
+      ownSubagent,
+    ]);
+
+    await handler(
+      { subagent: "own-keep", description: "test", prompt: "run" },
+      { threadId: "t", toolCallId: "tc", toolName: "Subagent" }
+    );
+
+    await destroySubagentSandboxes();
+
+    const lastResult = startMock.mock.results.at(-1);
+    if (!lastResult) throw new Error("expected startChild call");
+    const childHandle = await lastResult.value;
+    expect(childHandle.signal).toHaveBeenCalled();
+  });
+
+  it("does not signal destroy for sandbox=own with keep shutdown (without parent-close)", async () => {
+    const { startChild } = await import("@temporalio/workflow");
+    const startMock = startChild as ReturnType<typeof vi.fn>;
+
+    const ownSubagent: SubagentConfig = {
+      agentName: "own-keep-plain",
+      description: "Own sandbox keep",
+      workflow: mockWorkflow(),
+      sandbox: { source: "own", continuation: "fork", shutdown: "keep" },
+    };
+
+    const { handler, destroySubagentSandboxes } = createSubagentHandler([
+      ownSubagent,
+    ]);
+
+    await handler(
+      { subagent: "own-keep-plain", description: "test", prompt: "run" },
+      { threadId: "t", toolCallId: "tc", toolName: "Subagent" }
+    );
+
+    const lastResult = startMock.mock.results.at(-1);
+    if (!lastResult) throw new Error("expected startChild call");
+    const childHandle = await lastResult.value;
+    childHandle.signal.mockClear();
+
+    await destroySubagentSandboxes();
+
+    expect(childHandle.signal).not.toHaveBeenCalled();
+  });
+
+  // --- mustSurvive does not override user shutdown ---
+
+  it("does not override keep-until-parent-close with pause-until-parent-close for init=once", async () => {
+    const { startChild } = await import("@temporalio/workflow");
+    const startMock = startChild as ReturnType<typeof vi.fn>;
+
+    nextStartChildResult = () => ({
+      toolResponse: "first",
+      data: null,
+      threadId: "child-t-1",
+      sandboxId: "persistent-sb",
+    });
+
+    const config: SubagentConfig = {
+      agentName: "lazy-keep",
+      description: "Lazy keep",
+      workflow: mockWorkflow(),
+      sandbox: { source: "own", init: "once", continuation: "fork", shutdown: "keep-until-parent-close" },
+    };
+
+    const { handler } = createSubagentHandler([config]);
+
+    await handler(
+      { subagent: "lazy-keep", description: "test", prompt: "first" },
+      { threadId: "t", toolCallId: "tc-1", toolName: "Subagent" }
+    );
+
+    const firstCall = startMock.mock.calls.at(-1);
+    if (!firstCall) throw new Error("expected startChild call");
+    const firstInput = firstCall[1].args[1] as SubagentWorkflowInput;
+    expect(firstInput.sandboxShutdown).toBe("keep-until-parent-close");
+  });
+
+  it("does not override pause with pause-until-parent-close for init=once", async () => {
+    const { startChild } = await import("@temporalio/workflow");
+    const startMock = startChild as ReturnType<typeof vi.fn>;
+
+    nextStartChildResult = () => ({
+      toolResponse: "first",
+      data: null,
+      threadId: "child-t-1",
+      sandboxId: "persistent-sb",
+    });
+
+    const config: SubagentConfig = {
+      agentName: "lazy-pause",
+      description: "Lazy pause",
+      workflow: mockWorkflow(),
+      sandbox: { source: "own", init: "once", continuation: "fork", shutdown: "pause" },
+    };
+
+    const { handler } = createSubagentHandler([config]);
+
+    await handler(
+      { subagent: "lazy-pause", description: "test", prompt: "first" },
+      { threadId: "t", toolCallId: "tc-1", toolName: "Subagent" }
+    );
+
+    const firstCall = startMock.mock.calls.at(-1);
+    if (!firstCall) throw new Error("expected startChild call");
+    const firstInput = firstCall[1].args[1] as SubagentWorkflowInput;
+    expect(firstInput.sandboxShutdown).toBe("pause");
+  });
+
+  it("does not override keep with pause for continuation=continue", async () => {
+    const { startChild } = await import("@temporalio/workflow");
+    const startMock = startChild as ReturnType<typeof vi.fn>;
+
+    nextStartChildResult = () => ({
+      toolResponse: "first",
+      data: null,
+      threadId: "child-t-1",
+      sandboxId: "child-sb-1",
+    });
+
+    const config: SubagentConfig = {
+      agentName: "cont-keep",
+      description: "Continue keep",
+      workflow: mockWorkflow(),
+      thread: "continue",
+      sandbox: { source: "own", continuation: "continue", shutdown: "keep" },
+    };
+
+    const { handler } = createSubagentHandler([config]);
+
+    await handler(
+      { subagent: "cont-keep", description: "test", prompt: "first" },
+      { threadId: "t", toolCallId: "tc-1", toolName: "Subagent" }
+    );
+
+    const firstCall = startMock.mock.calls.at(-1);
+    if (!firstCall) throw new Error("expected startChild call");
+    const firstInput = firstCall[1].args[1] as SubagentWorkflowInput;
+    expect(firstInput.sandboxShutdown).toBe("keep");
+  });
+
+  it("still overrides destroy with pause for continuation=continue", async () => {
+    const { startChild } = await import("@temporalio/workflow");
+    const startMock = startChild as ReturnType<typeof vi.fn>;
+
+    nextStartChildResult = () => ({
+      toolResponse: "first",
+      data: null,
+      threadId: "child-t-1",
+      sandboxId: "child-sb-1",
+    });
+
+    const config: SubagentConfig = {
+      agentName: "cont-destroy",
+      description: "Continue destroy",
+      workflow: mockWorkflow(),
+      thread: "continue",
+      sandbox: { source: "own", continuation: "continue", shutdown: "destroy" },
+    };
+
+    const { handler } = createSubagentHandler([config]);
+
+    await handler(
+      { subagent: "cont-destroy", description: "test", prompt: "first" },
+      { threadId: "t", toolCallId: "tc-1", toolName: "Subagent" }
+    );
+
+    const firstCall = startMock.mock.calls.at(-1);
+    if (!firstCall) throw new Error("expected startChild call");
+    const firstInput = firstCall[1].args[1] as SubagentWorkflowInput;
+    expect(firstInput.sandboxShutdown).toBe("pause");
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -1624,5 +1812,56 @@ describe("defineSubagentWorkflow", () => {
       agentName: "test",
       sandboxShutdown: "destroy",
     });
+  });
+
+  it("validates destroySandbox required for keep-until-parent-close", async () => {
+    const workflow = defineSubagentWorkflow(
+      { name: "test", description: "test agent", sandboxShutdown: "keep-until-parent-close" },
+      async () => ({
+        toolResponse: "ok",
+        data: null,
+        threadId: "t",
+        sandboxId: "sb-1",
+      })
+    );
+
+    await expect(workflow("go", {})).rejects.toThrow(
+      /keep-until-parent-close.*destroySandbox/
+    );
+  });
+
+  it("validates sandboxId required for keep-until-parent-close", async () => {
+    const workflow = defineSubagentWorkflow(
+      { name: "test", description: "test agent", sandboxShutdown: "keep-until-parent-close" },
+      async () => ({
+        toolResponse: "ok",
+        data: null,
+        threadId: "t",
+        destroySandbox: async () => {},
+      })
+    );
+
+    await expect(workflow("go", {})).rejects.toThrow(
+      /keep-until-parent-close.*sandboxId/
+    );
+  });
+
+  it("uses keep-until-parent-close from workflowInput override in sessionInput", async () => {
+    let capturedSession: SubagentSessionInput | undefined;
+    const workflow = defineSubagentWorkflow(
+      { name: "test", description: "test agent" },
+      async (_prompt, sessionInput) => {
+        capturedSession = sessionInput;
+        return { toolResponse: "ok", data: null, threadId: "t" };
+      }
+    );
+
+    // Validation will throw because destroySandbox is missing, but sessionInput is captured first
+    try {
+      await workflow("go", { sandboxShutdown: "keep-until-parent-close" });
+    } catch {
+      // expected — no destroySandbox callback
+    }
+    expect(capturedSession?.sandboxShutdown).toBe("keep-until-parent-close");
   });
 });

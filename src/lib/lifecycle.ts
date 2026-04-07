@@ -25,8 +25,9 @@ export type ThreadInit =
  * - `"new"` — create a fresh sandbox. Optionally pass `ctx` to
  *   have the {@link SandboxManager}'s resolver produce creation options
  *   (e.g. initial files) from workflow arguments.
- * - `"continue"` — resume a previously-paused sandbox (this session takes
- *   ownership and the shutdown policy applies on exit).
+ * - `"continue"` — take ownership of an existing sandbox (paused or running).
+ *   Paused sandboxes are automatically resumed. The shutdown policy applies
+ *   on exit.
  * - `"fork"` — fork from an existing (or paused) sandbox; a new sandbox is
  *   created and owned by this session.
  * - `"inherit"` — use a sandbox owned by someone else (e.g. a parent agent).
@@ -56,7 +57,10 @@ export type SandboxShutdown = "destroy" | "pause" | "keep";
  * Includes all base {@link SandboxShutdown} values plus:
  * - `"pause-until-parent-close"` — pause the sandbox on exit, then wait for
  *   the parent workflow to signal when to destroy it.
+ * - `"keep-until-parent-close"` — leave the sandbox running on exit, then
+ *   wait for the parent workflow to signal when to destroy it.
  */
 export type SubagentSandboxShutdown =
   | SandboxShutdown
-  | "pause-until-parent-close";
+  | "pause-until-parent-close"
+  | "keep-until-parent-close";
