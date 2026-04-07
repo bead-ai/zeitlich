@@ -9,6 +9,22 @@ import type {
 } from "./tool-router/types";
 
 /**
+ * Safely retrieve Temporal activity heartbeat and cancellation signal.
+ * Returns empty object when called outside a Temporal activity (e.g. tests).
+ */
+export function getActivityContext(): {
+  heartbeat?: () => void;
+  signal?: AbortSignal;
+} {
+  try {
+    const ctx = Context.current();
+    return { heartbeat: () => ctx.heartbeat(), signal: ctx.cancellationSignal };
+  } catch {
+    return {};
+  }
+}
+
+/**
  * Query the parent workflow's state from within an activity.
  * Resolves the workflow handle from the current activity context.
  */
