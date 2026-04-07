@@ -21,7 +21,7 @@ import type {
  * const activities = {
  *   ...createVirtualFsActivities(resolver, "CodingAgent"),
  * };
- * // registers: codingAgentResolveFileTree
+ * // registers: virtualFsCodingAgentResolveFileTree
  * ```
  */
 export function createVirtualFsActivities<

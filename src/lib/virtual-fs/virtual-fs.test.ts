@@ -398,8 +398,8 @@ describe("createVirtualFsActivities", () => {
     const { resolver } = createMockResolver();
     const activities = createVirtualFsActivities(resolver, "codingAgent");
 
-    expect(activities).toHaveProperty("codingAgentResolveFileTree");
-    const result = await activities.codingAgentResolveFileTree(ctx);
+    expect(activities).toHaveProperty("virtualFsCodingAgentResolveFileTree");
+    const result = await activities.virtualFsCodingAgentResolveFileTree(ctx);
     expect(result.fileTree).toHaveLength(3);
     expect(result.fileTree[0]?.path).toMatch(/^\/resolved\//);
   });

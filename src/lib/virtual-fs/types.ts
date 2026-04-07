@@ -93,7 +93,7 @@ export interface VirtualFsOps<TCtx = unknown, TMeta = FileEntryMetadata> {
  * @example
  * ```typescript
  * type Ops = PrefixedVirtualFsOps<"codingAgent">;
- * // → { codingAgentResolveFileTree: ... }
+ * // → { virtualFsCodingAgentResolveFileTree: ... }
  * ```
  */
 export type PrefixedVirtualFsOps<
@@ -104,7 +104,7 @@ export type PrefixedVirtualFsOps<
   [K in keyof VirtualFsOps<
     TCtx,
     TMeta
-  > as `${TPrefix}${Capitalize<K & string>}`]: VirtualFsOps<TCtx, TMeta>[K];
+  > as `virtualFs${Capitalize<TPrefix>}${Capitalize<K & string>}`]: VirtualFsOps<TCtx, TMeta>[K];
 };
 
 // ============================================================================
