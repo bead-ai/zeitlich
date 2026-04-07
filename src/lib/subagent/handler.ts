@@ -169,16 +169,26 @@ export function createSubagentHandler<
         };
       }
 
-      // Force pause so the sandbox survives for future continuation/fork:
+      // Ensure the sandbox survives for future continuation/fork:
       // - first lazy call (creator): pause-until-parent-close so parent can clean up
       // - continuation=continue: sandbox must survive for next call
       // - lazy+fork (non-creator): template must survive for future forks
+      //
+      // Skip the override when the user already configured a *-until-parent-close
+      // shutdown — that already guarantees survival.
+      const userShutdown = sandboxCfg.shutdown;
+      const alreadySurvives =
+        userShutdown === "pause-until-parent-close" ||
+        userShutdown === "keep-until-parent-close" ||
+        userShutdown === "pause" ||
+        userShutdown === "keep";
+
       const mustSurvive =
         isLazyCreator ||
         sandboxCfg.continuation === "continue" ||
         (isLazy && sandboxCfg.continuation === "fork");
 
-      if (mustSurvive) {
+      if (mustSurvive && !alreadySurvives) {
         sandboxShutdownOverride = isLazyCreator
           ? "pause-until-parent-close"
           : "pause";
