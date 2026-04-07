@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.34](https://github.com/bead-ai/zeitlich/compare/v0.2.33...v0.2.34) (2026-04-07)
+
+
+### Features
+
+* enhance subagent sandbox configuration and handling ([#82](https://github.com/bead-ai/zeitlich/issues/82)) ([59b6035](https://github.com/bead-ai/zeitlich/commit/59b60357a499a9b7c40ea28a596a68c0611e1151))
+
+
+### Miscellaneous Chores
+
+* release 0.2.34 ([34deff1](https://github.com/bead-ai/zeitlich/commit/34deff140303b4ccbb2dddac3e1a96df7db8052e))
+
 ## [0.2.33](https://github.com/bead-ai/zeitlich/compare/v0.2.32...v0.2.33) (2026-04-07)
 
 
