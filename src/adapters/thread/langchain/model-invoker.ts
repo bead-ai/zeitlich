@@ -1,9 +1,11 @@
 import type Redis from "ioredis";
 import type { AgentResponse, ModelInvokerConfig } from "../../../lib/model";
 import type { StoredMessage } from "@langchain/core/messages";
+import type { AIMessageChunk } from "@langchain/core/messages";
 import { v4 as uuidv4 } from "uuid";
 import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
 import { createLangChainThreadManager, type LangChainThreadManagerHooks } from "./thread-manager";
+import { getActivityContext } from "../../../lib/activity";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export interface LangChainModelInvokerConfig<TModel extends BaseChatModel<any> = BaseChatModel<any>> {
@@ -16,8 +18,8 @@ export interface LangChainModelInvokerConfig<TModel extends BaseChatModel<any> =
  * Creates a LangChain-based model invoker that satisfies the generic
  * `ModelInvoker<StoredMessage>` contract.
  *
- * Loads the conversation thread from Redis, invokes a LangChain chat model,
- * and returns a normalised AgentResponse.
+ * Internally streams the response and emits Temporal heartbeats on each
+ * chunk so that long-running LLM calls remain visible to the scheduler.
  * The caller is responsible for appending the response to the thread.
  *
  * @example
@@ -40,20 +42,32 @@ export function createLangChainModelInvoker<TModel extends BaseChatModel<any> = 
     config: ModelInvokerConfig,
   ): Promise<AgentResponse<StoredMessage>> {
     const { threadId, threadKey, agentName, state, metadata } = config;
+    const { heartbeat, signal } = getActivityContext();
 
     const thread = createLangChainThreadManager({ redis, threadId, key: threadKey, hooks });
     const runId = uuidv4();
 
     const { messages } = await thread.prepareForInvocation();
-    const response = await model.invoke(
+    const stream = await model.stream(
       messages,
       {
         runName: agentName,
         runId,
         metadata: { thread_id: `${agentName}-${threadId}`, ...metadata },
         tools: state.tools,
+        signal,
       },
     );
+
+    let response: AIMessageChunk | undefined;
+    for await (const chunk of stream) {
+      response = response ? response.concat(chunk) : chunk;
+      heartbeat?.();
+    }
+
+    if (!response) {
+      throw new Error("LangChain stream ended without producing any chunks");
+    }
 
     const toolCalls = response.tool_calls ?? [];
 
