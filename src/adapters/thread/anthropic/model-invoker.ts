@@ -3,6 +3,7 @@ import type Anthropic from "@anthropic-ai/sdk";
 import type { SerializableToolDefinition } from "../../../lib/types";
 import type { AgentResponse, ModelInvokerConfig } from "../../../lib/model";
 import { createAnthropicThreadManager, type AnthropicThreadManagerHooks } from "./thread-manager";
+import { getActivityContext } from "../../../lib/activity";
 
 export interface AnthropicModelInvokerConfig {
   redis: Redis;
@@ -27,8 +28,8 @@ function toAnthropicTools(
  * Creates an Anthropic model invoker that satisfies the generic
  * `ModelInvoker<Anthropic.Messages.Message>` contract.
  *
- * Loads the conversation thread from Redis, invokes the Claude model via
- * `client.messages.create`, and returns a normalised AgentResponse.
+ * Internally streams the response and emits Temporal heartbeats on each
+ * event so that long-running LLM calls remain visible to the scheduler.
  * The caller is responsible for appending the response to the thread.
  *
  * @example
@@ -58,6 +59,7 @@ export function createAnthropicModelInvoker({
     config: ModelInvokerConfig,
   ): Promise<AgentResponse<Anthropic.Messages.Message>> {
     const { threadId, threadKey, state } = config;
+    const { heartbeat, signal } = getActivityContext();
 
     const thread = createAnthropicThreadManager({ redis, threadId, key: threadKey, hooks });
     const { messages, system } = await thread.prepareForInvocation();
@@ -65,13 +67,22 @@ export function createAnthropicModelInvoker({
     const anthropicTools = toAnthropicTools(state.tools);
     const tools = anthropicTools.length > 0 ? anthropicTools : undefined;
 
-    const response = await client.messages.create({
-      model,
-      max_tokens: maxTokens,
-      messages,
-      ...(system ? { system } : {}),
-      ...(tools ? { tools } : {}),
-    });
+    const stream = client.messages.stream(
+      {
+        model,
+        max_tokens: maxTokens,
+        messages,
+        ...(system ? { system } : {}),
+        ...(tools ? { tools } : {}),
+      },
+      { signal },
+    );
+
+    for await (const _event of stream) {
+      heartbeat?.();
+    }
+
+    const response = await stream.finalMessage();
 
     const toolCalls = response.content.filter(
       (block): block is Anthropic.Messages.ToolUseBlock =>
