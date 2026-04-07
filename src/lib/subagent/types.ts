@@ -160,14 +160,17 @@ export interface SubagentHooks<TArgs = unknown, TResult = unknown> {
  * Extended response from the subagent `fn` — includes optional cleanup callbacks
  * stripped before signaling the parent.
  *
- * When `TSandboxShutdown` is `"pause-until-parent-close"`, both `destroySandbox`
- * and `sandboxId` become required so the parent can coordinate cleanup.
+ * When `TSandboxShutdown` is `"pause-until-parent-close"` or
+ * `"keep-until-parent-close"`, both `destroySandbox` and `sandboxId` become
+ * required so the parent can coordinate cleanup.
  */
 export type SubagentFnResult<
   TResult = null,
   TSandboxShutdown extends SubagentSandboxShutdown = SubagentSandboxShutdown,
 > = SubagentHandlerResponse<TResult> &
-  (TSandboxShutdown extends "pause-until-parent-close"
+  (TSandboxShutdown extends
+    | "pause-until-parent-close"
+    | "keep-until-parent-close"
     ? { destroySandbox: () => Promise<void>; sandboxId: string }
     : { destroySandbox?: () => Promise<void> });
 

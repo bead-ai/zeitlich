@@ -221,7 +221,10 @@ export function createSubagentHandler<
     const effectiveShutdown =
       sandboxShutdownOverride ?? sandboxCfg.shutdown ?? "destroy";
 
-    if (effectiveShutdown === "pause-until-parent-close") {
+    if (
+      effectiveShutdown === "pause-until-parent-close" ||
+      effectiveShutdown === "keep-until-parent-close"
+    ) {
       const key = isLazyCreator
         ? `persistent:${config.agentName}`
         : childWorkflowId;

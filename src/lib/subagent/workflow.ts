@@ -130,16 +130,19 @@ export function defineSubagentWorkflow(
       context ?? {}
     );
 
-    if (effectiveShutdown === "pause-until-parent-close") {
+    if (
+      effectiveShutdown === "pause-until-parent-close" ||
+      effectiveShutdown === "keep-until-parent-close"
+    ) {
       if (!destroySandbox) {
         throw ApplicationFailure.create({
-          message: `Subagent "${config.name}" has sandboxShutdown="pause-until-parent-close" but fn did not return a destroySandbox callback`,
+          message: `Subagent "${config.name}" has sandboxShutdown="${effectiveShutdown}" but fn did not return a destroySandbox callback`,
           nonRetryable: true,
         });
       }
       if (!result.sandboxId) {
         throw ApplicationFailure.create({
-          message: `Subagent "${config.name}" has sandboxShutdown="pause-until-parent-close" but fn did not return a sandboxId`,
+          message: `Subagent "${config.name}" has sandboxShutdown="${effectiveShutdown}" but fn did not return a sandboxId`,
           nonRetryable: true,
         });
       }

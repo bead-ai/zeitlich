@@ -467,6 +467,7 @@ export async function createSession<
               await sandboxOps.pauseSandbox(sandboxId);
               break;
             case "keep":
+            case "keep-until-parent-close":
               break;
           }
         }
