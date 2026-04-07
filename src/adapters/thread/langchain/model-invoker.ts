@@ -4,11 +4,16 @@ import type { StoredMessage } from "@langchain/core/messages";
 import type { AIMessageChunk } from "@langchain/core/messages";
 import { v4 as uuidv4 } from "uuid";
 import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
-import { createLangChainThreadManager, type LangChainThreadManagerHooks } from "./thread-manager";
+import {
+  createLangChainThreadManager,
+  type LangChainThreadManagerHooks,
+} from "./thread-manager";
 import { getActivityContext } from "../../../lib/activity";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export interface LangChainModelInvokerConfig<TModel extends BaseChatModel<any> = BaseChatModel<any>> {
+export interface LangChainModelInvokerConfig<
+  TModel extends BaseChatModel<any> = BaseChatModel<any>,
+> {
   redis: Redis;
   model: TModel;
   hooks?: LangChainThreadManagerHooks;
@@ -35,29 +40,31 @@ export interface LangChainModelInvokerConfig<TModel extends BaseChatModel<any> =
  * ```
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function createLangChainModelInvoker<TModel extends BaseChatModel<any> = BaseChatModel<any>>(
-  { redis, model, hooks }: LangChainModelInvokerConfig<TModel>,
-) {
+export function createLangChainModelInvoker<
+  TModel extends BaseChatModel<any> = BaseChatModel<any>,
+>({ redis, model, hooks }: LangChainModelInvokerConfig<TModel>) {
   return async function invokeLangChainModel(
-    config: ModelInvokerConfig,
+    config: ModelInvokerConfig
   ): Promise<AgentResponse<StoredMessage>> {
     const { threadId, threadKey, agentName, state, metadata } = config;
     const { heartbeat, signal } = getActivityContext();
 
-    const thread = createLangChainThreadManager({ redis, threadId, key: threadKey, hooks });
+    const thread = createLangChainThreadManager({
+      redis,
+      threadId,
+      key: threadKey,
+      hooks,
+    });
     const runId = uuidv4();
 
     const { messages } = await thread.prepareForInvocation();
-    const stream = await model.stream(
-      messages,
-      {
-        runName: agentName,
-        runId,
-        metadata: { thread_id: `${agentName}-${threadId}`, ...metadata },
-        tools: state.tools,
-        signal,
-      },
-    );
+    const stream = await model.stream(messages, {
+      runName: agentName,
+      runId,
+      metadata: { thread_id: `${agentName}-${threadId}`, ...metadata },
+      tools: state.tools,
+      signal,
+    });
 
     let response: AIMessageChunk | undefined;
     for await (const chunk of stream) {
@@ -83,9 +90,15 @@ export function createLangChainModelInvoker<TModel extends BaseChatModel<any> = 
         outputTokens: response.usage_metadata?.output_tokens,
         reasonTokens: response.usage_metadata?.output_token_details?.reasoning,
         cachedWriteTokens:
-          response.usage_metadata?.input_token_details?.cache_creation,
+          response.usage_metadata?.input_token_details?.cache_creation ||
+          (response.response_metadata.cacheWriteInputTokens as
+            | number
+            | undefined),
         cachedReadTokens:
-          response.usage_metadata?.input_token_details?.cache_read,
+          response.usage_metadata?.input_token_details?.cache_read ||
+          (response.response_metadata.cacheReadInputTokens as
+            | number
+            | undefined),
       },
     };
   };
@@ -97,7 +110,9 @@ export function createLangChainModelInvoker<TModel extends BaseChatModel<any> = 
  * you don't need to reuse the invoker.
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export async function invokeLangChainModel<TModel extends BaseChatModel<any> = BaseChatModel<any>>({
+export async function invokeLangChainModel<
+  TModel extends BaseChatModel<any> = BaseChatModel<any>,
+>({
   redis,
   model,
   hooks,
