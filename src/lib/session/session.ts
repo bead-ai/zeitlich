@@ -237,7 +237,9 @@ export async function createSession<
         }
         sandboxId = (sandboxInit as { mode: "continue"; sandboxId: string })
           .sandboxId;
-        await sandboxOps.resumeSandbox(sandboxId);
+        if (sandboxShutdown === "pause-until-parent-close") {
+          await sandboxOps.resumeSandbox(sandboxId);
+        }
         sandboxOwned = true;
       } else if (sandboxMode === "fork") {
         if (!sandboxOps) {
