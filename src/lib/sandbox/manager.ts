@@ -166,6 +166,10 @@ export class SandboxManager<
     await this.provider.pause(id, ttlSeconds);
   }
 
+  async resume(id: string): Promise<void> {
+    await this.provider.resume(id);
+  }
+
   async snapshot(id: string): Promise<SandboxSnapshot> {
     return this.provider.snapshot(id);
   }
@@ -221,6 +225,9 @@ export class SandboxManager<
         ttlSeconds?: number
       ): Promise<void> => {
         await this.pause(sandboxId, ttlSeconds);
+      },
+      resumeSandbox: async (sandboxId: string): Promise<void> => {
+        await this.resume(sandboxId);
       },
       snapshotSandbox: async (sandboxId: string): Promise<SandboxSnapshot> => {
         return this.snapshot(sandboxId);

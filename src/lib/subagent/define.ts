@@ -21,7 +21,7 @@ import type { SubagentArgs } from "./tool";
  * // With parent-specific overrides
  * export const researcher = defineSubagent(researcherWorkflow, {
  *   thread: "fork",
- *   sandbox: { source: "own", shutdown: "pause" },
+ *   sandbox: { source: "own", continuation: "fork", shutdown: "pause" },
  *   hooks: {
  *     onPostExecution: ({ result }) => console.log(result),
  *   },

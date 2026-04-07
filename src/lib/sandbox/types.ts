@@ -131,6 +131,8 @@ export interface SandboxProvider<
   get(sandboxId: string): Promise<TSandbox>;
   destroy(sandboxId: string): Promise<void>;
   pause(sandboxId: string, ttlSeconds?: number): Promise<void>;
+  /** Resume a paused sandbox. No-op if already running. */
+  resume(sandboxId: string): Promise<void>;
   snapshot(sandboxId: string): Promise<SandboxSnapshot>;
   restore(snapshot: SandboxSnapshot): Promise<Sandbox>;
   fork(sandboxId: string): Promise<Sandbox>;
@@ -150,6 +152,8 @@ export interface SandboxOps<
   ): Promise<{ sandboxId: string } | null>;
   destroySandbox(sandboxId: string): Promise<void>;
   pauseSandbox(sandboxId: string): Promise<void>;
+  /** Resume a paused sandbox. No-op if already running. */
+  resumeSandbox(sandboxId: string): Promise<void>;
   snapshotSandbox(sandboxId: string): Promise<SandboxSnapshot>;
   forkSandbox(sandboxId: string): Promise<string>;
 }

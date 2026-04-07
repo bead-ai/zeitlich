@@ -14,7 +14,11 @@ import type {
   SubagentSessionInput,
 } from "./types";
 import type { SubagentSandboxShutdown } from "../lifecycle";
-import { childResultSignal, destroySandboxSignal } from "./signals";
+import {
+  childResultSignal,
+  childSandboxReadySignal,
+  destroySandboxSignal,
+} from "./signals";
 
 /**
  * Defines a subagent workflow with embedded metadata (name, description, resultSchema).
@@ -118,33 +122,6 @@ export function defineSubagentWorkflow(
     const effectiveShutdown =
       workflowInput.sandboxShutdown ?? config.sandboxShutdown ?? "destroy";
 
-    const sessionInput: SubagentSessionInput = {
-      agentName: config.name,
-      sandboxShutdown: effectiveShutdown,
-      ...(workflowInput.thread && { thread: workflowInput.thread }),
-      ...(workflowInput.sandbox && { sandbox: workflowInput.sandbox }),
-    };
-    const { destroySandbox, ...result } = await fn(
-      prompt,
-      sessionInput,
-      context ?? {}
-    );
-
-    if (effectiveShutdown === "pause-until-parent-close") {
-      if (!destroySandbox) {
-        throw ApplicationFailure.create({
-          message: `Subagent "${config.name}" has sandboxShutdown="pause-until-parent-close" but fn did not return a destroySandbox callback`,
-          nonRetryable: true,
-        });
-      }
-      if (!result.sandboxId) {
-        throw ApplicationFailure.create({
-          message: `Subagent "${config.name}" has sandboxShutdown="pause-until-parent-close" but fn did not return a sandboxId`,
-          nonRetryable: true,
-        });
-      }
-    }
-
     const { parent } = workflowInfo();
     if (!parent) {
       throw ApplicationFailure.create({
@@ -152,8 +129,44 @@ export function defineSubagentWorkflow(
         nonRetryable: true,
       });
     }
-
     const parentHandle = getExternalWorkflowHandle(parent.workflowId);
+
+    const sessionInput: SubagentSessionInput = {
+      agentName: config.name,
+      sandboxShutdown: effectiveShutdown,
+      ...(workflowInput.thread && { thread: workflowInput.thread }),
+      ...(workflowInput.sandbox && { sandbox: workflowInput.sandbox }),
+      onSandboxReady: (sandboxId: string) => {
+        void parentHandle.signal(childSandboxReadySignal, {
+          childWorkflowId: workflowInfo().workflowId,
+          sandboxId,
+        });
+      },
+    };
+    const { destroySandbox, ...result } = await fn(
+      prompt,
+      sessionInput,
+      context ?? {}
+    );
+
+    if (
+      effectiveShutdown === "pause-until-parent-close" ||
+      effectiveShutdown === "keep-until-parent-close"
+    ) {
+      if (!destroySandbox) {
+        throw ApplicationFailure.create({
+          message: `Subagent "${config.name}" has sandboxShutdown="${effectiveShutdown}" but fn did not return a destroySandbox callback`,
+          nonRetryable: true,
+        });
+      }
+      if (!result.sandboxId) {
+        throw ApplicationFailure.create({
+          message: `Subagent "${config.name}" has sandboxShutdown="${effectiveShutdown}" but fn did not return a sandboxId`,
+          nonRetryable: true,
+        });
+      }
+    }
+
     await parentHandle.signal(childResultSignal, {
       childWorkflowId: workflowInfo().workflowId,
       result,

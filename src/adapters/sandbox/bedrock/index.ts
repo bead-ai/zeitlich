@@ -237,6 +237,10 @@ export class BedrockSandboxProvider
     throw new SandboxNotSupportedError("pause");
   }
 
+  async resume(_sandboxId: string): Promise<void> {
+    // Bedrock sandboxes don't support pause, so resume is a no-op
+  }
+
   async snapshot(_sandboxId: string): Promise<SandboxSnapshot> {
     throw new SandboxNotSupportedError("snapshot");
   }

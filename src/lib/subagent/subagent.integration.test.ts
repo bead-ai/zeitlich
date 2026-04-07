@@ -1,9 +1,7 @@
 import { describe, expect, it, vi, afterEach } from "vitest";
 import { z } from "zod";
 
-let capturedSignalHandler:
-  | ((payload: { childWorkflowId: string; result: unknown }) => void)
-  | null = null;
+const capturedSignalHandlers = new Map<unknown, (...args: unknown[]) => void>();
 
 let nextStartChildResult: ((prompt: string) => unknown) | null = null;
 
@@ -35,10 +33,10 @@ vi.mock("@temporalio/workflow", () => {
       workflowId: "child-wf-1",
       parent: { workflowId: "parent-wf-1" },
     }),
-    defineSignal: vi.fn((_name: string) => ({ __signal: true })),
+    defineSignal: vi.fn((name: string) => ({ __signal: true, name })),
     setHandler: vi.fn(
-      (_signal: unknown, handler: (...a: unknown[]) => void) => {
-        capturedSignalHandler = handler as typeof capturedSignalHandler;
+      (signal: unknown, handler: (...a: unknown[]) => void) => {
+        capturedSignalHandlers.set(signal, handler);
       }
     ),
     condition: vi.fn(async (fn: () => boolean) => {
@@ -59,8 +57,10 @@ vi.mock("@temporalio/workflow", () => {
               usage: { inputTokens: 100, outputTokens: 50 },
             };
 
-        if (capturedSignalHandler) {
-          capturedSignalHandler({ childWorkflowId: opts.workflowId, result });
+        for (const [signal, handler] of capturedSignalHandlers.entries()) {
+          if ((signal as { name?: string }).name === "childResult") {
+            handler({ childWorkflowId: opts.workflowId, result });
+          }
         }
 
         return {
@@ -81,7 +81,13 @@ vi.mock("@temporalio/workflow", () => {
       ).join("");
       return `${bytes.slice(0, 8)}-${bytes.slice(8, 12)}-${bytes.slice(12, 16)}-${bytes.slice(16, 20)}-${bytes.slice(20, 32)}`;
     },
-    log: { trace: () => {}, debug: () => {}, info: () => {}, warn: () => {}, error: () => {} },
+    log: {
+      trace: () => {},
+      debug: () => {},
+      info: () => {},
+      warn: () => {},
+      error: () => {},
+    },
   };
 });
 
@@ -98,7 +104,7 @@ import type {
 } from "./types";
 afterEach(() => {
   nextStartChildResult = null;
-  capturedSignalHandler = null;
+  capturedSignalHandlers.clear();
 });
 
 function mockWorkflow(name?: string): SubagentWorkflow {
@@ -371,7 +377,7 @@ describe("createSubagentHandler", () => {
       agentName: "inherit-agent",
       description: "Inherits sandbox",
       workflow: mockWorkflow(),
-      sandbox: "inherit",
+      sandbox: { source: "inherit", continuation: "continue" },
     };
 
     const { handler } = createSubagentHandler([inheritSubagent]);
@@ -400,7 +406,7 @@ describe("createSubagentHandler", () => {
       agentName: "inherit-agent",
       description: "Inherits sandbox",
       workflow: mockWorkflow(),
-      sandbox: "inherit",
+      sandbox: { source: "inherit", continuation: "continue" },
     };
 
     const { handler } = createSubagentHandler([inheritSubagent]);
@@ -410,12 +416,10 @@ describe("createSubagentHandler", () => {
         { subagent: "inherit-agent", description: "test", prompt: "test" },
         { threadId: "t", toolCallId: "tc", toolName: "Subagent" }
       )
-    ).rejects.toThrow(
-      'sandbox: "inherit" but the parent has no sandbox'
-    );
+    ).rejects.toThrow('sandbox: "inherit" but the parent has no sandbox');
   });
 
-  it("does not pass sandboxId to child when sandbox is own", async () => {
+  it("does not pass sandboxId to child when sandbox is own (first call)", async () => {
     const { startChild } = await import("@temporalio/workflow");
     const startMock = startChild as ReturnType<typeof vi.fn>;
 
@@ -423,7 +427,7 @@ describe("createSubagentHandler", () => {
       agentName: "own-agent",
       description: "Own sandbox",
       workflow: mockWorkflow(),
-      sandbox: "own",
+      sandbox: { source: "own", continuation: "fork" },
     };
 
     const { handler } = createSubagentHandler([ownSubagent]);
@@ -496,7 +500,7 @@ describe("createSubagentHandler", () => {
     expect(context).toEqual({ key: "value" });
   });
 
-  it("does not pass sandboxId when sandbox is own", async () => {
+  it("does not pass sandbox init when sandbox is own without prior sandbox", async () => {
     const { startChild } = await import("@temporalio/workflow");
     const startMock = startChild as ReturnType<typeof vi.fn>;
 
@@ -504,7 +508,7 @@ describe("createSubagentHandler", () => {
       agentName: "own-agent",
       description: "Own sandbox",
       workflow: mockWorkflow(),
-      sandbox: "own",
+      sandbox: { source: "own", continuation: "fork" },
     };
 
     const { handler } = createSubagentHandler([ownSubagent]);
@@ -666,7 +670,7 @@ describe("createSubagentHandler", () => {
       description: "Sandbox continuation",
       workflow: mockWorkflow(),
       thread: "fork",
-      sandbox: "own",
+      sandbox: { source: "own", continuation: "fork" },
     };
 
     const { handler } = createSubagentHandler([contSandboxSubagent]);
@@ -722,7 +726,7 @@ describe("createSubagentHandler", () => {
       description: "Sandbox continuation",
       workflow: mockWorkflow(),
       thread: "fork",
-      sandbox: "own",
+      sandbox: { source: "own", continuation: "fork" },
     };
 
     const { handler } = createSubagentHandler([contSandboxSubagent]);
@@ -789,7 +793,7 @@ describe("createSubagentHandler", () => {
       agentName: "own-agent",
       description: "Own sandbox",
       workflow: mockWorkflow(),
-      sandbox: "own",
+      sandbox: { source: "own", continuation: "fork" },
     };
 
     const { handler, destroySubagentSandboxes } = createSubagentHandler([
@@ -819,7 +823,11 @@ describe("createSubagentHandler", () => {
       agentName: "own-agent",
       description: "Own sandbox",
       workflow: mockWorkflow(),
-      sandbox: { source: "own", shutdown: "pause-until-parent-close" },
+      sandbox: {
+        source: "own",
+        continuation: "fork",
+        shutdown: "pause-until-parent-close",
+      },
     };
 
     const { handler, destroySubagentSandboxes } = createSubagentHandler([
@@ -847,7 +855,7 @@ describe("createSubagentHandler", () => {
       agentName: "inherit-agent",
       description: "Inherits sandbox",
       workflow: mockWorkflow(),
-      sandbox: "inherit",
+      sandbox: { source: "inherit", continuation: "continue" },
     };
 
     const { handler, destroySubagentSandboxes } = createSubagentHandler([
@@ -961,6 +969,237 @@ describe("createSubagentHandler", () => {
     expect(childHandle.signal).not.toHaveBeenCalled();
   });
 
+  // --- inherit + continuation: fork ---
+
+  it("forks from parent sandbox when inherit + continuation=fork", async () => {
+    const { startChild } = await import("@temporalio/workflow");
+    const startMock = startChild as ReturnType<typeof vi.fn>;
+
+    const config: SubagentConfig = {
+      agentName: "inherit-fork",
+      description: "Inherit fork",
+      workflow: mockWorkflow(),
+      sandbox: { source: "inherit", continuation: "fork" },
+    };
+
+    const { handler } = createSubagentHandler([config]);
+
+    await handler(
+      { subagent: "inherit-fork", description: "test", prompt: "test" },
+      {
+        threadId: "t",
+        toolCallId: "tc",
+        toolName: "Subagent",
+        sandboxId: "parent-sb",
+      }
+    );
+
+    const lastCall = startMock.mock.calls.at(-1);
+    if (!lastCall) throw new Error("expected startChild call");
+    const workflowInput = lastCall[1].args[1] as SubagentWorkflowInput;
+    expect(workflowInput.sandbox).toEqual({
+      mode: "fork",
+      sandboxId: "parent-sb",
+    });
+  });
+
+  // --- own + continuation: continue ---
+
+  it("passes sandbox continue on thread continuation with continuation=continue", async () => {
+    const { startChild } = await import("@temporalio/workflow");
+    const startMock = startChild as ReturnType<typeof vi.fn>;
+
+    nextStartChildResult = () => ({
+      toolResponse: "first",
+      data: null,
+      threadId: "child-t-1",
+      sandboxId: "child-sb-1",
+    });
+
+    const config: SubagentConfig = {
+      agentName: "own-cont",
+      description: "Own continue",
+      workflow: mockWorkflow(),
+      thread: "continue",
+      sandbox: { source: "own", continuation: "continue" },
+    };
+
+    const { handler } = createSubagentHandler([config]);
+
+    await handler(
+      { subagent: "own-cont", description: "test", prompt: "first" },
+      { threadId: "t", toolCallId: "tc-1", toolName: "Subagent" }
+    );
+
+    nextStartChildResult = () => ({
+      toolResponse: "second",
+      data: null,
+      threadId: "child-t-1",
+      sandboxId: "child-sb-1",
+    });
+
+    await handler(
+      {
+        subagent: "own-cont",
+        description: "test",
+        prompt: "second",
+        threadId: "child-t-1",
+      },
+      { threadId: "t", toolCallId: "tc-2", toolName: "Subagent" }
+    );
+
+    const secondCall = startMock.mock.calls.at(-1);
+    if (!secondCall) throw new Error("expected startChild call");
+    const workflowInput = secondCall[1].args[1] as SubagentWorkflowInput;
+    expect(workflowInput.sandbox).toEqual({
+      mode: "continue",
+      sandboxId: "child-sb-1",
+    });
+    expect(workflowInput.sandboxShutdown).toBe("pause");
+  });
+
+  // --- own + init: once + continuation: fork ---
+
+  it("stores sandbox on first call and forks from it on second call (init=once, continuation=fork)", async () => {
+    const { startChild } = await import("@temporalio/workflow");
+    const startMock = startChild as ReturnType<typeof vi.fn>;
+
+    nextStartChildResult = () => ({
+      toolResponse: "first",
+      data: null,
+      threadId: "child-t-1",
+      sandboxId: "persistent-sb",
+    });
+
+    const config: SubagentConfig = {
+      agentName: "lazy-fork",
+      description: "Lazy fork",
+      workflow: mockWorkflow(),
+      sandbox: { source: "own", init: "once", continuation: "fork" },
+    };
+
+    const { handler } = createSubagentHandler([config]);
+
+    await handler(
+      { subagent: "lazy-fork", description: "test", prompt: "first" },
+      { threadId: "t", toolCallId: "tc-1", toolName: "Subagent" }
+    );
+
+    // First call: no sandbox init (child creates fresh), forced pause-until-parent-close
+    const firstCall = startMock.mock.calls.at(-1);
+    if (!firstCall) throw new Error("expected startChild call");
+    const firstInput = firstCall[1].args[1] as SubagentWorkflowInput;
+    expect(firstInput.sandbox).toBeUndefined();
+    expect(firstInput.sandboxShutdown).toBe("pause-until-parent-close");
+
+    nextStartChildResult = () => ({
+      toolResponse: "second",
+      data: null,
+      threadId: "child-t-2",
+      sandboxId: "forked-sb",
+    });
+
+    // Second call WITHOUT threadId — should still fork from persistent sandbox
+    await handler(
+      { subagent: "lazy-fork", description: "test", prompt: "second" },
+      { threadId: "t", toolCallId: "tc-2", toolName: "Subagent" }
+    );
+
+    const secondCall = startMock.mock.calls.at(-1);
+    if (!secondCall) throw new Error("expected startChild call");
+    const secondInput = secondCall[1].args[1] as SubagentWorkflowInput;
+    expect(secondInput.sandbox).toEqual({
+      mode: "fork",
+      sandboxId: "persistent-sb",
+    });
+  });
+
+  // --- own + init: once + continuation: continue ---
+
+  it("stores sandbox on first call and continues it on second call (init=once, continuation=continue)", async () => {
+    const { startChild } = await import("@temporalio/workflow");
+    const startMock = startChild as ReturnType<typeof vi.fn>;
+
+    nextStartChildResult = () => ({
+      toolResponse: "first",
+      data: null,
+      threadId: "child-t-1",
+      sandboxId: "persistent-sb",
+    });
+
+    const config: SubagentConfig = {
+      agentName: "lazy-cont",
+      description: "Lazy continue",
+      workflow: mockWorkflow(),
+      sandbox: { source: "own", init: "once", continuation: "continue" },
+    };
+
+    const { handler } = createSubagentHandler([config]);
+
+    await handler(
+      { subagent: "lazy-cont", description: "test", prompt: "first" },
+      { threadId: "t", toolCallId: "tc-1", toolName: "Subagent" }
+    );
+
+    nextStartChildResult = () => ({
+      toolResponse: "second",
+      data: null,
+      threadId: "child-t-2",
+      sandboxId: "persistent-sb",
+    });
+
+    await handler(
+      { subagent: "lazy-cont", description: "test", prompt: "second" },
+      { threadId: "t", toolCallId: "tc-2", toolName: "Subagent" }
+    );
+
+    const secondCall = startMock.mock.calls.at(-1);
+    if (!secondCall) throw new Error("expected startChild call");
+    const secondInput = secondCall[1].args[1] as SubagentWorkflowInput;
+    expect(secondInput.sandbox).toEqual({
+      mode: "continue",
+      sandboxId: "persistent-sb",
+    });
+    expect(secondInput.sandboxShutdown).toBe("pause");
+  });
+
+  // --- init: once cleanup ---
+
+  it("adds first-call child handle to pendingDestroys for init=once", async () => {
+    const { startChild } = await import("@temporalio/workflow");
+    const startMock = startChild as ReturnType<typeof vi.fn>;
+
+    nextStartChildResult = () => ({
+      toolResponse: "done",
+      data: null,
+      threadId: "child-t-1",
+      sandboxId: "persistent-sb",
+    });
+
+    const config: SubagentConfig = {
+      agentName: "lazy-cleanup",
+      description: "Lazy cleanup",
+      workflow: mockWorkflow(),
+      sandbox: { source: "own", init: "once", continuation: "fork" },
+    };
+
+    const { handler, destroySubagentSandboxes } = createSubagentHandler([
+      config,
+    ]);
+
+    await handler(
+      { subagent: "lazy-cleanup", description: "test", prompt: "run" },
+      { threadId: "t", toolCallId: "tc", toolName: "Subagent" }
+    );
+
+    await destroySubagentSandboxes();
+
+    const lastResult = startMock.mock.results.at(-1);
+    if (!lastResult) throw new Error("expected startChild call");
+    const childHandle = await lastResult.value;
+    expect(childHandle.signal).toHaveBeenCalled();
+  });
+
   it("returns sandboxId in response when child creates a sandbox", async () => {
     nextStartChildResult = () => ({
       toolResponse: "done",
@@ -973,7 +1212,7 @@ describe("createSubagentHandler", () => {
       agentName: "own-agent",
       description: "Own sandbox",
       workflow: mockWorkflow(),
-      sandbox: "own",
+      sandbox: { source: "own", continuation: "fork" },
     };
 
     const { handler } = createSubagentHandler([ownSubagent]);
@@ -1082,6 +1321,208 @@ describe("createSubagentHandler", () => {
     );
 
     expect(result.metadata).toBeUndefined();
+  });
+
+  // --- keep-until-parent-close ---
+
+  it("signals destroy for sandbox=own with keep-until-parent-close shutdown", async () => {
+    const { startChild } = await import("@temporalio/workflow");
+    const startMock = startChild as ReturnType<typeof vi.fn>;
+
+    const ownSubagent: SubagentConfig = {
+      agentName: "own-keep",
+      description: "Own sandbox kept",
+      workflow: mockWorkflow(),
+      sandbox: {
+        source: "own",
+        continuation: "fork",
+        shutdown: "keep-until-parent-close",
+      },
+    };
+
+    const { handler, destroySubagentSandboxes } = createSubagentHandler([
+      ownSubagent,
+    ]);
+
+    await handler(
+      { subagent: "own-keep", description: "test", prompt: "run" },
+      { threadId: "t", toolCallId: "tc", toolName: "Subagent" }
+    );
+
+    await destroySubagentSandboxes();
+
+    const lastResult = startMock.mock.results.at(-1);
+    if (!lastResult) throw new Error("expected startChild call");
+    const childHandle = await lastResult.value;
+    expect(childHandle.signal).toHaveBeenCalled();
+  });
+
+  it("does not signal destroy for sandbox=own with keep shutdown (without parent-close)", async () => {
+    const { startChild } = await import("@temporalio/workflow");
+    const startMock = startChild as ReturnType<typeof vi.fn>;
+
+    const ownSubagent: SubagentConfig = {
+      agentName: "own-keep-plain",
+      description: "Own sandbox keep",
+      workflow: mockWorkflow(),
+      sandbox: { source: "own", continuation: "fork", shutdown: "keep" },
+    };
+
+    const { handler, destroySubagentSandboxes } = createSubagentHandler([
+      ownSubagent,
+    ]);
+
+    await handler(
+      { subagent: "own-keep-plain", description: "test", prompt: "run" },
+      { threadId: "t", toolCallId: "tc", toolName: "Subagent" }
+    );
+
+    const lastResult = startMock.mock.results.at(-1);
+    if (!lastResult) throw new Error("expected startChild call");
+    const childHandle = await lastResult.value;
+    childHandle.signal.mockClear();
+
+    await destroySubagentSandboxes();
+
+    expect(childHandle.signal).not.toHaveBeenCalled();
+  });
+
+  // --- mustSurvive does not override user shutdown ---
+
+  it("does not override keep-until-parent-close with pause-until-parent-close for init=once", async () => {
+    const { startChild } = await import("@temporalio/workflow");
+    const startMock = startChild as ReturnType<typeof vi.fn>;
+
+    nextStartChildResult = () => ({
+      toolResponse: "first",
+      data: null,
+      threadId: "child-t-1",
+      sandboxId: "persistent-sb",
+    });
+
+    const config: SubagentConfig = {
+      agentName: "lazy-keep",
+      description: "Lazy keep",
+      workflow: mockWorkflow(),
+      sandbox: {
+        source: "own",
+        init: "once",
+        continuation: "fork",
+        shutdown: "keep-until-parent-close",
+      },
+    };
+
+    const { handler } = createSubagentHandler([config]);
+
+    await handler(
+      { subagent: "lazy-keep", description: "test", prompt: "first" },
+      { threadId: "t", toolCallId: "tc-1", toolName: "Subagent" }
+    );
+
+    const firstCall = startMock.mock.calls.at(-1);
+    if (!firstCall) throw new Error("expected startChild call");
+    const firstInput = firstCall[1].args[1] as SubagentWorkflowInput;
+    expect(firstInput.sandboxShutdown).toBe("keep-until-parent-close");
+  });
+
+  it("does not override pause with pause-until-parent-close for init=once", async () => {
+    const { startChild } = await import("@temporalio/workflow");
+    const startMock = startChild as ReturnType<typeof vi.fn>;
+
+    nextStartChildResult = () => ({
+      toolResponse: "first",
+      data: null,
+      threadId: "child-t-1",
+      sandboxId: "persistent-sb",
+    });
+
+    const config: SubagentConfig = {
+      agentName: "lazy-pause",
+      description: "Lazy pause",
+      workflow: mockWorkflow(),
+      sandbox: {
+        source: "own",
+        init: "once",
+        continuation: "fork",
+        shutdown: "pause",
+      },
+    };
+
+    const { handler } = createSubagentHandler([config]);
+
+    await handler(
+      { subagent: "lazy-pause", description: "test", prompt: "first" },
+      { threadId: "t", toolCallId: "tc-1", toolName: "Subagent" }
+    );
+
+    const firstCall = startMock.mock.calls.at(-1);
+    if (!firstCall) throw new Error("expected startChild call");
+    const firstInput = firstCall[1].args[1] as SubagentWorkflowInput;
+    expect(firstInput.sandboxShutdown).toBe("pause");
+  });
+
+  it("does not override keep with pause for continuation=continue", async () => {
+    const { startChild } = await import("@temporalio/workflow");
+    const startMock = startChild as ReturnType<typeof vi.fn>;
+
+    nextStartChildResult = () => ({
+      toolResponse: "first",
+      data: null,
+      threadId: "child-t-1",
+      sandboxId: "child-sb-1",
+    });
+
+    const config: SubagentConfig = {
+      agentName: "cont-keep",
+      description: "Continue keep",
+      workflow: mockWorkflow(),
+      thread: "continue",
+      sandbox: { source: "own", continuation: "continue", shutdown: "keep" },
+    };
+
+    const { handler } = createSubagentHandler([config]);
+
+    await handler(
+      { subagent: "cont-keep", description: "test", prompt: "first" },
+      { threadId: "t", toolCallId: "tc-1", toolName: "Subagent" }
+    );
+
+    const firstCall = startMock.mock.calls.at(-1);
+    if (!firstCall) throw new Error("expected startChild call");
+    const firstInput = firstCall[1].args[1] as SubagentWorkflowInput;
+    expect(firstInput.sandboxShutdown).toBe("keep");
+  });
+
+  it("still overrides destroy with pause for continuation=continue", async () => {
+    const { startChild } = await import("@temporalio/workflow");
+    const startMock = startChild as ReturnType<typeof vi.fn>;
+
+    nextStartChildResult = () => ({
+      toolResponse: "first",
+      data: null,
+      threadId: "child-t-1",
+      sandboxId: "child-sb-1",
+    });
+
+    const config: SubagentConfig = {
+      agentName: "cont-destroy",
+      description: "Continue destroy",
+      workflow: mockWorkflow(),
+      thread: "continue",
+      sandbox: { source: "own", continuation: "continue", shutdown: "destroy" },
+    };
+
+    const { handler } = createSubagentHandler([config]);
+
+    await handler(
+      { subagent: "cont-destroy", description: "test", prompt: "first" },
+      { threadId: "t", toolCallId: "tc-1", toolName: "Subagent" }
+    );
+
+    const firstCall = startMock.mock.calls.at(-1);
+    if (!firstCall) throw new Error("expected startChild call");
+    const firstInput = firstCall[1].args[1] as SubagentWorkflowInput;
+    expect(firstInput.sandboxShutdown).toBe("pause");
   });
 });
 
@@ -1289,6 +1730,7 @@ describe("defineSubagentWorkflow", () => {
       agentName: "test",
       sandboxShutdown: "destroy",
       thread: { mode: "fork", threadId: "prev-42" },
+      onSandboxReady: expect.any(Function),
     });
   });
 
@@ -1307,6 +1749,7 @@ describe("defineSubagentWorkflow", () => {
       agentName: "test",
       sandboxShutdown: "destroy",
       sandbox: { mode: "inherit", sandboxId: "sb-123" },
+      onSandboxReady: expect.any(Function),
     });
   });
 
@@ -1325,6 +1768,7 @@ describe("defineSubagentWorkflow", () => {
       agentName: "test",
       sandboxShutdown: "destroy",
       sandbox: { mode: "fork", sandboxId: "prev-sb-1" },
+      onSandboxReady: expect.any(Function),
     });
   });
 
@@ -1347,6 +1791,7 @@ describe("defineSubagentWorkflow", () => {
       sandboxShutdown: "destroy",
       thread: { mode: "fork", threadId: "prev-t" },
       sandbox: { mode: "fork", sandboxId: "prev-sb" },
+      onSandboxReady: expect.any(Function),
     });
   });
 
@@ -1416,6 +1861,68 @@ describe("defineSubagentWorkflow", () => {
     expect(capturedSession).toEqual({
       agentName: "test",
       sandboxShutdown: "destroy",
+      onSandboxReady: expect.any(Function),
     });
+  });
+
+  it("validates destroySandbox required for keep-until-parent-close", async () => {
+    // @ts-expect-error — deliberately omitting destroySandbox to test runtime validation
+    const workflow = defineSubagentWorkflow(
+      {
+        name: "test",
+        description: "test agent",
+        sandboxShutdown: "keep-until-parent-close",
+      },
+      async () => ({
+        toolResponse: "ok",
+        data: null,
+        threadId: "t",
+        sandboxId: "sb-1",
+      })
+    );
+
+    await expect(workflow("go", {})).rejects.toThrow(
+      /keep-until-parent-close.*destroySandbox/
+    );
+  });
+
+  it("validates sandboxId required for keep-until-parent-close", async () => {
+    // @ts-expect-error — deliberately omitting sandboxId to test runtime validation
+    const workflow = defineSubagentWorkflow(
+      {
+        name: "test",
+        description: "test agent",
+        sandboxShutdown: "keep-until-parent-close",
+      },
+      async () => ({
+        toolResponse: "ok",
+        data: null,
+        threadId: "t",
+        destroySandbox: async () => {},
+      })
+    );
+
+    await expect(workflow("go", {})).rejects.toThrow(
+      /keep-until-parent-close.*sandboxId/
+    );
+  });
+
+  it("uses keep-until-parent-close from workflowInput override in sessionInput", async () => {
+    let capturedSession: SubagentSessionInput | undefined;
+    const workflow = defineSubagentWorkflow(
+      { name: "test", description: "test agent" },
+      async (_prompt, sessionInput) => {
+        capturedSession = sessionInput;
+        return { toolResponse: "ok", data: null, threadId: "t" };
+      }
+    );
+
+    // Validation will throw because destroySandbox is missing, but sessionInput is captured first
+    try {
+      await workflow("go", { sandboxShutdown: "keep-until-parent-close" });
+    } catch {
+      // expected — no destroySandbox callback
+    }
+    expect(capturedSession?.sandboxShutdown).toBe("keep-until-parent-close");
   });
 });

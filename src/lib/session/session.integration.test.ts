@@ -518,6 +518,7 @@ describe("createSession integration", () => {
       }),
       forkSandbox: async () => "forked-sandbox-id",
       pauseSandbox: async () => {},
+      resumeSandbox: async () => {},
     };
 
     const session = await createSession({
@@ -559,6 +560,7 @@ describe("createSession integration", () => {
       }),
       forkSandbox: async () => "forked-sandbox-id",
       pauseSandbox: async () => {},
+      resumeSandbox: async () => {},
     };
 
     const session = await createSession({
@@ -600,6 +602,7 @@ describe("createSession integration", () => {
       createSandbox: async () => ({ sandboxId: "sb" }),
       destroySandbox: async () => {},
       pauseSandbox: async () => {},
+      resumeSandbox: async () => {},
       snapshotSandbox: async () => ({
         sandboxId: "sb",
         providerId: "test",
@@ -820,6 +823,7 @@ describe("createSession integration", () => {
       }),
       forkSandbox: async () => "forked-sandbox-id",
       pauseSandbox: async () => {},
+      resumeSandbox: async () => {},
     };
 
     const session = await createSession({
@@ -870,6 +874,7 @@ describe("createSession integration", () => {
       }),
       forkSandbox: async () => "forked-sandbox-id",
       pauseSandbox: async () => {},
+      resumeSandbox: async () => {},
     };
 
     const session = await createSession({

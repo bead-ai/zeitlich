@@ -145,6 +145,10 @@ export class DaytonaSandboxProvider implements SandboxProvider<
     throw new SandboxNotSupportedError("pause");
   }
 
+  async resume(_sandboxId: string): Promise<void> {
+    // Daytona sandboxes don't support pause, so resume is a no-op
+  }
+
   async fork(_sandboxId: string): Promise<Sandbox> {
     throw new Error("Not implemented");
   }

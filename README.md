@@ -465,7 +465,7 @@ export const researcherSubagent = defineSubagent(researcherWorkflow);
 // Optionally override parent-specific config
 export const researcherSubagent = defineSubagent(researcherWorkflow, {
   thread: "fork",
-  sandbox: "own",
+  sandbox: { source: "own", continuation: "fork" },
   hooks: {
     onPostExecution: ({ result }) => console.log("researcher done", result),
   },
@@ -640,7 +640,7 @@ The `sandbox` field controls how a sandbox is created or reused:
 | Mode | Description |
 |------|-------------|
 | `{ mode: "new" }` | Create a fresh sandbox (default when `sandboxOps` is provided). |
-| `{ mode: "continue", sandboxId }` | Resume a previously-paused sandbox. This session takes ownership. |
+| `{ mode: "continue", sandboxId }` | Take ownership of an existing sandbox (paused or running). Paused sandboxes are automatically resumed. |
 | `{ mode: "fork", sandboxId }` | Fork from an existing sandbox. A new sandbox is created and owned by this session. |
 | `{ mode: "inherit", sandboxId }` | Use a sandbox owned by someone else (e.g. a parent agent). Shutdown policy is ignored. |
 
@@ -654,7 +654,10 @@ The `sandboxShutdown` field controls what happens to the sandbox when the sessio
 | `"pause"` | Pause the sandbox so it can be resumed later. |
 | `"keep"` | Leave the sandbox running (no-op on exit). |
 
-Subagents also support `"pause-until-parent-close"` — pause on exit, then wait for the parent workflow to signal when to destroy it.
+Subagents also support two additional shutdown modes:
+
+- `"pause-until-parent-close"` — pause on exit, then wait for the parent workflow to signal when to destroy it.
+- `"keep-until-parent-close"` — leave the sandbox running on exit, then wait for the parent workflow to signal when to destroy it.
 
 #### Subagent Thread & Sandbox Config
 
@@ -675,18 +678,26 @@ export const researcherSubagent = defineSubagent(researcherWorkflow, {
 // Own sandbox with pause-on-exit
 export const researcherSubagent = defineSubagent(researcherWorkflow, {
   thread: "fork",
-  sandbox: { source: "own", shutdown: "pause" },
+  sandbox: { source: "own", continuation: "fork", shutdown: "pause" },
 });
 
 // Inherit the parent's sandbox
 export const researcherSubagent = defineSubagent(researcherWorkflow, {
-  sandbox: "inherit",
+  sandbox: { source: "inherit", continuation: "continue" },
+});
+
+// Own sandbox created once, reused across calls
+export const codeRunnerSubagent = defineSubagent(codeRunnerWorkflow, {
+  sandbox: { source: "own", init: "once", continuation: "continue" },
 });
 ```
 
 The `thread` field accepts `"new"` (default), `"fork"`, or `"continue"`. When set to `"fork"` or `"continue"`, the parent agent can pass a `threadId` in a subsequent `Task` tool call to resume the conversation. The subagent returns its `threadId` in the response (surfaced as `[Thread ID: ...]`), which the parent can use for continuation.
 
-The `sandbox` field accepts `"none"` (default), `"inherit"`, `"own"`, or `{ source: "own", shutdown }` for explicit shutdown policy.
+The `sandbox` field accepts `"none"` (default) or an object with `source`, `continuation`, and optional `init`/`shutdown` fields:
+
+- `source: "inherit"` — use the parent's sandbox. `continuation: "continue"` shares it directly; `"fork"` forks from it on every call.
+- `source: "own"` — the child gets its own sandbox. `init: "per-call"` (default) creates fresh each call; `init: "once"` creates on the first call and stores it for subsequent calls. `continuation` controls whether subsequent calls reuse (`"continue"`) or fork from (`"fork"`) the stored sandbox.
 
 The subagent workflow receives lifecycle fields via `sessionInput`:
 

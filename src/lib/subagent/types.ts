@@ -63,19 +63,28 @@ export type InferSubagentResult<T extends SubagentConfig> =
 /**
  * Sandbox configuration for a subagent.
  *
- * String shorthands:
  * - `"none"` — no sandbox (default).
- * - `"inherit"` — reuse the parent's sandbox (shared filesystem/exec).
- * - `"own"` — the child creates and owns its own sandbox (shutdown defaults to `"destroy"`).
- *
- * Object form (only for `source: "own"`):
- * - `{ source: "own", shutdown?: SubagentSandboxShutdown }` — own sandbox with explicit shutdown policy.
+ * - `{ source: "inherit", continuation }` — reuse the parent's sandbox.
+ *   `continuation: "continue"` shares the parent sandbox directly;
+ *   `continuation: "fork"` forks from the parent on every call.
+ * - `{ source: "own", init?, continuation }` — the child gets its own sandbox.
+ *   `init: "per-call"` (default) creates fresh each call (thread continuation
+ *   uses the previous sandbox). `init: "once"` creates on the first call and
+ *   stores it for all subsequent calls.
  */
 export type SubagentSandboxConfig =
   | "none"
-  | "inherit"
-  | "own"
-  | { source: "own"; shutdown?: SubagentSandboxShutdown };
+  | {
+      source: "inherit";
+      continuation: "continue" | "fork";
+      shutdown?: SubagentSandboxShutdown;
+    }
+  | {
+      source: "own";
+      init?: "per-call" | "once";
+      continuation: "continue" | "fork";
+      shutdown?: SubagentSandboxShutdown;
+    };
 
 /**
  * Configuration for a subagent that can be spawned by the parent workflow.
@@ -111,9 +120,6 @@ export interface SubagentConfig<TResult extends z.ZodType = z.ZodType> {
   thread?: "new" | "fork" | "continue";
   /**
    * Sandbox strategy for this subagent.
-   *
-   * String shorthands: `"none"` (default) | `"inherit"` | `"own"`.
-   * Object form: `{ source: "own", shutdown?: SubagentSandboxShutdown }`.
    *
    * @see {@link SubagentSandboxConfig}
    */
@@ -154,14 +160,17 @@ export interface SubagentHooks<TArgs = unknown, TResult = unknown> {
  * Extended response from the subagent `fn` — includes optional cleanup callbacks
  * stripped before signaling the parent.
  *
- * When `TSandboxShutdown` is `"pause-until-parent-close"`, both `destroySandbox`
- * and `sandboxId` become required so the parent can coordinate cleanup.
+ * When `TSandboxShutdown` is `"pause-until-parent-close"` or
+ * `"keep-until-parent-close"`, both `destroySandbox` and `sandboxId` become
+ * required so the parent can coordinate cleanup.
  */
 export type SubagentFnResult<
   TResult = null,
   TSandboxShutdown extends SubagentSandboxShutdown = SubagentSandboxShutdown,
 > = SubagentHandlerResponse<TResult> &
-  (TSandboxShutdown extends "pause-until-parent-close"
+  (TSandboxShutdown extends
+    | "pause-until-parent-close"
+    | "keep-until-parent-close"
     ? { destroySandbox: () => Promise<void>; sandboxId: string }
     : { destroySandbox?: () => Promise<void> });
 
@@ -169,6 +178,12 @@ export type SubagentFnResult<
 export interface ChildResultSignalPayload {
   childWorkflowId: string;
   result: SubagentHandlerResponse;
+}
+
+/** Payload sent by a child workflow as soon as its sandbox is ready */
+export interface ChildSandboxReadySignalPayload {
+  childWorkflowId: string;
+  sandboxId: string;
 }
 
 /**
@@ -183,4 +198,6 @@ export interface SubagentSessionInput {
   sandbox?: SandboxInit;
   /** Sandbox shutdown policy (default: "destroy") */
   sandboxShutdown?: SubagentSandboxShutdown;
+  /** Called by the session as soon as the sandbox is created, before the agent loop starts. */
+  onSandboxReady?: (sandboxId: string) => void;
 }

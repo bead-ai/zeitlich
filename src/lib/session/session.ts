@@ -106,6 +106,7 @@ export async function createSession<
   thread: threadInit,
   sandbox: sandboxInit,
   sandboxShutdown = "destroy",
+  onSandboxReady,
   virtualFs: virtualFsConfig,
   virtualFsOps,
 }: SessionConfig<T, M, TContent>): Promise<ZeitlichSession<M, boolean>> {
@@ -236,6 +237,9 @@ export async function createSession<
         }
         sandboxId = (sandboxInit as { mode: "continue"; sandboxId: string })
           .sandboxId;
+        if (sandboxShutdown === "pause-until-parent-close") {
+          await sandboxOps.resumeSandbox(sandboxId);
+        }
         sandboxOwned = true;
       } else if (sandboxMode === "fork") {
         if (!sandboxOps) {
@@ -260,6 +264,10 @@ export async function createSession<
           sandboxId = result.sandboxId;
           sandboxOwned = true;
         }
+      }
+
+      if (sandboxId && onSandboxReady) {
+        onSandboxReady(sandboxId);
       }
 
       // --- Virtual filesystem init (independent of sandbox) ----------------
@@ -467,6 +475,7 @@ export async function createSession<
               await sandboxOps.pauseSandbox(sandboxId);
               break;
             case "keep":
+            case "keep-until-parent-close":
               break;
           }
         }

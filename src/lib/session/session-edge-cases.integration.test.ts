@@ -434,6 +434,7 @@ describe("createSession edge cases", () => {
       }),
       forkSandbox: async () => "forked-sandbox-id",
       pauseSandbox: async () => {},
+      resumeSandbox: async () => {},
     };
 
     const session = await createSession({
@@ -476,6 +477,7 @@ describe("createSession edge cases", () => {
       }),
       forkSandbox: async () => "forked-sandbox-id",
       pauseSandbox: async () => {},
+      resumeSandbox: async () => {},
     };
 
     const session = await createSession({
@@ -939,6 +941,7 @@ describe("createSession edge cases", () => {
       snapshotSandbox: snapshotSpy,
       forkSandbox: async () => "forked-sandbox-id",
       pauseSandbox: async () => {},
+      resumeSandbox: async () => {},
     };
 
     const session = await createSession({
@@ -1029,6 +1032,7 @@ describe("createSession edge cases", () => {
       createSandbox: async () => ({ sandboxId: "sb-created" }),
       destroySandbox: async () => {},
       pauseSandbox: async () => {},
+      resumeSandbox: async () => {},
       snapshotSandbox: async () => ({
         sandboxId: "sb-1",
         providerId: "test",
@@ -1062,6 +1066,7 @@ describe("createSession edge cases", () => {
       createSandbox: async () => ({ sandboxId: "sb" }),
       destroySandbox: async () => {},
       pauseSandbox: async () => {},
+      resumeSandbox: async () => {},
       snapshotSandbox: async () => ({
         sandboxId: "sb",
         providerId: "test",
@@ -1106,6 +1111,7 @@ describe("createSession edge cases", () => {
       pauseSandbox: async (id: string) => {
         sandboxLog.push(`pause:${id}`);
       },
+      resumeSandbox: async () => {},
       snapshotSandbox: async () => ({
         sandboxId: "sb-1",
         providerId: "test",
@@ -1149,6 +1155,7 @@ describe("createSession edge cases", () => {
         sandboxLog.push(`destroy:${id}`);
       },
       pauseSandbox: async () => {},
+      resumeSandbox: async () => {},
       snapshotSandbox: async () => ({
         sandboxId: "sb-1",
         providerId: "test",
@@ -1195,6 +1202,7 @@ describe("createSession edge cases", () => {
         sandboxLog.push(`destroy:${id}`);
       },
       pauseSandbox: async () => {},
+      resumeSandbox: async () => {},
       snapshotSandbox: async () => ({
         sandboxId: "sb-1",
         providerId: "test",
@@ -1237,6 +1245,7 @@ describe("createSession edge cases", () => {
       pauseSandbox: async (id: string) => {
         sandboxLog.push(`pause:${id}`);
       },
+      resumeSandbox: async () => {},
       snapshotSandbox: async () => ({
         sandboxId: "sb-1",
         providerId: "test",
@@ -1280,6 +1289,7 @@ describe("createSession edge cases", () => {
       pauseSandbox: async (id: string) => {
         sandboxLog.push(`pause:${id}`);
       },
+      resumeSandbox: async () => {},
       snapshotSandbox: async () => ({
         sandboxId: "sb-1",
         providerId: "test",
@@ -1395,6 +1405,7 @@ describe("createSession edge cases", () => {
       pauseSandbox: async (id: string) => {
         sandboxLog.push(`pause:${id}`);
       },
+      resumeSandbox: async () => {},
       snapshotSandbox: async () => ({
         sandboxId: "sb-1",
         providerId: "test",
@@ -1426,5 +1437,188 @@ describe("createSession edge cases", () => {
 
     expect(sandboxLog).toContain("pause:sb-err");
     expect(sandboxLog).not.toContain("destroy:sb-err");
+  });
+
+  // --- sandboxShutdown: "keep-until-parent-close" ---
+
+  it("keeps sandbox running on exit when sandboxShutdown is keep-until-parent-close", async () => {
+    const { ops } = createMockThreadOps();
+    const sandboxLog: string[] = [];
+
+    const sandboxOps: SandboxOps = {
+      createSandbox: async () => ({ sandboxId: "sb-keep-parent" }),
+      destroySandbox: async (id: string) => {
+        sandboxLog.push(`destroy:${id}`);
+      },
+      pauseSandbox: async (id: string) => {
+        sandboxLog.push(`pause:${id}`);
+      },
+      resumeSandbox: async () => {},
+      snapshotSandbox: async () => ({
+        sandboxId: "sb-1",
+        providerId: "test",
+        data: null,
+        createdAt: new Date().toISOString(),
+      }),
+      forkSandbox: async () => "forked-sb",
+    };
+
+    const session = await createSession({
+      agentName: "TestAgent",
+      thread: { mode: "new", threadId: "thread-1" },
+      runAgent: createScriptedRunAgent([{ message: "done", toolCalls: [] }]),
+      threadOps: ops,
+      buildContextMessage: () => "go",
+      sandboxOps,
+      sandboxShutdown: "keep-until-parent-close",
+    });
+
+    const stateManager = createAgentStateManager({
+      initialState: { systemPrompt: "test" },
+    });
+
+    await session.runSession({ stateManager });
+
+    expect(sandboxLog).not.toContain("pause:sb-keep-parent");
+    expect(sandboxLog).not.toContain("destroy:sb-keep-parent");
+  });
+
+  it("keeps sandbox running on error when sandboxShutdown is keep-until-parent-close", async () => {
+    const { ops } = createMockThreadOps();
+    const sandboxLog: string[] = [];
+
+    const sandboxOps: SandboxOps = {
+      createSandbox: async () => ({ sandboxId: "sb-keep-err" }),
+      destroySandbox: async (id: string) => {
+        sandboxLog.push(`destroy:${id}`);
+      },
+      pauseSandbox: async (id: string) => {
+        sandboxLog.push(`pause:${id}`);
+      },
+      resumeSandbox: async () => {},
+      snapshotSandbox: async () => ({
+        sandboxId: "sb-1",
+        providerId: "test",
+        data: null,
+        createdAt: new Date().toISOString(),
+      }),
+      forkSandbox: async () => "forked-sb",
+    };
+
+    const session = await createSession({
+      agentName: "TestAgent",
+      thread: { mode: "new", threadId: "thread-1" },
+      runAgent: async () => {
+        throw new Error("crash");
+      },
+      threadOps: ops,
+      buildContextMessage: () => "go",
+      sandboxOps,
+      sandboxShutdown: "keep-until-parent-close",
+    });
+
+    const stateManager = createAgentStateManager({
+      initialState: { systemPrompt: "test" },
+    });
+
+    await expect(session.runSession({ stateManager })).rejects.toThrow(
+      "crash"
+    );
+
+    expect(sandboxLog).not.toContain("pause:sb-keep-err");
+    expect(sandboxLog).not.toContain("destroy:sb-keep-err");
+  });
+
+  // --- sandbox continue calls resumeSandbox only for pause-until-parent-close ---
+
+  it("calls resumeSandbox when sandbox mode is continue with pause-until-parent-close", async () => {
+    const { ops } = createMockThreadOps();
+    const sandboxLog: string[] = [];
+
+    const sandboxOps: SandboxOps = {
+      createSandbox: async () => ({ sandboxId: "new-sb" }),
+      destroySandbox: async (id: string) => {
+        sandboxLog.push(`destroy:${id}`);
+      },
+      pauseSandbox: async (id: string) => {
+        sandboxLog.push(`pause:${id}`);
+      },
+      resumeSandbox: async (id: string) => {
+        sandboxLog.push(`resume:${id}`);
+      },
+      snapshotSandbox: async () => ({
+        sandboxId: "sb-1",
+        providerId: "test",
+        data: null,
+        createdAt: new Date().toISOString(),
+      }),
+      forkSandbox: async () => "forked-sb",
+    };
+
+    const session = await createSession({
+      agentName: "TestAgent",
+      thread: { mode: "new", threadId: "thread-1" },
+      runAgent: createScriptedRunAgent([{ message: "done", toolCalls: [] }]),
+      threadOps: ops,
+      buildContextMessage: () => "go",
+      sandboxOps,
+      sandbox: { mode: "continue", sandboxId: "paused-sb" },
+      sandboxShutdown: "pause-until-parent-close",
+    });
+
+    const stateManager = createAgentStateManager({
+      initialState: { systemPrompt: "test" },
+    });
+
+    await session.runSession({ stateManager });
+
+    expect(sandboxLog).toContain("resume:paused-sb");
+    expect(sandboxLog).toContain("pause:paused-sb");
+  });
+
+  it("skips resumeSandbox when sandbox mode is continue with keep-until-parent-close", async () => {
+    const { ops } = createMockThreadOps();
+    const sandboxLog: string[] = [];
+
+    const sandboxOps: SandboxOps = {
+      createSandbox: async () => ({ sandboxId: "new-sb" }),
+      destroySandbox: async (id: string) => {
+        sandboxLog.push(`destroy:${id}`);
+      },
+      pauseSandbox: async (id: string) => {
+        sandboxLog.push(`pause:${id}`);
+      },
+      resumeSandbox: async (id: string) => {
+        sandboxLog.push(`resume:${id}`);
+      },
+      snapshotSandbox: async () => ({
+        sandboxId: "sb-1",
+        providerId: "test",
+        data: null,
+        createdAt: new Date().toISOString(),
+      }),
+      forkSandbox: async () => "forked-sb",
+    };
+
+    const session = await createSession({
+      agentName: "TestAgent",
+      thread: { mode: "new", threadId: "thread-1" },
+      runAgent: createScriptedRunAgent([{ message: "done", toolCalls: [] }]),
+      threadOps: ops,
+      buildContextMessage: () => "go",
+      sandboxOps,
+      sandbox: { mode: "continue", sandboxId: "kept-sb" },
+      sandboxShutdown: "keep-until-parent-close",
+    });
+
+    const stateManager = createAgentStateManager({
+      initialState: { systemPrompt: "test" },
+    });
+
+    await session.runSession({ stateManager });
+
+    expect(sandboxLog).not.toContain("resume:kept-sb");
+    expect(sandboxLog).not.toContain("pause:kept-sb");
+    expect(sandboxLog).not.toContain("destroy:kept-sb");
   });
 });

@@ -136,6 +136,10 @@ export class E2bSandboxProvider
     await sdkSandbox.pause();
   }
 
+  async resume(sandboxId: string): Promise<void> {
+    await E2bSdkSandbox.connect(sandboxId);
+  }
+
   async snapshot(_sandboxId: string): Promise<SandboxSnapshot> {
     throw new SandboxNotSupportedError("snapshot");
   }
