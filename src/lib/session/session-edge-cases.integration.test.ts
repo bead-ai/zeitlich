@@ -1529,9 +1529,9 @@ describe("createSession edge cases", () => {
     expect(sandboxLog).not.toContain("destroy:sb-keep-err");
   });
 
-  // --- sandbox continue calls resumeSandbox ---
+  // --- sandbox continue calls resumeSandbox only for pause-until-parent-close ---
 
-  it("calls resumeSandbox when sandbox mode is continue", async () => {
+  it("calls resumeSandbox when sandbox mode is continue with pause-until-parent-close", async () => {
     const { ops } = createMockThreadOps();
     const sandboxLog: string[] = [];
 
@@ -1540,7 +1540,9 @@ describe("createSession edge cases", () => {
       destroySandbox: async (id: string) => {
         sandboxLog.push(`destroy:${id}`);
       },
-      pauseSandbox: async () => {},
+      pauseSandbox: async (id: string) => {
+        sandboxLog.push(`pause:${id}`);
+      },
       resumeSandbox: async (id: string) => {
         sandboxLog.push(`resume:${id}`);
       },
@@ -1561,6 +1563,7 @@ describe("createSession edge cases", () => {
       buildContextMessage: () => "go",
       sandboxOps,
       sandbox: { mode: "continue", sandboxId: "paused-sb" },
+      sandboxShutdown: "pause-until-parent-close",
     });
 
     const stateManager = createAgentStateManager({
@@ -1570,6 +1573,52 @@ describe("createSession edge cases", () => {
     await session.runSession({ stateManager });
 
     expect(sandboxLog).toContain("resume:paused-sb");
-    expect(sandboxLog).toContain("destroy:paused-sb");
+    expect(sandboxLog).toContain("pause:paused-sb");
+  });
+
+  it("skips resumeSandbox when sandbox mode is continue with keep-until-parent-close", async () => {
+    const { ops } = createMockThreadOps();
+    const sandboxLog: string[] = [];
+
+    const sandboxOps: SandboxOps = {
+      createSandbox: async () => ({ sandboxId: "new-sb" }),
+      destroySandbox: async (id: string) => {
+        sandboxLog.push(`destroy:${id}`);
+      },
+      pauseSandbox: async (id: string) => {
+        sandboxLog.push(`pause:${id}`);
+      },
+      resumeSandbox: async (id: string) => {
+        sandboxLog.push(`resume:${id}`);
+      },
+      snapshotSandbox: async () => ({
+        sandboxId: "sb-1",
+        providerId: "test",
+        data: null,
+        createdAt: new Date().toISOString(),
+      }),
+      forkSandbox: async () => "forked-sb",
+    };
+
+    const session = await createSession({
+      agentName: "TestAgent",
+      thread: { mode: "new", threadId: "thread-1" },
+      runAgent: createScriptedRunAgent([{ message: "done", toolCalls: [] }]),
+      threadOps: ops,
+      buildContextMessage: () => "go",
+      sandboxOps,
+      sandbox: { mode: "continue", sandboxId: "kept-sb" },
+      sandboxShutdown: "keep-until-parent-close",
+    });
+
+    const stateManager = createAgentStateManager({
+      initialState: { systemPrompt: "test" },
+    });
+
+    await session.runSession({ stateManager });
+
+    expect(sandboxLog).not.toContain("resume:kept-sb");
+    expect(sandboxLog).not.toContain("pause:kept-sb");
+    expect(sandboxLog).not.toContain("destroy:kept-sb");
   });
 });
