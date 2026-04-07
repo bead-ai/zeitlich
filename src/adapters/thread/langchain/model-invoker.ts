@@ -1,7 +1,6 @@
 import type Redis from "ioredis";
 import type { AgentResponse, ModelInvokerConfig } from "../../../lib/model";
 import type { StoredMessage } from "@langchain/core/messages";
-import type { AIMessageChunk } from "@langchain/core/messages";
 import { v4 as uuidv4 } from "uuid";
 import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
 import {
@@ -23,8 +22,10 @@ export interface LangChainModelInvokerConfig<
  * Creates a LangChain-based model invoker that satisfies the generic
  * `ModelInvoker<StoredMessage>` contract.
  *
- * Internally streams the response and emits Temporal heartbeats on each
- * chunk so that long-running LLM calls remain visible to the scheduler.
+ * Uses interval-based Temporal heartbeats during model.invoke() to keep
+ * long-running LLM calls visible to the scheduler. LangChain's streaming
+ * chunk accumulation is unreliable across providers (e.g. reasoning_content
+ * blocks don't merge correctly), so we use invoke() for correctness.
  * The caller is responsible for appending the response to the thread.
  *
  * @example
@@ -58,49 +59,49 @@ export function createLangChainModelInvoker<
     const runId = uuidv4();
 
     const { messages } = await thread.prepareForInvocation();
-    const stream = await model.stream(messages, {
-      runName: agentName,
-      runId,
-      metadata: { thread_id: `${agentName}-${threadId}`, ...metadata },
-      tools: state.tools,
-      signal,
-    });
 
-    let response: AIMessageChunk | undefined;
-    for await (const chunk of stream) {
-      response = response ? response.concat(chunk) : chunk;
-      heartbeat?.();
+    const heartbeatInterval = heartbeat
+      ? setInterval(() => heartbeat(), 30_000)
+      : undefined;
+
+    try {
+      const response = await model.invoke(messages, {
+        runName: agentName,
+        runId,
+        metadata: { thread_id: `${agentName}-${threadId}`, ...metadata },
+        tools: state.tools,
+        signal,
+      });
+
+      const toolCalls = response.tool_calls ?? [];
+
+      return {
+        message: response.toDict(),
+        rawToolCalls: toolCalls.map((tc) => ({
+          id: tc.id,
+          name: tc.name,
+          args: tc.args,
+        })),
+        usage: {
+          inputTokens: response.usage_metadata?.input_tokens,
+          outputTokens: response.usage_metadata?.output_tokens,
+          reasonTokens:
+            response.usage_metadata?.output_token_details?.reasoning,
+          cachedWriteTokens:
+            response.usage_metadata?.input_token_details?.cache_creation ||
+            (response.response_metadata.cacheWriteInputTokens as
+              | number
+              | undefined),
+          cachedReadTokens:
+            response.usage_metadata?.input_token_details?.cache_read ||
+            (response.response_metadata.cacheReadInputTokens as
+              | number
+              | undefined),
+        },
+      };
+    } finally {
+      if (heartbeatInterval) clearInterval(heartbeatInterval);
     }
-
-    if (!response) {
-      throw new Error("LangChain stream ended without producing any chunks");
-    }
-
-    const toolCalls = response.tool_calls ?? [];
-
-    return {
-      message: response.toDict(),
-      rawToolCalls: toolCalls.map((tc) => ({
-        id: tc.id,
-        name: tc.name,
-        args: tc.args,
-      })),
-      usage: {
-        inputTokens: response.usage_metadata?.input_tokens,
-        outputTokens: response.usage_metadata?.output_tokens,
-        reasonTokens: response.usage_metadata?.output_token_details?.reasoning,
-        cachedWriteTokens:
-          response.usage_metadata?.input_token_details?.cache_creation ||
-          (response.response_metadata.cacheWriteInputTokens as
-            | number
-            | undefined),
-        cachedReadTokens:
-          response.usage_metadata?.input_token_details?.cache_read ||
-          (response.response_metadata.cacheReadInputTokens as
-            | number
-            | undefined),
-      },
-    };
   };
 }
 
