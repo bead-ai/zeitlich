@@ -7,15 +7,20 @@
  *
  * Import this from `zeitlich/workflow` in your Temporal workflow files.
  *
+ * @typeParam M - SDK-native message type (e.g. `StoredMessage` for LangChain,
+ *   `Anthropic.Messages.Message` for Anthropic, `Content` for Google GenAI).
+ *   Must be provided for `SessionResult.finalMessage` to be correctly typed.
+ *
  * @example
  * ```typescript
  * import { proxyRunAgent } from 'zeitlich/workflow';
+ * import type { StoredMessage } from '@langchain/core/messages';
  *
  * // Auto-scoped to the current workflow name
- * const runAgent = proxyRunAgent();
+ * const runAgent = proxyRunAgent<StoredMessage>();
  *
  * // Explicit scope for subagents
- * const runResearcher = proxyRunAgent("Researcher");
+ * const runResearcher = proxyRunAgent<StoredMessage>("Researcher");
  * ```
  */
 import { proxyActivities, workflowInfo } from "@temporalio/workflow";

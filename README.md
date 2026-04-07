@@ -178,11 +178,12 @@ import {
 } from "zeitlich/workflow";
 import { searchTool } from "./tools";
 import type { MyActivities } from "./activities";
+import type { StoredMessage } from "@langchain/core/messages";
 
 import { proxyLangChainThreadOps } from "zeitlich/adapters/thread/langchain/workflow";
 import { proxyInMemorySandboxOps } from "zeitlich/adapters/sandbox/inmemory/workflow";
 
-const runAgentActivity = proxyRunAgent();
+const runAgentActivity = proxyRunAgent<StoredMessage>();
 
 const {
   searchHandlerActivity,
@@ -419,8 +420,9 @@ import {
   proxyRunAgent,
 } from "zeitlich/workflow";
 import { proxyLangChainThreadOps } from "zeitlich/adapters/thread/langchain/workflow";
+import type { StoredMessage } from "@langchain/core/messages";
 
-const runResearcherActivity = proxyRunAgent();
+const runResearcherActivity = proxyRunAgent<StoredMessage>();
 
 // Define the workflow — name, description (and optional resultSchema) live here
 export const researcherWorkflow = defineSubagentWorkflow(

@@ -67,22 +67,21 @@ export function createAnthropicModelInvoker({
     const anthropicTools = toAnthropicTools(state.tools);
     const tools = anthropicTools.length > 0 ? anthropicTools : undefined;
 
-    const stream = client.messages.stream(
-      {
-        model,
-        max_tokens: maxTokens,
-        messages,
-        ...(system ? { system } : {}),
-        ...(tools ? { tools } : {}),
-      },
-      { signal },
-    );
+    const params: Anthropic.MessageCreateParams = {
+      model,
+      max_tokens: maxTokens,
+      messages,
+      ...(system ? { system } : {}),
+      ...(tools ? { tools } : {}),
+    };
+
+    const stream = client.messages.stream(params, { signal });
 
     for await (const _event of stream) {
       heartbeat?.();
     }
 
-    const response = await stream.finalMessage();
+    const response: Anthropic.Messages.Message = await stream.finalMessage();
 
     const toolCalls = response.content.filter(
       (block): block is Anthropic.Messages.ToolUseBlock =>
