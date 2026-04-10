@@ -1,6 +1,23 @@
 import type { JsonValue } from "./state/types";
 import type { FileEntry } from "./virtual-fs/types";
 
+/**
+ * A content block in a structured system prompt. Shape is SDK-specific —
+ * zeitlich forwards blocks verbatim without translating between formats.
+ */
+export type SystemPromptContentBlock = Record<string, unknown>;
+
+/** Plain string or an array of SDK-native content blocks. */
+export type SystemPromptContent = string | SystemPromptContentBlock[];
+
+export function isValidSystemPrompt(
+  prompt: SystemPromptContent | undefined,
+): prompt is SystemPromptContent {
+  if (!prompt) return false;
+  if (typeof prompt === "string") return prompt.trim() !== "";
+  return prompt.length > 0;
+}
+
 // ============================================================================
 // Agent core types
 // ============================================================================
@@ -28,7 +45,7 @@ export interface BaseAgentState {
   /** In-memory file contents keyed by path, bypassing the resolver (e.g. skill resources). */
   inlineFiles?: Record<string, string>;
   virtualFsCtx?: unknown;
-  systemPrompt?: string;
+  systemPrompt?: SystemPromptContent;
   totalInputTokens: number;
   totalOutputTokens: number;
   cachedWriteTokens: number;

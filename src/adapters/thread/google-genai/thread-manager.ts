@@ -1,5 +1,6 @@
 import type Redis from "ioredis";
 import type { Content, Part } from "@google/genai";
+import type { SystemPromptContent } from "../../../lib/types";
 import { createThreadManager } from "../../../lib/thread/manager";
 import type {
   ProviderThreadManager,
@@ -106,11 +107,16 @@ export function createGoogleGenAIThreadManager(
       }]);
     },
 
-    async appendSystemMessage(id: string, content: string): Promise<void> {
+    async appendSystemMessage(
+      id: string,
+      content: SystemPromptContent,
+    ): Promise<void> {
+      const parts: Part[] =
+        typeof content === "string" ? [{ text: content }] : (content as Part[]);
       await base.initialize();
       await base.append([{
         id,
-        content: { role: "system", parts: [{ text: content }] },
+        content: { role: "system", parts },
       }]);
     },
 

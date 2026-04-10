@@ -1,5 +1,9 @@
 import type { Duration } from "@temporalio/common";
-import type { ToolResultConfig, SessionExitReason } from "../types";
+import type {
+  SessionExitReason,
+  SystemPromptContent,
+  ToolResultConfig,
+} from "../types";
 import type {
   ToolMap,
   ToolCallResultUnion,
@@ -50,7 +54,7 @@ export interface ThreadOps<TContent = string> {
   appendSystemMessage(
     threadId: string,
     id: string,
-    content: string,
+    content: SystemPromptContent,
     threadKey?: string
   ): Promise<void>;
   /** Copy all messages from sourceThreadId into a new thread at targetThreadId */

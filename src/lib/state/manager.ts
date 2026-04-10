@@ -7,6 +7,7 @@ import {
 import {
   type AgentStatus,
   type BaseAgentState,
+  type SystemPromptContent,
   type WorkflowTask,
   isTerminalStatus,
 } from "../types";
@@ -108,7 +109,7 @@ export function createAgentStateManager<
       return status === "RUNNING";
     },
 
-    getSystemPrompt(): string | undefined {
+    getSystemPrompt(): SystemPromptContent | undefined {
       return systemPrompt;
     },
 
@@ -202,7 +203,7 @@ export function createAgentStateManager<
       }));
     },
 
-    setSystemPrompt(newSystemPrompt: string): void {
+    setSystemPrompt(newSystemPrompt: SystemPromptContent): void {
       systemPrompt = newSystemPrompt;
     },
 

@@ -119,11 +119,12 @@ export type {
   ToolResultConfig,
   SessionExitReason,
   SerializableToolDefinition,
-  // Task types
+  SystemPromptContent,
+  SystemPromptContentBlock,
   TaskStatus,
   WorkflowTask,
 } from "./lib/types";
-export { isTerminalStatus } from "./lib/types";
+export { isTerminalStatus, isValidSystemPrompt } from "./lib/types";
 
 // Model types
 export type {

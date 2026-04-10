@@ -1,5 +1,6 @@
 import type Redis from "ioredis";
 import type { JsonValue } from "../../../lib/state/types";
+import type { SystemPromptContent } from "../../../lib/types";
 import {
   AIMessage,
   type BaseMessage,
@@ -81,10 +82,16 @@ export function createLangChainThreadManager(
       ]);
     },
 
-    async appendSystemMessage(id: string, content: string): Promise<void> {
+    async appendSystemMessage(
+      id: string,
+      content: SystemPromptContent,
+    ): Promise<void> {
       await base.initialize();
       await base.append([
-        new SystemMessage({ id, content }).toDict(),
+        new SystemMessage({
+          id,
+          content: content as MessageContent,
+        }).toDict(),
       ]);
     },
 

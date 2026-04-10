@@ -1,5 +1,8 @@
 import type Redis from "ioredis";
-import type { ToolResultConfig } from "../../../lib/types";
+import type {
+  SystemPromptContent,
+  ToolResultConfig,
+} from "../../../lib/types";
 import type { MessageContent } from "@langchain/core/messages";
 import type {
   ActivityToolHandler,
@@ -135,7 +138,7 @@ export function createLangChainAdapter(
     async appendSystemMessage(
       threadId: string,
       id: string,
-      content: string,
+      content: SystemPromptContent,
       threadKey?: string,
     ): Promise<void> {
       const thread = createLangChainThreadManager({ redis, threadId, key: threadKey });

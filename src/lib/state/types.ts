@@ -3,6 +3,7 @@ import type { UpdateDefinition } from "@temporalio/common/lib/interfaces";
 import type {
   AgentStatus,
   BaseAgentState,
+  SystemPromptContent,
   TokenUsage,
   WorkflowTask,
 } from "../types";
@@ -90,10 +91,10 @@ export interface AgentStateManager<TCustom extends JsonSerializable<TCustom>> {
   getTurns(): number;
 
   /** Get the system prompt */
-  getSystemPrompt(): string | undefined;
+  getSystemPrompt(): SystemPromptContent | undefined;
 
   /** Set the system prompt */
-  setSystemPrompt(newSystemPrompt: string): void;
+  setSystemPrompt(newSystemPrompt: SystemPromptContent): void;
 
   /** Get a custom state value by key */
   get<K extends keyof TCustom>(key: K): TCustom[K];
