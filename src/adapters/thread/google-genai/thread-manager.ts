@@ -33,7 +33,7 @@ export interface GoogleGenAIThreadManagerConfig {
 /** Prepared payload ready to send to the Google GenAI API */
 export interface GoogleGenAIInvocationPayload {
   contents: Content[];
-  systemInstruction?: string;
+  systemInstruction?: Part[];
 }
 
 /** Thread manager with Google GenAI Content convenience helpers */
@@ -158,12 +158,12 @@ export function createGoogleGenAIThreadManager(
         ? stored.map((msg, i) => onPrepareMessage(msg, i, stored))
         : stored;
 
-      let systemInstruction: string | undefined;
+      let systemInstruction: Part[] | undefined;
       const conversationContents: Content[] = [];
 
       for (const item of mapped) {
         if (item.content.role === "system") {
-          systemInstruction = item.content.parts?.[0]?.text;
+          systemInstruction = item.content.parts ?? [];
         } else {
           conversationContents.push(item.content);
         }
@@ -174,7 +174,7 @@ export function createGoogleGenAIThreadManager(
         contents: onPreparedMessage
           ? contents.map((msg, i) => onPreparedMessage(msg, i, contents))
           : contents,
-        ...(systemInstruction ? { systemInstruction } : {}),
+        ...(systemInstruction && systemInstruction.length > 0 ? { systemInstruction } : {}),
       };
     },
   };

@@ -55,7 +55,7 @@ describe("Google GenAI thread manager hooks", () => {
 
       expect(hook).toHaveBeenCalledTimes(3);
       expect(hook).toHaveBeenCalledWith(systemContent, 0, [systemContent, userContent, modelContent]);
-      expect(systemInstruction).toBe("You are helpful.");
+      expect(systemInstruction).toEqual([{ text: "You are helpful." }]);
       expect(contents[0]?.parts?.[0]?.text).toBe("[modified] Hello");
       expect(contents[1]?.parts?.[0]?.text).toBe("[modified] Hi there!");
     });
