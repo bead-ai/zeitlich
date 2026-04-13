@@ -108,7 +108,7 @@ export function createAgentStateManager<
       return status === "RUNNING";
     },
 
-    getSystemPrompt(): string | undefined {
+    getSystemPrompt(): unknown {
       return systemPrompt;
     },
 
@@ -202,7 +202,7 @@ export function createAgentStateManager<
       }));
     },
 
-    setSystemPrompt(newSystemPrompt: string): void {
+    setSystemPrompt(newSystemPrompt: unknown): void {
       systemPrompt = newSystemPrompt;
     },
 

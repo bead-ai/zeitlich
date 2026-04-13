@@ -13,6 +13,11 @@ export type AnthropicContent =
   | string
   | Anthropic.Messages.ContentBlockParam[];
 
+/** SDK-native content type for Anthropic system prompts (supports cache_control blocks) */
+export type AnthropicSystemContent =
+  | string
+  | Anthropic.Messages.TextBlockParam[];
+
 /** A MessageParam with a unique ID for idempotent Redis storage */
 export interface StoredMessage {
   id: string;
@@ -34,12 +39,12 @@ export interface AnthropicThreadManagerConfig {
 /** Prepared payload ready to send to the Anthropic API */
 export interface AnthropicInvocationPayload {
   messages: Anthropic.Messages.MessageParam[];
-  system?: string;
+  system?: string | Anthropic.Messages.TextBlockParam[];
 }
 
 /** Thread manager with Anthropic MessageParam convenience helpers */
 export interface AnthropicThreadManager
-  extends ProviderThreadManager<StoredMessage, AnthropicContent> {
+  extends ProviderThreadManager<StoredMessage, AnthropicContent, JsonValue, AnthropicSystemContent> {
   appendAssistantMessage(
     id: string,
     content: Anthropic.Messages.ContentBlock[],
@@ -120,11 +125,19 @@ export function createAnthropicThreadManager(
       }]);
     },
 
-    async appendSystemMessage(id: string, content: string): Promise<void> {
+    async appendSystemMessage(
+      id: string,
+      content: AnthropicSystemContent,
+    ): Promise<void> {
       await base.initialize();
       await base.append([{
         id,
-        message: { role: "user", content },
+        // Stored under a user-role placeholder to satisfy the MessageParam
+        // shape; the `isSystem` flag steers extraction in prepareForInvocation.
+        message: {
+          role: "user",
+          content: content as Anthropic.Messages.MessageParam["content"],
+        },
         isSystem: true,
       }]);
     },
@@ -174,15 +187,14 @@ export function createAnthropicThreadManager(
         ? stored.map((msg, i) => onPrepareMessage(msg, i, stored))
         : stored;
 
-      let system: string | undefined;
+      let system: string | Anthropic.Messages.TextBlockParam[] | undefined;
       const conversationMessages: Anthropic.Messages.MessageParam[] = [];
 
       for (const item of mapped) {
         if (item.isSystem) {
-          system =
-            typeof item.message.content === "string"
-              ? item.message.content
-              : undefined;
+          system = item.message.content as
+            | string
+            | Anthropic.Messages.TextBlockParam[];
         } else {
           conversationMessages.push(item.message);
         }

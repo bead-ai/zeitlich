@@ -1,6 +1,5 @@
 import type Redis from "ioredis";
 import type { JsonValue } from "../state/types";
-
 export interface ThreadManagerConfig<T> {
   redis: Redis;
   threadId: string;
@@ -71,9 +70,10 @@ export interface ProviderThreadManager<
   TStored,
   TContent = string,
   TToolContent = JsonValue,
+  TSystemContent = string,
 > extends BaseThreadManager<TStored> {
   appendUserMessage(id: string, content: TContent): Promise<void>;
-  appendSystemMessage(id: string, content: string): Promise<void>;
+  appendSystemMessage(id: string, content: TSystemContent): Promise<void>;
   appendToolResult(
     id: string,
     toolCallId: string,

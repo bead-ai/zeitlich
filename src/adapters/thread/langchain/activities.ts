@@ -17,6 +17,7 @@ import type { BaseChatModel } from "@langchain/core/language_models/chat_models"
 import {
   createLangChainThreadManager,
   type LangChainContent,
+  type LangChainSystemContent,
   type LangChainThreadManagerHooks,
 } from "./thread-manager";
 import { createLangChainModelInvoker } from "./model-invoker";
@@ -135,7 +136,7 @@ export function createLangChainAdapter(
     async appendSystemMessage(
       threadId: string,
       id: string,
-      content: string,
+      content: LangChainSystemContent,
       threadKey?: string,
     ): Promise<void> {
       const thread = createLangChainThreadManager({ redis, threadId, key: threadKey });

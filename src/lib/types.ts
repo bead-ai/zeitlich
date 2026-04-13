@@ -28,7 +28,7 @@ export interface BaseAgentState {
   /** In-memory file contents keyed by path, bypassing the resolver (e.g. skill resources). */
   inlineFiles?: Record<string, string>;
   virtualFsCtx?: unknown;
-  systemPrompt?: string;
+  systemPrompt?: unknown;
   totalInputTokens: number;
   totalOutputTokens: number;
   cachedWriteTokens: number;

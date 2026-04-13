@@ -325,7 +325,10 @@ export async function createSession<
         // "continue" — thread already exists, just append the new message
       } else {
         if (appendSystemPrompt) {
-          if (!systemPrompt || systemPrompt.trim() === "") {
+          if (
+            systemPrompt == null ||
+            (typeof systemPrompt === "string" && systemPrompt.trim() === "")
+          ) {
             throw ApplicationFailure.create({
               message: "No system prompt in state",
               nonRetryable: true,

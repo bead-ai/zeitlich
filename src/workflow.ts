@@ -119,7 +119,6 @@ export type {
   ToolResultConfig,
   SessionExitReason,
   SerializableToolDefinition,
-  // Task types
   TaskStatus,
   WorkflowTask,
 } from "./lib/types";

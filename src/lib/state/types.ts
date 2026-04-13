@@ -90,10 +90,10 @@ export interface AgentStateManager<TCustom extends JsonSerializable<TCustom>> {
   getTurns(): number;
 
   /** Get the system prompt */
-  getSystemPrompt(): string | undefined;
+  getSystemPrompt(): unknown;
 
   /** Set the system prompt */
-  setSystemPrompt(newSystemPrompt: string): void;
+  setSystemPrompt(newSystemPrompt: unknown): void;
 
   /** Get a custom state value by key */
   get<K extends keyof TCustom>(key: K): TCustom[K];

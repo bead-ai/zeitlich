@@ -11,6 +11,9 @@ import type { GoogleGenAIToolResponse } from "./activities";
 /** SDK-native content type for Google GenAI human messages */
 export type GoogleGenAIContent = string | Part[];
 
+/** SDK-native content type for Google GenAI system instructions */
+export type GoogleGenAISystemContent = string | Part[];
+
 /** A Content with a unique ID for idempotent Redis storage */
 export interface StoredContent {
   id: string;
@@ -30,12 +33,12 @@ export interface GoogleGenAIThreadManagerConfig {
 /** Prepared payload ready to send to the Google GenAI API */
 export interface GoogleGenAIInvocationPayload {
   contents: Content[];
-  systemInstruction?: string;
+  systemInstruction?: Part[];
 }
 
 /** Thread manager with Google GenAI Content convenience helpers */
 export interface GoogleGenAIThreadManager
-  extends ProviderThreadManager<StoredContent, GoogleGenAIContent, GoogleGenAIToolResponse> {
+  extends ProviderThreadManager<StoredContent, GoogleGenAIContent, GoogleGenAIToolResponse, GoogleGenAISystemContent> {
   appendModelContent(id: string, parts: Part[]): Promise<void>;
   prepareForInvocation(): Promise<GoogleGenAIInvocationPayload>;
 }
@@ -106,11 +109,16 @@ export function createGoogleGenAIThreadManager(
       }]);
     },
 
-    async appendSystemMessage(id: string, content: string): Promise<void> {
+    async appendSystemMessage(
+      id: string,
+      content: GoogleGenAISystemContent,
+    ): Promise<void> {
+      const parts: Part[] =
+        typeof content === "string" ? [{ text: content }] : content;
       await base.initialize();
       await base.append([{
         id,
-        content: { role: "system", parts: [{ text: content }] },
+        content: { role: "system", parts },
       }]);
     },
 
@@ -150,12 +158,12 @@ export function createGoogleGenAIThreadManager(
         ? stored.map((msg, i) => onPrepareMessage(msg, i, stored))
         : stored;
 
-      let systemInstruction: string | undefined;
+      let systemInstruction: Part[] | undefined;
       const conversationContents: Content[] = [];
 
       for (const item of mapped) {
         if (item.content.role === "system") {
-          systemInstruction = item.content.parts?.[0]?.text;
+          systemInstruction = item.content.parts ?? [];
         } else {
           conversationContents.push(item.content);
         }
@@ -166,7 +174,7 @@ export function createGoogleGenAIThreadManager(
         contents: onPreparedMessage
           ? contents.map((msg, i) => onPreparedMessage(msg, i, contents))
           : contents,
-        ...(systemInstruction ? { systemInstruction } : {}),
+        ...(systemInstruction && systemInstruction.length > 0 ? { systemInstruction } : {}),
       };
     },
   };
