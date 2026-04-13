@@ -6,7 +6,6 @@ import {
   log,
 } from "@temporalio/workflow";
 import type { SessionExitReason } from "../types";
-import { isValidSystemPrompt } from "../types";
 import type { SessionConfig, ZeitlichSession } from "./types";
 import type { SandboxOps } from "../sandbox/types";
 import type {
@@ -326,7 +325,10 @@ export async function createSession<
         // "continue" — thread already exists, just append the new message
       } else {
         if (appendSystemPrompt) {
-          if (!isValidSystemPrompt(systemPrompt)) {
+          if (
+            systemPrompt == null ||
+            (typeof systemPrompt === "string" && systemPrompt.trim() === "")
+          ) {
             throw ApplicationFailure.create({
               message: "No system prompt in state",
               nonRetryable: true,

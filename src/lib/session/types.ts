@@ -1,7 +1,6 @@
 import type { Duration } from "@temporalio/common";
 import type {
   SessionExitReason,
-  SystemPromptContent,
   ToolResultConfig,
 } from "../types";
 import type {
@@ -54,7 +53,7 @@ export interface ThreadOps<TContent = string> {
   appendSystemMessage(
     threadId: string,
     id: string,
-    content: SystemPromptContent,
+    content: unknown,
     threadKey?: string
   ): Promise<void>;
   /** Copy all messages from sourceThreadId into a new thread at targetThreadId */

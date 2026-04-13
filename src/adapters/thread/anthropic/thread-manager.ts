@@ -1,7 +1,6 @@
 import type Redis from "ioredis";
 import type Anthropic from "@anthropic-ai/sdk";
 import type { JsonValue } from "../../../lib/state/types";
-import type { SystemPromptContent } from "../../../lib/types";
 import { createThreadManager } from "../../../lib/thread/manager";
 import type {
   ProviderThreadManager,
@@ -13,6 +12,11 @@ import type {
 export type AnthropicContent =
   | string
   | Anthropic.Messages.ContentBlockParam[];
+
+/** SDK-native content type for Anthropic system prompts (supports cache_control blocks) */
+export type AnthropicSystemContent =
+  | string
+  | Anthropic.Messages.TextBlockParam[];
 
 /** A MessageParam with a unique ID for idempotent Redis storage */
 export interface StoredMessage {
@@ -40,7 +44,7 @@ export interface AnthropicInvocationPayload {
 
 /** Thread manager with Anthropic MessageParam convenience helpers */
 export interface AnthropicThreadManager
-  extends ProviderThreadManager<StoredMessage, AnthropicContent> {
+  extends ProviderThreadManager<StoredMessage, AnthropicContent, JsonValue, AnthropicSystemContent> {
   appendAssistantMessage(
     id: string,
     content: Anthropic.Messages.ContentBlock[],
@@ -123,7 +127,7 @@ export function createAnthropicThreadManager(
 
     async appendSystemMessage(
       id: string,
-      content: SystemPromptContent,
+      content: AnthropicSystemContent,
     ): Promise<void> {
       await base.initialize();
       await base.append([{

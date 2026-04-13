@@ -15,6 +15,7 @@ import type { ModelInvoker } from "../../../lib/model";
 import {
   createAnthropicThreadManager,
   type AnthropicContent,
+  type AnthropicSystemContent,
   type AnthropicThreadManagerHooks,
 } from "./thread-manager";
 import {
@@ -152,7 +153,7 @@ export function createAnthropicAdapter(
     async appendSystemMessage(
       threadId: string,
       id: string,
-      content: string,
+      content: AnthropicSystemContent,
       threadKey?: string,
     ): Promise<void> {
       const thread = createAnthropicThreadManager({ redis, threadId, key: threadKey });

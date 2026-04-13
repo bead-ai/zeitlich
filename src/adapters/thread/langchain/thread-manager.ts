@@ -1,6 +1,5 @@
 import type Redis from "ioredis";
 import type { JsonValue } from "../../../lib/state/types";
-import type { SystemPromptContent } from "../../../lib/types";
 import {
   AIMessage,
   type BaseMessage,
@@ -21,6 +20,9 @@ import type {
 /** SDK-native content type for LangChain human messages */
 export type LangChainContent = string | MessageContent;
 
+/** SDK-native content type for LangChain system messages */
+export type LangChainSystemContent = string | MessageContent;
+
 export type LangChainThreadManagerHooks = ThreadManagerHooks<StoredMessage, BaseMessage>;
 
 export interface LangChainThreadManagerConfig {
@@ -38,7 +40,7 @@ export interface LangChainInvocationPayload {
 
 /** Thread manager with LangChain StoredMessage convenience helpers */
 export interface LangChainThreadManager
-  extends ProviderThreadManager<StoredMessage, LangChainContent> {
+  extends ProviderThreadManager<StoredMessage, LangChainContent, JsonValue, LangChainSystemContent> {
   appendAIMessage(id: string, content: string | MessageContent): Promise<void>;
   prepareForInvocation(): Promise<LangChainInvocationPayload>;
 }
@@ -84,7 +86,7 @@ export function createLangChainThreadManager(
 
     async appendSystemMessage(
       id: string,
-      content: SystemPromptContent,
+      content: LangChainSystemContent,
     ): Promise<void> {
       await base.initialize();
       await base.append([

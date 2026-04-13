@@ -15,6 +15,7 @@ import type { ModelInvoker } from "../../../lib/model";
 import {
   createGoogleGenAIThreadManager,
   type GoogleGenAIContent,
+  type GoogleGenAISystemContent,
   type GoogleGenAIThreadManagerHooks,
 } from "./thread-manager";
 import { createGoogleGenAIModelInvoker } from "./model-invoker";
@@ -169,7 +170,7 @@ export function createGoogleGenAIAdapter(
     async appendSystemMessage(
       threadId: string,
       id: string,
-      content: string,
+      content: GoogleGenAISystemContent,
       threadKey?: string
     ): Promise<void> {
       const thread = createGoogleGenAIThreadManager({
