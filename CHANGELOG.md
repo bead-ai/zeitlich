@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.35](https://github.com/bead-ai/zeitlich/compare/v0.2.34...v0.2.35) (2026-04-13)
+
+
+### Features
+
+* support structured system prompts across providers ([#85](https://github.com/bead-ai/zeitlich/issues/85)) ([58e9f42](https://github.com/bead-ai/zeitlich/commit/58e9f422088aea8d12e4b32b14dfcaf90021a841))
+
+
+### Miscellaneous Chores
+
+* release 0.2.35 ([7415b56](https://github.com/bead-ai/zeitlich/commit/7415b5681e69fd43de0478cca6aab78883d9d0e0))
+
 ## [0.2.34](https://github.com/bead-ai/zeitlich/compare/v0.2.33...v0.2.34) (2026-04-07)
 
 
