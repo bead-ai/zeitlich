@@ -28,6 +28,28 @@ export class DaytonaSandboxFileSystem implements SandboxFileSystem {
     return posix.resolve(this.workspaceBase, path);
   }
 
+  private async ensureParentDirs(absolutePaths: string[]): Promise<void> {
+    const prefix = this.workspaceBase === "/" ? "/" : `${this.workspaceBase}/`;
+    const dirs = new Set<string>();
+    for (const p of absolutePaths) {
+      let dir = posix.dirname(p);
+      while (dir.startsWith(prefix)) {
+        dirs.add(dir);
+        dir = posix.dirname(dir);
+      }
+    }
+    const sorted = [...dirs].sort(
+      (a, b) => a.split("/").length - b.split("/").length
+    );
+    for (const dir of sorted) {
+      try {
+        await this.sandbox.fs.createFolder(dir, "755");
+      } catch {
+        // Folder already exists — Daytona's createFolder throws in that case.
+      }
+    }
+  }
+
   async readFile(path: string): Promise<string> {
     const norm = this.normalisePath(path);
     const buf = await this.sandbox.fs.downloadFile(norm);
@@ -46,18 +68,19 @@ export class DaytonaSandboxFileSystem implements SandboxFileSystem {
       typeof content === "string"
         ? Buffer.from(content, "utf-8")
         : Buffer.from(content);
+    await this.ensureParentDirs([norm]);
     await this.sandbox.fs.uploadFile(buf, norm);
   }
 
   async writeFiles(
     files: { path: string; content: string | Uint8Array }[]
   ): Promise<void> {
-    await this.sandbox.fs.uploadFiles(
-      files.map((f) => ({
-        source: Buffer.from(f.content),
-        destination: this.normalisePath(f.path),
-      }))
-    );
+    const uploads = files.map((f) => ({
+      source: Buffer.from(f.content),
+      destination: this.normalisePath(f.path),
+    }));
+    await this.ensureParentDirs(uploads.map((u) => u.destination));
+    await this.sandbox.fs.uploadFiles(uploads);
   }
 
   async appendFile(path: string, content: string | Uint8Array): Promise<void> {
