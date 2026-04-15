@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.36](https://github.com/bead-ai/zeitlich/compare/v0.2.35...v0.2.36) (2026-04-15)
+
+
+### Bug Fixes
+
+* **daytona:** create parent directories before uploading files ([#87](https://github.com/bead-ai/zeitlich/issues/87)) ([66e6c5f](https://github.com/bead-ai/zeitlich/commit/66e6c5f9910bef7561d5320f699e8f23c375e3b4))
+
 ## [0.2.35](https://github.com/bead-ai/zeitlich/compare/v0.2.34...v0.2.35) (2026-04-13)
 
 
