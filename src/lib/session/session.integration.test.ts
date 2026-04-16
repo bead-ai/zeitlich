@@ -519,6 +519,8 @@ describe("createSession integration", () => {
       forkSandbox: async () => "forked-sandbox-id",
       pauseSandbox: async () => {},
       resumeSandbox: async () => {},
+
+      deleteSnapshot: async () => true,
     };
 
     const session = await createSession({
@@ -561,6 +563,8 @@ describe("createSession integration", () => {
       forkSandbox: async () => "forked-sandbox-id",
       pauseSandbox: async () => {},
       resumeSandbox: async () => {},
+
+      deleteSnapshot: async () => true,
     };
 
     const session = await createSession({
@@ -610,6 +614,8 @@ describe("createSession integration", () => {
         createdAt: new Date().toISOString(),
       }),
       forkSandbox: async () => "forked-sb",
+
+      deleteSnapshot: async () => true,
     };
 
     const session = await createSession({
@@ -824,6 +830,8 @@ describe("createSession integration", () => {
       forkSandbox: async () => "forked-sandbox-id",
       pauseSandbox: async () => {},
       resumeSandbox: async () => {},
+
+      deleteSnapshot: async () => true,
     };
 
     const session = await createSession({
@@ -875,6 +883,8 @@ describe("createSession integration", () => {
       forkSandbox: async () => "forked-sandbox-id",
       pauseSandbox: async () => {},
       resumeSandbox: async () => {},
+
+      deleteSnapshot: async () => true,
     };
 
     const session = await createSession({

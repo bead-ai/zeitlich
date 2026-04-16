@@ -53,5 +53,6 @@ export function proxyE2bSandboxOps(
     resumeSandbox: acts[p("resumeSandbox")],
     snapshotSandbox: acts[p("snapshotSandbox")],
     forkSandbox: acts[p("forkSandbox")],
+    deleteSnapshot: acts[p("deleteSnapshot")],
   } as SandboxOps<E2bSandboxCreateOptions>;
 }

@@ -18,7 +18,10 @@ import type {
   DirentEntry,
   FileStat,
 } from "../../../lib/sandbox/types";
-import { SandboxNotFoundError } from "../../../lib/sandbox/types";
+import {
+  SandboxNotFoundError,
+  SandboxNotSupportedError,
+} from "../../../lib/sandbox/types";
 import { getShortId } from "../../../lib/thread/id";
 
 // ============================================================================
@@ -208,6 +211,10 @@ export class InMemorySandboxProvider implements SandboxProvider {
       data: { files },
       createdAt: new Date().toISOString(),
     };
+  }
+
+  async deleteSnapshot(_snapshotId: string): Promise<boolean> {
+    throw new SandboxNotSupportedError("deleteSnapshot");
   }
 
   async fork(sandboxId: string): Promise<Sandbox> {

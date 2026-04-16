@@ -34,13 +34,10 @@ export type ThreadInit =
  *   The session will **not** manage its lifecycle on exit.
  */
 export type SandboxInit =
-  | { mode: "new"; ctx?: unknown }
+  | { mode: "new"; ctx?: unknown; snapshotId?: string }
   | { mode: "continue"; sandboxId: string }
   | { mode: "fork"; sandboxId: string }
-  | {
-      mode: "inherit";
-      sandboxId: string;
-    };
+  | { mode: "inherit"; sandboxId: string };
 
 /**
  * What to do with the sandbox when the session exits.

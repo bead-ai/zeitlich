@@ -42,7 +42,7 @@ class E2bSandboxImpl implements Sandbox {
 
   async exec(command: string, options?: ExecOptions): Promise<ExecResult> {
     const result = await this.sdkSandbox.commands.run(command, {
-      cwd: options?.cwd,
+      cwd: options?.cwd ?? this.fs.workspaceBase,
       envs: options?.env,
       timeoutMs: options?.timeout,
     });
@@ -85,15 +85,12 @@ export class E2bSandboxProvider
   async create(
     options?: E2bSandboxCreateOptions
   ): Promise<SandboxCreateResult> {
-    const template = options?.template ?? this.defaultTemplate;
+    const identifier = options?.snapshotId ?? options?.template ?? this.defaultTemplate;
     const workspaceBase = this.defaultWorkspaceBase;
-    const createOpts = {
-      envs: options?.env,
-      timeoutMs: options?.timeoutMs ?? this.defaultTimeoutMs,
-    };
+    const createOpts = this.buildSdkCreateOpts(options);
 
-    const sdkSandbox = template
-      ? await E2bSdkSandbox.create(template, createOpts)
+    const sdkSandbox = identifier
+      ? await E2bSdkSandbox.create(identifier, createOpts)
       : await E2bSdkSandbox.create(createOpts);
 
     const sandbox = new E2bSandboxImpl(
@@ -140,12 +137,18 @@ export class E2bSandboxProvider
     await E2bSdkSandbox.connect(sandboxId);
   }
 
-  async snapshot(_sandboxId: string): Promise<SandboxSnapshot> {
-    throw new SandboxNotSupportedError("snapshot");
+  async snapshot(sandboxId: string): Promise<SandboxSnapshot> {
+    const { snapshotId } = await E2bSdkSandbox.createSnapshot(sandboxId);
+    return {
+      sandboxId,
+      providerId: this.id,
+      data: { snapshotId },
+      createdAt: new Date().toISOString(),
+    };
   }
 
   async restore(_snapshot: SandboxSnapshot): Promise<Sandbox> {
-    throw new SandboxNotSupportedError("restore");
+    throw new SandboxNotSupportedError("restore (use create with snapshotId instead)");
   }
 
   async fork(sandboxId: string): Promise<Sandbox> {
@@ -156,6 +159,32 @@ export class E2bSandboxProvider
       sdkSandbox,
       this.defaultWorkspaceBase
     );
+  }
+
+  async deleteSnapshot(snapshotId: string): Promise<boolean> {
+    return E2bSdkSandbox.deleteSnapshot(snapshotId);
+  }
+
+  private buildSdkCreateOpts(options?: E2bSandboxCreateOptions) {
+    return {
+      envs: options?.env,
+      timeoutMs: options?.timeoutMs ?? this.defaultTimeoutMs,
+      metadata: options?.metadata,
+      allowInternetAccess: options?.allowInternetAccess,
+      network: options?.network
+        ? {
+            allowOut: options.network.allowOut,
+            denyOut: options.network.denyOut,
+            allowPublicTraffic: options.network.allowPublicTraffic,
+          }
+        : undefined,
+      lifecycle: options?.lifecycle
+        ? {
+            onTimeout: options.lifecycle.onTimeout,
+            autoResume: options.lifecycle.autoResume,
+          }
+        : undefined,
+    };
   }
 }
 

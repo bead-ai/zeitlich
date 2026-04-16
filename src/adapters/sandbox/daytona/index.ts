@@ -150,7 +150,11 @@ export class DaytonaSandboxProvider implements SandboxProvider<
   }
 
   async fork(_sandboxId: string): Promise<Sandbox> {
-    throw new Error("Not implemented");
+    throw new SandboxNotSupportedError("fork");
+  }
+
+  async deleteSnapshot(_snapshotId: string): Promise<boolean> {
+    throw new SandboxNotSupportedError("deleteSnapshot");
   }
 
   async snapshot(_sandboxId: string): Promise<SandboxSnapshot> {

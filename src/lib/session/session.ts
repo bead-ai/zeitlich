@@ -254,10 +254,13 @@ export async function createSession<
         sandboxOwned = true;
       } else if (sandboxOps) {
         const skillFiles = skills ? collectSkillFiles(skills) : undefined;
-        const ctx = (sandboxInit as { mode: "new"; ctx?: unknown } | undefined)
-          ?.ctx;
-        const createOptions = skillFiles
-          ? { initialFiles: skillFiles }
+        const newInit = sandboxInit as { mode: "new"; ctx?: unknown; snapshotId?: string } | undefined;
+        const ctx = newInit?.ctx;
+        const createOptions = (skillFiles || newInit?.snapshotId)
+          ? {
+              ...(skillFiles && { initialFiles: skillFiles }),
+              ...(newInit?.snapshotId && { snapshotId: newInit.snapshotId }),
+            }
           : undefined;
         const result = await sandboxOps.createSandbox(createOptions, ctx);
         if (result) {

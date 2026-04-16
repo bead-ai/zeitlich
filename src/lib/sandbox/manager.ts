@@ -184,6 +184,10 @@ export class SandboxManager<
     return sandbox.id;
   }
 
+  async deleteSnapshot(snapshotId: string): Promise<boolean> {
+    return this.provider.deleteSnapshot(snapshotId);
+  }
+
   /**
    * Returns Temporal activity functions with prefixed names.
    *
@@ -234,6 +238,9 @@ export class SandboxManager<
       },
       forkSandbox: async (sandboxId: string): Promise<string> => {
         return this.fork(sandboxId);
+      },
+      deleteSnapshot: async (snapshotId: string): Promise<boolean> => {
+        return this.deleteSnapshot(snapshotId);
       },
     };
     const cap = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1);

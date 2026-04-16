@@ -252,6 +252,10 @@ export class BedrockSandboxProvider
   async fork(_sandboxId: string): Promise<Sandbox> {
     throw new SandboxNotSupportedError("fork");
   }
+
+  async deleteSnapshot(_snapshotId: string): Promise<boolean> {
+    throw new SandboxNotSupportedError("deleteSnapshot");
+  }
 }
 
 // Re-exports

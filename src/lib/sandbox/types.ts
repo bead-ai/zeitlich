@@ -104,6 +104,21 @@ export interface SandboxSnapshot {
 }
 
 // ============================================================================
+// Network & lifecycle
+// ============================================================================
+
+export interface SandboxNetworkConfig {
+  allowOut?: string[];
+  denyOut?: string[];
+  allowPublicTraffic?: boolean;
+}
+
+export interface SandboxLifecycleConfig {
+  onTimeout: "kill" | "pause";
+  autoResume?: boolean;
+}
+
+// ============================================================================
 // Provider
 // ============================================================================
 
@@ -114,6 +129,18 @@ export interface SandboxCreateOptions {
   initialFiles?: Record<string, string | Uint8Array>;
   /** Environment variables available inside the sandbox */
   env?: Record<string, string>;
+  /** Key-value metadata surfaced via provider list/query APIs */
+  metadata?: Record<string, string>;
+  /** Sandbox idle timeout in milliseconds */
+  timeoutMs?: number;
+  /** Enable or disable outbound internet access */
+  allowInternetAccess?: boolean;
+  /** Outbound network allow/deny rules */
+  network?: SandboxNetworkConfig;
+  /** Sandbox timeout behaviour */
+  lifecycle?: SandboxLifecycleConfig;
+  /** Snapshot ID to seed from (takes precedence over template) */
+  snapshotId?: string;
 }
 
 export interface SandboxCreateResult {
@@ -136,6 +163,8 @@ export interface SandboxProvider<
   snapshot(sandboxId: string): Promise<SandboxSnapshot>;
   restore(snapshot: SandboxSnapshot): Promise<Sandbox>;
   fork(sandboxId: string): Promise<Sandbox>;
+  /** Delete a snapshot by ID. Returns true if deleted, false if not found. */
+  deleteSnapshot(snapshotId: string): Promise<boolean>;
 }
 
 // ============================================================================
@@ -156,6 +185,8 @@ export interface SandboxOps<
   resumeSandbox(sandboxId: string): Promise<void>;
   snapshotSandbox(sandboxId: string): Promise<SandboxSnapshot>;
   forkSandbox(sandboxId: string): Promise<string>;
+  /** Delete a snapshot by ID. */
+  deleteSnapshot(snapshotId: string): Promise<boolean>;
 }
 
 /**
