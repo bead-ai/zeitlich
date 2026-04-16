@@ -192,6 +192,7 @@ describe("SandboxManager", () => {
     expect(activities.inMemoryTestCreateSandbox).toBeTypeOf("function");
     expect(activities.inMemoryTestDestroySandbox).toBeTypeOf("function");
     expect(activities.inMemoryTestSnapshotSandbox).toBeTypeOf("function");
+    expect(activities.inMemoryTestDeleteSnapshot).toBeTypeOf("function");
 
     const result = await activities.inMemoryTestCreateSandbox();
     expect(result).not.toBeNull();

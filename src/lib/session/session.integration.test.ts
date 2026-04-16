@@ -542,6 +542,48 @@ describe("createSession integration", () => {
     expect(sandboxLog).toContain("destroy:sb-1");
   });
 
+  it("passes snapshotId through to createSandbox when sandbox.mode is 'new'", async () => {
+    const { ops } = createMockThreadOps();
+    let capturedOptions: { snapshotId?: string } | undefined;
+
+    const sandboxOps: SandboxOps = {
+      createSandbox: async (options) => {
+        capturedOptions = options;
+        return { sandboxId: "sb-from-snap" };
+      },
+      destroySandbox: async () => {},
+      snapshotSandbox: async () => ({
+        sandboxId: "sb-from-snap",
+        providerId: "test",
+        data: null,
+        createdAt: new Date().toISOString(),
+      }),
+      forkSandbox: async () => "forked-sandbox-id",
+      pauseSandbox: async () => {},
+      resumeSandbox: async () => {},
+
+      deleteSnapshot: async () => true,
+    };
+
+    const session = await createSession({
+      agentName: "TestAgent",
+      thread: { mode: "new", threadId: "thread-1" },
+      runAgent: createScriptedRunAgent([{ message: "done", toolCalls: [] }]),
+      threadOps: ops,
+      buildContextMessage: () => "go",
+      sandboxOps,
+      sandbox: { mode: "new", snapshotId: "snap-xyz" },
+    });
+
+    const stateManager = createAgentStateManager({
+      initialState: { systemPrompt: "test" },
+    });
+
+    await session.runSession({ stateManager });
+
+    expect(capturedOptions?.snapshotId).toBe("snap-xyz");
+  });
+
   it("does not create or destroy sandbox when sandboxId is inherited", async () => {
     const { ops } = createMockThreadOps();
     const sandboxLog: string[] = [];
