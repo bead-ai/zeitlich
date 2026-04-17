@@ -1,8 +1,6 @@
 import { describe, expect, it, vi, afterEach } from "vitest";
 import { z } from "zod";
 
-const capturedSignalHandlers = new Map<unknown, (...args: unknown[]) => void>();
-
 let nextStartChildResult: ((prompt: string) => unknown) | null = null;
 
 vi.mock("@temporalio/workflow", () => {
@@ -34,11 +32,7 @@ vi.mock("@temporalio/workflow", () => {
       parent: { workflowId: "parent-wf-1" },
     }),
     defineSignal: vi.fn((name: string) => ({ __signal: true, name })),
-    setHandler: vi.fn(
-      (signal: unknown, handler: (...a: unknown[]) => void) => {
-        capturedSignalHandlers.set(signal, handler);
-      }
-    ),
+    setHandler: vi.fn(),
     condition: vi.fn(async (fn: () => boolean) => {
       if (!fn()) throw new Error("condition predicate was not satisfied");
     }),
@@ -56,12 +50,6 @@ vi.mock("@temporalio/workflow", () => {
               threadId: "child-thread-1",
               usage: { inputTokens: 100, outputTokens: 50 },
             };
-
-        for (const [signal, handler] of capturedSignalHandlers.entries()) {
-          if ((signal as { name?: string }).name === "childResult") {
-            handler({ childWorkflowId: opts.workflowId, result });
-          }
-        }
 
         return {
           signal: vi.fn(),
@@ -104,7 +92,6 @@ import type {
 } from "./types";
 afterEach(() => {
   nextStartChildResult = null;
-  capturedSignalHandlers.clear();
 });
 
 function mockWorkflow(name?: string): SubagentWorkflow {
@@ -116,6 +103,27 @@ function mockWorkflow(name?: string): SubagentWorkflow {
   if (name) Object.defineProperty(fn, "name", { value: name });
   return fn as SubagentWorkflow;
 }
+
+function makeMockSandboxOps() {
+  return {
+    createSandbox: vi.fn(),
+    destroySandbox: vi.fn(),
+    pauseSandbox: vi.fn(),
+    resumeSandbox: vi.fn(),
+    snapshotSandbox: vi.fn(),
+    restoreSandbox: vi.fn(),
+    deleteSandboxSnapshot: vi.fn(),
+    forkSandbox: vi.fn(),
+  };
+}
+
+/**
+ * Default no-op sandbox proxy factory — satisfies the runtime check that
+ * every sandbox-using subagent must declare a `sandboxProxy`. Tests that
+ * need to assert on destroy/cleanup create their own mock ops and wire
+ * them through `sandboxProxy: () => opsMock`.
+ */
+const noopSandboxProxy = () => makeMockSandboxOps();
 
 // ---------------------------------------------------------------------------
 // createSubagentTool
@@ -378,6 +386,7 @@ describe("createSubagentHandler", () => {
       description: "Inherits sandbox",
       workflow: mockWorkflow(),
       sandbox: { source: "inherit", continuation: "continue" },
+      sandboxProxy: noopSandboxProxy,
     };
 
     const { handler } = createSubagentHandler([inheritSubagent]);
@@ -407,6 +416,7 @@ describe("createSubagentHandler", () => {
       description: "Inherits sandbox",
       workflow: mockWorkflow(),
       sandbox: { source: "inherit", continuation: "continue" },
+      sandboxProxy: noopSandboxProxy,
     };
 
     const { handler } = createSubagentHandler([inheritSubagent]);
@@ -428,6 +438,7 @@ describe("createSubagentHandler", () => {
       description: "Own sandbox",
       workflow: mockWorkflow(),
       sandbox: { source: "own", continuation: "fork" },
+      sandboxProxy: noopSandboxProxy,
     };
 
     const { handler } = createSubagentHandler([ownSubagent]);
@@ -509,6 +520,7 @@ describe("createSubagentHandler", () => {
       description: "Own sandbox",
       workflow: mockWorkflow(),
       sandbox: { source: "own", continuation: "fork" },
+      sandboxProxy: noopSandboxProxy,
     };
 
     const { handler } = createSubagentHandler([ownSubagent]);
@@ -671,6 +683,7 @@ describe("createSubagentHandler", () => {
       workflow: mockWorkflow(),
       thread: "fork",
       sandbox: { source: "own", continuation: "fork" },
+      sandboxProxy: noopSandboxProxy,
     };
 
     const { handler } = createSubagentHandler([contSandboxSubagent]);
@@ -727,6 +740,7 @@ describe("createSubagentHandler", () => {
       workflow: mockWorkflow(),
       thread: "fork",
       sandbox: { source: "own", continuation: "fork" },
+      sandboxProxy: noopSandboxProxy,
     };
 
     const { handler } = createSubagentHandler([contSandboxSubagent]);
@@ -755,10 +769,7 @@ describe("createSubagentHandler", () => {
     expect(workflowInput.thread).toBeUndefined();
   });
 
-  it("does not signal destroy for fork-mode subagent without pause-until-parent-close", async () => {
-    const { startChild } = await import("@temporalio/workflow");
-    const startMock = startChild as ReturnType<typeof vi.fn>;
-
+  it("does not destroy fork-mode subagent sandbox without pause-until-parent-close", async () => {
     const contSandboxSubagent: SubagentConfig = {
       agentName: "sb-cont",
       description: "Sandbox continuation",
@@ -775,25 +786,17 @@ describe("createSubagentHandler", () => {
       { threadId: "t", toolCallId: "tc", toolName: "Subagent" }
     );
 
-    const lastResult = startMock.mock.results.at(-1);
-    if (!lastResult) throw new Error("expected startChild call");
-    const childHandle = await lastResult.value;
-    childHandle.signal.mockClear();
-
-    await destroySubagentSandboxes();
-
-    expect(childHandle.signal).not.toHaveBeenCalled();
+    await expect(destroySubagentSandboxes()).resolves.toBeUndefined();
   });
 
-  it("does not signal destroy for sandbox=own with default shutdown", async () => {
-    const { startChild } = await import("@temporalio/workflow");
-    const startMock = startChild as ReturnType<typeof vi.fn>;
-
+  it("does not destroy sandbox=own with default shutdown", async () => {
+    const opsMock = makeMockSandboxOps();
     const ownSubagent: SubagentConfig = {
       agentName: "own-agent",
       description: "Own sandbox",
       workflow: mockWorkflow(),
       sandbox: { source: "own", continuation: "fork" },
+      sandboxProxy: () => opsMock,
     };
 
     const { handler, destroySubagentSandboxes } = createSubagentHandler([
@@ -805,20 +808,20 @@ describe("createSubagentHandler", () => {
       { threadId: "t", toolCallId: "tc", toolName: "Subagent" }
     );
 
-    const lastResult = startMock.mock.results.at(-1);
-    if (!lastResult) throw new Error("expected startChild call");
-    const childHandle = await lastResult.value;
-    childHandle.signal.mockClear();
-
     await destroySubagentSandboxes();
 
-    expect(childHandle.signal).not.toHaveBeenCalled();
+    expect(opsMock.destroySandbox).not.toHaveBeenCalled();
   });
 
-  it("signals destroy for sandbox=own with pause-until-parent-close shutdown", async () => {
-    const { startChild } = await import("@temporalio/workflow");
-    const startMock = startChild as ReturnType<typeof vi.fn>;
+  it("destroys sandbox via sandboxProxy for own + pause-until-parent-close", async () => {
+    nextStartChildResult = () => ({
+      toolResponse: "done",
+      data: null,
+      threadId: "child-t",
+      sandboxId: "child-sb-99",
+    });
 
+    const opsMock = makeMockSandboxOps();
     const ownSubagent: SubagentConfig = {
       agentName: "own-agent",
       description: "Own sandbox",
@@ -828,6 +831,7 @@ describe("createSubagentHandler", () => {
         continuation: "fork",
         shutdown: "pause-until-parent-close",
       },
+      sandboxProxy: () => opsMock,
     };
 
     const { handler, destroySubagentSandboxes } = createSubagentHandler([
@@ -841,21 +845,17 @@ describe("createSubagentHandler", () => {
 
     await destroySubagentSandboxes();
 
-    const lastResult = startMock.mock.results.at(-1);
-    if (!lastResult) throw new Error("expected startChild call");
-    const childHandle = await lastResult.value;
-    expect(childHandle.signal).toHaveBeenCalled();
+    expect(opsMock.destroySandbox).toHaveBeenCalledWith("child-sb-99");
   });
 
-  it("does not signal destroy for inherit subagents", async () => {
-    const { startChild } = await import("@temporalio/workflow");
-    const startMock = startChild as ReturnType<typeof vi.fn>;
-
+  it("does not destroy inherit subagents' sandbox", async () => {
+    const opsMock = makeMockSandboxOps();
     const inheritSubagent: SubagentConfig = {
       agentName: "inherit-agent",
       description: "Inherits sandbox",
       workflow: mockWorkflow(),
       sandbox: { source: "inherit", continuation: "continue" },
+      sandboxProxy: () => opsMock,
     };
 
     const { handler, destroySubagentSandboxes } = createSubagentHandler([
@@ -872,14 +872,9 @@ describe("createSubagentHandler", () => {
       }
     );
 
-    const lastResult = startMock.mock.results.at(-1);
-    if (!lastResult) throw new Error("expected startChild call");
-    const childHandle = await lastResult.value;
-    childHandle.signal.mockClear();
-
     await destroySubagentSandboxes();
 
-    expect(childHandle.signal).not.toHaveBeenCalled();
+    expect(opsMock.destroySandbox).not.toHaveBeenCalled();
   });
 
   it("does not pass sandboxId when sandbox is none (default)", async () => {
@@ -939,10 +934,7 @@ describe("createSubagentHandler", () => {
     expect(workflowInput.sandbox).toBeUndefined();
   });
 
-  it("does not signal destroy for none subagents", async () => {
-    const { startChild } = await import("@temporalio/workflow");
-    const startMock = startChild as ReturnType<typeof vi.fn>;
-
+  it("destroySubagentSandboxes is a no-op for none subagents", async () => {
     const noneSubagent: SubagentConfig = {
       agentName: "none-agent",
       description: "No sandbox",
@@ -959,14 +951,7 @@ describe("createSubagentHandler", () => {
       { threadId: "t", toolCallId: "tc", toolName: "Subagent" }
     );
 
-    const lastResult = startMock.mock.results.at(-1);
-    if (!lastResult) throw new Error("expected startChild call");
-    const childHandle = await lastResult.value;
-    childHandle.signal.mockClear();
-
-    await destroySubagentSandboxes();
-
-    expect(childHandle.signal).not.toHaveBeenCalled();
+    await expect(destroySubagentSandboxes()).resolves.toBeUndefined();
   });
 
   // --- inherit + continuation: fork ---
@@ -980,6 +965,7 @@ describe("createSubagentHandler", () => {
       description: "Inherit fork",
       workflow: mockWorkflow(),
       sandbox: { source: "inherit", continuation: "fork" },
+      sandboxProxy: noopSandboxProxy,
     };
 
     const { handler } = createSubagentHandler([config]);
@@ -1022,6 +1008,7 @@ describe("createSubagentHandler", () => {
       workflow: mockWorkflow(),
       thread: "continue",
       sandbox: { source: "own", continuation: "continue" },
+      sandboxProxy: noopSandboxProxy,
     };
 
     const { handler } = createSubagentHandler([config]);
@@ -1076,6 +1063,7 @@ describe("createSubagentHandler", () => {
       description: "Lazy fork",
       workflow: mockWorkflow(),
       sandbox: { source: "own", init: "once", continuation: "fork" },
+      sandboxProxy: noopSandboxProxy,
     };
 
     const { handler } = createSubagentHandler([config]);
@@ -1132,6 +1120,7 @@ describe("createSubagentHandler", () => {
       description: "Lazy continue",
       workflow: mockWorkflow(),
       sandbox: { source: "own", init: "once", continuation: "continue" },
+      sandboxProxy: noopSandboxProxy,
     };
 
     const { handler } = createSubagentHandler([config]);
@@ -1165,10 +1154,7 @@ describe("createSubagentHandler", () => {
 
   // --- init: once cleanup ---
 
-  it("adds first-call child handle to pendingDestroys for init=once", async () => {
-    const { startChild } = await import("@temporalio/workflow");
-    const startMock = startChild as ReturnType<typeof vi.fn>;
-
+  it("destroys the persistent sandbox for init=once at parent shutdown", async () => {
     nextStartChildResult = () => ({
       toolResponse: "done",
       data: null,
@@ -1176,11 +1162,13 @@ describe("createSubagentHandler", () => {
       sandboxId: "persistent-sb",
     });
 
+    const opsMock = makeMockSandboxOps();
     const config: SubagentConfig = {
       agentName: "lazy-cleanup",
       description: "Lazy cleanup",
       workflow: mockWorkflow(),
       sandbox: { source: "own", init: "once", continuation: "fork" },
+      sandboxProxy: () => opsMock,
     };
 
     const { handler, destroySubagentSandboxes } = createSubagentHandler([
@@ -1194,10 +1182,7 @@ describe("createSubagentHandler", () => {
 
     await destroySubagentSandboxes();
 
-    const lastResult = startMock.mock.results.at(-1);
-    if (!lastResult) throw new Error("expected startChild call");
-    const childHandle = await lastResult.value;
-    expect(childHandle.signal).toHaveBeenCalled();
+    expect(opsMock.destroySandbox).toHaveBeenCalledWith("persistent-sb");
   });
 
   it("returns sandboxId in response when child creates a sandbox", async () => {
@@ -1213,6 +1198,7 @@ describe("createSubagentHandler", () => {
       description: "Own sandbox",
       workflow: mockWorkflow(),
       sandbox: { source: "own", continuation: "fork" },
+      sandboxProxy: noopSandboxProxy,
     };
 
     const { handler } = createSubagentHandler([ownSubagent]);
@@ -1325,10 +1311,15 @@ describe("createSubagentHandler", () => {
 
   // --- keep-until-parent-close ---
 
-  it("signals destroy for sandbox=own with keep-until-parent-close shutdown", async () => {
-    const { startChild } = await import("@temporalio/workflow");
-    const startMock = startChild as ReturnType<typeof vi.fn>;
+  it("destroys sandbox for own + keep-until-parent-close", async () => {
+    nextStartChildResult = () => ({
+      toolResponse: "done",
+      data: null,
+      threadId: "child-t",
+      sandboxId: "child-sb-77",
+    });
 
+    const opsMock = makeMockSandboxOps();
     const ownSubagent: SubagentConfig = {
       agentName: "own-keep",
       description: "Own sandbox kept",
@@ -1338,6 +1329,7 @@ describe("createSubagentHandler", () => {
         continuation: "fork",
         shutdown: "keep-until-parent-close",
       },
+      sandboxProxy: () => opsMock,
     };
 
     const { handler, destroySubagentSandboxes } = createSubagentHandler([
@@ -1351,21 +1343,17 @@ describe("createSubagentHandler", () => {
 
     await destroySubagentSandboxes();
 
-    const lastResult = startMock.mock.results.at(-1);
-    if (!lastResult) throw new Error("expected startChild call");
-    const childHandle = await lastResult.value;
-    expect(childHandle.signal).toHaveBeenCalled();
+    expect(opsMock.destroySandbox).toHaveBeenCalledWith("child-sb-77");
   });
 
-  it("does not signal destroy for sandbox=own with keep shutdown (without parent-close)", async () => {
-    const { startChild } = await import("@temporalio/workflow");
-    const startMock = startChild as ReturnType<typeof vi.fn>;
-
+  it("does not destroy sandbox for own + keep (without parent-close)", async () => {
+    const opsMock = makeMockSandboxOps();
     const ownSubagent: SubagentConfig = {
       agentName: "own-keep-plain",
       description: "Own sandbox keep",
       workflow: mockWorkflow(),
       sandbox: { source: "own", continuation: "fork", shutdown: "keep" },
+      sandboxProxy: () => opsMock,
     };
 
     const { handler, destroySubagentSandboxes } = createSubagentHandler([
@@ -1377,14 +1365,9 @@ describe("createSubagentHandler", () => {
       { threadId: "t", toolCallId: "tc", toolName: "Subagent" }
     );
 
-    const lastResult = startMock.mock.results.at(-1);
-    if (!lastResult) throw new Error("expected startChild call");
-    const childHandle = await lastResult.value;
-    childHandle.signal.mockClear();
-
     await destroySubagentSandboxes();
 
-    expect(childHandle.signal).not.toHaveBeenCalled();
+    expect(opsMock.destroySandbox).not.toHaveBeenCalled();
   });
 
   // --- mustSurvive does not override user shutdown ---
@@ -1410,6 +1393,7 @@ describe("createSubagentHandler", () => {
         continuation: "fork",
         shutdown: "keep-until-parent-close",
       },
+      sandboxProxy: noopSandboxProxy,
     };
 
     const { handler } = createSubagentHandler([config]);
@@ -1446,6 +1430,7 @@ describe("createSubagentHandler", () => {
         continuation: "fork",
         shutdown: "pause",
       },
+      sandboxProxy: noopSandboxProxy,
     };
 
     const { handler } = createSubagentHandler([config]);
@@ -1478,6 +1463,7 @@ describe("createSubagentHandler", () => {
       workflow: mockWorkflow(),
       thread: "continue",
       sandbox: { source: "own", continuation: "continue", shutdown: "keep" },
+      sandboxProxy: noopSandboxProxy,
     };
 
     const { handler } = createSubagentHandler([config]);
@@ -1510,6 +1496,7 @@ describe("createSubagentHandler", () => {
       workflow: mockWorkflow(),
       thread: "continue",
       sandbox: { source: "own", continuation: "continue", shutdown: "destroy" },
+      sandboxProxy: noopSandboxProxy,
     };
 
     const { handler } = createSubagentHandler([config]);
@@ -1555,6 +1542,7 @@ describe("createSubagentHandler", () => {
       workflow: mockWorkflow(),
       thread: "continue",
       sandbox: { source: "own", init: "once", continuation: "snapshot" },
+      sandboxProxy: noopSandboxProxy,
     };
 
     const { handler } = createSubagentHandler([config]);
@@ -1599,6 +1587,7 @@ describe("createSubagentHandler", () => {
       workflow: mockWorkflow(),
       thread: "continue",
       sandbox: { source: "own", init: "once", continuation: "snapshot" },
+      sandboxProxy: noopSandboxProxy,
     };
 
     const { handler } = createSubagentHandler([config]);
@@ -1669,6 +1658,7 @@ describe("createSubagentHandler", () => {
       workflow: mockWorkflow(),
       thread: "continue",
       sandbox: { source: "own", init: "once", continuation: "snapshot" },
+      sandboxProxy: noopSandboxProxy,
     };
 
     const { handler } = createSubagentHandler([config]);
@@ -1705,40 +1695,22 @@ describe("createSubagentHandler", () => {
     });
   });
 
-  it("eagerly deletes superseded thread snapshots and sweeps remaining on cleanup", async () => {
-    const deleted: unknown[] = [];
-    const sandboxOps = {
-      createSandbox: async () => ({ sandboxId: "unused" }),
-      destroySandbox: async () => {},
-      pauseSandbox: async () => {},
-      resumeSandbox: async () => {},
-      snapshotSandbox: async () => ({
-        sandboxId: "",
-        providerId: "test",
-        data: null,
-        createdAt: new Date().toISOString(),
-      }),
-      restoreSandbox: async () => "restored-sb",
-      deleteSandboxSnapshot: async (snap: unknown) => {
-        deleted.push(snap);
-      },
-      forkSandbox: async () => "forked-sb",
-    };
-
+  it("deletes every stored snapshot via sandboxProxy during cleanup sweep", async () => {
+    const opsMock = makeMockSandboxOps();
     const config: SubagentConfig = {
       agentName: "snap-agent",
       description: "Snapshot-driven",
       workflow: mockWorkflow(),
       thread: "continue",
       sandbox: { source: "own", init: "once", continuation: "snapshot" },
+      sandboxProxy: () => opsMock,
     };
 
-    const { handler, cleanupSubagentSnapshots } = createSubagentHandler(
-      [config],
-      { sandboxOps }
-    );
+    const { handler, cleanupSubagentSnapshots } = createSubagentHandler([
+      config,
+    ]);
 
-    // Call 1 — base snapshot + first exit snapshot.
+    // Call 1 — produces base + exit-1.
     nextStartChildResult = () => ({
       toolResponse: "first",
       data: null,
@@ -1760,9 +1732,8 @@ describe("createSubagentHandler", () => {
       { subagent: "snap-agent", description: "test", prompt: "first" },
       { threadId: "t", toolCallId: "tc-1", toolName: "Subagent" }
     );
-    expect(deleted).toHaveLength(0);
 
-    // Call 2 — same thread, new exit snapshot → eager delete of exit-1.
+    // Call 2 — same thread, produces exit-2 (supersedes exit-1).
     nextStartChildResult = () => ({
       toolResponse: "second",
       data: null,
@@ -1783,15 +1754,45 @@ describe("createSubagentHandler", () => {
       },
       { threadId: "t", toolCallId: "tc-2", toolName: "Subagent" }
     );
-    expect(deleted).toHaveLength(1);
-    expect((deleted[0] as { data: unknown }).data).toEqual({ tag: "exit-1" });
 
-    // Cleanup sweep: base + current thread snapshot.
     await cleanupSubagentSnapshots();
-    const tags = deleted
-      .map((s) => (s as { data: { tag: string } }).data.tag)
-      .sort();
-    expect(tags).toEqual(["base", "exit-1", "exit-2"]);
+
+    // Parent should have deleted both the latest thread snapshot and the
+    // per-agent base snapshot through the subagent's sandboxProxy.
+    const deletedTags = opsMock.deleteSandboxSnapshot.mock.calls.map(
+      (call) => (call[0] as { data: { tag: string } }).data.tag
+    );
+    expect(deletedTags.sort()).toEqual(["base", "exit-2"]);
+  });
+
+  it("does not call deleteSandboxSnapshot for children that produced no snapshots", async () => {
+    const opsMock = makeMockSandboxOps();
+    const config: SubagentConfig = {
+      agentName: "snap-agent",
+      description: "Snapshot-driven",
+      workflow: mockWorkflow(),
+      thread: "continue",
+      sandbox: { source: "own", init: "once", continuation: "snapshot" },
+      sandboxProxy: () => opsMock,
+    };
+
+    const { handler, cleanupSubagentSnapshots } = createSubagentHandler([
+      config,
+    ]);
+
+    nextStartChildResult = () => ({
+      toolResponse: "no-snap",
+      data: null,
+      threadId: "child-t",
+    });
+    await handler(
+      { subagent: "snap-agent", description: "test", prompt: "run" },
+      { threadId: "t", toolCallId: "tc-1", toolName: "Subagent" }
+    );
+
+    await cleanupSubagentSnapshots();
+
+    expect(opsMock.deleteSandboxSnapshot).not.toHaveBeenCalled();
   });
 });
 
@@ -2134,64 +2135,23 @@ describe("defineSubagentWorkflow", () => {
     });
   });
 
-  it("validates destroySandbox required for keep-until-parent-close", async () => {
-    // @ts-expect-error — deliberately omitting destroySandbox to test runtime validation
-    const workflow = defineSubagentWorkflow(
-      {
-        name: "test",
-        description: "test agent",
-        sandboxShutdown: "keep-until-parent-close",
-      },
-      async () => ({
-        toolResponse: "ok",
-        data: null,
-        threadId: "t",
-        sandboxId: "sb-1",
-      })
-    );
-
-    await expect(workflow("go", {})).rejects.toThrow(
-      /keep-until-parent-close.*destroySandbox/
-    );
-  });
-
-  it("validates sandboxId required for keep-until-parent-close", async () => {
-    // @ts-expect-error — deliberately omitting sandboxId to test runtime validation
-    const workflow = defineSubagentWorkflow(
-      {
-        name: "test",
-        description: "test agent",
-        sandboxShutdown: "keep-until-parent-close",
-      },
-      async () => ({
-        toolResponse: "ok",
-        data: null,
-        threadId: "t",
-        destroySandbox: async () => {},
-      })
-    );
-
-    await expect(workflow("go", {})).rejects.toThrow(
-      /keep-until-parent-close.*sandboxId/
-    );
-  });
-
   it("uses keep-until-parent-close from workflowInput override in sessionInput", async () => {
     let capturedSession: SubagentSessionInput | undefined;
     const workflow = defineSubagentWorkflow(
       { name: "test", description: "test agent" },
       async (_prompt, sessionInput) => {
         capturedSession = sessionInput;
-        return { toolResponse: "ok", data: null, threadId: "t" };
+        return {
+          toolResponse: "ok",
+          data: null,
+          threadId: "t",
+          sandboxId: "sb-1",
+        };
       }
     );
 
-    // Validation will throw because destroySandbox is missing, but sessionInput is captured first
-    try {
-      await workflow("go", { sandboxShutdown: "keep-until-parent-close" });
-    } catch {
-      // expected — no destroySandbox callback
-    }
+    await workflow("go", { sandboxShutdown: "keep-until-parent-close" });
+
     expect(capturedSession?.sandboxShutdown).toBe("keep-until-parent-close");
   });
 });

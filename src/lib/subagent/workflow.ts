@@ -2,8 +2,6 @@ import type { z } from "zod";
 import {
   workflowInfo,
   getExternalWorkflowHandle,
-  setHandler,
-  condition,
   ApplicationFailure,
 } from "@temporalio/workflow";
 import type {
@@ -14,11 +12,7 @@ import type {
   SubagentSessionInput,
 } from "./types";
 import type { SubagentSandboxShutdown } from "../lifecycle";
-import {
-  childResultSignal,
-  childSandboxReadySignal,
-  destroySandboxSignal,
-} from "./signals";
+import { childSandboxReadySignal } from "./signals";
 
 /**
  * Defines a subagent workflow with embedded metadata (name, description, resultSchema).
@@ -146,45 +140,8 @@ export function defineSubagentWorkflow(
         }
       },
     };
-    const { destroySandbox, ...result } = await fn(
-      prompt,
-      sessionInput,
-      context ?? {}
-    );
 
-    if (
-      effectiveShutdown === "pause-until-parent-close" ||
-      effectiveShutdown === "keep-until-parent-close"
-    ) {
-      if (!destroySandbox) {
-        throw ApplicationFailure.create({
-          message: `Subagent "${config.name}" has sandboxShutdown="${effectiveShutdown}" but fn did not return a destroySandbox callback`,
-          nonRetryable: true,
-        });
-      }
-      if (!result.sandboxId) {
-        throw ApplicationFailure.create({
-          message: `Subagent "${config.name}" has sandboxShutdown="${effectiveShutdown}" but fn did not return a sandboxId`,
-          nonRetryable: true,
-        });
-      }
-    }
-
-    await parentHandle.signal(childResultSignal, {
-      childWorkflowId: workflowInfo().workflowId,
-      result,
-    });
-
-    if (destroySandbox) {
-      let destroyRequested = false;
-      setHandler(destroySandboxSignal, () => {
-        destroyRequested = true;
-      });
-      await condition(() => destroyRequested);
-      await destroySandbox();
-    }
-
-    return result;
+    return fn(prompt, sessionInput, context ?? {});
   };
 
   // for temporal workflow name

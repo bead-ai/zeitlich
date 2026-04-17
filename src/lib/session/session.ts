@@ -149,9 +149,7 @@ export async function createSession<
   let cleanupSubagentSnapshots: (() => Promise<void>) | undefined;
 
   if (subagents) {
-    const result = buildSubagentRegistration(subagents, {
-      ...(sandboxOps && { sandboxOps }),
-    });
+    const result = buildSubagentRegistration(subagents);
     if (result) {
       plugins.push(result.registration);
       destroySubagentSandboxes = result.destroySubagentSandboxes;

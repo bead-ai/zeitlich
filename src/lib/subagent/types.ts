@@ -10,7 +10,7 @@ import type {
   SandboxInit,
   SubagentSandboxShutdown,
 } from "../lifecycle";
-import type { SandboxSnapshot } from "../sandbox/types";
+import type { SandboxOps, SandboxSnapshot } from "../sandbox/types";
 
 /** ToolHandlerResponse with threadId required (subagents must always surface their thread) */
 export type SubagentHandlerResponse<
@@ -138,6 +138,29 @@ export interface SubagentConfig<TResult extends z.ZodType = z.ZodType> {
    * @see {@link SubagentSandboxConfig}
    */
   sandbox?: SubagentSandboxConfig;
+  /**
+   * Factory that returns workflow-safe sandbox ops matching the subagent's
+   * own activities. Called once inside `createSubagentHandler` with
+   * `scope = agentName`, so the returned proxy resolves to the same
+   * activity prefix the child session uses.
+   *
+   * Required whenever `sandbox` is anything other than `"none"` — the
+   * parent uses it to destroy lingering sandboxes and delete stored
+   * snapshots at shutdown.
+   *
+   * @example
+   * ```ts
+   * import { proxyDaytonaSandboxOps } from "zeitlich/adapters/sandbox/daytona/workflow";
+   *
+   * const researcher: SubagentConfig = {
+   *   agentName: "researcher",
+   *   workflow: researcherWorkflow,
+   *   sandbox: { source: "own", continuation: "snapshot" },
+   *   sandboxProxy: proxyDaytonaSandboxOps,
+   * };
+   * ```
+   */
+  sandboxProxy?: (scope: string) => SandboxOps;
 }
 
 /**
@@ -171,12 +194,11 @@ export interface SubagentHooks<TArgs = unknown, TResult = unknown> {
 }
 
 /**
- * Extended response from the subagent `fn` — includes optional cleanup callbacks
- * stripped before signaling the parent.
+ * Response returned from a subagent workflow `fn`.
  *
  * When `TSandboxShutdown` is `"pause-until-parent-close"` or
- * `"keep-until-parent-close"`, both `destroySandbox` and `sandboxId` become
- * required so the parent can coordinate cleanup.
+ * `"keep-until-parent-close"`, the parent needs the `sandboxId` to destroy
+ * the sandbox at its own shutdown, so the field becomes required.
  */
 export type SubagentFnResult<
   TResult = null,
@@ -185,14 +207,8 @@ export type SubagentFnResult<
   (TSandboxShutdown extends
     | "pause-until-parent-close"
     | "keep-until-parent-close"
-    ? { destroySandbox: () => Promise<void>; sandboxId: string }
-    : { destroySandbox?: () => Promise<void> });
-
-/** Payload sent by a child workflow to signal its result back to the parent */
-export interface ChildResultSignalPayload {
-  childWorkflowId: string;
-  result: SubagentHandlerResponse;
-}
+    ? { sandboxId: string }
+    : { sandboxId?: string });
 
 /** Payload sent by a child workflow as soon as its sandbox is ready */
 export interface ChildSandboxReadySignalPayload {
