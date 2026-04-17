@@ -17,6 +17,21 @@ export interface FileStat {
   mtime: Date;
 }
 
+// ============================================================================
+// Network & lifecycle
+// ============================================================================
+
+export interface SandboxNetworkConfig {
+  allowOut?: string[];
+  denyOut?: string[];
+  allowPublicTraffic?: boolean;
+}
+
+export interface SandboxLifecycleConfig {
+  onTimeout: "kill" | "pause";
+  autoResume?: boolean;
+}
+
 /**
  * Provider-agnostic filesystem interface.
  *
@@ -114,6 +129,16 @@ export interface SandboxCreateOptions {
   initialFiles?: Record<string, string | Uint8Array>;
   /** Environment variables available inside the sandbox */
   env?: Record<string, string>;
+  /** Key-value metadata surfaced via provider list/query APIs */
+  metadata?: Record<string, string>;
+  /** Sandbox idle timeout in milliseconds */
+  timeoutMs?: number;
+  /** Enable or disable outbound internet access */
+  allowInternetAccess?: boolean;
+  /** Outbound network allow/deny rules */
+  network?: SandboxNetworkConfig;
+  /** Sandbox timeout behaviour */
+  lifecycle?: SandboxLifecycleConfig;
 }
 
 export interface SandboxCreateResult {
@@ -178,7 +203,10 @@ export type PrefixedSandboxOps<
   TOptions extends SandboxCreateOptions = SandboxCreateOptions,
   TCtx = unknown,
 > = {
-  [K in keyof SandboxOps<TOptions, TCtx> as `${TPrefix}${Capitalize<K & string>}`]: SandboxOps<TOptions, TCtx>[K];
+  [K in keyof SandboxOps<
+    TOptions,
+    TCtx
+  > as `${TPrefix}${Capitalize<K & string>}`]: SandboxOps<TOptions, TCtx>[K];
 };
 
 // ============================================================================

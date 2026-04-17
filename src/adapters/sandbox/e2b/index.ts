@@ -62,9 +62,10 @@ class E2bSandboxImpl implements Sandbox {
 // E2bSandboxProvider
 // ============================================================================
 
-export class E2bSandboxProvider
-  implements SandboxProvider<E2bSandboxCreateOptions, E2bSandbox>
-{
+export class E2bSandboxProvider implements SandboxProvider<
+  E2bSandboxCreateOptions,
+  E2bSandbox
+> {
   readonly id = "e2b";
   readonly capabilities: SandboxCapabilities = {
     filesystem: true,
@@ -87,10 +88,7 @@ export class E2bSandboxProvider
   ): Promise<SandboxCreateResult> {
     const template = options?.template ?? this.defaultTemplate;
     const workspaceBase = this.defaultWorkspaceBase;
-    const createOpts = {
-      envs: options?.env,
-      timeoutMs: options?.timeoutMs ?? this.defaultTimeoutMs,
-    };
+    const createOpts = this.buildSdkCreateOpts(options);
 
     const sdkSandbox = template
       ? await E2bSdkSandbox.create(template, createOpts)
@@ -116,7 +114,11 @@ export class E2bSandboxProvider
   async get(sandboxId: string): Promise<E2bSandbox> {
     try {
       const sdkSandbox = await E2bSdkSandbox.connect(sandboxId);
-      return new E2bSandboxImpl(sandboxId, sdkSandbox, this.defaultWorkspaceBase);
+      return new E2bSandboxImpl(
+        sandboxId,
+        sdkSandbox,
+        this.defaultWorkspaceBase
+      );
     } catch {
       throw new SandboxNotFoundError(sandboxId);
     }
@@ -183,6 +185,28 @@ export class E2bSandboxProvider
       sdkSandbox,
       this.defaultWorkspaceBase
     );
+  }
+
+  private buildSdkCreateOpts(options?: E2bSandboxCreateOptions) {
+    return {
+      envs: options?.env,
+      timeoutMs: options?.timeoutMs ?? this.defaultTimeoutMs,
+      metadata: options?.metadata,
+      allowInternetAccess: options?.allowInternetAccess,
+      network: options?.network
+        ? {
+            allowOut: options.network.allowOut,
+            denyOut: options.network.denyOut,
+            allowPublicTraffic: options.network.allowPublicTraffic,
+          }
+        : undefined,
+      lifecycle: options?.lifecycle
+        ? {
+            onTimeout: options.lifecycle.onTimeout,
+            autoResume: options.lifecycle.autoResume,
+          }
+        : undefined,
+    };
   }
 }
 
