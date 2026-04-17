@@ -50,8 +50,12 @@ export interface SandboxManagerHooks<
 
   /**
    * Called after a sandbox has been successfully created.
+   *
+   * Receives the live {@link Sandbox} instance so the hook can run setup
+   * commands, seed files, or capture identifiers without an extra
+   * `provider.get()` round-trip.
    */
-  onPostCreate?: (sandboxId: string) => Promise<void>;
+  onPostCreate?: (sandbox: Sandbox) => Promise<void>;
 }
 
 /**
@@ -87,8 +91,9 @@ export interface SandboxManagerHooks<
  *         for (const p of filePaths) files[p] = await db.readFile(projectId, p);
  *         return { modifiedOptions: { initialFiles: files } };
  *       },
- *       onPostCreate: async (sandboxId) => {
- *         console.log("Sandbox created:", sandboxId);
+ *       onPostCreate: async (sandbox) => {
+ *         console.log("Sandbox created:", sandbox.id);
+ *         await sandbox.exec("git init");
  *       },
  *     },
  *   },
@@ -148,7 +153,7 @@ export class SandboxManager<
     const { sandbox } = await this.provider.create(providerOptions);
 
     if (this.hooks.onPostCreate) {
-      await this.hooks.onPostCreate(sandbox.id);
+      await this.hooks.onPostCreate(sandbox);
     }
 
     return { sandboxId: sandbox.id };

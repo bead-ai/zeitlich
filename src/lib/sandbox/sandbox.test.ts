@@ -157,18 +157,21 @@ describe("SandboxManager", () => {
     expect(await sandbox.fs.readFile("/file.txt")).toBe("explicit");
   });
 
-  it("onPostCreate hook receives sandboxId", async () => {
+  it("onPostCreate hook receives the live sandbox", async () => {
     let capturedId: string | undefined;
     const mgr = new SandboxManager(new InMemorySandboxProvider(), {
       hooks: {
-        onPostCreate: async (sandboxId) => {
-          capturedId = sandboxId;
+        onPostCreate: async (sandbox) => {
+          capturedId = sandbox.id;
+          await sandbox.fs.writeFile("/hook.txt", "written-by-hook");
         },
       },
     });
 
     const { sandboxId } = await mustCreate(mgr);
     expect(capturedId).toBe(sandboxId);
+    const sandbox = await mgr.getSandbox(sandboxId);
+    expect(await sandbox.fs.readFile("/hook.txt")).toBe("written-by-hook");
   });
 
   it("onPostCreate hook does not run when creation is skipped", async () => {
