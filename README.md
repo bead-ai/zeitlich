@@ -642,6 +642,7 @@ The `sandbox` field controls how a sandbox is created or reused:
 | `{ mode: "new" }` | Create a fresh sandbox (default when `sandboxOps` is provided). |
 | `{ mode: "continue", sandboxId }` | Take ownership of an existing sandbox (paused or running). Paused sandboxes are automatically resumed. |
 | `{ mode: "fork", sandboxId }` | Fork from an existing sandbox. A new sandbox is created and owned by this session. |
+| `{ mode: "from-snapshot", snapshot }` | Restore a fresh sandbox from a previously captured `SandboxSnapshot`. The new sandbox is owned by this session. |
 | `{ mode: "inherit", sandboxId }` | Use a sandbox owned by someone else (e.g. a parent agent). Shutdown policy is ignored. |
 
 #### Sandbox Shutdown (`SandboxShutdown`)
@@ -653,6 +654,7 @@ The `sandboxShutdown` field controls what happens to the sandbox when the sessio
 | `"destroy"` | Tear down the sandbox entirely (default). |
 | `"pause"` | Pause the sandbox so it can be resumed later. |
 | `"keep"` | Leave the sandbox running (no-op on exit). |
+| `"snapshot"` | Capture a snapshot, then destroy the sandbox. The snapshot is surfaced on the session result as `snapshot` (plus `baseSnapshot` when the sandbox was freshly created). |
 
 Subagents also support two additional shutdown modes:
 
@@ -691,6 +693,31 @@ export const codeRunnerSubagent = defineSubagent(codeRunnerWorkflow, {
   sandbox: { source: "own", init: "once", continuation: "continue" },
 });
 ```
+
+##### Snapshot-driven continuation (E2B only)
+
+`continuation: "snapshot"` avoids keeping a sandbox paused between invocations. Instead, each call boots a fresh sandbox from a stored snapshot, captures a new snapshot on exit, and destroys the sandbox inline:
+
+```typescript
+export const analystSubagent = defineSubagent(analystWorkflow, {
+  thread: "continue",
+  sandbox: { source: "own", init: "once", continuation: "snapshot" },
+});
+```
+
+How it works:
+
+- **First call** for a thread: session creates a fresh sandbox, snapshots it right after seeding (the **base snapshot**, kept per-agent with `init: "once"`), runs the agent, snapshots again on exit (the **thread snapshot**), and destroys the sandbox.
+- **Same-thread follow-up**: session restores the thread's latest snapshot into a new sandbox, runs, snapshots on exit, destroys. The superseded snapshot is deleted eagerly.
+- **New thread, same agent** (`init: "once"`): session restores from the base snapshot, skipping re-seeding.
+- `thread: "fork"` preserves the source thread's snapshot (the fork writes to a new key) so the source can still be continued later.
+
+Snapshots are cleaned up automatically:
+
+- Eagerly when a thread snapshot is replaced by a newer one.
+- In a final sweep when the parent session exits — all remaining thread + base snapshots are deleted via `sandboxOps.deleteSandboxSnapshot`.
+
+Currently implemented for the E2B adapter. The in-memory adapter treats snapshots as opaque caller-held data (delete is a no-op), and Daytona/Bedrock throw `SandboxNotSupportedError` for snapshot operations.
 
 The `thread` field accepts `"new"` (default), `"fork"`, or `"continue"`. When set to `"fork"` or `"continue"`, the parent agent can pass a `threadId` in a subsequent `Task` tool call to resume the conversation. The subagent returns its `threadId` in the response (surfaced as `[Thread ID: ...]`), which the parent can use for continuation.
 
@@ -946,10 +973,10 @@ Framework-agnostic utilities for activities, worker setup, and Node.js code:
 | `Hooks`                 | Combined session lifecycle + tool execution hooks                            |
 | `ToolRouterHooks`       | Narrowed hook interface for tool execution only (pre/post/failure)            |
 | `ThreadInit`            | Thread initialization strategy: `"new"`, `"continue"`, or `"fork"`               |
-| `SandboxInit`           | Sandbox initialization strategy: `"new"`, `"continue"`, `"fork"`, or `"inherit"` |
-| `SandboxShutdown`       | Sandbox exit policy: `"destroy" \| "pause" \| "keep"`                            |
+| `SandboxInit`           | Sandbox initialization strategy: `"new"`, `"continue"`, `"fork"`, `"from-snapshot"`, or `"inherit"` |
+| `SandboxShutdown`       | Sandbox exit policy: `"destroy" \| "pause" \| "keep" \| "snapshot"`                |
 | `SubagentSandboxShutdown` | Extended shutdown with `"pause-until-parent-close"`                             |
-| `SubagentSandboxConfig` | Subagent sandbox strategy: `"none" \| "inherit" \| "own" \| { source, shutdown }` |
+| `SubagentSandboxConfig` | Subagent sandbox strategy: `"none" \| "inherit" \| "own"` with `continuation: "continue" \| "fork" \| "snapshot"` |
 | `SubagentDefinition`    | Callable subagent workflow with embedded metadata (from `defineSubagentWorkflow`) |
 | `SubagentConfig`        | Resolved subagent configuration consumed by `createSession`                  |
 | `AgentState`            | Generic agent state type                                                     |

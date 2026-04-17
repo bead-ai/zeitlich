@@ -179,6 +179,10 @@ export class SandboxManager<
     return sandbox.id;
   }
 
+  async deleteSnapshot(snapshot: SandboxSnapshot): Promise<void> {
+    await this.provider.deleteSnapshot(snapshot);
+  }
+
   async fork(sandboxId: string): Promise<string> {
     const sandbox = await this.provider.fork(sandboxId);
     return sandbox.id;
@@ -231,6 +235,14 @@ export class SandboxManager<
       },
       snapshotSandbox: async (sandboxId: string): Promise<SandboxSnapshot> => {
         return this.snapshot(sandboxId);
+      },
+      restoreSandbox: async (snapshot: SandboxSnapshot): Promise<string> => {
+        return this.restore(snapshot);
+      },
+      deleteSandboxSnapshot: async (
+        snapshot: SandboxSnapshot
+      ): Promise<void> => {
+        await this.deleteSnapshot(snapshot);
       },
       forkSandbox: async (sandboxId: string): Promise<string> => {
         return this.fork(sandboxId);

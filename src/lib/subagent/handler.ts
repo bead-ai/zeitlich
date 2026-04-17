@@ -22,6 +22,7 @@ import type {
   SandboxInit,
   SubagentSandboxShutdown,
 } from "../lifecycle";
+import type { SandboxOps, SandboxSnapshot } from "../sandbox/types";
 import {
   childResultSignal,
   childSandboxReadySignal,
@@ -32,7 +33,7 @@ import {
 interface ResolvedSandboxConfig {
   source: "none" | "inherit" | "own";
   init: "per-call" | "once";
-  continuation: "continue" | "fork";
+  continuation: "continue" | "fork" | "snapshot";
   shutdown?: SubagentSandboxShutdown;
 }
 
@@ -71,14 +72,17 @@ function resolveSandboxConfig(
 export function createSubagentHandler<
   const T extends readonly SubagentConfig[],
 >(
-  subagents: [...T]
+  subagents: [...T],
+  options?: { sandboxOps?: SandboxOps }
 ): {
   handler: (
     args: SubagentArgs,
     context: RouterContext
   ) => Promise<ToolHandlerResponse<InferSubagentResult<T[number]> | null>>;
   destroySubagentSandboxes: () => Promise<void>;
+  cleanupSubagentSnapshots: () => Promise<void>;
 } {
+  const sandboxOps = options?.sandboxOps;
   const { taskQueue: parentTaskQueue } = workflowInfo();
 
   const childResults = new Map<string, SubagentHandlerResponse>();
@@ -94,6 +98,12 @@ export function createSubagentHandler<
   const persistentSandboxCreating = new Set<string>();
   /** Reverse lookup: childWorkflowId → agentName for in-flight lazy creators */
   const lazyCreatorAgent = new Map<string, string>();
+  /** Maps childThreadId → latest snapshot for sandbox continuation via snapshots */
+  const threadSnapshots = new Map<string, SandboxSnapshot>();
+  /** Maps agentName → reusable base snapshot captured on first-ever call (init: once + continuation: "snapshot") */
+  const persistentBaseSnapshot = new Map<string, SandboxSnapshot>();
+  /** Tracks agents whose first snapshot-backed sandbox creation is in-flight */
+  const persistentBaseSnapshotCreating = new Set<string>();
 
   setHandler(childResultSignal, ({ childWorkflowId, result }) => {
     childResults.set(childWorkflowId, result);
@@ -151,13 +161,52 @@ export function createSubagentHandler<
     let sandbox: SandboxInit | undefined;
     let sandboxShutdownOverride: SubagentSandboxShutdown | undefined;
     let isLazyCreator = false;
+    let isSnapshotBaseCreator = false;
 
     if (sandboxCfg.source === "inherit" && parentSandboxId) {
       if (sandboxCfg.continuation === "fork") {
         sandbox = { mode: "fork", sandboxId: parentSandboxId };
+      } else if (sandboxCfg.continuation === "snapshot") {
+        throw new Error(
+          `Subagent "${config.agentName}" has sandbox source "inherit" with continuation "snapshot" — snapshot continuation is only supported for source "own"`
+        );
       } else {
         sandbox = { mode: "inherit", sandboxId: parentSandboxId };
       }
+    } else if (
+      sandboxCfg.source === "own" &&
+      sandboxCfg.continuation === "snapshot"
+    ) {
+      // Snapshot-driven continuation: each call boots a fresh sandbox from a
+      // stored snapshot (per-thread, or a per-agent base for new threads with
+      // init: "once"). The sandbox is destroyed inline by the child on exit;
+      // only the snapshot IDs are kept alive in parent-workflow state.
+      const isLazy = sandboxCfg.init === "once";
+
+      let baseSnap: SandboxSnapshot | undefined;
+      if (continuationThreadId) {
+        baseSnap = threadSnapshots.get(continuationThreadId);
+      }
+
+      if (!baseSnap && isLazy) {
+        baseSnap = persistentBaseSnapshot.get(config.agentName);
+        if (!baseSnap) {
+          if (persistentBaseSnapshotCreating.has(config.agentName)) {
+            await condition(() =>
+              persistentBaseSnapshot.has(config.agentName)
+            );
+            baseSnap = persistentBaseSnapshot.get(config.agentName);
+          } else {
+            persistentBaseSnapshotCreating.add(config.agentName);
+            isSnapshotBaseCreator = true;
+          }
+        }
+      }
+
+      if (baseSnap) {
+        sandbox = { mode: "from-snapshot", snapshot: baseSnap };
+      }
+      sandboxShutdownOverride = "snapshot";
     } else if (sandboxCfg.source === "own") {
       const isLazy = sandboxCfg.init === "once";
 
@@ -297,6 +346,8 @@ export function createSubagentHandler<
       usage,
       threadId: childThreadId,
       sandboxId: childSandboxId,
+      snapshot: childSnapshot,
+      baseSnapshot: childBaseSnapshot,
       metadata,
     } = childResult;
 
@@ -305,18 +356,59 @@ export function createSubagentHandler<
       if (
         sandboxCfg.source === "own" &&
         sandboxCfg.init === "once" &&
+        sandboxCfg.continuation !== "snapshot" &&
         !persistentSandboxes.has(config.agentName)
       ) {
         // Fallback: signal may have already set this via childSandboxReadySignal
         persistentSandboxes.set(config.agentName, childSandboxId);
-      } else if (allowsContinuation && childThreadId) {
+      } else if (
+        allowsContinuation &&
+        childThreadId &&
+        sandboxCfg.source === "own" &&
+        sandboxCfg.continuation !== "snapshot"
+      ) {
         threadSandboxes.set(childThreadId, childSandboxId);
+      }
+    }
+
+    // Store snapshots for future snapshot-driven continuation.
+    // Eager GC: if a thread snapshot was already stored under this key, it
+    // has been superseded and can be deleted immediately. This naturally
+    // only applies to `thread: "continue"` — fork/new produce fresh keys
+    // and leave the source's snapshot intact.
+    if (
+      sandboxCfg.source === "own" &&
+      sandboxCfg.continuation === "snapshot"
+    ) {
+      if (childSnapshot && childThreadId) {
+        const superseded = threadSnapshots.get(childThreadId);
+        threadSnapshots.set(childThreadId, childSnapshot);
+        if (superseded && sandboxOps) {
+          try {
+            await sandboxOps.deleteSandboxSnapshot(superseded);
+          } catch (err) {
+            log.warn(
+              "Failed to delete superseded subagent snapshot",
+              { error: err }
+            );
+          }
+        }
+      }
+      if (
+        isSnapshotBaseCreator &&
+        childBaseSnapshot &&
+        !persistentBaseSnapshot.has(config.agentName)
+      ) {
+        persistentBaseSnapshot.set(config.agentName, childBaseSnapshot);
       }
     }
 
     if (isLazyCreator) {
       persistentSandboxCreating.delete(config.agentName);
       lazyCreatorAgent.delete(childWorkflowId);
+    }
+    if (isSnapshotBaseCreator) {
+      persistentBaseSnapshotCreating.delete(config.agentName);
     }
 
     if (!toolResponse) {
@@ -379,5 +471,30 @@ export function createSubagentHandler<
     );
   };
 
-  return { handler, destroySubagentSandboxes };
+  const cleanupSubagentSnapshots = async (): Promise<void> => {
+    if (!sandboxOps) {
+      threadSnapshots.clear();
+      persistentBaseSnapshot.clear();
+      return;
+    }
+    const snaps = [
+      ...threadSnapshots.values(),
+      ...persistentBaseSnapshot.values(),
+    ];
+    threadSnapshots.clear();
+    persistentBaseSnapshot.clear();
+    await Promise.all(
+      snaps.map(async (snap) => {
+        try {
+          await sandboxOps.deleteSandboxSnapshot(snap);
+        } catch (err) {
+          log.warn("Failed to delete subagent snapshot on cleanup", {
+            error: err,
+          });
+        }
+      })
+    );
+  };
+
+  return { handler, destroySubagentSandboxes, cleanupSubagentSnapshots };
 }

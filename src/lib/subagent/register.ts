@@ -5,6 +5,7 @@ import type {
   ToolMap,
 } from "../tool-router/types";
 import type { SubagentConfig, SubagentHooks } from "./types";
+import type { SandboxOps } from "../sandbox/types";
 import type { z } from "zod";
 import {
   createSubagentTool,
@@ -23,9 +24,13 @@ import { createSubagentHandler } from "./handler";
  *
  * Returns null if no subagents are configured.
  */
-export function buildSubagentRegistration(subagents: SubagentConfig[]): {
+export function buildSubagentRegistration(
+  subagents: SubagentConfig[],
+  options?: { sandboxOps?: SandboxOps }
+): {
   registration: ToolMap[string];
   destroySubagentSandboxes: () => Promise<void>;
+  cleanupSubagentSnapshots: () => Promise<void>;
 } | null {
   if (subagents.length === 0) return null;
 
@@ -42,8 +47,10 @@ export function buildSubagentRegistration(subagents: SubagentConfig[]): {
   const resolveSubagentName = (args: unknown): string =>
     (args as SubagentArgs).subagent;
 
-  const { handler, destroySubagentSandboxes } =
-    createSubagentHandler(subagents);
+  const { handler, destroySubagentSandboxes, cleanupSubagentSnapshots } =
+    createSubagentHandler(subagents, {
+      ...(options?.sandboxOps && { sandboxOps: options.sandboxOps }),
+    });
 
   const registration: ToolMap[string] = {
     name: SUBAGENT_TOOL_NAME,
@@ -72,5 +79,5 @@ export function buildSubagentRegistration(subagents: SubagentConfig[]): {
     }),
   };
 
-  return { registration, destroySubagentSandboxes };
+  return { registration, destroySubagentSandboxes, cleanupSubagentSnapshots };
 }

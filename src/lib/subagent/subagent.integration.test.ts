@@ -1524,6 +1524,275 @@ describe("createSubagentHandler", () => {
     const firstInput = firstCall[1].args[1] as SubagentWorkflowInput;
     expect(firstInput.sandboxShutdown).toBe("pause");
   });
+
+  // --- snapshot continuation ---
+
+  it("forces sandboxShutdown=snapshot and passes no sandbox on first call (continuation=snapshot)", async () => {
+    const { startChild } = await import("@temporalio/workflow");
+    const startMock = startChild as ReturnType<typeof vi.fn>;
+
+    nextStartChildResult = () => ({
+      toolResponse: "first",
+      data: null,
+      threadId: "child-snap-1",
+      baseSnapshot: {
+        sandboxId: "sb-first",
+        providerId: "test",
+        data: { tag: "base" },
+        createdAt: new Date().toISOString(),
+      },
+      snapshot: {
+        sandboxId: "sb-first",
+        providerId: "test",
+        data: { tag: "exit-1" },
+        createdAt: new Date().toISOString(),
+      },
+    });
+
+    const config: SubagentConfig = {
+      agentName: "snap-agent",
+      description: "Snapshot-driven",
+      workflow: mockWorkflow(),
+      thread: "continue",
+      sandbox: { source: "own", init: "once", continuation: "snapshot" },
+    };
+
+    const { handler } = createSubagentHandler([config]);
+
+    await handler(
+      { subagent: "snap-agent", description: "test", prompt: "first" },
+      { threadId: "t", toolCallId: "tc-1", toolName: "Subagent" }
+    );
+
+    const firstCall = startMock.mock.calls.at(-1);
+    if (!firstCall) throw new Error("expected startChild call");
+    const firstInput = firstCall[1].args[1] as SubagentWorkflowInput;
+    expect(firstInput.sandbox).toBeUndefined();
+    expect(firstInput.sandboxShutdown).toBe("snapshot");
+  });
+
+  it("boots follow-up from stored thread snapshot on continuation=snapshot", async () => {
+    const { startChild } = await import("@temporalio/workflow");
+    const startMock = startChild as ReturnType<typeof vi.fn>;
+
+    nextStartChildResult = () => ({
+      toolResponse: "first",
+      data: null,
+      threadId: "child-snap-2",
+      baseSnapshot: {
+        sandboxId: "sb-first",
+        providerId: "test",
+        data: { tag: "base" },
+        createdAt: new Date().toISOString(),
+      },
+      snapshot: {
+        sandboxId: "sb-first",
+        providerId: "test",
+        data: { tag: "exit-1" },
+        createdAt: new Date().toISOString(),
+      },
+    });
+
+    const config: SubagentConfig = {
+      agentName: "snap-agent",
+      description: "Snapshot-driven",
+      workflow: mockWorkflow(),
+      thread: "continue",
+      sandbox: { source: "own", init: "once", continuation: "snapshot" },
+    };
+
+    const { handler } = createSubagentHandler([config]);
+
+    await handler(
+      { subagent: "snap-agent", description: "test", prompt: "first" },
+      { threadId: "t", toolCallId: "tc-1", toolName: "Subagent" }
+    );
+
+    nextStartChildResult = () => ({
+      toolResponse: "second",
+      data: null,
+      threadId: "child-snap-2", // same thread — continuation
+      snapshot: {
+        sandboxId: "sb-second",
+        providerId: "test",
+        data: { tag: "exit-2" },
+        createdAt: new Date().toISOString(),
+      },
+    });
+
+    await handler(
+      {
+        subagent: "snap-agent",
+        description: "test",
+        prompt: "second",
+        threadId: "child-snap-2",
+      },
+      { threadId: "t", toolCallId: "tc-2", toolName: "Subagent" }
+    );
+
+    const secondCall = startMock.mock.calls.at(-1);
+    if (!secondCall) throw new Error("expected startChild call");
+    const secondInput = secondCall[1].args[1] as SubagentWorkflowInput;
+    expect(secondInput.sandbox).toEqual({
+      mode: "from-snapshot",
+      snapshot: expect.objectContaining({ data: { tag: "exit-1" } }),
+    });
+    expect(secondInput.sandboxShutdown).toBe("snapshot");
+  });
+
+  it("uses per-agent base snapshot for a new thread when init=once + continuation=snapshot", async () => {
+    const { startChild } = await import("@temporalio/workflow");
+    const startMock = startChild as ReturnType<typeof vi.fn>;
+
+    // First call — establishes base snapshot.
+    nextStartChildResult = () => ({
+      toolResponse: "first",
+      data: null,
+      threadId: "child-snap-A",
+      baseSnapshot: {
+        sandboxId: "sb-first",
+        providerId: "test",
+        data: { tag: "base" },
+        createdAt: new Date().toISOString(),
+      },
+      snapshot: {
+        sandboxId: "sb-first",
+        providerId: "test",
+        data: { tag: "exit-A" },
+        createdAt: new Date().toISOString(),
+      },
+    });
+
+    const config: SubagentConfig = {
+      agentName: "snap-agent",
+      description: "Snapshot-driven",
+      workflow: mockWorkflow(),
+      thread: "continue",
+      sandbox: { source: "own", init: "once", continuation: "snapshot" },
+    };
+
+    const { handler } = createSubagentHandler([config]);
+
+    await handler(
+      { subagent: "snap-agent", description: "test", prompt: "first" },
+      { threadId: "t", toolCallId: "tc-1", toolName: "Subagent" }
+    );
+
+    // Third call: different thread → should use base snapshot.
+    nextStartChildResult = () => ({
+      toolResponse: "new-thread",
+      data: null,
+      threadId: "child-snap-B",
+      snapshot: {
+        sandboxId: "sb-B",
+        providerId: "test",
+        data: { tag: "exit-B" },
+        createdAt: new Date().toISOString(),
+      },
+    });
+
+    await handler(
+      { subagent: "snap-agent", description: "test", prompt: "new" },
+      { threadId: "t", toolCallId: "tc-2", toolName: "Subagent" }
+    );
+
+    const secondCall = startMock.mock.calls.at(-1);
+    if (!secondCall) throw new Error("expected startChild call");
+    const secondInput = secondCall[1].args[1] as SubagentWorkflowInput;
+    expect(secondInput.sandbox).toEqual({
+      mode: "from-snapshot",
+      snapshot: expect.objectContaining({ data: { tag: "base" } }),
+    });
+  });
+
+  it("eagerly deletes superseded thread snapshots and sweeps remaining on cleanup", async () => {
+    const deleted: unknown[] = [];
+    const sandboxOps = {
+      createSandbox: async () => ({ sandboxId: "unused" }),
+      destroySandbox: async () => {},
+      pauseSandbox: async () => {},
+      resumeSandbox: async () => {},
+      snapshotSandbox: async () => ({
+        sandboxId: "",
+        providerId: "test",
+        data: null,
+        createdAt: new Date().toISOString(),
+      }),
+      restoreSandbox: async () => "restored-sb",
+      deleteSandboxSnapshot: async (snap: unknown) => {
+        deleted.push(snap);
+      },
+      forkSandbox: async () => "forked-sb",
+    };
+
+    const config: SubagentConfig = {
+      agentName: "snap-agent",
+      description: "Snapshot-driven",
+      workflow: mockWorkflow(),
+      thread: "continue",
+      sandbox: { source: "own", init: "once", continuation: "snapshot" },
+    };
+
+    const { handler, cleanupSubagentSnapshots } = createSubagentHandler(
+      [config],
+      { sandboxOps }
+    );
+
+    // Call 1 — base snapshot + first exit snapshot.
+    nextStartChildResult = () => ({
+      toolResponse: "first",
+      data: null,
+      threadId: "child-t",
+      baseSnapshot: {
+        sandboxId: "sb-first",
+        providerId: "test",
+        data: { tag: "base" },
+        createdAt: new Date().toISOString(),
+      },
+      snapshot: {
+        sandboxId: "sb-first",
+        providerId: "test",
+        data: { tag: "exit-1" },
+        createdAt: new Date().toISOString(),
+      },
+    });
+    await handler(
+      { subagent: "snap-agent", description: "test", prompt: "first" },
+      { threadId: "t", toolCallId: "tc-1", toolName: "Subagent" }
+    );
+    expect(deleted).toHaveLength(0);
+
+    // Call 2 — same thread, new exit snapshot → eager delete of exit-1.
+    nextStartChildResult = () => ({
+      toolResponse: "second",
+      data: null,
+      threadId: "child-t",
+      snapshot: {
+        sandboxId: "sb-second",
+        providerId: "test",
+        data: { tag: "exit-2" },
+        createdAt: new Date().toISOString(),
+      },
+    });
+    await handler(
+      {
+        subagent: "snap-agent",
+        description: "test",
+        prompt: "second",
+        threadId: "child-t",
+      },
+      { threadId: "t", toolCallId: "tc-2", toolName: "Subagent" }
+    );
+    expect(deleted).toHaveLength(1);
+    expect((deleted[0] as { data: unknown }).data).toEqual({ tag: "exit-1" });
+
+    // Cleanup sweep: base + current thread snapshot.
+    await cleanupSubagentSnapshots();
+    const tags = deleted
+      .map((s) => (s as { data: { tag: string } }).data.tag)
+      .sort();
+    expect(tags).toEqual(["base", "exit-1", "exit-2"]);
+  });
 });
 
 // ---------------------------------------------------------------------------

@@ -433,6 +433,8 @@ describe("createSession edge cases", () => {
         createdAt: new Date().toISOString(),
       }),
       forkSandbox: async () => "forked-sandbox-id",
+      restoreSandbox: async () => "restored-sandbox-id",
+      deleteSandboxSnapshot: async () => {},
       pauseSandbox: async () => {},
       resumeSandbox: async () => {},
     };
@@ -476,6 +478,8 @@ describe("createSession edge cases", () => {
         createdAt: new Date().toISOString(),
       }),
       forkSandbox: async () => "forked-sandbox-id",
+      restoreSandbox: async () => "restored-sandbox-id",
+      deleteSandboxSnapshot: async () => {},
       pauseSandbox: async () => {},
       resumeSandbox: async () => {},
     };
@@ -940,6 +944,8 @@ describe("createSession edge cases", () => {
       destroySandbox: async () => {},
       snapshotSandbox: snapshotSpy,
       forkSandbox: async () => "forked-sandbox-id",
+      restoreSandbox: async () => "restored-sandbox-id",
+      deleteSandboxSnapshot: async () => {},
       pauseSandbox: async () => {},
       resumeSandbox: async () => {},
     };
@@ -1040,6 +1046,8 @@ describe("createSession edge cases", () => {
         createdAt: new Date().toISOString(),
       }),
       forkSandbox: async () => "forked-sb",
+      restoreSandbox: async () => "restored-sb",
+      deleteSandboxSnapshot: async () => {},
     };
 
     const session = await createSession({
@@ -1074,6 +1082,8 @@ describe("createSession edge cases", () => {
         createdAt: new Date().toISOString(),
       }),
       forkSandbox: async () => "forked-sb",
+      restoreSandbox: async () => "restored-sb",
+      deleteSandboxSnapshot: async () => {},
     };
 
     const session = await createSession({
@@ -1119,6 +1129,8 @@ describe("createSession edge cases", () => {
         createdAt: new Date().toISOString(),
       }),
       forkSandbox: async () => "forked-sb",
+      restoreSandbox: async () => "restored-sb",
+      deleteSandboxSnapshot: async () => {},
     };
 
     const session = await createSession({
@@ -1166,6 +1178,8 @@ describe("createSession edge cases", () => {
         sandboxLog.push(`fork:${id}`);
         return `forked-from-${id}`;
       },
+      restoreSandbox: async () => "restored-sb",
+      deleteSandboxSnapshot: async () => {},
     };
 
     const session = await createSession({
@@ -1210,6 +1224,8 @@ describe("createSession edge cases", () => {
         createdAt: new Date().toISOString(),
       }),
       forkSandbox: async () => "forked-sb",
+      restoreSandbox: async () => "restored-sb",
+      deleteSandboxSnapshot: async () => {},
     };
 
     const session = await createSession({
@@ -1253,6 +1269,8 @@ describe("createSession edge cases", () => {
         createdAt: new Date().toISOString(),
       }),
       forkSandbox: async () => "forked-sb",
+      restoreSandbox: async () => "restored-sb",
+      deleteSandboxSnapshot: async () => {},
     };
 
     const session = await createSession({
@@ -1297,6 +1315,8 @@ describe("createSession edge cases", () => {
         createdAt: new Date().toISOString(),
       }),
       forkSandbox: async () => "forked-sb",
+      restoreSandbox: async () => "restored-sb",
+      deleteSandboxSnapshot: async () => {},
     };
 
     const session = await createSession({
@@ -1413,6 +1433,8 @@ describe("createSession edge cases", () => {
         createdAt: new Date().toISOString(),
       }),
       forkSandbox: async () => "forked-sb",
+      restoreSandbox: async () => "restored-sb",
+      deleteSandboxSnapshot: async () => {},
     };
 
     const session = await createSession({
@@ -1461,6 +1483,8 @@ describe("createSession edge cases", () => {
         createdAt: new Date().toISOString(),
       }),
       forkSandbox: async () => "forked-sb",
+      restoreSandbox: async () => "restored-sb",
+      deleteSandboxSnapshot: async () => {},
     };
 
     const session = await createSession({
@@ -1503,6 +1527,8 @@ describe("createSession edge cases", () => {
         createdAt: new Date().toISOString(),
       }),
       forkSandbox: async () => "forked-sb",
+      restoreSandbox: async () => "restored-sb",
+      deleteSandboxSnapshot: async () => {},
     };
 
     const session = await createSession({
@@ -1553,6 +1579,8 @@ describe("createSession edge cases", () => {
         createdAt: new Date().toISOString(),
       }),
       forkSandbox: async () => "forked-sb",
+      restoreSandbox: async () => "restored-sb",
+      deleteSandboxSnapshot: async () => {},
     };
 
     const session = await createSession({
@@ -1598,6 +1626,8 @@ describe("createSession edge cases", () => {
         createdAt: new Date().toISOString(),
       }),
       forkSandbox: async () => "forked-sb",
+      restoreSandbox: async () => "restored-sb",
+      deleteSandboxSnapshot: async () => {},
     };
 
     const session = await createSession({

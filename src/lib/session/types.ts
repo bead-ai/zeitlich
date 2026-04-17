@@ -11,7 +11,7 @@ import type {
 import type { Hooks } from "../hooks/types";
 import type { SubagentConfig } from "../subagent/types";
 import type { Skill } from "../skills/types";
-import type { SandboxOps } from "../sandbox/types";
+import type { SandboxOps, SandboxSnapshot } from "../sandbox/types";
 import type { VirtualFsOps } from "../virtual-fs/types";
 import type { RunAgentActivity } from "../model/types";
 import type { AgentStateManager, JsonSerializable } from "../state/types";
@@ -219,6 +219,17 @@ export type SessionResult<
   finalMessage: M | null;
   exitReason: SessionExitReason;
   usage: ReturnType<AgentStateManager<TState>["getTotalUsage"]>;
+  /**
+   * Snapshot captured on exit when `sandboxShutdown === "snapshot"`.
+   */
+  snapshot?: SandboxSnapshot;
+  /**
+   * Snapshot captured immediately after sandbox seeding (before the agent
+   * loop starts) when `sandbox.mode === "new"` and
+   * `sandboxShutdown === "snapshot"`. Intended as a reusable "base" for new
+   * threads that want to skip re-seeding.
+   */
+  baseSnapshot?: SandboxSnapshot;
 } & (HasSandbox extends true
   ? { sandboxId: string }
   : { sandboxId?: undefined });

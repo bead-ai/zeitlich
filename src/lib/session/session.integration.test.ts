@@ -517,6 +517,8 @@ describe("createSession integration", () => {
         createdAt: new Date().toISOString(),
       }),
       forkSandbox: async () => "forked-sandbox-id",
+      restoreSandbox: async () => "restored-sandbox-id",
+      deleteSandboxSnapshot: async () => {},
       pauseSandbox: async () => {},
       resumeSandbox: async () => {},
     };
@@ -559,6 +561,8 @@ describe("createSession integration", () => {
         createdAt: new Date().toISOString(),
       }),
       forkSandbox: async () => "forked-sandbox-id",
+      restoreSandbox: async () => "restored-sandbox-id",
+      deleteSandboxSnapshot: async () => {},
       pauseSandbox: async () => {},
       resumeSandbox: async () => {},
     };
@@ -610,6 +614,8 @@ describe("createSession integration", () => {
         createdAt: new Date().toISOString(),
       }),
       forkSandbox: async () => "forked-sb",
+      restoreSandbox: async () => "restored-sb",
+      deleteSandboxSnapshot: async () => {},
     };
 
     const session = await createSession({
@@ -822,6 +828,8 @@ describe("createSession integration", () => {
         createdAt: new Date().toISOString(),
       }),
       forkSandbox: async () => "forked-sandbox-id",
+      restoreSandbox: async () => "restored-sandbox-id",
+      deleteSandboxSnapshot: async () => {},
       pauseSandbox: async () => {},
       resumeSandbox: async () => {},
     };
@@ -873,6 +881,8 @@ describe("createSession integration", () => {
         createdAt: new Date().toISOString(),
       }),
       forkSandbox: async () => "forked-sandbox-id",
+      restoreSandbox: async () => "restored-sandbox-id",
+      deleteSandboxSnapshot: async () => {},
       pauseSandbox: async () => {},
       resumeSandbox: async () => {},
     };
@@ -948,5 +958,134 @@ describe("createSession integration", () => {
     // Note: handler-level usage is not forwarded through router results
     expect(result.usage.totalInputTokens).toBe(180);
     expect(result.usage.totalOutputTokens).toBe(90);
+  });
+
+  // --- Snapshot-driven shutdown ---
+
+  it("captures base + exit snapshot and destroys sandbox on sandboxShutdown=snapshot", async () => {
+    const { ops } = createMockThreadOps();
+    const sandboxLog: string[] = [];
+    let snapCounter = 0;
+
+    const sandboxOps: SandboxOps = {
+      createSandbox: async () => {
+        sandboxLog.push("create");
+        return { sandboxId: "sb-snap" };
+      },
+      destroySandbox: async (id: string) => {
+        sandboxLog.push(`destroy:${id}`);
+      },
+      pauseSandbox: async () => {
+        sandboxLog.push("pause");
+      },
+      resumeSandbox: async () => {},
+      snapshotSandbox: async (id: string) => {
+        snapCounter += 1;
+        sandboxLog.push(`snapshot:${id}`);
+        return {
+          sandboxId: id,
+          providerId: "test",
+          data: { tag: `snap-${snapCounter}` },
+          createdAt: new Date().toISOString(),
+        };
+      },
+      restoreSandbox: async () => "restored-sb",
+      deleteSandboxSnapshot: async () => {},
+      forkSandbox: async () => "forked-sb",
+    };
+
+    const session = await createSession({
+      agentName: "TestAgent",
+      thread: { mode: "new", threadId: "thread-snap" },
+      runAgent: createScriptedRunAgent([{ message: "done", toolCalls: [] }]),
+      threadOps: ops,
+      buildContextMessage: () => "go",
+      sandboxOps,
+      sandboxShutdown: "snapshot",
+    });
+
+    const stateManager = createAgentStateManager({
+      initialState: { systemPrompt: "test" },
+    });
+
+    const result = await session.runSession({ stateManager });
+
+    expect(result.exitReason).toBe("completed");
+    expect(result.sandboxId).toBe("sb-snap");
+    expect(result.baseSnapshot?.data).toEqual({ tag: "snap-1" });
+    expect(result.snapshot?.data).toEqual({ tag: "snap-2" });
+    expect(sandboxLog).toEqual([
+      "create",
+      "snapshot:sb-snap",
+      "snapshot:sb-snap",
+      "destroy:sb-snap",
+    ]);
+    expect(sandboxLog).not.toContain("pause");
+  });
+
+  it("restores a sandbox when sandbox.mode=from-snapshot and skips base snapshot", async () => {
+    const { ops } = createMockThreadOps();
+    const sandboxLog: string[] = [];
+    const priorSnapshot = {
+      sandboxId: "sb-prior",
+      providerId: "test",
+      data: { tag: "prior" },
+      createdAt: new Date().toISOString(),
+    };
+
+    const sandboxOps: SandboxOps = {
+      createSandbox: async () => {
+        sandboxLog.push("create");
+        return { sandboxId: "sb-should-not-be-created" };
+      },
+      destroySandbox: async (id: string) => {
+        sandboxLog.push(`destroy:${id}`);
+      },
+      pauseSandbox: async () => {},
+      resumeSandbox: async () => {},
+      snapshotSandbox: async (id: string) => {
+        sandboxLog.push(`snapshot:${id}`);
+        return {
+          sandboxId: id,
+          providerId: "test",
+          data: { tag: "exit" },
+          createdAt: new Date().toISOString(),
+        };
+      },
+      restoreSandbox: async (snap) => {
+        sandboxLog.push(`restore:${(snap.data as { tag: string }).tag}`);
+        return "sb-restored";
+      },
+      deleteSandboxSnapshot: async () => {},
+      forkSandbox: async () => "forked-sb",
+    };
+
+    const session = await createSession({
+      agentName: "TestAgent",
+      thread: { mode: "new", threadId: "thread-restore" },
+      runAgent: createScriptedRunAgent([{ message: "done", toolCalls: [] }]),
+      threadOps: ops,
+      buildContextMessage: () => "go",
+      sandboxOps,
+      sandbox: { mode: "from-snapshot", snapshot: priorSnapshot },
+      sandboxShutdown: "snapshot",
+    });
+
+    const stateManager = createAgentStateManager({
+      initialState: { systemPrompt: "test" },
+    });
+
+    const result = await session.runSession({ stateManager });
+
+    expect(result.sandboxId).toBe("sb-restored");
+    // No base snapshot because the sandbox was restored, not freshly created.
+    expect(result.baseSnapshot).toBeUndefined();
+    expect(result.snapshot?.data).toEqual({ tag: "exit" });
+    expect(sandboxLog).toEqual([
+      "restore:prior",
+      "snapshot:sb-restored",
+      "destroy:sb-restored",
+    ]);
+    expect(sandboxLog).not.toContain("create");
   });
 });

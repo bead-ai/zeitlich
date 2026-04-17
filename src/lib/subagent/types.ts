@@ -10,10 +10,24 @@ import type {
   SandboxInit,
   SubagentSandboxShutdown,
 } from "../lifecycle";
+import type { SandboxSnapshot } from "../sandbox/types";
 
 /** ToolHandlerResponse with threadId required (subagents must always surface their thread) */
-export type SubagentHandlerResponse<TResult = null, TToolResponse = JsonValue> =
-  ToolHandlerResponse<TResult, TToolResponse> & { threadId: string; sandboxId?: string };
+export type SubagentHandlerResponse<
+  TResult = null,
+  TToolResponse = JsonValue,
+> = ToolHandlerResponse<TResult, TToolResponse> & {
+  threadId: string;
+  sandboxId?: string;
+  /** Snapshot captured on session exit when `sandboxShutdown === "snapshot"`. */
+  snapshot?: SandboxSnapshot;
+  /**
+   * Snapshot captured immediately after the sandbox was seeded (before the
+   * first agent turn) when `continuation === "snapshot"`. Only set on the
+   * first call that actually created the sandbox.
+   */
+  baseSnapshot?: SandboxSnapshot;
+};
 
 /**
  * Raw workflow input fields passed from parent to child workflow.
@@ -82,7 +96,7 @@ export type SubagentSandboxConfig =
   | {
       source: "own";
       init?: "per-call" | "once";
-      continuation: "continue" | "fork";
+      continuation: "continue" | "fork" | "snapshot";
       shutdown?: SubagentSandboxShutdown;
     };
 

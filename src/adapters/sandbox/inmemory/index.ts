@@ -244,4 +244,9 @@ export class InMemorySandboxProvider implements SandboxProvider {
     this.sandboxes.set(sandbox.id, sandbox);
     return sandbox;
   }
+
+  async deleteSnapshot(_snapshot: SandboxSnapshot): Promise<void> {
+    // In-memory snapshots are opaque data held by the caller — nothing to
+    // delete on the provider side.
+  }
 }

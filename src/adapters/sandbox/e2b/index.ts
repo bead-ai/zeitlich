@@ -140,12 +140,39 @@ export class E2bSandboxProvider
     await E2bSdkSandbox.connect(sandboxId);
   }
 
-  async snapshot(_sandboxId: string): Promise<SandboxSnapshot> {
-    throw new SandboxNotSupportedError("snapshot");
+  async snapshot(sandboxId: string): Promise<SandboxSnapshot> {
+    const { snapshotId } = await E2bSdkSandbox.createSnapshot(sandboxId);
+    return {
+      sandboxId,
+      providerId: this.id,
+      data: { snapshotId },
+      createdAt: new Date().toISOString(),
+    };
   }
 
-  async restore(_snapshot: SandboxSnapshot): Promise<Sandbox> {
-    throw new SandboxNotSupportedError("restore");
+  async restore(snapshot: SandboxSnapshot): Promise<Sandbox> {
+    const data = snapshot.data as { snapshotId?: string } | null;
+    if (!data?.snapshotId) {
+      throw new SandboxNotSupportedError(
+        "restore: snapshot is missing snapshotId"
+      );
+    }
+    const sdkSandbox = await E2bSdkSandbox.create(data.snapshotId);
+    return new E2bSandboxImpl(
+      sdkSandbox.sandboxId,
+      sdkSandbox,
+      this.defaultWorkspaceBase
+    );
+  }
+
+  async deleteSnapshot(snapshot: SandboxSnapshot): Promise<void> {
+    const data = snapshot.data as { snapshotId?: string } | null;
+    if (!data?.snapshotId) return;
+    try {
+      await E2bSdkSandbox.deleteSnapshot(data.snapshotId);
+    } catch {
+      // Already deleted or no longer accessible — treat as no-op.
+    }
   }
 
   async fork(sandboxId: string): Promise<Sandbox> {
