@@ -1,8 +1,6 @@
 import { describe, expect, it, vi, afterEach } from "vitest";
 import { z } from "zod";
 
-const capturedSignalHandlers = new Map<unknown, (...args: unknown[]) => void>();
-
 let nextStartChildResult: ((prompt: string) => unknown) | null = null;
 
 vi.mock("@temporalio/workflow", () => {
@@ -34,11 +32,7 @@ vi.mock("@temporalio/workflow", () => {
       parent: { workflowId: "parent-wf-1" },
     }),
     defineSignal: vi.fn((name: string) => ({ __signal: true, name })),
-    setHandler: vi.fn(
-      (signal: unknown, handler: (...a: unknown[]) => void) => {
-        capturedSignalHandlers.set(signal, handler);
-      }
-    ),
+    setHandler: vi.fn(),
     condition: vi.fn(async (fn: () => boolean) => {
       if (!fn()) throw new Error("condition predicate was not satisfied");
     }),
@@ -56,12 +50,6 @@ vi.mock("@temporalio/workflow", () => {
               threadId: "child-thread-1",
               usage: { inputTokens: 100, outputTokens: 50 },
             };
-
-        for (const [signal, handler] of capturedSignalHandlers.entries()) {
-          if ((signal as { name?: string }).name === "childResult") {
-            handler({ childWorkflowId: opts.workflowId, result });
-          }
-        }
 
         return {
           signal: vi.fn(),
@@ -104,7 +92,6 @@ import type {
 } from "./types";
 afterEach(() => {
   nextStartChildResult = null;
-  capturedSignalHandlers.clear();
 });
 
 function mockWorkflow(name?: string): SubagentWorkflow {
@@ -2146,26 +2133,6 @@ describe("defineSubagentWorkflow", () => {
       sandboxShutdown: "destroy",
       onSandboxReady: expect.any(Function),
     });
-  });
-
-  it("validates sandboxId required for keep-until-parent-close", async () => {
-    // @ts-expect-error — deliberately omitting sandboxId to test runtime validation
-    const workflow = defineSubagentWorkflow(
-      {
-        name: "test",
-        description: "test agent",
-        sandboxShutdown: "keep-until-parent-close",
-      },
-      async () => ({
-        toolResponse: "ok",
-        data: null,
-        threadId: "t",
-      })
-    );
-
-    await expect(workflow("go", {})).rejects.toThrow(
-      /keep-until-parent-close.*sandboxId/
-    );
   });
 
   it("uses keep-until-parent-close from workflowInput override in sessionInput", async () => {

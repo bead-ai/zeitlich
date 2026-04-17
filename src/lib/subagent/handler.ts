@@ -12,7 +12,6 @@ import type { JsonValue } from "../state/types";
 import type {
   InferSubagentResult,
   SubagentConfig,
-  SubagentHandlerResponse,
   SubagentSandboxConfig,
   SubagentWorkflowInput,
 } from "./types";
@@ -24,7 +23,7 @@ import type {
   SubagentSandboxShutdown,
 } from "../lifecycle";
 import type { SandboxOps, SandboxSnapshot } from "../sandbox/types";
-import { childResultSignal, childSandboxReadySignal } from "./signals";
+import { childSandboxReadySignal } from "./signals";
 
 /** Normalized sandbox config after resolving the union. */
 interface ResolvedSandboxConfig {
@@ -59,10 +58,6 @@ function resolveSandboxConfig(
 /**
  * Creates a Subagent tool handler that spawns child workflows for configured subagents.
  *
- * Child workflows signal their result back via `childResultSignal` instead of
- * returning it as the workflow return value. The handler awaits the signal
- * before continuing.
- *
  * Sandbox and snapshot cleanup happens inside the parent via each subagent's
  * `sandboxProxy` — the proxy factory is invoked once per subagent with
  * `scope = agentName` so it resolves to the same activities the child uses.
@@ -92,7 +87,6 @@ export function createSubagentHandler<
     }
   }
 
-  const childResults = new Map<string, SubagentHandlerResponse>();
   /**
    * Sandboxes that outlived their child session and must be destroyed by the
    * parent at shutdown (shutdown = `pause-until-parent-close` /
@@ -123,10 +117,6 @@ export function createSubagentHandler<
   const persistentBaseSnapshot = new Map<string, SandboxSnapshot>();
   /** Tracks agents whose first snapshot-backed sandbox creation is in-flight */
   const persistentBaseSnapshotCreating = new Set<string>();
-
-  setHandler(childResultSignal, ({ childWorkflowId, result }) => {
-    childResults.set(childWorkflowId, result);
-  });
 
   setHandler(childSandboxReadySignal, ({ childWorkflowId, sandboxId }) => {
     const agentName = lazyCreatorAgent.get(childWorkflowId);
@@ -324,28 +314,7 @@ export function createSubagentHandler<
     const effectiveShutdown =
       sandboxShutdownOverride ?? sandboxCfg.shutdown ?? "destroy";
 
-    // Wait for signal from child; race with child completion to propagate failures
-    await Promise.race([
-      condition(() => childResults.has(childWorkflowId)),
-      childHandle.result(),
-    ]);
-    if (!childResults.has(childWorkflowId)) {
-      await condition(() => childResults.has(childWorkflowId));
-    }
-
-    const childResult = childResults.get(childWorkflowId);
-    childResults.delete(childWorkflowId);
-
-    if (!childResult) {
-      log.warn("subagent returned no result", {
-        subagent: config.agentName,
-        childWorkflowId,
-      });
-      return {
-        toolResponse: "Subagent workflow did not signal a result",
-        data: null,
-      };
-    }
+    const childResult = await childHandle.result();
 
     log.info("subagent completed", {
       subagent: config.agentName,
@@ -461,7 +430,9 @@ export function createSubagentHandler<
 
     return {
       toolResponse: finalToolResponse,
-      data: validated ? validated.data : data,
+      data: validated
+        ? validated.data
+        : (data as InferSubagentResult<T[number]> | null),
       ...(usage && { usage }),
       ...(childSandboxId && { sandboxId: childSandboxId }),
       ...(metadata && { metadata }),

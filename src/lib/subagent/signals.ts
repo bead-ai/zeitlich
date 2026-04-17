@@ -1,11 +1,5 @@
 import { defineSignal } from "@temporalio/workflow";
-import type {
-  ChildResultSignalPayload,
-  ChildSandboxReadySignalPayload,
-} from "./types";
-
-export const childResultSignal =
-  defineSignal<[ChildResultSignalPayload]>("childResult");
+import type { ChildSandboxReadySignalPayload } from "./types";
 
 /** Sent by a child workflow as soon as its sandbox is created, before the agent loop starts. */
 export const childSandboxReadySignal =

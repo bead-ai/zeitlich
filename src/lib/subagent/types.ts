@@ -210,12 +210,6 @@ export type SubagentFnResult<
     ? { sandboxId: string }
     : { sandboxId?: string });
 
-/** Payload sent by a child workflow to signal its result back to the parent */
-export interface ChildResultSignalPayload {
-  childWorkflowId: string;
-  result: SubagentHandlerResponse;
-}
-
 /** Payload sent by a child workflow as soon as its sandbox is ready */
 export interface ChildSandboxReadySignalPayload {
   childWorkflowId: string;

@@ -17,4 +17,4 @@ export { createSubagentHandler } from "./handler";
 export { defineSubagent } from "./define";
 export { defineSubagentWorkflow } from "./workflow";
 export { buildSubagentRegistration } from "./register";
-export { childResultSignal, childSandboxReadySignal } from "./signals";
+export { childSandboxReadySignal } from "./signals";

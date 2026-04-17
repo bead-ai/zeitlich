@@ -12,7 +12,7 @@ import type {
   SubagentSessionInput,
 } from "./types";
 import type { SubagentSandboxShutdown } from "../lifecycle";
-import { childResultSignal, childSandboxReadySignal } from "./signals";
+import { childSandboxReadySignal } from "./signals";
 
 /**
  * Defines a subagent workflow with embedded metadata (name, description, resultSchema).
@@ -141,14 +141,7 @@ export function defineSubagentWorkflow(
       },
     };
 
-    const result = await fn(prompt, sessionInput, context ?? {});
-
-    await parentHandle.signal(childResultSignal, {
-      childWorkflowId: workflowInfo().workflowId,
-      result,
-    });
-
-    return result;
+    return fn(prompt, sessionInput, context ?? {});
   };
 
   // for temporal workflow name
