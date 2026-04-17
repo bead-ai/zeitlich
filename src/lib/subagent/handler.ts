@@ -22,10 +22,11 @@ import type {
   SandboxInit,
   SubagentSandboxShutdown,
 } from "../lifecycle";
-import type { SandboxOps, SandboxSnapshot } from "../sandbox/types";
+import type { SandboxSnapshot } from "../sandbox/types";
 import {
   childResultSignal,
   childSandboxReadySignal,
+  cleanupSnapshotsSignal,
   destroySandboxSignal,
 } from "./signals";
 
@@ -72,8 +73,7 @@ function resolveSandboxConfig(
 export function createSubagentHandler<
   const T extends readonly SubagentConfig[],
 >(
-  subagents: [...T],
-  options?: { sandboxOps?: SandboxOps }
+  subagents: [...T]
 ): {
   handler: (
     args: SubagentArgs,
@@ -82,11 +82,20 @@ export function createSubagentHandler<
   destroySubagentSandboxes: () => Promise<void>;
   cleanupSubagentSnapshots: () => Promise<void>;
 } {
-  const sandboxOps = options?.sandboxOps;
   const { taskQueue: parentTaskQueue } = workflowInfo();
 
   const childResults = new Map<string, SubagentHandlerResponse>();
   const pendingDestroys = new Map<
+    string,
+    Awaited<ReturnType<typeof startChild>>
+  >();
+  /**
+   * Child workflows that stayed alive after returning their result to hold
+   * snapshots for the parent. They will be signalled with
+   * `cleanupSnapshotsSignal` during the final cleanup sweep so they can
+   * delete their snapshots using their own `sandboxOps`.
+   */
+  const pendingSnapshotCleanups = new Map<
     string,
     Awaited<ReturnType<typeof startChild>>
   >();
@@ -372,27 +381,19 @@ export function createSubagentHandler<
     }
 
     // Store snapshots for future snapshot-driven continuation.
-    // Eager GC: if a thread snapshot was already stored under this key, it
-    // has been superseded and can be deleted immediately. This naturally
-    // only applies to `thread: "continue"` — fork/new produce fresh keys
-    // and leave the source's snapshot intact.
+    //
+    // Each snapshot-producing child stays alive after signalling its result
+    // so we can trigger cleanup via `cleanupSnapshotsSignal` later (the
+    // child then deletes its snapshots using its own `sandboxOps`, which
+    // may be a different provider from the parent's). All snapshots — live
+    // or superseded — are swept in the final `cleanupSubagentSnapshots`
+    // pass.
     if (
       sandboxCfg.source === "own" &&
       sandboxCfg.continuation === "snapshot"
     ) {
       if (childSnapshot && childThreadId) {
-        const superseded = threadSnapshots.get(childThreadId);
         threadSnapshots.set(childThreadId, childSnapshot);
-        if (superseded && sandboxOps) {
-          try {
-            await sandboxOps.deleteSandboxSnapshot(superseded);
-          } catch (err) {
-            log.warn(
-              "Failed to delete superseded subagent snapshot",
-              { error: err }
-            );
-          }
-        }
       }
       if (
         isSnapshotBaseCreator &&
@@ -400,6 +401,9 @@ export function createSubagentHandler<
         !persistentBaseSnapshot.has(config.agentName)
       ) {
         persistentBaseSnapshot.set(config.agentName, childBaseSnapshot);
+      }
+      if (childSnapshot || childBaseSnapshot) {
+        pendingSnapshotCleanups.set(childWorkflowId, childHandle);
       }
     }
 
@@ -472,25 +476,20 @@ export function createSubagentHandler<
   };
 
   const cleanupSubagentSnapshots = async (): Promise<void> => {
-    if (!sandboxOps) {
-      threadSnapshots.clear();
-      persistentBaseSnapshot.clear();
-      return;
-    }
-    const snaps = [
-      ...threadSnapshots.values(),
-      ...persistentBaseSnapshot.values(),
-    ];
+    const handles = [...pendingSnapshotCleanups.values()];
+    pendingSnapshotCleanups.clear();
     threadSnapshots.clear();
     persistentBaseSnapshot.clear();
     await Promise.all(
-      snaps.map(async (snap) => {
+      handles.map(async (handle) => {
         try {
-          await sandboxOps.deleteSandboxSnapshot(snap);
+          await handle.signal(cleanupSnapshotsSignal);
+          await handle.result();
         } catch (err) {
-          log.warn("Failed to delete subagent snapshot on cleanup", {
-            error: err,
-          });
+          log.warn(
+            "Failed to signal cleanupSnapshots to child workflow",
+            { error: err }
+          );
         }
       })
     );

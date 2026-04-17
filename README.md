@@ -712,12 +712,22 @@ How it works:
 - **New thread, same agent** (`init: "once"`): session restores from the base snapshot, skipping re-seeding.
 - `thread: "fork"` preserves the source thread's snapshot (the fork writes to a new key) so the source can still be continued later.
 
-Snapshots are cleaned up automatically:
+Snapshots are cleaned up by the **child workflow that produced them**, not by the parent. Each snapshot-producing subagent stays alive after signalling its result back to the parent, and waits for a `cleanupSnapshots` signal. When the parent session exits, it fans that signal out to every pending snapshot-owner child; each child deletes its own snapshots via its own `sandboxOps` and terminates.
 
-- Eagerly when a thread snapshot is replaced by a newer one.
-- In a final sweep when the parent session exits — all remaining thread + base snapshots are deleted via `sandboxOps.deleteSandboxSnapshot`.
+This means heterogeneous providers "just work" — the parent doesn't need to know (or even have) `sandboxOps` for the provider the child used. The child wraps its `deleteSnapshots` callback via `session.runSession()` and the workflow wrapper does the rest:
 
-Currently implemented for the E2B adapter. The in-memory adapter treats snapshots as opaque caller-held data (delete is a no-op), and Daytona/Bedrock throw `SandboxNotSupportedError` for snapshot operations.
+```typescript
+export const analystWorkflow = defineSubagentWorkflow(
+  { name: "analyst", description: "...", sandboxShutdown: "snapshot" },
+  async (prompt, sessionInput) => {
+    const session = await createSession({ ...sessionInput, sandboxOps, runAgent, threadOps, buildContextMessage: () => prompt });
+    const result = await session.runSession({ stateManager });
+    return result; // result.deleteSnapshots is forwarded automatically
+  }
+);
+```
+
+Trade-off: cleanup is deferred to parent close (no eager GC of superseded thread snapshots). Extra cost is a few snapshot IDs held for the parent's lifetime — much cheaper than keeping sandboxes paused. Currently implemented for the E2B adapter. The in-memory adapter treats snapshots as opaque caller-held data (delete is a no-op), and Daytona/Bedrock throw `SandboxNotSupportedError` for snapshot operations.
 
 The `thread` field accepts `"new"` (default), `"fork"`, or `"continue"`. When set to `"fork"` or `"continue"`, the parent agent can pass a `threadId` in a subsequent `Task` tool call to resume the conversation. The subagent returns its `threadId` in the response (surfaced as `[Thread ID: ...]`), which the parent can use for continuation.
 

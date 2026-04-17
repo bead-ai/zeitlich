@@ -17,6 +17,7 @@ import type { SubagentSandboxShutdown } from "../lifecycle";
 import {
   childResultSignal,
   childSandboxReadySignal,
+  cleanupSnapshotsSignal,
   destroySandboxSignal,
 } from "./signals";
 
@@ -146,7 +147,7 @@ export function defineSubagentWorkflow(
         }
       },
     };
-    const { destroySandbox, ...result } = await fn(
+    const { destroySandbox, deleteSnapshots, ...result } = await fn(
       prompt,
       sessionInput,
       context ?? {}
@@ -170,6 +171,13 @@ export function defineSubagentWorkflow(
       }
     }
 
+    if (effectiveShutdown === "snapshot" && !deleteSnapshots) {
+      throw ApplicationFailure.create({
+        message: `Subagent "${config.name}" has sandboxShutdown="snapshot" but fn did not return a deleteSnapshots callback`,
+        nonRetryable: true,
+      });
+    }
+
     await parentHandle.signal(childResultSignal, {
       childWorkflowId: workflowInfo().workflowId,
       result,
@@ -182,6 +190,15 @@ export function defineSubagentWorkflow(
       });
       await condition(() => destroyRequested);
       await destroySandbox();
+    }
+
+    if (deleteSnapshots) {
+      let cleanupRequested = false;
+      setHandler(cleanupSnapshotsSignal, () => {
+        cleanupRequested = true;
+      });
+      await condition(() => cleanupRequested);
+      await deleteSnapshots();
     }
 
     return result;

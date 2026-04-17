@@ -177,6 +177,9 @@ export interface SubagentHooks<TArgs = unknown, TResult = unknown> {
  * When `TSandboxShutdown` is `"pause-until-parent-close"` or
  * `"keep-until-parent-close"`, both `destroySandbox` and `sandboxId` become
  * required so the parent can coordinate cleanup.
+ *
+ * When `TSandboxShutdown` is `"snapshot"`, `deleteSnapshots` is required so
+ * the child can clean up its snapshots on signal from the parent.
  */
 export type SubagentFnResult<
   TResult = null,
@@ -186,7 +189,10 @@ export type SubagentFnResult<
     | "pause-until-parent-close"
     | "keep-until-parent-close"
     ? { destroySandbox: () => Promise<void>; sandboxId: string }
-    : { destroySandbox?: () => Promise<void> });
+    : { destroySandbox?: () => Promise<void> }) &
+  (TSandboxShutdown extends "snapshot"
+    ? { deleteSnapshots: () => Promise<void> }
+    : { deleteSnapshots?: () => Promise<void> });
 
 /** Payload sent by a child workflow to signal its result back to the parent */
 export interface ChildResultSignalPayload {
