@@ -4,6 +4,7 @@ import {
   setHandler,
   condition,
   log,
+  ApplicationFailure,
 } from "@temporalio/workflow";
 import { getShortId } from "../thread/id";
 import type { ToolHandlerResponse, RouterContext } from "../tool-router";
@@ -22,13 +23,8 @@ import type {
   SandboxInit,
   SubagentSandboxShutdown,
 } from "../lifecycle";
-import type { SandboxSnapshot } from "../sandbox/types";
-import {
-  childResultSignal,
-  childSandboxReadySignal,
-  cleanupSnapshotsSignal,
-  destroySandboxSignal,
-} from "./signals";
+import type { SandboxOps, SandboxSnapshot } from "../sandbox/types";
+import { childResultSignal, childSandboxReadySignal } from "./signals";
 
 /** Normalized sandbox config after resolving the union. */
 interface ResolvedSandboxConfig {
@@ -60,12 +56,22 @@ function resolveSandboxConfig(
   };
 }
 
+/** Snapshot tagged with the agent that produced it so the parent knows which sandboxOps to use. */
+interface TaggedSnapshot {
+  agentName: string;
+  snapshot: SandboxSnapshot;
+}
+
 /**
  * Creates a Subagent tool handler that spawns child workflows for configured subagents.
  *
  * Child workflows signal their result back via `childResultSignal` instead of
  * returning it as the workflow return value. The handler awaits the signal
  * before continuing.
+ *
+ * Sandbox and snapshot cleanup happens inside the parent via each subagent's
+ * `sandboxProxy` — the proxy factory is invoked once per subagent with
+ * `scope = agentName` so it resolves to the same activities the child uses.
  *
  * @param subagents - Array of subagent configurations
  * @returns A tool handler function that can be used with the tool router
@@ -84,20 +90,24 @@ export function createSubagentHandler<
 } {
   const { taskQueue: parentTaskQueue } = workflowInfo();
 
+  /** Sandbox ops proxy per subagent, built eagerly from `sandboxProxy` factories. */
+  const agentSandboxOps = new Map<string, SandboxOps>();
+  for (const cfg of subagents) {
+    if (cfg.sandboxProxy) {
+      agentSandboxOps.set(cfg.agentName, cfg.sandboxProxy(cfg.agentName));
+    }
+  }
+
   const childResults = new Map<string, SubagentHandlerResponse>();
+  /**
+   * Sandboxes that outlived their child session and must be destroyed by the
+   * parent at shutdown (shutdown = `pause-until-parent-close` /
+   * `keep-until-parent-close`). Keyed by `persistent:<agent>` for lazy
+   * shared sandboxes and by childWorkflowId otherwise.
+   */
   const pendingDestroys = new Map<
     string,
-    Awaited<ReturnType<typeof startChild>>
-  >();
-  /**
-   * Child workflows that stayed alive after returning their result to hold
-   * snapshots for the parent. They will be signalled with
-   * `cleanupSnapshotsSignal` during the final cleanup sweep so they can
-   * delete their snapshots using their own `sandboxOps`.
-   */
-  const pendingSnapshotCleanups = new Map<
-    string,
-    Awaited<ReturnType<typeof startChild>>
+    { agentName: string; sandboxId: string }
   >();
   /** Maps childThreadId → sandboxId for sandbox continuation across invocations (init: per-call) */
   const threadSandboxes = new Map<string, string>();
@@ -108,7 +118,7 @@ export function createSubagentHandler<
   /** Reverse lookup: childWorkflowId → agentName for in-flight lazy creators */
   const lazyCreatorAgent = new Map<string, string>();
   /** Maps childThreadId → latest snapshot for sandbox continuation via snapshots */
-  const threadSnapshots = new Map<string, SandboxSnapshot>();
+  const threadSnapshots = new Map<string, TaggedSnapshot>();
   /** Maps agentName → reusable base snapshot captured on first-ever call (init: once + continuation: "snapshot") */
   const persistentBaseSnapshot = new Map<string, SandboxSnapshot>();
   /** Tracks agents whose first snapshot-backed sandbox creation is in-flight */
@@ -145,6 +155,13 @@ export function createSubagentHandler<
 
     const { sandboxId: parentSandboxId } = context;
     const sandboxCfg = resolveSandboxConfig(config.sandbox);
+
+    if (sandboxCfg.source !== "none" && !agentSandboxOps.has(config.agentName)) {
+      throw ApplicationFailure.create({
+        message: `Subagent "${config.agentName}" uses a sandbox but no \`sandboxProxy\` is configured on its SubagentConfig`,
+        nonRetryable: true,
+      });
+    }
 
     if (sandboxCfg.source === "inherit" && !parentSandboxId) {
       throw new Error(
@@ -188,13 +205,13 @@ export function createSubagentHandler<
     ) {
       // Snapshot-driven continuation: each call boots a fresh sandbox from a
       // stored snapshot (per-thread, or a per-agent base for new threads with
-      // init: "once"). The sandbox is destroyed inline by the child on exit;
-      // only the snapshot IDs are kept alive in parent-workflow state.
+      // init: "once"). The session destroys its sandbox inline on exit;
+      // stored snapshot IDs are cleaned up by the parent at shutdown.
       const isLazy = sandboxCfg.init === "once";
 
       let baseSnap: SandboxSnapshot | undefined;
       if (continuationThreadId) {
-        baseSnap = threadSnapshots.get(continuationThreadId);
+        baseSnap = threadSnapshots.get(continuationThreadId)?.snapshot;
       }
 
       if (!baseSnap && isLazy) {
@@ -306,19 +323,8 @@ export function createSubagentHandler<
 
     const childHandle = await startChild(config.workflow, childOpts);
 
-    // Track child handles that need signaling at parent shutdown.
     const effectiveShutdown =
       sandboxShutdownOverride ?? sandboxCfg.shutdown ?? "destroy";
-
-    if (
-      effectiveShutdown === "pause-until-parent-close" ||
-      effectiveShutdown === "keep-until-parent-close"
-    ) {
-      const key = isLazyCreator
-        ? `persistent:${config.agentName}`
-        : childWorkflowId;
-      pendingDestroys.set(key, childHandle);
-    }
 
     // Wait for signal from child; race with child completion to propagate failures
     await Promise.race([
@@ -360,7 +366,6 @@ export function createSubagentHandler<
       metadata,
     } = childResult;
 
-    // Store sandbox ID for future continuation/fork
     if (childSandboxId) {
       if (
         sandboxCfg.source === "own" &&
@@ -380,20 +385,33 @@ export function createSubagentHandler<
       }
     }
 
-    // Store snapshots for future snapshot-driven continuation.
-    //
-    // Each snapshot-producing child stays alive after signalling its result
-    // so we can trigger cleanup via `cleanupSnapshotsSignal` later (the
-    // child then deletes its snapshots using its own `sandboxOps`, which
-    // may be a different provider from the parent's). All snapshots — live
-    // or superseded — are swept in the final `cleanupSubagentSnapshots`
-    // pass.
+    // Track sandboxes that must be destroyed by the parent at shutdown.
+    if (
+      childSandboxId &&
+      (effectiveShutdown === "pause-until-parent-close" ||
+        effectiveShutdown === "keep-until-parent-close")
+    ) {
+      const key = isLazyCreator
+        ? `persistent:${config.agentName}`
+        : childWorkflowId;
+      pendingDestroys.set(key, {
+        agentName: config.agentName,
+        sandboxId: childSandboxId,
+      });
+    }
+
+    // Store snapshots for future snapshot-driven continuation and final sweep.
+    // Tag each with `agentName` so `cleanupSubagentSnapshots` knows which
+    // sandbox ops to call for deletion.
     if (
       sandboxCfg.source === "own" &&
       sandboxCfg.continuation === "snapshot"
     ) {
       if (childSnapshot && childThreadId) {
-        threadSnapshots.set(childThreadId, childSnapshot);
+        threadSnapshots.set(childThreadId, {
+          agentName: config.agentName,
+          snapshot: childSnapshot,
+        });
       }
       if (
         isSnapshotBaseCreator &&
@@ -401,9 +419,6 @@ export function createSubagentHandler<
         !persistentBaseSnapshot.has(config.agentName)
       ) {
         persistentBaseSnapshot.set(config.agentName, childBaseSnapshot);
-      }
-      if (childSnapshot || childBaseSnapshot) {
-        pendingSnapshotCleanups.set(childWorkflowId, childHandle);
       }
     }
 
@@ -459,15 +474,24 @@ export function createSubagentHandler<
   };
 
   const destroySubagentSandboxes = async (): Promise<void> => {
-    const handles = [...pendingDestroys.values()];
+    const entries = [...pendingDestroys.values()];
     pendingDestroys.clear();
     await Promise.all(
-      handles.map(async (handle) => {
+      entries.map(async ({ agentName, sandboxId }) => {
+        const ops = agentSandboxOps.get(agentName);
+        if (!ops) {
+          log.warn(
+            "Skipping sandbox destroy — no sandboxProxy registered for agent",
+            { agentName, sandboxId }
+          );
+          return;
+        }
         try {
-          await handle.signal(destroySandboxSignal);
-          await handle.result();
+          await ops.destroySandbox(sandboxId);
         } catch (err) {
-          log.warn("Failed to signal destroySandbox to child workflow", {
+          log.warn("Failed to destroy subagent sandbox", {
+            agentName,
+            sandboxId,
             error: err,
           });
         }
@@ -476,20 +500,31 @@ export function createSubagentHandler<
   };
 
   const cleanupSubagentSnapshots = async (): Promise<void> => {
-    const handles = [...pendingSnapshotCleanups.values()];
-    pendingSnapshotCleanups.clear();
+    const tagged: TaggedSnapshot[] = [];
+    for (const entry of threadSnapshots.values()) tagged.push(entry);
+    for (const [agentName, snapshot] of persistentBaseSnapshot.entries()) {
+      tagged.push({ agentName, snapshot });
+    }
     threadSnapshots.clear();
     persistentBaseSnapshot.clear();
+
     await Promise.all(
-      handles.map(async (handle) => {
-        try {
-          await handle.signal(cleanupSnapshotsSignal);
-          await handle.result();
-        } catch (err) {
+      tagged.map(async ({ agentName, snapshot }) => {
+        const ops = agentSandboxOps.get(agentName);
+        if (!ops) {
           log.warn(
-            "Failed to signal cleanupSnapshots to child workflow",
-            { error: err }
+            "Skipping snapshot delete — no sandboxProxy registered for agent",
+            { agentName }
           );
+          return;
+        }
+        try {
+          await ops.deleteSandboxSnapshot(snapshot);
+        } catch (err) {
+          log.warn("Failed to delete subagent snapshot", {
+            agentName,
+            error: err,
+          });
         }
       })
     );

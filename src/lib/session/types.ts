@@ -230,15 +230,6 @@ export type SessionResult<
    * threads that want to skip re-seeding.
    */
   baseSnapshot?: SandboxSnapshot;
-  /**
-   * Deletes any snapshots captured by this session (`snapshot` +
-   * `baseSnapshot`) via the session's own `sandboxOps`. Only defined when
-   * `sandboxShutdown === "snapshot"` and `sandboxOps` is provided.
-   *
-   * Subagent workflows typically forward this callback so the parent can
-   * trigger cleanup after it is done reusing the snapshots.
-   */
-  deleteSnapshots?: () => Promise<void>;
 } & (HasSandbox extends true
   ? { sandboxId: string }
   : { sandboxId?: undefined });

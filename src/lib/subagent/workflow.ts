@@ -2,8 +2,6 @@ import type { z } from "zod";
 import {
   workflowInfo,
   getExternalWorkflowHandle,
-  setHandler,
-  condition,
   ApplicationFailure,
 } from "@temporalio/workflow";
 import type {
@@ -14,12 +12,7 @@ import type {
   SubagentSessionInput,
 } from "./types";
 import type { SubagentSandboxShutdown } from "../lifecycle";
-import {
-  childResultSignal,
-  childSandboxReadySignal,
-  cleanupSnapshotsSignal,
-  destroySandboxSignal,
-} from "./signals";
+import { childResultSignal, childSandboxReadySignal } from "./signals";
 
 /**
  * Defines a subagent workflow with embedded metadata (name, description, resultSchema).
@@ -147,33 +140,16 @@ export function defineSubagentWorkflow(
         }
       },
     };
-    const { destroySandbox, deleteSnapshots, ...result } = await fn(
-      prompt,
-      sessionInput,
-      context ?? {}
-    );
+
+    const result = await fn(prompt, sessionInput, context ?? {});
 
     if (
-      effectiveShutdown === "pause-until-parent-close" ||
-      effectiveShutdown === "keep-until-parent-close"
+      (effectiveShutdown === "pause-until-parent-close" ||
+        effectiveShutdown === "keep-until-parent-close") &&
+      !result.sandboxId
     ) {
-      if (!destroySandbox) {
-        throw ApplicationFailure.create({
-          message: `Subagent "${config.name}" has sandboxShutdown="${effectiveShutdown}" but fn did not return a destroySandbox callback`,
-          nonRetryable: true,
-        });
-      }
-      if (!result.sandboxId) {
-        throw ApplicationFailure.create({
-          message: `Subagent "${config.name}" has sandboxShutdown="${effectiveShutdown}" but fn did not return a sandboxId`,
-          nonRetryable: true,
-        });
-      }
-    }
-
-    if (effectiveShutdown === "snapshot" && !deleteSnapshots) {
       throw ApplicationFailure.create({
-        message: `Subagent "${config.name}" has sandboxShutdown="snapshot" but fn did not return a deleteSnapshots callback`,
+        message: `Subagent "${config.name}" has sandboxShutdown="${effectiveShutdown}" but fn did not return a sandboxId`,
         nonRetryable: true,
       });
     }
@@ -182,24 +158,6 @@ export function defineSubagentWorkflow(
       childWorkflowId: workflowInfo().workflowId,
       result,
     });
-
-    if (destroySandbox) {
-      let destroyRequested = false;
-      setHandler(destroySandboxSignal, () => {
-        destroyRequested = true;
-      });
-      await condition(() => destroyRequested);
-      await destroySandbox();
-    }
-
-    if (deleteSnapshots) {
-      let cleanupRequested = false;
-      setHandler(cleanupSnapshotsSignal, () => {
-        cleanupRequested = true;
-      });
-      await condition(() => cleanupRequested);
-      await deleteSnapshots();
-    }
 
     return result;
   };

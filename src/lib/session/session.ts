@@ -526,31 +526,6 @@ export async function createSession<
         ...(exitSnapshot && { hasExitSnapshot: true }),
       });
 
-      const snapshotsToClean: SandboxSnapshot[] = [];
-      if (baseSnapshot) snapshotsToClean.push(baseSnapshot);
-      if (exitSnapshot) snapshotsToClean.push(exitSnapshot);
-
-      // Helper that closes over the session's own sandboxOps + captured
-      // snapshots. Subagent workflows wire this into their workflow wrapper
-      // so the parent can signal cleanup without needing to know the child's
-      // sandbox provider.
-      const deleteSnapshots =
-        snapshotsToClean.length > 0 && sandboxOps
-          ? async (): Promise<void> => {
-              await Promise.all(
-                snapshotsToClean.map(async (snap) => {
-                  try {
-                    await sandboxOps.deleteSandboxSnapshot(snap);
-                  } catch (err) {
-                    log.warn("Failed to delete session snapshot", {
-                      error: err,
-                    });
-                  }
-                })
-              );
-            }
-          : undefined;
-
       return {
         threadId,
         finalMessage,
@@ -559,7 +534,6 @@ export async function createSession<
         sandboxId,
         ...(baseSnapshot && { baseSnapshot }),
         ...(exitSnapshot && { snapshot: exitSnapshot }),
-        ...(deleteSnapshots && { deleteSnapshots }),
       } as Awaited<ReturnType<ZeitlichSession<M, boolean>["runSession"]>>;
     },
   };
