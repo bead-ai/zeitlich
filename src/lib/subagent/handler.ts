@@ -56,12 +56,6 @@ function resolveSandboxConfig(
   };
 }
 
-/** Snapshot tagged with the agent that produced it so the parent knows which sandboxOps to use. */
-interface TaggedSnapshot {
-  agentName: string;
-  snapshot: SandboxSnapshot;
-}
-
 /**
  * Creates a Subagent tool handler that spawns child workflows for configured subagents.
  *
@@ -118,7 +112,13 @@ export function createSubagentHandler<
   /** Reverse lookup: childWorkflowId → agentName for in-flight lazy creators */
   const lazyCreatorAgent = new Map<string, string>();
   /** Maps childThreadId → latest snapshot for sandbox continuation via snapshots */
-  const threadSnapshots = new Map<string, TaggedSnapshot>();
+  const threadSnapshots = new Map<
+    string,
+    {
+      agentName: string;
+      snapshot: SandboxSnapshot;
+    }
+  >();
   /** Maps agentName → reusable base snapshot captured on first-ever call (init: once + continuation: "snapshot") */
   const persistentBaseSnapshot = new Map<string, SandboxSnapshot>();
   /** Tracks agents whose first snapshot-backed sandbox creation is in-flight */
@@ -128,16 +128,13 @@ export function createSubagentHandler<
     childResults.set(childWorkflowId, result);
   });
 
-  setHandler(
-    childSandboxReadySignal,
-    ({ childWorkflowId, sandboxId }) => {
-      const agentName = lazyCreatorAgent.get(childWorkflowId);
-      if (agentName && !persistentSandboxes.has(agentName)) {
-        persistentSandboxes.set(agentName, sandboxId);
-        lazyCreatorAgent.delete(childWorkflowId);
-      }
+  setHandler(childSandboxReadySignal, ({ childWorkflowId, sandboxId }) => {
+    const agentName = lazyCreatorAgent.get(childWorkflowId);
+    if (agentName && !persistentSandboxes.has(agentName)) {
+      persistentSandboxes.set(agentName, sandboxId);
+      lazyCreatorAgent.delete(childWorkflowId);
     }
-  );
+  });
 
   const handler = async (
     args: SubagentArgs,
@@ -156,7 +153,10 @@ export function createSubagentHandler<
     const { sandboxId: parentSandboxId } = context;
     const sandboxCfg = resolveSandboxConfig(config.sandbox);
 
-    if (sandboxCfg.source !== "none" && !agentSandboxOps.has(config.agentName)) {
+    if (
+      sandboxCfg.source !== "none" &&
+      !agentSandboxOps.has(config.agentName)
+    ) {
       throw ApplicationFailure.create({
         message: `Subagent "${config.agentName}" uses a sandbox but no \`sandboxProxy\` is configured on its SubagentConfig`,
         nonRetryable: true,
@@ -218,9 +218,7 @@ export function createSubagentHandler<
         baseSnap = persistentBaseSnapshot.get(config.agentName);
         if (!baseSnap) {
           if (persistentBaseSnapshotCreating.has(config.agentName)) {
-            await condition(() =>
-              persistentBaseSnapshot.has(config.agentName)
-            );
+            await condition(() => persistentBaseSnapshot.has(config.agentName));
             baseSnap = persistentBaseSnapshot.get(config.agentName);
           } else {
             persistentBaseSnapshotCreating.add(config.agentName);
@@ -403,10 +401,7 @@ export function createSubagentHandler<
     // Store snapshots for future snapshot-driven continuation and final sweep.
     // Tag each with `agentName` so `cleanupSubagentSnapshots` knows which
     // sandbox ops to call for deletion.
-    if (
-      sandboxCfg.source === "own" &&
-      sandboxCfg.continuation === "snapshot"
-    ) {
+    if (sandboxCfg.source === "own" && sandboxCfg.continuation === "snapshot") {
       if (childSnapshot && childThreadId) {
         threadSnapshots.set(childThreadId, {
           agentName: config.agentName,
@@ -500,7 +495,7 @@ export function createSubagentHandler<
   };
 
   const cleanupSubagentSnapshots = async (): Promise<void> => {
-    const tagged: TaggedSnapshot[] = [];
+    const tagged = [];
     for (const entry of threadSnapshots.values()) tagged.push(entry);
     for (const [agentName, snapshot] of persistentBaseSnapshot.entries()) {
       tagged.push({ agentName, snapshot });

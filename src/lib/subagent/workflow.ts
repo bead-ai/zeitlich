@@ -143,17 +143,6 @@ export function defineSubagentWorkflow(
 
     const result = await fn(prompt, sessionInput, context ?? {});
 
-    if (
-      (effectiveShutdown === "pause-until-parent-close" ||
-        effectiveShutdown === "keep-until-parent-close") &&
-      !result.sandboxId
-    ) {
-      throw ApplicationFailure.create({
-        message: `Subagent "${config.name}" has sandboxShutdown="${effectiveShutdown}" but fn did not return a sandboxId`,
-        nonRetryable: true,
-      });
-    }
-
     await parentHandle.signal(childResultSignal, {
       childWorkflowId: workflowInfo().workflowId,
       result,
