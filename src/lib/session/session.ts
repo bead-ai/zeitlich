@@ -7,7 +7,7 @@ import {
 } from "@temporalio/workflow";
 import type { SessionExitReason } from "../types";
 import type { SessionConfig, ZeitlichSession } from "./types";
-import type { SandboxOps } from "../sandbox/types";
+import type { SandboxOps, SandboxSnapshot } from "../sandbox/types";
 import type {
   AgentState,
   AgentStateManager,
@@ -146,12 +146,16 @@ export async function createSession<
 
   const plugins: ToolMap[string][] = [];
   let destroySubagentSandboxes: (() => Promise<void>) | undefined;
+  let cleanupSubagentSnapshots: (() => Promise<void>) | undefined;
 
   if (subagents) {
-    const result = buildSubagentRegistration(subagents);
+    const result = buildSubagentRegistration(subagents, {
+      ...(sandboxOps && { sandboxOps }),
+    });
     if (result) {
       plugins.push(result.registration);
       destroySubagentSandboxes = result.destroySubagentSandboxes;
+      cleanupSubagentSnapshots = result.cleanupSubagentSnapshots;
     }
   }
   if (skills) {
@@ -210,10 +214,13 @@ export async function createSession<
         }
       );
 
-      // --- Sandbox lifecycle: create, continue, fork, or inherit ----------
+      // --- Sandbox lifecycle: create, continue, fork, from-snapshot, or inherit ---
       const sandboxMode = sandboxInit?.mode;
       let sandboxId: string | undefined;
       let sandboxOwned = false;
+      let baseSnapshot: SandboxSnapshot | undefined;
+      let exitSnapshot: SandboxSnapshot | undefined;
+      let freshlyCreated = false;
 
       if (sandboxMode === "inherit") {
         const inheritInit = sandboxInit as {
@@ -252,6 +259,18 @@ export async function createSession<
           (sandboxInit as { mode: "fork"; sandboxId: string }).sandboxId
         );
         sandboxOwned = true;
+      } else if (sandboxMode === "from-snapshot") {
+        if (!sandboxOps) {
+          throw ApplicationFailure.create({
+            message: "No sandboxOps provided — cannot restore sandbox",
+            nonRetryable: true,
+          });
+        }
+        const snap = (
+          sandboxInit as { mode: "from-snapshot"; snapshot: SandboxSnapshot }
+        ).snapshot;
+        sandboxId = await sandboxOps.restoreSandbox(snap);
+        sandboxOwned = true;
       } else if (sandboxOps) {
         const skillFiles = skills ? collectSkillFiles(skills) : undefined;
         const ctx = (sandboxInit as { mode: "new"; ctx?: unknown } | undefined)
@@ -263,7 +282,21 @@ export async function createSession<
         if (result) {
           sandboxId = result.sandboxId;
           sandboxOwned = true;
+          freshlyCreated = true;
         }
+      }
+
+      // Capture a base snapshot immediately after seeding so it can be reused
+      // as a template for future runs that want to skip the (potentially
+      // expensive) seed step.
+      if (
+        sandboxId &&
+        sandboxOwned &&
+        freshlyCreated &&
+        sandboxShutdown === "snapshot" &&
+        sandboxOps
+      ) {
+        baseSnapshot = await sandboxOps.snapshotSandbox(sandboxId);
       }
 
       if (sandboxId && sandboxOwned && onSandboxReady) {
@@ -347,6 +380,7 @@ export async function createSession<
       );
 
       let exitReason: SessionExitReason = "completed";
+      let finalMessage: M | null = null;
 
       try {
         while (
@@ -385,21 +419,8 @@ export async function createSession<
           if (!toolRouter.hasTools() || rawToolCalls.length === 0) {
             stateManager.complete();
             exitReason = "completed";
-            log.info("session ended", {
-              agentName,
-              threadId,
-              exitReason,
-              turns: currentTurn,
-              durationMs: Date.now() - sessionStartMs,
-              usage: stateManager.getTotalUsage(),
-            });
-            return {
-              threadId,
-              finalMessage: message,
-              exitReason,
-              usage: stateManager.getTotalUsage(),
-              sandboxId,
-            } as Awaited<ReturnType<ZeitlichSession<M, boolean>["runSession"]>>;
+            finalMessage = message;
+            break;
           }
 
           const parsedToolCalls: ParsedToolCallUnion<T>[] = [];
@@ -480,11 +501,19 @@ export async function createSession<
             case "keep":
             case "keep-until-parent-close":
               break;
+            case "snapshot":
+              exitSnapshot = await sandboxOps.snapshotSandbox(sandboxId);
+              await sandboxOps.destroySandbox(sandboxId);
+              break;
           }
         }
 
         if (destroySubagentSandboxes) {
           await destroySubagentSandboxes();
+        }
+
+        if (cleanupSubagentSnapshots) {
+          await cleanupSubagentSnapshots();
         }
       }
 
@@ -495,14 +524,18 @@ export async function createSession<
         turns: stateManager.getTurns(),
         durationMs: Date.now() - sessionStartMs,
         usage: stateManager.getTotalUsage(),
+        ...(baseSnapshot && { hasBaseSnapshot: true }),
+        ...(exitSnapshot && { hasExitSnapshot: true }),
       });
 
       return {
         threadId,
-        finalMessage: null,
+        finalMessage,
         exitReason,
         usage: stateManager.getTotalUsage(),
         sandboxId,
+        ...(baseSnapshot && { baseSnapshot }),
+        ...(exitSnapshot && { snapshot: exitSnapshot }),
       } as Awaited<ReturnType<ZeitlichSession<M, boolean>["runSession"]>>;
     },
   };

@@ -19,6 +19,8 @@ export type ThreadInit =
 // Sandbox lifecycle
 // ============================================================================
 
+import type { SandboxSnapshot } from "./sandbox/types";
+
 /**
  * Sandbox initialization strategy.
  *
@@ -30,6 +32,8 @@ export type ThreadInit =
  *   on exit.
  * - `"fork"` — fork from an existing (or paused) sandbox; a new sandbox is
  *   created and owned by this session.
+ * - `"from-snapshot"` — restore a fresh sandbox from a previously captured
+ *   {@link SandboxSnapshot}. The new sandbox is owned by this session.
  * - `"inherit"` — use a sandbox owned by someone else (e.g. a parent agent).
  *   The session will **not** manage its lifecycle on exit.
  */
@@ -37,6 +41,7 @@ export type SandboxInit =
   | { mode: "new"; ctx?: unknown }
   | { mode: "continue"; sandboxId: string }
   | { mode: "fork"; sandboxId: string }
+  | { mode: "from-snapshot"; snapshot: SandboxSnapshot }
   | {
       mode: "inherit";
       sandboxId: string;
@@ -48,8 +53,11 @@ export type SandboxInit =
  * - `"destroy"` — tear down the sandbox entirely.
  * - `"pause"` — pause the sandbox so it can be resumed later.
  * - `"keep"` — leave the sandbox running (no-op on exit).
+ * - `"snapshot"` — capture a snapshot then destroy the sandbox. The snapshot
+ *   is surfaced on the session result so the caller can reuse it to spawn
+ *   future sandboxes.
  */
-export type SandboxShutdown = "destroy" | "pause" | "keep";
+export type SandboxShutdown = "destroy" | "pause" | "keep" | "snapshot";
 
 /**
  * Extended shutdown options available to subagent workflows.

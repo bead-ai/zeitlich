@@ -164,6 +164,12 @@ export class DaytonaSandboxProvider implements SandboxProvider<
       "restore (use Daytona's native snapshot API directly)"
     );
   }
+
+  async deleteSnapshot(_snapshot: SandboxSnapshot): Promise<void> {
+    throw new SandboxNotSupportedError(
+      "deleteSnapshot (use Daytona's native snapshot API directly)"
+    );
+  }
 }
 
 // Re-exports

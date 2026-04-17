@@ -192,6 +192,8 @@ describe("SandboxManager", () => {
     expect(activities.inMemoryTestCreateSandbox).toBeTypeOf("function");
     expect(activities.inMemoryTestDestroySandbox).toBeTypeOf("function");
     expect(activities.inMemoryTestSnapshotSandbox).toBeTypeOf("function");
+    expect(activities.inMemoryTestRestoreSandbox).toBeTypeOf("function");
+    expect(activities.inMemoryTestDeleteSandboxSnapshot).toBeTypeOf("function");
 
     const result = await activities.inMemoryTestCreateSandbox();
     expect(result).not.toBeNull();
@@ -202,6 +204,34 @@ describe("SandboxManager", () => {
     await expect(manager.getSandbox(sandboxId)).rejects.toThrow(
       SandboxNotFoundError
     );
+  });
+
+  it("restoreSandbox activity creates a new sandbox from a snapshot", async () => {
+    const activities = manager.createActivities("Test");
+
+    const created = await activities.inMemoryTestCreateSandbox({
+      initialFiles: { "/greeting.txt": "hello" },
+    });
+    const { sandboxId } = created as { sandboxId: string };
+
+    const snapshot = await activities.inMemoryTestSnapshotSandbox(sandboxId);
+    await activities.inMemoryTestDestroySandbox(sandboxId);
+
+    const restoredId = await activities.inMemoryTestRestoreSandbox(snapshot);
+    const restored = await manager.getSandbox(restoredId);
+    expect(await restored.fs.readFile("/greeting.txt")).toBe("hello");
+  });
+
+  it("deleteSandboxSnapshot activity is a no-op for in-memory snapshots", async () => {
+    const activities = manager.createActivities("Test");
+
+    const created = await activities.inMemoryTestCreateSandbox();
+    const { sandboxId } = created as { sandboxId: string };
+
+    const snapshot = await activities.inMemoryTestSnapshotSandbox(sandboxId);
+    await expect(
+      activities.inMemoryTestDeleteSandboxSnapshot(snapshot)
+    ).resolves.toBeUndefined();
   });
 });
 

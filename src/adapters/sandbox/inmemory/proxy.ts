@@ -49,6 +49,8 @@ export function proxyInMemorySandboxOps(
     pauseSandbox: acts[p("pauseSandbox")],
     resumeSandbox: acts[p("resumeSandbox")],
     snapshotSandbox: acts[p("snapshotSandbox")],
+    restoreSandbox: acts[p("restoreSandbox")],
+    deleteSandboxSnapshot: acts[p("deleteSandboxSnapshot")],
     forkSandbox: acts[p("forkSandbox")],
   } as SandboxOps;
 }

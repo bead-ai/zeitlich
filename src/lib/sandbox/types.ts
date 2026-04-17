@@ -135,6 +135,8 @@ export interface SandboxProvider<
   resume(sandboxId: string): Promise<void>;
   snapshot(sandboxId: string): Promise<SandboxSnapshot>;
   restore(snapshot: SandboxSnapshot): Promise<Sandbox>;
+  /** Delete a previously captured snapshot. No-op if already deleted. */
+  deleteSnapshot(snapshot: SandboxSnapshot): Promise<void>;
   fork(sandboxId: string): Promise<Sandbox>;
 }
 
@@ -155,6 +157,10 @@ export interface SandboxOps<
   /** Resume a paused sandbox. No-op if already running. */
   resumeSandbox(sandboxId: string): Promise<void>;
   snapshotSandbox(sandboxId: string): Promise<SandboxSnapshot>;
+  /** Create a fresh sandbox from a previously captured snapshot. */
+  restoreSandbox(snapshot: SandboxSnapshot): Promise<string>;
+  /** Delete a previously captured snapshot. No-op if already deleted. */
+  deleteSandboxSnapshot(snapshot: SandboxSnapshot): Promise<void>;
   forkSandbox(sandboxId: string): Promise<string>;
 }
 
