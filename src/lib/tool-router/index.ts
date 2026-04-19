@@ -26,6 +26,8 @@ export type {
   InferToolResults,
   ToolCallResultUnion,
   ProcessToolCallsContext,
+  ProcessToolCallsResult,
+  RewindSignal,
   PreToolUseHookResult,
   PostToolUseFailureHookResult,
   ToolHooks,

@@ -36,6 +36,15 @@ export interface BaseThreadManager<T> {
   fork(newThreadId: string): Promise<BaseThreadManager<T>>;
   /** Delete the thread */
   delete(): Promise<void>;
+  /** Get the number of stored messages currently in the thread */
+  length(): Promise<number>;
+  /**
+   * Truncate the thread to the given length (inclusive). Any messages
+   * beyond `length` are removed. When `length` is 0 the thread ends up
+   * empty (but still exists). Also clears any dedup markers so that
+   * subsequent appends with the same ids replay correctly.
+   */
+  truncate(length: number): Promise<void>;
 }
 
 /**

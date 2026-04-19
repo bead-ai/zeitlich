@@ -136,6 +136,17 @@ export interface ToolHandlerResponse<TResult = null, TToolResponse = JsonValue> 
    * payloads through Temporal's activity payload limit.
    */
   resultAppended?: boolean;
+  /**
+   * When true, the session will rewind: any in-flight parallel tool calls
+   * are cancelled, previously appended tool results and the triggering
+   * assistant message are removed from the thread, and the LLM call that
+   * produced the tool calls is retried.
+   *
+   * The `toolResponse` for a rewinding tool call is ignored (never
+   * appended) since the session truncates the thread back to the
+   * pre-invocation state.
+   */
+  rewind?: boolean;
   /** Token usage from the tool execution (e.g. child agent invocations) */
   usage?: TokenUsage;
   /** Thread ID used by the handler (surfaced to the LLM for subagent thread continuation) */
@@ -269,6 +280,28 @@ export interface ProcessToolCallsContext {
   /** Active sandbox ID (when a sandbox is configured for this session) */
   sandboxId?: string;
 }
+
+/**
+ * Signal that a tool handler requested a rewind. Attached to the
+ * {@link ProcessToolCallsResult} so the session can roll the thread
+ * back to the pre-invocation snapshot and retry the LLM call.
+ */
+export interface RewindSignal {
+  toolCallId: string;
+  toolName: string;
+}
+
+/**
+ * Result returned by {@link ToolRouter.processToolCalls}.
+ *
+ * The object is a standard array of tool call results for successful
+ * tool calls (cancelled or rewinding siblings are omitted), extended
+ * with a `rewind` property when any tool in the batch requested a
+ * rewind. Using an array-with-property lets existing code that treats
+ * the return value as `ToolCallResultUnion[]` continue to work.
+ */
+export type ProcessToolCallsResult<TResults extends Record<string, unknown>> =
+  ToolCallResultUnion<TResults>[] & { rewind?: RewindSignal };
 
 // ============================================================================
 // Hook Types
@@ -461,7 +494,7 @@ export interface ToolRouter<T extends ToolMap> {
   processToolCalls(
     toolCalls: ParsedToolCallUnion<T>[],
     context?: ProcessToolCallsContext
-  ): Promise<ToolCallResultUnion<InferToolResults<T>>[]>;
+  ): Promise<ProcessToolCallsResult<InferToolResults<T>>>;
 
   /**
    * Process tool calls matching a specific name with a custom handler.

@@ -15,12 +15,19 @@ import type {
   ToolArgs,
   ToolResult,
   ProcessToolCallsContext,
+  ProcessToolCallsResult,
+  RewindSignal,
   ToolWithHandler,
 } from "./types";
 
 import type { JsonValue } from "../state/types";
 import type { z } from "zod";
-import { uuid4, log } from "@temporalio/workflow";
+import {
+  uuid4,
+  log,
+  CancellationScope,
+  isCancellation,
+} from "@temporalio/workflow";
 
 /**
  * Creates a tool router for declarative tool call processing.
@@ -198,11 +205,22 @@ export function createToolRouter<T extends ToolMap>(
     }
   }
 
+  /**
+   * Internal per-tool-call outcome. `rewind` signals the caller that the
+   * handler requested a session-level rewind; when present, the result is
+   * not appended to the thread and siblings should be cancelled.
+   */
+  type ProcessedToolCall =
+    | { kind: "result"; value: ToolCallResultUnion<TResults> }
+    | { kind: "rewind"; signal: RewindSignal }
+    | { kind: "skipped" };
+
   async function processToolCall(
     toolCall: ParsedToolCallUnion<T>,
     turn: number,
     sandboxId?: string,
-  ): Promise<ToolCallResultUnion<TResults> | null> {
+    onRewindRequested?: (signal: RewindSignal) => void,
+  ): Promise<ProcessedToolCall> {
     const startTime = Date.now();
     const tool = toolMap.get(toolCall.name);
 
@@ -219,7 +237,7 @@ export function createToolRouter<T extends ToolMap>(
           reason: "Skipped by PreToolUse hook",
         }),
       });
-      return null;
+      return { kind: "skipped" };
     }
     const effectiveArgs = preResult.args;
 
@@ -234,6 +252,7 @@ export function createToolRouter<T extends ToolMap>(
     let content!: JsonValue;
     let resultAppended = false;
     let metadata: Record<string, unknown> | undefined;
+    let rewindRequested = false;
 
     try {
       if (tool) {
@@ -252,11 +271,15 @@ export function createToolRouter<T extends ToolMap>(
         content = response.toolResponse as JsonValue;
         resultAppended = response.resultAppended === true;
         metadata = response.metadata;
+        rewindRequested = response.rewind === true;
       } else {
         result = { error: `Unknown tool: ${toolCall.name}` };
         content = JSON.stringify(result, null, 2);
       }
     } catch (error) {
+      if (isCancellation(error)) {
+        throw error;
+      }
       log.warn("tool call failed", {
         toolName: toolCall.name,
         toolCallId: toolCall.id,
@@ -273,6 +296,16 @@ export function createToolRouter<T extends ToolMap>(
       );
       result = recovery.result;
       content = recovery.content;
+    }
+
+    if (rewindRequested) {
+      const signal: RewindSignal = {
+        toolCallId: toolCall.id,
+        toolName: toolCall.name,
+      };
+      log.info("tool requested rewind", { ...signal });
+      onRewindRequested?.(signal);
+      return { kind: "rewind", signal };
     }
 
     // --- Append result to thread (unless handler already did) ---
@@ -318,7 +351,7 @@ export function createToolRouter<T extends ToolMap>(
       durationMs
     );
 
-    return toolResult;
+    return { kind: "result", value: toolResult };
   }
 
   return {
@@ -368,31 +401,71 @@ export function createToolRouter<T extends ToolMap>(
     async processToolCalls(
       toolCalls: ParsedToolCallUnion<T>[],
       context?: ProcessToolCallsContext
-    ): Promise<ToolCallResultUnion<TResults>[]> {
+    ): Promise<ProcessToolCallsResult<TResults>> {
+      const attachRewind = (
+        arr: ToolCallResultUnion<TResults>[],
+        rewind: RewindSignal | undefined,
+      ): ProcessToolCallsResult<TResults> => {
+        if (rewind) {
+          (arr as ProcessToolCallsResult<TResults>).rewind = rewind;
+        }
+        return arr as ProcessToolCallsResult<TResults>;
+      };
+
       if (toolCalls.length === 0) {
-        return [];
+        return attachRewind([], undefined);
       }
 
       const turn = context?.turn ?? 0;
       const sandboxId = context?.sandboxId;
 
+      let rewindSignal: RewindSignal | undefined;
+
       if (options.parallel) {
-        const results = await Promise.all(
-          toolCalls.map((tc) => processToolCall(tc, turn, sandboxId))
+        const scope = new CancellationScope({ cancellable: true });
+        const onRewindRequested = (signal: RewindSignal): void => {
+          if (!rewindSignal) {
+            rewindSignal = signal;
+            // Cancel all other in-flight tool calls in this batch.
+            scope.cancel();
+          }
+        };
+
+        const outcomes = await scope.run(async () =>
+          Promise.allSettled(
+            toolCalls.map((tc) =>
+              processToolCall(tc, turn, sandboxId, onRewindRequested)
+            )
+          )
         );
-        return results.filter(
-          (r): r is NonNullable<typeof r> => r !== null
-        ) as ToolCallResultUnion<TResults>[];
+
+        const results: ToolCallResultUnion<TResults>[] = [];
+        for (const outcome of outcomes) {
+          if (outcome.status === "rejected") {
+            if (isCancellation(outcome.reason)) {
+              continue;
+            }
+            throw outcome.reason;
+          }
+          if (outcome.value.kind === "result") {
+            results.push(outcome.value.value);
+          }
+        }
+        return attachRewind(results, rewindSignal);
       }
 
       const results: ToolCallResultUnion<TResults>[] = [];
       for (const toolCall of toolCalls) {
-        const result = await processToolCall(toolCall, turn, sandboxId);
-        if (result !== null) {
-          results.push(result);
+        const outcome = await processToolCall(toolCall, turn, sandboxId);
+        if (outcome.kind === "rewind") {
+          rewindSignal = outcome.signal;
+          break;
+        }
+        if (outcome.kind === "result") {
+          results.push(outcome.value);
         }
       }
-      return results;
+      return attachRewind(results, rewindSignal);
     },
 
     async processToolCallsByName<TName extends ToolNames<T>, TResult>(

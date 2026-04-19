@@ -86,6 +86,9 @@ export interface AgentStateManager<TCustom extends JsonSerializable<TCustom>> {
   /** Increment turns (call after each turn) */
   incrementTurns(): void;
 
+  /** Decrement turns (used to roll back the turn counter on rewind) */
+  decrementTurns(): void;
+
   /** Get current turns */
   getTurns(): number;
 

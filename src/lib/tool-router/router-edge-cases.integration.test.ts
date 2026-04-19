@@ -23,8 +23,20 @@ vi.mock("@temporalio/workflow", () => {
     }
   }
   const noop = () => {};
+  class MockCancellationScope {
+    cancellable: boolean;
+    constructor(opts?: { cancellable?: boolean }) {
+      this.cancellable = opts?.cancellable ?? true;
+    }
+    async run<T>(fn: () => Promise<T>): Promise<T> {
+      return fn();
+    }
+    cancel(): void {}
+  }
   return {
     ApplicationFailure: MockApplicationFailure,
+    CancellationScope: MockCancellationScope,
+    isCancellation: (_err: unknown) => false,
     uuid4: () => "00000000-0000-0000-0000-000000000000",
     log: { trace: noop, debug: noop, info: noop, warn: noop, error: noop },
   };
@@ -647,6 +659,86 @@ describe("createToolRouter edge cases", () => {
       error: "string error",
       recovered: true,
     });
+  });
+
+  // --- Rewind signal -------------------------------------------------------
+
+  it("attaches a rewind signal and skips result append when handler returns rewind:true", async () => {
+    const rewindTool = defineTool({
+      name: "Rewind" as const,
+      description: "rewinds",
+      schema: z.object({}),
+      handler: async () => ({
+        toolResponse: "ignored",
+        data: null,
+        rewind: true,
+      }),
+    });
+
+    const router = createToolRouter({
+      tools: { Rewind: rewindTool } as const,
+      threadId: "t-1",
+      appendToolResult: appendSpy.fn,
+    });
+
+    const parsed = router.parseToolCall({
+      id: "tc-1",
+      name: "Rewind",
+      args: {},
+    });
+
+    const results = await router.processToolCalls([parsed]);
+
+    expect(results).toHaveLength(0);
+    expect(results.rewind).toEqual({
+      toolCallId: "tc-1",
+      toolName: "Rewind",
+    });
+    expect(appendSpy.calls).toHaveLength(0);
+  });
+
+  it("short-circuits further sequential tool calls when one requests rewind", async () => {
+    let laterCalled = false;
+    const laterTool = defineTool({
+      name: "Later" as const,
+      description: "runs after rewind",
+      schema: z.object({}),
+      handler: async () => {
+        laterCalled = true;
+        return { toolResponse: "ok", data: null };
+      },
+    });
+    const rewindTool = defineTool({
+      name: "Rewind" as const,
+      description: "rewinds",
+      schema: z.object({}),
+      handler: async () => ({
+        toolResponse: "ignored",
+        data: null,
+        rewind: true,
+      }),
+    });
+
+    const router = createToolRouter({
+      tools: { Rewind: rewindTool, Later: laterTool } as const,
+      threadId: "t-1",
+      appendToolResult: appendSpy.fn,
+      parallel: false,
+    });
+
+    const calls = [
+      router.parseToolCall({ id: "tc-1", name: "Rewind", args: {} }),
+      router.parseToolCall({ id: "tc-2", name: "Later", args: {} }),
+    ];
+
+    const results = await router.processToolCalls(calls);
+
+    expect(results).toHaveLength(0);
+    expect(results.rewind).toEqual({
+      toolCallId: "tc-1",
+      toolName: "Rewind",
+    });
+    expect(laterCalled).toBe(false);
   });
 });
 

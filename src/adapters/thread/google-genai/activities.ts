@@ -222,6 +222,31 @@ export function createGoogleGenAIAdapter(
       });
       await thread.fork(targetThreadId);
     },
+
+    async getThreadLength(
+      threadId: string,
+      threadKey?: string,
+    ): Promise<number> {
+      const thread = createGoogleGenAIThreadManager({
+        redis,
+        threadId,
+        key: threadKey,
+      });
+      return thread.length();
+    },
+
+    async truncateThread(
+      threadId: string,
+      length: number,
+      threadKey?: string,
+    ): Promise<void> {
+      const thread = createGoogleGenAIThreadManager({
+        redis,
+        threadId,
+        key: threadKey,
+      });
+      await thread.truncate(length);
+    },
   };
 
   function createActivities<S extends string = "">(

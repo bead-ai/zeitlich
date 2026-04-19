@@ -33,6 +33,16 @@ vi.mock("@temporalio/workflow", () => {
     }
   }
 
+  class MockCancellationScope {
+    cancellable: boolean;
+    constructor(opts?: { cancellable?: boolean }) {
+      this.cancellable = opts?.cancellable ?? true;
+    }
+    async run<T>(fn: () => Promise<T>): Promise<T> {
+      return fn();
+    }
+    cancel(): void {}
+  }
   return {
     proxyActivities: <T>() => ({}) as T,
     condition: async (fn: () => boolean) => fn(),
@@ -46,6 +56,8 @@ vi.mock("@temporalio/workflow", () => {
     uuid4: () =>
       `00000000-0000-0000-0000-${String(++idCounter).padStart(12, "0")}`,
     ApplicationFailure: MockApplicationFailure,
+    CancellationScope: MockCancellationScope,
+    isCancellation: (_err: unknown) => false,
     log: {
       trace: () => {},
       debug: () => {},
@@ -85,25 +97,39 @@ function toActivityInterface(raw: ThreadOps): ActivityInterfaceFor<ThreadOps> {
 
 function createMockThreadOps() {
   const log: { op: string; args: unknown[] }[] = [];
+  let threadLength = 0;
 
   const ops = toActivityInterface({
     initializeThread: async (threadId) => {
       log.push({ op: "initializeThread", args: [threadId] });
+      threadLength = 0;
     },
     appendHumanMessage: async (threadId, id, content) => {
       log.push({ op: "appendHumanMessage", args: [threadId, id, content] });
+      threadLength += 1;
     },
     appendToolResult: async (id, config) => {
       log.push({ op: "appendToolResult", args: [id, config] });
+      threadLength += 1;
     },
     appendSystemMessage: async (threadId, id, content) => {
       log.push({ op: "appendSystemMessage", args: [threadId, id, content] });
+      threadLength += 1;
     },
     appendAgentMessage: async (threadId, id, message) => {
       log.push({ op: "appendAgentMessage", args: [threadId, id, message] });
+      threadLength += 1;
     },
     forkThread: async (source, target) => {
       log.push({ op: "forkThread", args: [source, target] });
+    },
+    getThreadLength: async (threadId) => {
+      log.push({ op: "getThreadLength", args: [threadId] });
+      return threadLength;
+    },
+    truncateThread: async (threadId, length) => {
+      log.push({ op: "truncateThread", args: [threadId, length] });
+      threadLength = length;
     },
   });
 

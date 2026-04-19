@@ -142,6 +142,8 @@ export async function createSession<
     appendSystemMessage,
     appendAgentMessage,
     forkThread,
+    getThreadLength,
+    truncateThread,
   } = threadOps;
 
   const plugins: ToolMap[string][] = [];
@@ -400,6 +402,10 @@ export async function createSession<
             metadata,
           });
 
+          // Snapshot thread length *before* appending the assistant message
+          // so we can roll everything back to this point on a rewind.
+          const preAssistantLength = await getThreadLength(threadId, threadKey);
+
           await appendAgentMessage(threadId, uuid4(), message, threadKey);
 
           if (usage) {
@@ -450,6 +456,23 @@ export async function createSession<
             if (result.usage) {
               stateManager.updateUsage(result.usage);
             }
+          }
+
+          const rewind = toolCallResults.rewind;
+          if (rewind) {
+            log.info("rewinding turn", {
+              agentName,
+              threadId,
+              turn: currentTurn,
+              toolCallId: rewind.toolCallId,
+              toolName: rewind.toolName,
+            });
+            // Drop the assistant message + any already-saved tool results
+            // so the LLM call can be retried from the pre-assistant state.
+            await truncateThread(threadId, preAssistantLength, threadKey);
+            // Roll back the turn counter — the retry re-increments it.
+            stateManager.decrementTurns();
+            continue;
           }
 
           if (stateManager.getStatus() === "WAITING_FOR_INPUT") {

@@ -23,8 +23,20 @@ vi.mock("@temporalio/workflow", () => {
     }
   }
   const noop = () => {};
+  class MockCancellationScope {
+    cancellable: boolean;
+    constructor(opts?: { cancellable?: boolean }) {
+      this.cancellable = opts?.cancellable ?? true;
+    }
+    async run<T>(fn: () => Promise<T>): Promise<T> {
+      return fn();
+    }
+    cancel(): void {}
+  }
   return {
     ApplicationFailure: MockApplicationFailure,
+    CancellationScope: MockCancellationScope,
+    isCancellation: (_err: unknown) => false,
     uuid4: () => "00000000-0000-0000-0000-000000000000",
     log: { trace: noop, debug: noop, info: noop, warn: noop, error: noop },
   };
