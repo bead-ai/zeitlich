@@ -469,9 +469,10 @@ export async function createSession<
             });
             // Drop the assistant message + any already-saved tool results
             // so the LLM call can be retried from the pre-assistant state.
+            // The turn counter is intentionally NOT rolled back — each
+            // rewind still consumes one of the `maxTurns` budget so a
+            // misbehaving tool cannot spin the session forever.
             await truncateThread(threadId, preAssistantLength, threadKey);
-            // Roll back the turn counter — the retry re-increments it.
-            stateManager.decrementTurns();
             continue;
           }
 

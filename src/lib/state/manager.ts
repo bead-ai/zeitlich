@@ -157,10 +157,6 @@ export function createAgentStateManager<
       turns++;
     },
 
-    decrementTurns(): void {
-      if (turns > 0) turns--;
-    },
-
     get<K extends keyof TCustom>(key: K): TCustom[K] {
       return customState[key];
     },

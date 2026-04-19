@@ -1876,12 +1876,55 @@ describe("createSession edge cases", () => {
 
     expect(result.exitReason).toBe("completed");
     expect(result.finalMessage).toBe("done");
-    // Turns should reflect: turn 1 (rewound, decremented), turn 1 again
-    // (retry appended result), turn 2 (completion) → 2 final turns.
-    expect(result.usage.turns).toBe(2);
+    // Each rewind still consumes a turn from the `maxTurns` budget:
+    // turn 1 (rewound) + turn 2 (successful tool call) + turn 3 (done) = 3.
+    expect(result.usage.turns).toBe(3);
     expect(attempts).toBe(2);
 
     const truncateOps = log.filter((l) => l.op === "truncateThread");
     expect(truncateOps).toHaveLength(1);
+  });
+
+  it("bails out with max_turns when a tool keeps requesting rewind", async () => {
+    const { ops, log } = createMockThreadOps();
+
+    let attempts = 0;
+    const alwaysRewind = defineTool({
+      name: "AlwaysRewind" as const,
+      description: "always rewinds",
+      schema: z.object({}),
+      handler: async () => {
+        attempts += 1;
+        return { toolResponse: "ignored", data: null, rewind: true };
+      },
+    });
+
+    const session = await createSession({
+      agentName: "TestAgent",
+      thread: { mode: "new", threadId: "thread-1" },
+      maxTurns: 3,
+      runAgent: createScriptedRunAgent([
+        { message: "t1", toolCalls: [{ id: "tc-1", name: "AlwaysRewind", args: {} }] },
+        { message: "t2", toolCalls: [{ id: "tc-2", name: "AlwaysRewind", args: {} }] },
+        { message: "t3", toolCalls: [{ id: "tc-3", name: "AlwaysRewind", args: {} }] },
+        { message: "t4", toolCalls: [{ id: "tc-4", name: "AlwaysRewind", args: {} }] },
+      ]),
+      threadOps: ops,
+      tools: { AlwaysRewind: alwaysRewind },
+      buildContextMessage: () => "go",
+    });
+
+    const stateManager = createAgentStateManager({
+      initialState: { systemPrompt: "test" },
+    });
+
+    const result = await session.runSession({ stateManager });
+
+    expect(result.exitReason).toBe("max_turns");
+    expect(result.usage.turns).toBe(3);
+    expect(attempts).toBe(3);
+
+    const truncateOps = log.filter((l) => l.op === "truncateThread");
+    expect(truncateOps).toHaveLength(3);
   });
 });
