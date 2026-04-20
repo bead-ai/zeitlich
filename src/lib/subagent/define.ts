@@ -45,7 +45,7 @@ export function defineSubagent<
     taskQueue?: string;
     thread?: "new" | "fork" | "continue";
     sandbox?: SubagentSandboxConfig;
-  },
+  }
 ): SubagentConfig<TResult> {
   return {
     agentName: definition.agentName,

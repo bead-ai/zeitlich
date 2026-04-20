@@ -6,9 +6,10 @@ export const SUBAGENT_TOOL_NAME = "Subagent" as const;
 function buildSubagentDescription(subagents: SubagentConfig[]): string {
   const subagentList = subagents
     .map((s) => {
-      const continuation = s.thread && s.thread !== "new"
-        ? "\n*(Supports thread continuation — pass a threadId to resume a previous conversation)*"
-        : "";
+      const continuation =
+        s.thread && s.thread !== "new"
+          ? "\n*(Supports thread continuation — pass a threadId to resume a previous conversation)*"
+          : "";
       return `## ${s.agentName}\n${s.description}${continuation}`;
     })
     .join("\n\n");

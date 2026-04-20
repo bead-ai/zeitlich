@@ -1,8 +1,5 @@
 import type { Duration } from "@temporalio/common";
-import type {
-  SessionExitReason,
-  ToolResultConfig,
-} from "../types";
+import type { SessionExitReason, ToolResultConfig } from "../types";
 import type {
   ToolMap,
   ToolCallResultUnion,

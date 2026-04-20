@@ -2,7 +2,10 @@ import type Redis from "ioredis";
 import type Anthropic from "@anthropic-ai/sdk";
 import type { SerializableToolDefinition } from "../../../lib/types";
 import type { AgentResponse, ModelInvokerConfig } from "../../../lib/model";
-import { createAnthropicThreadManager, type AnthropicThreadManagerHooks } from "./thread-manager";
+import {
+  createAnthropicThreadManager,
+  type AnthropicThreadManagerHooks,
+} from "./thread-manager";
 import { getActivityContext } from "../../../lib/activity";
 
 export interface AnthropicModelInvokerConfig {
@@ -15,7 +18,7 @@ export interface AnthropicModelInvokerConfig {
 }
 
 function toAnthropicTools(
-  tools: SerializableToolDefinition[],
+  tools: SerializableToolDefinition[]
 ): Anthropic.Messages.Tool[] {
   return tools.map((t) => ({
     name: t.name,
@@ -56,13 +59,19 @@ export function createAnthropicModelInvoker({
   hooks,
 }: AnthropicModelInvokerConfig) {
   return async function invokeAnthropicModel(
-    config: ModelInvokerConfig,
+    config: ModelInvokerConfig
   ): Promise<AgentResponse<Anthropic.Messages.Message>> {
     const { threadId, threadKey, state } = config;
     const { heartbeat, signal } = getActivityContext();
 
-    const thread = createAnthropicThreadManager({ redis, threadId, key: threadKey, hooks });
-    const { messages, system, storedLength } = await thread.prepareForInvocation();
+    const thread = createAnthropicThreadManager({
+      redis,
+      threadId,
+      key: threadKey,
+      hooks,
+    });
+    const { messages, system, storedLength } =
+      await thread.prepareForInvocation();
 
     const anthropicTools = toAnthropicTools(state.tools);
     const tools = anthropicTools.length > 0 ? anthropicTools : undefined;
@@ -85,7 +94,7 @@ export function createAnthropicModelInvoker({
 
     const toolCalls = response.content.filter(
       (block): block is Anthropic.Messages.ToolUseBlock =>
-        block.type === "tool_use",
+        block.type === "tool_use"
     );
 
     return {
@@ -98,7 +107,8 @@ export function createAnthropicModelInvoker({
       usage: {
         inputTokens: response.usage.input_tokens,
         outputTokens: response.usage.output_tokens,
-        cachedWriteTokens: response.usage.cache_creation_input_tokens ?? undefined,
+        cachedWriteTokens:
+          response.usage.cache_creation_input_tokens ?? undefined,
         cachedReadTokens: response.usage.cache_read_input_tokens ?? undefined,
       },
       threadLengthAtCall: storedLength,

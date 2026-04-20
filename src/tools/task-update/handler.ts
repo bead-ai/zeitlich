@@ -1,7 +1,4 @@
-import type {
-  AgentStateManager,
-  JsonSerializable,
-} from "../../lib/state";
+import type { AgentStateManager, JsonSerializable } from "../../lib/state";
 import type { ToolHandler } from "../../lib/tool-router";
 import type { WorkflowTask } from "../../lib/types";
 import type { TaskUpdateArgs } from "./tool";
@@ -22,7 +19,9 @@ export function createTaskUpdateHandler<
 
     if (!task) {
       return {
-        toolResponse: JSON.stringify({ error: `Task not found: ${args.taskId}` }),
+        toolResponse: JSON.stringify({
+          error: `Task not found: ${args.taskId}`,
+        }),
         data: null,
       };
     }

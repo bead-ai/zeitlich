@@ -1,8 +1,5 @@
 import type { SessionExitReason } from "../types";
-import type {
-  ToolMap,
-  ToolRouterHooks,
-} from "../tool-router/types";
+import type { ToolMap, ToolRouterHooks } from "../tool-router/types";
 
 // ============================================================================
 // Session Lifecycle Hooks
@@ -85,8 +82,11 @@ export type PostHumanMessageAppendHook<TContent = unknown> = (
  * (consumed by the router) with session/message lifecycle hooks
  * (consumed directly by the session).
  */
-export interface Hooks<T extends ToolMap, TResult = unknown, TContent = unknown>
-  extends ToolRouterHooks<T, TResult> {
+export interface Hooks<
+  T extends ToolMap,
+  TResult = unknown,
+  TContent = unknown,
+> extends ToolRouterHooks<T, TResult> {
   /** Called before each human message is appended to the thread */
   onPreHumanMessageAppend?: PreHumanMessageAppendHook<TContent>;
   /** Called after each human message is appended to the thread */

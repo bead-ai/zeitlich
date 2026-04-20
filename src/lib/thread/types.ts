@@ -70,9 +70,17 @@ export interface BaseThreadManager<T> {
  */
 export interface ThreadManagerHooks<TStored, TPrepared = TStored> {
   /** Called for each stored message before SDK-specific processing (system extraction, role merging, format conversion) */
-  onPrepareMessage?: (message: TStored, index: number, thread: readonly TStored[]) => TStored;
+  onPrepareMessage?: (
+    message: TStored,
+    index: number,
+    thread: readonly TStored[]
+  ) => TStored;
   /** Called for each SDK-native message after all processing, right before the payload is returned */
-  onPreparedMessage?: (message: TPrepared, index: number, messages: readonly TPrepared[]) => TPrepared;
+  onPreparedMessage?: (
+    message: TPrepared,
+    index: number,
+    messages: readonly TPrepared[]
+  ) => TPrepared;
 }
 
 export interface ProviderThreadManager<
@@ -87,6 +95,6 @@ export interface ProviderThreadManager<
     id: string,
     toolCallId: string,
     toolName: string,
-    content: TToolContent,
+    content: TToolContent
   ): Promise<void>;
 }

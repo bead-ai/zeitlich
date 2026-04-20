@@ -20,7 +20,10 @@ export interface StoredContent {
   content: Content;
 }
 
-export type GoogleGenAIThreadManagerHooks = ThreadManagerHooks<StoredContent, Content>;
+export type GoogleGenAIThreadManagerHooks = ThreadManagerHooks<
+  StoredContent,
+  Content
+>;
 
 export interface GoogleGenAIThreadManagerConfig {
   redis: Redis;
@@ -39,8 +42,12 @@ export interface GoogleGenAIInvocationPayload {
 }
 
 /** Thread manager with Google GenAI Content convenience helpers */
-export interface GoogleGenAIThreadManager
-  extends ProviderThreadManager<StoredContent, GoogleGenAIContent, GoogleGenAIToolResponse, GoogleGenAISystemContent> {
+export interface GoogleGenAIThreadManager extends ProviderThreadManager<
+  StoredContent,
+  GoogleGenAIContent,
+  GoogleGenAIToolResponse,
+  GoogleGenAISystemContent
+> {
   appendModelContent(id: string, parts: Part[]): Promise<void>;
   prepareForInvocation(): Promise<GoogleGenAIInvocationPayload>;
 }
@@ -58,7 +65,9 @@ function toParts(content: GoogleGenAIContent): Part[] {
 }
 
 /** Convert a string or object into a Record suitable for functionResponse.response */
-function toFunctionResponse(content: string | Record<string, unknown>): Record<string, unknown> {
+function toFunctionResponse(
+  content: string | Record<string, unknown>
+): Record<string, unknown> {
   if (typeof content === "object") {
     return content;
   }
@@ -89,7 +98,7 @@ function mergeConsecutiveContents(contents: Content[]): Content[] {
  * appending typed Content messages.
  */
 export function createGoogleGenAIThreadManager(
-  config: GoogleGenAIThreadManagerConfig,
+  config: GoogleGenAIThreadManagerConfig
 ): GoogleGenAIThreadManager {
   const baseConfig: ThreadManagerConfig<StoredContent> = {
     redis: config.redis,
@@ -103,54 +112,64 @@ export function createGoogleGenAIThreadManager(
   const helpers: Omit<GoogleGenAIThreadManager, keyof typeof base> = {
     async appendUserMessage(
       id: string,
-      content: GoogleGenAIContent,
+      content: GoogleGenAIContent
     ): Promise<void> {
-      await base.append([{
-        id,
-        content: { role: "user", parts: toParts(content) },
-      }]);
+      await base.append([
+        {
+          id,
+          content: { role: "user", parts: toParts(content) },
+        },
+      ]);
     },
 
     async appendSystemMessage(
       id: string,
-      content: GoogleGenAISystemContent,
+      content: GoogleGenAISystemContent
     ): Promise<void> {
       const parts: Part[] =
         typeof content === "string" ? [{ text: content }] : content;
       await base.initialize();
-      await base.append([{
-        id,
-        content: { role: "system", parts },
-      }]);
+      await base.append([
+        {
+          id,
+          content: { role: "system", parts },
+        },
+      ]);
     },
 
     async appendModelContent(id: string, parts: Part[]): Promise<void> {
-      await base.append([{
-        id,
-        content: { role: "model", parts },
-      }]);
+      await base.append([
+        {
+          id,
+          content: { role: "model", parts },
+        },
+      ]);
     },
 
     async appendToolResult(
       id: string,
       toolCallId: string,
       toolName: string,
-      content: GoogleGenAIToolResponse,
+      content: GoogleGenAIToolResponse
     ): Promise<void> {
       const parts: Part[] = Array.isArray(content)
-        ? content as Part[]
-        : [{
-            functionResponse: {
-              id: toolCallId,
-              name: toolName,
-              response: toFunctionResponse(content),
+        ? (content as Part[])
+        : [
+            {
+              functionResponse: {
+                id: toolCallId,
+                name: toolName,
+                response: toFunctionResponse(content),
+              },
             },
-          }];
+          ];
 
-      await base.append([{
-        id,
-        content: { role: "user", parts },
-      }]);
+      await base.append([
+        {
+          id,
+          content: { role: "user", parts },
+        },
+      ]);
     },
 
     async prepareForInvocation(): Promise<GoogleGenAIInvocationPayload> {
@@ -176,7 +195,9 @@ export function createGoogleGenAIThreadManager(
         contents: onPreparedMessage
           ? contents.map((msg, i) => onPreparedMessage(msg, i, contents))
           : contents,
-        ...(systemInstruction && systemInstruction.length > 0 ? { systemInstruction } : {}),
+        ...(systemInstruction && systemInstruction.length > 0
+          ? { systemInstruction }
+          : {}),
         storedLength: stored.length,
       };
     },

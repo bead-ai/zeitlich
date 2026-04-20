@@ -29,7 +29,7 @@ import type { RunAgentConfig } from "../types";
 
 export function proxyRunAgent<M = unknown>(
   scope?: string,
-  options?: Parameters<typeof proxyActivities>[0],
+  options?: Parameters<typeof proxyActivities>[0]
 ): (config: RunAgentConfig) => Promise<AgentResponse<M>> {
   const resolvedScope = scope ?? workflowInfo().workflowType;
   const name = `run${resolvedScope.charAt(0).toUpperCase()}${resolvedScope.slice(1)}`;
@@ -44,7 +44,7 @@ export function proxyRunAgent<M = unknown>(
         maximumInterval: "2m",
         backoffCoefficient: 3,
       },
-    },
+    }
   );
   return acts[name] as (config: RunAgentConfig) => Promise<AgentResponse<M>>;
 }

@@ -18,7 +18,7 @@ function formatSkillResponse(skill: Skill): string {
   if (skill.location) {
     parts.push(`\nSkill directory: ${skill.location}`);
     parts.push(
-      "Relative paths in this skill resolve against the skill directory above.",
+      "Relative paths in this skill resolve against the skill directory above."
     );
   }
 

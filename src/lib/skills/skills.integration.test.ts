@@ -47,7 +47,10 @@ Body content here.`;
     expect(frontmatter.license).toBe("MIT");
     expect(frontmatter.compatibility).toBe("linux-only");
     expect(frontmatter.allowedTools).toEqual(["bash", "grep", "read-file"]);
-    expect(frontmatter.metadata).toEqual({ author: "test-author", version: "1.0" });
+    expect(frontmatter.metadata).toEqual({
+      author: "test-author",
+      version: "1.0",
+    });
     expect(body).toBe("Body content here.");
   });
 
@@ -76,7 +79,7 @@ Body`;
 
   it("throws when frontmatter is missing", () => {
     expect(() => parseSkillFile("No frontmatter here")).toThrow(
-      "SKILL.md must start with YAML frontmatter",
+      "SKILL.md must start with YAML frontmatter"
     );
   });
 
@@ -87,7 +90,7 @@ description: Missing name
 Body`;
 
     expect(() => parseSkillFile(raw)).toThrow(
-      "SKILL.md frontmatter must include a 'name' field",
+      "SKILL.md frontmatter must include a 'name' field"
     );
   });
 
@@ -98,7 +101,7 @@ name: no-desc
 Body`;
 
     expect(() => parseSkillFile(raw)).toThrow(
-      "SKILL.md frontmatter must include a 'description' field",
+      "SKILL.md frontmatter must include a 'description' field"
     );
   });
 
@@ -114,7 +117,8 @@ description: No body content
   });
 
   it("handles CRLF line endings", () => {
-    const raw = "---\r\nname: crlf-skill\r\ndescription: CRLF test\r\n---\r\nBody with CRLF";
+    const raw =
+      "---\r\nname: crlf-skill\r\ndescription: CRLF test\r\n---\r\nBody with CRLF";
 
     const { frontmatter, body } = parseSkillFile(raw);
     expect(frontmatter.name).toBe("crlf-skill");
@@ -204,7 +208,7 @@ describe("createReadSkillTool", () => {
 
   it("throws when no skills are provided", () => {
     expect(() => createReadSkillTool([])).toThrow(
-      "createReadSkillTool requires at least one skill",
+      "createReadSkillTool requires at least one skill"
     );
   });
 });
@@ -242,7 +246,9 @@ describe("createReadSkillHandler", () => {
 
     const text = result.toolResponse as string;
     expect(text).toContain("Skill directory: /skills/skill-a");
-    expect(text).toContain("Relative paths in this skill resolve against the skill directory above.");
+    expect(text).toContain(
+      "Relative paths in this skill resolve against the skill directory above."
+    );
   });
 
   it("lists resources derived from resourceContents keys", () => {
@@ -298,17 +304,21 @@ describe("createReadSkillHandler", () => {
     const result = handler({ skill_name: "nonexistent" });
 
     expect(typeof result.toolResponse).toBe("string");
-    expect((result.toolResponse as string)).toContain("not found");
+    expect(result.toolResponse as string).toContain("not found");
     expect(result.data).toBeNull();
   });
 
   it("handles single skill", () => {
     const skills: Skill[] = [
-      { name: "skill-a", description: "First", instructions: "Instructions for A" },
+      {
+        name: "skill-a",
+        description: "First",
+        instructions: "Instructions for A",
+      },
     ];
     const handler = createReadSkillHandler(skills);
     const result = handler({ skill_name: "skill-a" });
-    expect((result.toolResponse as string)).toContain("Instructions for A");
+    expect(result.toolResponse as string).toContain("Instructions for A");
   });
 });
 
@@ -350,7 +360,9 @@ describe("buildSkillRegistration", () => {
       { name: "dupe", description: "First", instructions: "A" },
       { name: "dupe", description: "Second", instructions: "B" },
     ];
-    expect(() => buildSkillRegistration(skills)).toThrow("Duplicate skill names: dupe");
+    expect(() => buildSkillRegistration(skills)).toThrow(
+      "Duplicate skill names: dupe"
+    );
   });
 
   it("returns a complete tool entry with handler", () => {
@@ -389,7 +401,7 @@ describe("buildSkillRegistration", () => {
     if (!registration) return;
     const result = registration.handler(
       { skill_name: "test-skill" },
-      { threadId: "t-1", toolCallId: "tc-1", toolName: "ReadSkill" },
+      { threadId: "t-1", toolCallId: "tc-1", toolName: "ReadSkill" }
     );
 
     if (result instanceof Promise) {
@@ -414,9 +426,7 @@ describe("buildSkillRegistration", () => {
 // FileSystemSkillProvider — resource discovery
 // ---------------------------------------------------------------------------
 
-function createMockFs(
-  tree: Record<string, string | "DIR">,
-): SandboxFileSystem {
+function createMockFs(tree: Record<string, string | "DIR">): SandboxFileSystem {
   const dir = (entries: DirentEntry[]): DirentEntry[] => entries;
 
   return {

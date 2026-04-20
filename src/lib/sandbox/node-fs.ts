@@ -65,10 +65,7 @@ export class NodeFsSandboxFileSystem implements SandboxFileSystem {
     };
   }
 
-  async mkdir(
-    path: string,
-    options?: { recursive?: boolean },
-  ): Promise<void> {
+  async mkdir(path: string, options?: { recursive?: boolean }): Promise<void> {
     await fsp.mkdir(this.abs(path), options);
   }
 
@@ -88,7 +85,7 @@ export class NodeFsSandboxFileSystem implements SandboxFileSystem {
 
   async rm(
     path: string,
-    options?: { recursive?: boolean; force?: boolean },
+    options?: { recursive?: boolean; force?: boolean }
   ): Promise<void> {
     await fsp.rm(this.abs(path), options);
   }
@@ -96,7 +93,7 @@ export class NodeFsSandboxFileSystem implements SandboxFileSystem {
   async cp(
     src: string,
     dest: string,
-    options?: { recursive?: boolean },
+    options?: { recursive?: boolean }
   ): Promise<void> {
     await fsp.cp(this.abs(src), this.abs(dest), options);
   }

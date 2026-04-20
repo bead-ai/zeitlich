@@ -23,7 +23,10 @@ export type LangChainContent = string | MessageContent;
 /** SDK-native content type for LangChain system messages */
 export type LangChainSystemContent = string | MessageContent;
 
-export type LangChainThreadManagerHooks = ThreadManagerHooks<StoredMessage, BaseMessage>;
+export type LangChainThreadManagerHooks = ThreadManagerHooks<
+  StoredMessage,
+  BaseMessage
+>;
 
 export interface LangChainThreadManagerConfig {
   redis: Redis;
@@ -41,8 +44,12 @@ export interface LangChainInvocationPayload {
 }
 
 /** Thread manager with LangChain StoredMessage convenience helpers */
-export interface LangChainThreadManager
-  extends ProviderThreadManager<StoredMessage, LangChainContent, JsonValue, LangChainSystemContent> {
+export interface LangChainThreadManager extends ProviderThreadManager<
+  StoredMessage,
+  LangChainContent,
+  JsonValue,
+  LangChainSystemContent
+> {
   appendAIMessage(id: string, content: string | MessageContent): Promise<void>;
   prepareForInvocation(): Promise<LangChainInvocationPayload>;
 }
@@ -65,7 +72,7 @@ function storedMessageId(msg: StoredMessage): string {
  * appending typed LangChain messages.
  */
 export function createLangChainThreadManager(
-  config: LangChainThreadManagerConfig,
+  config: LangChainThreadManagerConfig
 ): LangChainThreadManager {
   const baseConfig: ThreadManagerConfig<StoredMessage> = {
     redis: config.redis,
@@ -79,7 +86,7 @@ export function createLangChainThreadManager(
   const helpers: Omit<LangChainThreadManager, keyof typeof base> = {
     async appendUserMessage(
       id: string,
-      content: LangChainContent,
+      content: LangChainContent
     ): Promise<void> {
       await base.append([
         new HumanMessage({ id, content: content as MessageContent }).toDict(),
@@ -88,7 +95,7 @@ export function createLangChainThreadManager(
 
     async appendSystemMessage(
       id: string,
-      content: LangChainSystemContent,
+      content: LangChainSystemContent
     ): Promise<void> {
       await base.initialize();
       await base.append([
@@ -101,7 +108,7 @@ export function createLangChainThreadManager(
 
     async appendAIMessage(
       id: string,
-      content: string | MessageContent,
+      content: string | MessageContent
     ): Promise<void> {
       await base.append([
         new AIMessage({ id, content: content as MessageContent }).toDict(),
@@ -112,10 +119,14 @@ export function createLangChainThreadManager(
       id: string,
       _toolCallId: string,
       _toolName: string,
-      content: JsonValue,
+      content: JsonValue
     ): Promise<void> {
       await base.append([
-        new ToolMessage({ id, content: content as MessageContent, tool_call_id: _toolCallId }).toDict(),
+        new ToolMessage({
+          id,
+          content: content as MessageContent,
+          tool_call_id: _toolCallId,
+        }).toDict(),
       ]);
     },
 

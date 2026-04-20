@@ -54,7 +54,13 @@ vi.mock("@temporalio/workflow", () => {
     ApplicationFailure: MockApplicationFailure,
     CancellationScope: MockCancellationScope,
     isCancellation: (_err: unknown) => false,
-    log: { trace: () => {}, debug: () => {}, info: () => {}, warn: () => {}, error: () => {} },
+    log: {
+      trace: () => {},
+      debug: () => {},
+      info: () => {},
+      warn: () => {},
+      error: () => {},
+    },
   };
 });
 
@@ -74,7 +80,9 @@ type TurnScript = {
  * Wraps every method on a ThreadOps object so it also has `.executeWithOptions()`,
  * matching Temporal's `ActivityInterfaceFor<ThreadOps>` shape.
  */
-function toActivityInterface<TContent = string>(raw: ThreadOps<TContent>): ActivityInterfaceFor<ThreadOps<TContent>> {
+function toActivityInterface<TContent = string>(
+  raw: ThreadOps<TContent>
+): ActivityInterfaceFor<ThreadOps<TContent>> {
   const result = {} as Record<string, unknown>;
   for (const [key, fn] of Object.entries(raw)) {
     const wrapped = (...args: unknown[]) =>
@@ -794,7 +802,11 @@ describe("createSession edge cases", () => {
       },
     });
 
-    const session = await createSession<Record<string, never>, unknown, TestContent>({
+    const session = await createSession<
+      Record<string, never>,
+      unknown,
+      TestContent
+    >({
       agentName: "TestAgent",
       thread: { mode: "new", threadId: "thread-1" },
       runAgent: createScriptedRunAgent([{ message: "done", toolCalls: [] }]),
@@ -1225,7 +1237,9 @@ describe("createSession edge cases", () => {
 
     expect(sandboxLog).toContain("fork:paused-sb-1");
     expect(sandboxLog).not.toContain("create");
-    expect((result as { sandboxId?: string }).sandboxId).toBe("forked-from-paused-sb-1");
+    expect((result as { sandboxId?: string }).sandboxId).toBe(
+      "forked-from-paused-sb-1"
+    );
     expect(sandboxLog).toContain("destroy:forked-from-paused-sb-1");
   });
 
@@ -1415,9 +1429,7 @@ describe("createSession edge cases", () => {
 
     const session = await createSession({
       agentName: "TestAgent",
-      runAgent: createScriptedRunAgent([
-        { message: "done", toolCalls: [] },
-      ]),
+      runAgent: createScriptedRunAgent([{ message: "done", toolCalls: [] }]),
       threadOps: ops,
       buildContextMessage: () => "go",
     });
@@ -1478,9 +1490,7 @@ describe("createSession edge cases", () => {
       initialState: { systemPrompt: "test" },
     });
 
-    await expect(session.runSession({ stateManager })).rejects.toThrow(
-      "crash"
-    );
+    await expect(session.runSession({ stateManager })).rejects.toThrow("crash");
 
     expect(sandboxLog).toContain("pause:sb-err");
     expect(sandboxLog).not.toContain("destroy:sb-err");
@@ -1572,9 +1582,7 @@ describe("createSession edge cases", () => {
       initialState: { systemPrompt: "test" },
     });
 
-    await expect(session.runSession({ stateManager })).rejects.toThrow(
-      "crash"
-    );
+    await expect(session.runSession({ stateManager })).rejects.toThrow("crash");
 
     expect(sandboxLog).not.toContain("pause:sb-keep-err");
     expect(sandboxLog).not.toContain("destroy:sb-keep-err");

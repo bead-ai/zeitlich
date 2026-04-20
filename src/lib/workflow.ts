@@ -1,8 +1,4 @@
-import type {
-  ThreadInit,
-  SandboxInit,
-  SandboxShutdown,
-} from "./lifecycle";
+import type { ThreadInit, SandboxInit, SandboxShutdown } from "./lifecycle";
 
 /**
  * Session config fields derived from a main workflow input, ready to spread

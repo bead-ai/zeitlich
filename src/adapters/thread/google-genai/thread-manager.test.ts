@@ -39,7 +39,9 @@ describe("Google GenAI thread manager hooks", () => {
           ...msg,
           content: {
             ...msg.content,
-            parts: [{ text: `[modified] ${msg.content.parts?.[0]?.text ?? ""}` }],
+            parts: [
+              { text: `[modified] ${msg.content.parts?.[0]?.text ?? ""}` },
+            ],
           },
         };
       });
@@ -54,7 +56,11 @@ describe("Google GenAI thread manager hooks", () => {
       const { contents, systemInstruction } = await tm.prepareForInvocation();
 
       expect(hook).toHaveBeenCalledTimes(3);
-      expect(hook).toHaveBeenCalledWith(systemContent, 0, [systemContent, userContent, modelContent]);
+      expect(hook).toHaveBeenCalledWith(systemContent, 0, [
+        systemContent,
+        userContent,
+        modelContent,
+      ]);
       expect(systemInstruction).toEqual([{ text: "You are helpful." }]);
       expect(contents[0]?.parts?.[0]?.text).toBe("[modified] Hello");
       expect(contents[1]?.parts?.[0]?.text).toBe("[modified] Hi there!");
@@ -106,7 +112,11 @@ describe("Google GenAI thread manager hooks", () => {
 
       await tm.prepareForInvocation();
 
-      const args = hook.mock.calls[0] as unknown as [Content, number, Content[]];
+      const args = hook.mock.calls[0] as unknown as [
+        Content,
+        number,
+        Content[],
+      ];
       expect(args[2]).toHaveLength(2);
     });
   });

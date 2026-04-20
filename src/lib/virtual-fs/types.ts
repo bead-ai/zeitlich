@@ -104,7 +104,10 @@ export type PrefixedVirtualFsOps<
   [K in keyof VirtualFsOps<
     TCtx,
     TMeta
-  > as `virtualFs${Capitalize<TPrefix>}${Capitalize<K & string>}`]: VirtualFsOps<TCtx, TMeta>[K];
+  > as `virtualFs${Capitalize<TPrefix>}${Capitalize<K & string>}`]: VirtualFsOps<
+    TCtx,
+    TMeta
+  >[K];
 };
 
 // ============================================================================

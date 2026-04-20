@@ -1,8 +1,17 @@
 import type Redis from "ioredis";
-import type { GoogleGenAI, Content, FunctionDeclaration, Part, GenerateContentResponse } from "@google/genai";
+import type {
+  GoogleGenAI,
+  Content,
+  FunctionDeclaration,
+  Part,
+  GenerateContentResponse,
+} from "@google/genai";
 import type { SerializableToolDefinition } from "../../../lib/types";
 import type { AgentResponse, ModelInvokerConfig } from "../../../lib/model";
-import { createGoogleGenAIThreadManager, type GoogleGenAIThreadManagerHooks } from "./thread-manager";
+import {
+  createGoogleGenAIThreadManager,
+  type GoogleGenAIThreadManagerHooks,
+} from "./thread-manager";
 import { getActivityContext } from "../../../lib/activity";
 
 export interface GoogleGenAIModelInvokerConfig {
@@ -13,7 +22,7 @@ export interface GoogleGenAIModelInvokerConfig {
 }
 
 function toFunctionDeclarations(
-  tools: SerializableToolDefinition[],
+  tools: SerializableToolDefinition[]
 ): FunctionDeclaration[] {
   return tools.map((t) => ({
     name: t.name,
@@ -53,12 +62,17 @@ export function createGoogleGenAIModelInvoker({
   hooks,
 }: GoogleGenAIModelInvokerConfig) {
   return async function invokeGoogleGenAIModel(
-    config: ModelInvokerConfig,
+    config: ModelInvokerConfig
   ): Promise<AgentResponse<Content>> {
     const { threadId, threadKey, state } = config;
     const { heartbeat, signal } = getActivityContext();
 
-    const thread = createGoogleGenAIThreadManager({ redis, threadId, key: threadKey, hooks });
+    const thread = createGoogleGenAIThreadManager({
+      redis,
+      threadId,
+      key: threadKey,
+      hooks,
+    });
     const { contents, systemInstruction, storedLength } =
       await thread.prepareForInvocation();
 
@@ -126,6 +140,11 @@ export async function invokeGoogleGenAIModel({
   hooks?: GoogleGenAIThreadManagerHooks;
   config: ModelInvokerConfig;
 }): Promise<AgentResponse<Content>> {
-  const invoker = createGoogleGenAIModelInvoker({ redis, client, model, hooks });
+  const invoker = createGoogleGenAIModelInvoker({
+    redis,
+    client,
+    model,
+    hooks,
+  });
   return invoker(config);
 }

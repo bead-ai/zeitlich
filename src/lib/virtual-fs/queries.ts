@@ -25,10 +25,12 @@ export interface FileTreeAccessor<TMeta> {
  */
 export function hasFileWithMimeType<TMeta>(
   stateManager: FileTreeAccessor<TMeta>,
-  pattern: string | string[],
+  pattern: string | string[]
 ): boolean {
   const tree = stateManager.get("fileTree");
-  const matchers = (Array.isArray(pattern) ? pattern : [pattern]).map(buildMatcher);
+  const matchers = (Array.isArray(pattern) ? pattern : [pattern]).map(
+    buildMatcher
+  );
   return tree.some((entry) => {
     const meta = entry.metadata as Record<string, unknown> | undefined;
     const mime = meta?.mimeType;
@@ -41,7 +43,7 @@ export function hasFileWithMimeType<TMeta>(
  */
 export function filesWithMimeType<TMeta>(
   stateManager: FileTreeAccessor<TMeta>,
-  pattern: string,
+  pattern: string
 ): FileEntry<TMeta>[] {
   const tree = stateManager.get("fileTree");
   const match = buildMatcher(pattern);
@@ -66,7 +68,7 @@ export function filesWithMimeType<TMeta>(
  */
 export function hasDirectory<TMeta>(
   stateManager: FileTreeAccessor<TMeta>,
-  pattern: string,
+  pattern: string
 ): boolean {
   const tree = stateManager.get("fileTree");
   const match = buildGlobMatcher(pattern);
@@ -91,7 +93,9 @@ function buildMatcher(pattern: string): (value: string) => boolean {
 function buildGlobMatcher(pattern: string): (value: string) => boolean {
   if (!pattern.includes("*")) return (v) => v === pattern;
   const re = new RegExp(
-    "^" + pattern.replace(/[.+^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*") + "$",
+    "^" +
+      pattern.replace(/[.+^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*") +
+      "$"
   );
   return (v) => re.test(v);
 }

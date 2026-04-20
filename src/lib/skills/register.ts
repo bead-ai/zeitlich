@@ -11,9 +11,7 @@ function validateSkillNames(skills: SkillMetadata[]): void {
   const names = skills.map((s) => s.name);
   const dupes = names.filter((n, i) => names.indexOf(n) !== i);
   if (dupes.length > 0) {
-    throw new Error(
-      `Duplicate skill names: ${[...new Set(dupes)].join(", ")}`
-    );
+    throw new Error(`Duplicate skill names: ${[...new Set(dupes)].join(", ")}`);
   }
 }
 

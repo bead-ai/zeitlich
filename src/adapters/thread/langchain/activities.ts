@@ -24,8 +24,10 @@ import { createLangChainModelInvoker } from "./model-invoker";
 
 const ADAPTER_PREFIX = "langChain" as const;
 
-export type LangChainThreadOps<TScope extends string = ""> =
-  PrefixedThreadOps<ScopedPrefix<TScope, typeof ADAPTER_PREFIX>, LangChainContent>;
+export type LangChainThreadOps<TScope extends string = ""> = PrefixedThreadOps<
+  ScopedPrefix<TScope, typeof ADAPTER_PREFIX>,
+  LangChainContent
+>;
 
 export interface LangChainAdapterConfig {
   redis: Redis;
@@ -61,9 +63,7 @@ export interface LangChainAdapter {
    * // → { langChainCodingAgentInitializeThread, langChainCodingAgentAppendHumanMessage, … }
    * ```
    */
-  createActivities<S extends string = "">(
-    scope?: S,
-  ): LangChainThreadOps<S>;
+  createActivities<S extends string = "">(scope?: S): LangChainThreadOps<S>;
 
   /**
    * Identity wrapper that types a tool handler for this adapter.
@@ -72,8 +72,8 @@ export interface LangChainAdapter {
   wrapHandler<TArgs, TResult, TContext extends RouterContext = RouterContext>(
     handler: (
       args: TArgs,
-      context: TContext,
-    ) => Promise<ToolHandlerResponse<TResult, LangChainToolResponse>>,
+      context: TContext
+    ) => Promise<ToolHandlerResponse<TResult, LangChainToolResponse>>
   ): ActivityToolHandler<TArgs, TResult, TContext, LangChainToolResponse>;
 }
 
@@ -113,13 +113,20 @@ export interface LangChainAdapter {
  * ```
  */
 export function createLangChainAdapter(
-  config: LangChainAdapterConfig,
+  config: LangChainAdapterConfig
 ): LangChainAdapter {
   const { redis } = config;
 
   const threadOps: ThreadOps<LangChainContent> = {
-    async initializeThread(threadId: string, threadKey?: string): Promise<void> {
-      const thread = createLangChainThreadManager({ redis, threadId, key: threadKey });
+    async initializeThread(
+      threadId: string,
+      threadKey?: string
+    ): Promise<void> {
+      const thread = createLangChainThreadManager({
+        redis,
+        threadId,
+        key: threadKey,
+      });
       await thread.initialize();
     },
 
@@ -127,9 +134,13 @@ export function createLangChainAdapter(
       threadId: string,
       id: string,
       content: LangChainContent,
-      threadKey?: string,
+      threadKey?: string
     ): Promise<void> {
-      const thread = createLangChainThreadManager({ redis, threadId, key: threadKey });
+      const thread = createLangChainThreadManager({
+        redis,
+        threadId,
+        key: threadKey,
+      });
       await thread.appendUserMessage(id, content);
     },
 
@@ -137,15 +148,23 @@ export function createLangChainAdapter(
       threadId: string,
       id: string,
       content: LangChainSystemContent,
-      threadKey?: string,
+      threadKey?: string
     ): Promise<void> {
-      const thread = createLangChainThreadManager({ redis, threadId, key: threadKey });
+      const thread = createLangChainThreadManager({
+        redis,
+        threadId,
+        key: threadKey,
+      });
       await thread.appendSystemMessage(id, content);
     },
 
     async appendToolResult(id: string, cfg: ToolResultConfig): Promise<void> {
       const { threadId, threadKey, toolCallId, content } = cfg;
-      const thread = createLangChainThreadManager({ redis, threadId, key: threadKey });
+      const thread = createLangChainThreadManager({
+        redis,
+        threadId,
+        key: threadKey,
+      });
       await thread.appendToolResult(id, toolCallId, "", content);
     },
 
@@ -153,9 +172,13 @@ export function createLangChainAdapter(
       threadId: string,
       id: string,
       message: StoredMessage,
-      threadKey?: string,
+      threadKey?: string
     ): Promise<void> {
-      const thread = createLangChainThreadManager({ redis, threadId, key: threadKey });
+      const thread = createLangChainThreadManager({
+        redis,
+        threadId,
+        key: threadKey,
+      });
       const patched = { ...message, data: { ...message.data, id } };
       await thread.append([patched]);
     },
@@ -163,7 +186,7 @@ export function createLangChainAdapter(
     async forkThread(
       sourceThreadId: string,
       targetThreadId: string,
-      threadKey?: string,
+      threadKey?: string
     ): Promise<void> {
       const thread = createLangChainThreadManager({
         redis,
@@ -184,21 +207,20 @@ export function createLangChainAdapter(
   };
 
   function createActivities<S extends string = "">(
-    scope?: S,
+    scope?: S
   ): LangChainThreadOps<S> {
     const prefix = scope
       ? `${ADAPTER_PREFIX}${scope.charAt(0).toUpperCase()}${scope.slice(1)}`
       : ADAPTER_PREFIX;
-    const cap = (s: string): string =>
-      s.charAt(0).toUpperCase() + s.slice(1);
+    const cap = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1);
     return Object.fromEntries(
-      Object.entries(threadOps).map(([k, v]) => [`${prefix}${cap(k)}`, v]),
+      Object.entries(threadOps).map(([k, v]) => [`${prefix}${cap(k)}`, v])
     ) as LangChainThreadOps<S>;
   }
 
   const makeInvoker = (
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    model: BaseChatModel<any>,
+    model: BaseChatModel<any>
   ): ModelInvoker<StoredMessage> =>
     createLangChainModelInvoker({ redis, model, hooks: config.hooks });
 
@@ -207,7 +229,7 @@ export function createLangChainAdapter(
     : () => {
         throw new Error(
           "No default model provided to createLangChainAdapter. " +
-            "Either pass `model` in the config or use `createModelInvoker(model)` instead.",
+            "Either pass `model` in the config or use `createModelInvoker(model)` instead."
         );
       };
 

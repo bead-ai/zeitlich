@@ -49,9 +49,7 @@ async function consumeExecStream(
         event.resourceNotFoundException.message ?? "Resource not found"
       );
     if ("validationException" in event && event.validationException)
-      throw new Error(
-        event.validationException.message ?? "Validation error"
-      );
+      throw new Error(event.validationException.message ?? "Validation error");
     if ("internalServerException" in event && event.internalServerException)
       throw new Error(
         event.internalServerException.message ?? "Internal server error"
@@ -118,8 +116,7 @@ class BedrockSandboxImpl implements Sandbox {
       })
     );
 
-    if (!resp.stream)
-      throw new Error("No stream in code interpreter response");
+    if (!resp.stream) throw new Error("No stream in code interpreter response");
     return consumeExecStream(resp.stream);
   }
 
@@ -137,9 +134,10 @@ class BedrockSandboxImpl implements Sandbox {
 // BedrockSandboxProvider
 // ============================================================================
 
-export class BedrockSandboxProvider
-  implements SandboxProvider<BedrockSandboxCreateOptions, BedrockSandbox>
-{
+export class BedrockSandboxProvider implements SandboxProvider<
+  BedrockSandboxCreateOptions,
+  BedrockSandbox
+> {
   readonly id = "bedrock";
   readonly capabilities: SandboxCapabilities = {
     filesystem: true,

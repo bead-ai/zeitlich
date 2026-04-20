@@ -42,6 +42,4 @@ Usage notes:
   strict: true,
 } satisfies ToolDefinition;
 
-export type AskUserQuestionArgs = z.infer<
-  typeof askUserQuestionTool.schema
->;
+export type AskUserQuestionArgs = z.infer<typeof askUserQuestionTool.schema>;

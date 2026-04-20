@@ -24,7 +24,7 @@ import { parseSkillFile } from "./parse";
 export class FileSystemSkillProvider implements SkillProvider {
   constructor(
     private readonly fs: SandboxFileSystem,
-    private readonly baseDir: string,
+    private readonly baseDir: string
   ) {}
 
   async listSkills(): Promise<SkillMetadata[]> {
@@ -45,20 +45,21 @@ export class FileSystemSkillProvider implements SkillProvider {
   }
 
   async getSkill(name: string): Promise<Skill> {
-    const raw = await this.fs.readFile(
-      join(this.baseDir, name, "SKILL.md"),
-    );
+    const raw = await this.fs.readFile(join(this.baseDir, name, "SKILL.md"));
     const { frontmatter, body } = parseSkillFile(raw);
 
     if (frontmatter.name !== name) {
       throw new Error(
-        `Skill directory "${name}" contains SKILL.md with mismatched name "${frontmatter.name}"`,
+        `Skill directory "${name}" contains SKILL.md with mismatched name "${frontmatter.name}"`
       );
     }
 
     const location = join(this.baseDir, name);
     const resourcePaths = await this.discoverResources(name);
-    const resourceContents = await this.readResourceContents(location, resourcePaths);
+    const resourceContents = await this.readResourceContents(
+      location,
+      resourcePaths
+    );
     return {
       ...frontmatter,
       instructions: body,
@@ -80,7 +81,10 @@ export class FileSystemSkillProvider implements SkillProvider {
       const { frontmatter, body } = parseSkillFile(raw);
       const location = join(this.baseDir, dir);
       const resourcePaths = await this.discoverResources(dir);
-      const resourceContents = await this.readResourceContents(location, resourcePaths);
+      const resourceContents = await this.readResourceContents(
+        location,
+        resourcePaths
+      );
       skills.push({
         ...frontmatter,
         instructions: body,
@@ -119,7 +123,7 @@ export class FileSystemSkillProvider implements SkillProvider {
 
   private async readResourceContents(
     location: string,
-    resources: string[],
+    resources: string[]
   ): Promise<Record<string, string> | undefined> {
     if (resources.length === 0) return undefined;
     const contents: Record<string, string> = {};

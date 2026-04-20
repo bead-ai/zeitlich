@@ -27,7 +27,10 @@ const userMsg: StoredMessage = {
 
 const assistantMsg: StoredMessage = {
   id: "msg-2",
-  message: { role: "assistant", content: [{ type: "text", text: "Hi there!" }] },
+  message: {
+    role: "assistant",
+    content: [{ type: "text", text: "Hi there!" }],
+  },
 };
 
 describe("Anthropic thread manager hooks", () => {
@@ -40,7 +43,9 @@ describe("Anthropic thread manager hooks", () => {
           ...msg,
           message: {
             ...msg.message,
-            content: [{ type: "text" as const, text: `[modified] ${firstBlock?.text}` }],
+            content: [
+              { type: "text" as const, text: `[modified] ${firstBlock?.text}` },
+            ],
           },
         };
       });
@@ -55,10 +60,18 @@ describe("Anthropic thread manager hooks", () => {
       const { messages, system } = await tm.prepareForInvocation();
 
       expect(hook).toHaveBeenCalledTimes(3);
-      expect(hook).toHaveBeenCalledWith(systemMsg, 0, [systemMsg, userMsg, assistantMsg]);
+      expect(hook).toHaveBeenCalledWith(systemMsg, 0, [
+        systemMsg,
+        userMsg,
+        assistantMsg,
+      ]);
       expect(system).toBe("You are helpful.");
-      expect(messages[0]?.content).toEqual([{ type: "text", text: "[modified] Hello" }]);
-      expect(messages[1]?.content).toEqual([{ type: "text", text: "[modified] Hi there!" }]);
+      expect(messages[0]?.content).toEqual([
+        { type: "text", text: "[modified] Hello" },
+      ]);
+      expect(messages[1]?.content).toEqual([
+        { type: "text", text: "[modified] Hi there!" },
+      ]);
     });
 
     it("is not called when not configured", async () => {
@@ -90,7 +103,9 @@ describe("Anthropic thread manager hooks", () => {
       const { messages } = await tm.prepareForInvocation();
 
       expect(hook).toHaveBeenCalledTimes(2);
-      expect(messages[0]?.content).toEqual([{ type: "text", text: "[post] done" }]);
+      expect(messages[0]?.content).toEqual([
+        { type: "text", text: "[post] done" },
+      ]);
     });
 
     it("receives the full prepared messages array", async () => {
@@ -105,7 +120,11 @@ describe("Anthropic thread manager hooks", () => {
 
       await tm.prepareForInvocation();
 
-      const args = hook.mock.calls[0] as unknown as [unknown, number, unknown[]];
+      const args = hook.mock.calls[0] as unknown as [
+        unknown,
+        number,
+        unknown[],
+      ];
       expect(args[2]).toHaveLength(2);
     });
   });

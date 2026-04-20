@@ -9,9 +9,7 @@ import type {
 } from "../../../lib/thread/types";
 
 /** SDK-native content type for Anthropic human messages */
-export type AnthropicContent =
-  | string
-  | Anthropic.Messages.ContentBlockParam[];
+export type AnthropicContent = string | Anthropic.Messages.ContentBlockParam[];
 
 /** SDK-native content type for Anthropic system prompts (supports cache_control blocks) */
 export type AnthropicSystemContent =
@@ -26,7 +24,10 @@ export interface StoredMessage {
   isSystem?: boolean;
 }
 
-export type AnthropicThreadManagerHooks = ThreadManagerHooks<StoredMessage, Anthropic.Messages.MessageParam>;
+export type AnthropicThreadManagerHooks = ThreadManagerHooks<
+  StoredMessage,
+  Anthropic.Messages.MessageParam
+>;
 
 export interface AnthropicThreadManagerConfig {
   redis: Redis;
@@ -45,11 +46,15 @@ export interface AnthropicInvocationPayload {
 }
 
 /** Thread manager with Anthropic MessageParam convenience helpers */
-export interface AnthropicThreadManager
-  extends ProviderThreadManager<StoredMessage, AnthropicContent, JsonValue, AnthropicSystemContent> {
+export interface AnthropicThreadManager extends ProviderThreadManager<
+  StoredMessage,
+  AnthropicContent,
+  JsonValue,
+  AnthropicSystemContent
+> {
   appendAssistantMessage(
     id: string,
-    content: Anthropic.Messages.ContentBlock[],
+    content: Anthropic.Messages.ContentBlock[]
   ): Promise<void>;
   prepareForInvocation(): Promise<AnthropicInvocationPayload>;
 }
@@ -60,7 +65,7 @@ function storedMessageId(msg: StoredMessage): string {
 
 /** Normalise content into an array of ContentBlockParam */
 function toContentBlocks(
-  content: AnthropicContent,
+  content: AnthropicContent
 ): Anthropic.Messages.ContentBlockParam[] {
   if (typeof content === "string") {
     return [{ type: "text", text: content }];
@@ -74,7 +79,7 @@ function toContentBlocks(
  * merging, multiple sequential tool-result messages would violate this.
  */
 function mergeConsecutiveMessages(
-  messages: Anthropic.Messages.MessageParam[],
+  messages: Anthropic.Messages.MessageParam[]
 ): Anthropic.Messages.MessageParam[] {
   const merged: Anthropic.Messages.MessageParam[] = [];
   for (const msg of messages) {
@@ -90,9 +95,7 @@ function mergeConsecutiveMessages(
     } else {
       merged.push({
         ...msg,
-        content: Array.isArray(msg.content)
-          ? [...msg.content]
-          : msg.content,
+        content: Array.isArray(msg.content) ? [...msg.content] : msg.content,
       });
     }
   }
@@ -105,7 +108,7 @@ function mergeConsecutiveMessages(
  * appending typed messages.
  */
 export function createAnthropicThreadManager(
-  config: AnthropicThreadManagerConfig,
+  config: AnthropicThreadManagerConfig
 ): AnthropicThreadManager {
   const baseConfig: ThreadManagerConfig<StoredMessage> = {
     redis: config.redis,
@@ -119,49 +122,56 @@ export function createAnthropicThreadManager(
   const helpers: Omit<AnthropicThreadManager, keyof typeof base> = {
     async appendUserMessage(
       id: string,
-      content: AnthropicContent,
+      content: AnthropicContent
     ): Promise<void> {
-      await base.append([{
-        id,
-        message: { role: "user", content: toContentBlocks(content) },
-      }]);
+      await base.append([
+        {
+          id,
+          message: { role: "user", content: toContentBlocks(content) },
+        },
+      ]);
     },
 
     async appendSystemMessage(
       id: string,
-      content: AnthropicSystemContent,
+      content: AnthropicSystemContent
     ): Promise<void> {
       await base.initialize();
-      await base.append([{
-        id,
-        // Stored under a user-role placeholder to satisfy the MessageParam
-        // shape; the `isSystem` flag steers extraction in prepareForInvocation.
-        message: {
-          role: "user",
-          content: content as Anthropic.Messages.MessageParam["content"],
+      await base.append([
+        {
+          id,
+          // Stored under a user-role placeholder to satisfy the MessageParam
+          // shape; the `isSystem` flag steers extraction in prepareForInvocation.
+          message: {
+            role: "user",
+            content: content as Anthropic.Messages.MessageParam["content"],
+          },
+          isSystem: true,
         },
-        isSystem: true,
-      }]);
+      ]);
     },
 
     async appendAssistantMessage(
       id: string,
-      content: Anthropic.Messages.ContentBlock[],
+      content: Anthropic.Messages.ContentBlock[]
     ): Promise<void> {
-      await base.append([{
-        id,
-        message: {
-          role: "assistant",
-          content: content as unknown as Anthropic.Messages.ContentBlockParam[],
+      await base.append([
+        {
+          id,
+          message: {
+            role: "assistant",
+            content:
+              content as unknown as Anthropic.Messages.ContentBlockParam[],
+          },
         },
-      }]);
+      ]);
     },
 
     async appendToolResult(
       id: string,
       toolCallId: string,
       _toolName: string,
-      content: JsonValue,
+      content: JsonValue
     ): Promise<void> {
       const toolContent =
         typeof content === "string"
@@ -169,17 +179,21 @@ export function createAnthropicThreadManager(
           : Array.isArray(content)
             ? (content as unknown as Anthropic.Messages.ToolResultBlockParam["content"])
             : JSON.stringify(content);
-      await base.append([{
-        id,
-        message: {
-          role: "user",
-          content: [{
-            type: "tool_result" as const,
-            tool_use_id: toolCallId,
-            content: toolContent,
-          }],
+      await base.append([
+        {
+          id,
+          message: {
+            role: "user",
+            content: [
+              {
+                type: "tool_result" as const,
+                tool_use_id: toolCallId,
+                content: toolContent,
+              },
+            ],
+          },
         },
-      }]);
+      ]);
     },
 
     async prepareForInvocation(): Promise<AnthropicInvocationPayload> {

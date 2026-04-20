@@ -200,7 +200,7 @@ export function createGoogleGenAIAdapter(
       threadId: string,
       id: string,
       message: Content,
-      threadKey?: string,
+      threadKey?: string
     ): Promise<void> {
       const thread = createGoogleGenAIThreadManager({
         redis,
@@ -253,7 +253,12 @@ export function createGoogleGenAIAdapter(
     model: string,
     client: GoogleGenAI
   ): ModelInvoker<Content> =>
-    createGoogleGenAIModelInvoker({ redis, client, model, hooks: config.hooks });
+    createGoogleGenAIModelInvoker({
+      redis,
+      client,
+      model,
+      hooks: config.hooks,
+    });
 
   const invoker: ModelInvoker<Content> =
     config.model && config.client

@@ -11,7 +11,13 @@ vi.mock("@temporalio/workflow", () => {
     setHandler: (_def: unknown, _handler: unknown) => {},
     uuid4: () =>
       `00000000-0000-0000-0000-${String(++idCounter).padStart(12, "0")}`,
-    log: { trace: () => {}, debug: () => {}, info: () => {}, warn: () => {}, error: () => {} },
+    log: {
+      trace: () => {},
+      debug: () => {},
+      info: () => {},
+      warn: () => {},
+      error: () => {},
+    },
   };
 });
 
@@ -148,7 +154,11 @@ describe("createAgentStateManager integration", () => {
     const sm = createAgentStateManager({});
 
     sm.updateUsage({ inputTokens: 100, outputTokens: 50 });
-    sm.updateUsage({ inputTokens: 200, outputTokens: 100, cachedWriteTokens: 30 });
+    sm.updateUsage({
+      inputTokens: 200,
+      outputTokens: 100,
+      cachedWriteTokens: 30,
+    });
     sm.updateUsage({ cachedReadTokens: 20, reasonTokens: 10 });
 
     expect(sm.getTotalUsage()).toEqual({

@@ -39,15 +39,16 @@ Zeitlich's core is framework-agnostic — it defines generic interfaces (`ModelI
 ### Thread Adapters
 
 A thread adapter bundles two concerns:
+
 1. **Thread management** — Storing and retrieving conversation messages in Redis
 2. **Model invocation** — Calling the LLM with the conversation history and tools
 
 Each adapter exposes the same shape: `createActivities(scope)` for Temporal worker registration, and an `invoker` for model calls. Pick the one matching your preferred SDK:
 
-| Adapter | Import | SDK |
-|---------|--------|-----|
-| LangChain | `zeitlich/adapters/thread/langchain` | `@langchain/core` + any provider package |
-| Google GenAI | `zeitlich/adapters/thread/google-genai` | `@google/genai` |
+| Adapter      | Import                                  | SDK                                      |
+| ------------ | --------------------------------------- | ---------------------------------------- |
+| LangChain    | `zeitlich/adapters/thread/langchain`    | `@langchain/core` + any provider package |
+| Google GenAI | `zeitlich/adapters/thread/google-genai` | `@google/genai`                          |
 
 Vercel AI SDK and other provider-specific adapters can be built by implementing the `ThreadOps` and `ModelInvoker` interfaces.
 
@@ -55,13 +56,13 @@ Vercel AI SDK and other provider-specific adapters can be built by implementing 
 
 A sandbox adapter provides filesystem access for tools like `Bash`, `Read`, `Write`, and `Edit`:
 
-| Adapter | Import | Use case |
-|---------|--------|----------|
-| In-memory | `zeitlich/adapters/sandbox/inmemory` | Tests and lightweight agents |
-| Virtual FS | `zeitlich` / `zeitlich/workflow` | Built-in virtual filesystem with custom resolvers |
-| Daytona | `zeitlich/adapters/sandbox/daytona` | Remote Daytona workspaces |
-| E2B | `zeitlich/adapters/sandbox/e2b` | E2B cloud sandboxes |
-| Bedrock | `zeitlich/adapters/sandbox/bedrock` | AWS Bedrock AgentCore Code Interpreter |
+| Adapter    | Import                               | Use case                                          |
+| ---------- | ------------------------------------ | ------------------------------------------------- |
+| In-memory  | `zeitlich/adapters/sandbox/inmemory` | Tests and lightweight agents                      |
+| Virtual FS | `zeitlich` / `zeitlich/workflow`     | Built-in virtual filesystem with custom resolvers |
+| Daytona    | `zeitlich/adapters/sandbox/daytona`  | Remote Daytona workspaces                         |
+| E2B        | `zeitlich/adapters/sandbox/e2b`      | E2B cloud sandboxes                               |
+| Bedrock    | `zeitlich/adapters/sandbox/bedrock`  | AWS Bedrock AgentCore Code Interpreter            |
 
 ### Example: LangChain Adapter
 
@@ -442,13 +443,15 @@ export const researcherWorkflow = defineSubagentWorkflow(
       buildContextMessage: () => [{ type: "text", text: prompt }],
     });
 
-    const { finalMessage, threadId } = await session.runSession({ stateManager });
+    const { finalMessage, threadId } = await session.runSession({
+      stateManager,
+    });
     return {
       toolResponse: finalMessage ? extractText(finalMessage) : "No response",
       data: null,
       threadId,
     };
-  },
+  }
 );
 ```
 
@@ -510,6 +513,7 @@ license: MIT
 ## Instructions
 
 When reviewing code, follow these steps:
+
 1. Read the diff with `Bash`
 2. Search for related tests with `Grep`
 3. Read the checklist from `resources/checklist.md`
@@ -591,7 +595,7 @@ For advanced use cases, you can construct the tool and handler independently:
 ```typescript
 import { createReadSkillTool, createReadSkillHandler } from "zeitlich/workflow";
 
-const tool = createReadSkillTool(skills);    // ToolDefinition with enum schema
+const tool = createReadSkillTool(skills); // ToolDefinition with enum schema
 const handler = createReadSkillHandler(skills); // Returns skill instructions
 ```
 
@@ -603,11 +607,11 @@ Every session has a **thread** (conversation history) and an optional **sandbox*
 
 The `thread` field on `SessionConfig` (and `WorkflowInput`) accepts one of three modes:
 
-| Mode | Description |
-|------|-------------|
-| `{ mode: "new" }` | Start a fresh thread (default). Optionally pass `threadId` to choose the ID. |
-| `{ mode: "fork", threadId }` | Copy all messages from an existing thread into a new one and continue there. The original is never mutated. |
-| `{ mode: "continue", threadId }` | Append directly to an existing thread in-place. |
+| Mode                             | Description                                                                                                 |
+| -------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `{ mode: "new" }`                | Start a fresh thread (default). Optionally pass `threadId` to choose the ID.                                |
+| `{ mode: "fork", threadId }`     | Copy all messages from an existing thread into a new one and continue there. The original is never mutated. |
+| `{ mode: "continue", threadId }` | Append directly to an existing thread in-place.                                                             |
 
 ```typescript
 import { createSession } from "zeitlich/workflow";
@@ -637,23 +641,23 @@ const continuedSession = await createSession({
 
 The `sandbox` field controls how a sandbox is created or reused:
 
-| Mode | Description |
-|------|-------------|
-| `{ mode: "new" }` | Create a fresh sandbox (default when `sandboxOps` is provided). |
-| `{ mode: "continue", sandboxId }` | Take ownership of an existing sandbox (paused or running). Paused sandboxes are automatically resumed. |
-| `{ mode: "fork", sandboxId }` | Fork from an existing sandbox. A new sandbox is created and owned by this session. |
+| Mode                                  | Description                                                                                                     |
+| ------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `{ mode: "new" }`                     | Create a fresh sandbox (default when `sandboxOps` is provided).                                                 |
+| `{ mode: "continue", sandboxId }`     | Take ownership of an existing sandbox (paused or running). Paused sandboxes are automatically resumed.          |
+| `{ mode: "fork", sandboxId }`         | Fork from an existing sandbox. A new sandbox is created and owned by this session.                              |
 | `{ mode: "from-snapshot", snapshot }` | Restore a fresh sandbox from a previously captured `SandboxSnapshot`. The new sandbox is owned by this session. |
-| `{ mode: "inherit", sandboxId }` | Use a sandbox owned by someone else (e.g. a parent agent). Shutdown policy is ignored. |
+| `{ mode: "inherit", sandboxId }`      | Use a sandbox owned by someone else (e.g. a parent agent). Shutdown policy is ignored.                          |
 
 #### Sandbox Shutdown (`SandboxShutdown`)
 
 The `sandboxShutdown` field controls what happens to the sandbox when the session exits:
 
-| Value | Description |
-|-------|-------------|
-| `"destroy"` | Tear down the sandbox entirely (default). |
-| `"pause"` | Pause the sandbox so it can be resumed later. |
-| `"keep"` | Leave the sandbox running (no-op on exit). |
+| Value        | Description                                                                                                                                                            |
+| ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `"destroy"`  | Tear down the sandbox entirely (default).                                                                                                                              |
+| `"pause"`    | Pause the sandbox so it can be resumed later.                                                                                                                          |
+| `"keep"`     | Leave the sandbox running (no-op on exit).                                                                                                                             |
 | `"snapshot"` | Capture a snapshot, then destroy the sandbox. The snapshot is surfaced on the session result as `snapshot` (plus `baseSnapshot` when the sandbox was freshly created). |
 
 Subagents also support two additional shutdown modes:
@@ -720,7 +724,13 @@ This means heterogeneous providers "just work" — the parent doesn't need to kn
 export const analystWorkflow = defineSubagentWorkflow(
   { name: "analyst", description: "...", sandboxShutdown: "snapshot" },
   async (prompt, sessionInput) => {
-    const session = await createSession({ ...sessionInput, sandboxOps, runAgent, threadOps, buildContextMessage: () => prompt });
+    const session = await createSession({
+      ...sessionInput,
+      sandboxOps,
+      runAgent,
+      threadOps,
+      buildContextMessage: () => prompt,
+    });
     const result = await session.runSession({ stateManager });
     return result; // result.deleteSnapshots is forwarded automatically
   }
@@ -751,9 +761,11 @@ export const researcherWorkflow = defineSubagentWorkflow(
       // ... other config
     });
 
-    const { threadId, finalMessage } = await session.runSession({ stateManager });
+    const { threadId, finalMessage } = await session.runSession({
+      stateManager,
+    });
     return { toolResponse: extractText(finalMessage), data: null, threadId };
-  },
+  }
 );
 ```
 
@@ -827,10 +839,15 @@ Each `fs` instance also exposes `workspaceBase`, which is the base used for rela
 ```typescript
 import { VirtualFileSystem } from "zeitlich";
 
-const virtualFs = new VirtualFileSystem(fileTree, resolver, { projectId: "p1" }, "/repo");
+const virtualFs = new VirtualFileSystem(
+  fileTree,
+  resolver,
+  { projectId: "p1" },
+  "/repo"
+);
 console.log(virtualFs.workspaceBase); // "/repo"
 
-await virtualFs.writeFile("src/index.ts", 'export const ok = true;\n');
+await virtualFs.writeFile("src/index.ts", "export const ok = true;\n");
 const content = await virtualFs.readFile("src/index.ts"); // reads /repo/src/index.ts
 ```
 
@@ -916,80 +933,80 @@ const session = await createSession({
 
 Safe for use in Temporal workflow files:
 
-| Export                      | Description                                                                                            |
-| --------------------------- | ------------------------------------------------------------------------------------------------------ |
-| `createSession`             | Creates an agent session with tools, prompts, subagents, and hooks                                     |
-| `createAgentStateManager`   | Creates a state manager for workflow state with query/update handlers                                  |
-| `createToolRouter`          | Creates a tool router (used internally by session, or for advanced use)                                |
-| `defineTool`                | Identity function for type-safe tool definition with handler and hooks                                 |
-| `defineSubagentWorkflow`    | Defines a subagent workflow with embedded name, description, and optional resultSchema                 |
-| `defineSubagent`            | Creates a `SubagentConfig` from a `SubagentDefinition` with optional parent-specific overrides         |
-| `proxyRunAgent`             | Workflow-safe proxy for `runAgent` activities with LLM-optimised defaults (heartbeat, timeouts, retries) |
-| `getShortId`                | Generate a compact, workflow-deterministic identifier (base-62, 12 chars)                              |
-| Tool definitions            | `askUserQuestionTool`, `globTool`, `grepTool`, `readFileTool`, `writeFileTool`, `editTool`, `bashTool` |
-| Task tools                  | `taskCreateTool`, `taskGetTool`, `taskListTool`, `taskUpdateTool` for workflow task management         |
-| Skill utilities             | `parseSkillFile`, `createReadSkillTool`, `createReadSkillHandler`                                      |
-| `defineWorkflow`            | Wraps a main workflow function, translating `WorkflowInput` into session-compatible fields             |
-| Lifecycle types             | `ThreadInit`, `SandboxInit`, `SandboxShutdown`, `SubagentSandboxShutdown`, `SubagentSandboxConfig`     |
-| Types                       | `Skill`, `SkillMetadata`, `SkillProvider`, `SubagentDefinition`, `SubagentConfig`, `ToolDefinition`, `ToolWithHandler`, `RouterContext`, `SessionConfig`, `WorkflowConfig`, `WorkflowInput`, etc. |
+| Export                    | Description                                                                                                                                                                                       |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `createSession`           | Creates an agent session with tools, prompts, subagents, and hooks                                                                                                                                |
+| `createAgentStateManager` | Creates a state manager for workflow state with query/update handlers                                                                                                                             |
+| `createToolRouter`        | Creates a tool router (used internally by session, or for advanced use)                                                                                                                           |
+| `defineTool`              | Identity function for type-safe tool definition with handler and hooks                                                                                                                            |
+| `defineSubagentWorkflow`  | Defines a subagent workflow with embedded name, description, and optional resultSchema                                                                                                            |
+| `defineSubagent`          | Creates a `SubagentConfig` from a `SubagentDefinition` with optional parent-specific overrides                                                                                                    |
+| `proxyRunAgent`           | Workflow-safe proxy for `runAgent` activities with LLM-optimised defaults (heartbeat, timeouts, retries)                                                                                          |
+| `getShortId`              | Generate a compact, workflow-deterministic identifier (base-62, 12 chars)                                                                                                                         |
+| Tool definitions          | `askUserQuestionTool`, `globTool`, `grepTool`, `readFileTool`, `writeFileTool`, `editTool`, `bashTool`                                                                                            |
+| Task tools                | `taskCreateTool`, `taskGetTool`, `taskListTool`, `taskUpdateTool` for workflow task management                                                                                                    |
+| Skill utilities           | `parseSkillFile`, `createReadSkillTool`, `createReadSkillHandler`                                                                                                                                 |
+| `defineWorkflow`          | Wraps a main workflow function, translating `WorkflowInput` into session-compatible fields                                                                                                        |
+| Lifecycle types           | `ThreadInit`, `SandboxInit`, `SandboxShutdown`, `SubagentSandboxShutdown`, `SubagentSandboxConfig`                                                                                                |
+| Types                     | `Skill`, `SkillMetadata`, `SkillProvider`, `SubagentDefinition`, `SubagentConfig`, `ToolDefinition`, `ToolWithHandler`, `RouterContext`, `SessionConfig`, `WorkflowConfig`, `WorkflowInput`, etc. |
 
 ### Activity Entry Point (`zeitlich`)
 
 Framework-agnostic utilities for activities, worker setup, and Node.js code:
 
-| Export                    | Description                                                                                   |
-| ------------------------- | --------------------------------------------------------------------------------------------- |
-| `createRunAgentActivity`  | Wraps a handler into a scope-prefixed `RunAgentActivity` with auto-fetched parent workflow state |
-| `withParentWorkflowState`  | Wraps a tool handler into an `ActivityToolHandler` with auto-fetched parent workflow state    |
-| `createThreadManager`     | Generic Redis-backed thread manager factory                                                   |
-| `toTree`                  | Generate file tree string from an `IFileSystem` instance                                      |
-| `withSandbox`             | Wraps a handler to auto-resolve sandbox from context (pairs with `withAutoAppend`)            |
-| `NodeFsSandboxFileSystem`   | `node:fs` adapter for `SandboxFileSystem` — read skills from the worker's local disk              |
-| `FileSystemSkillProvider`   | Load skills from a directory following the agentskills.io layout                                  |
+| Export                    | Description                                                                                                        |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `createRunAgentActivity`  | Wraps a handler into a scope-prefixed `RunAgentActivity` with auto-fetched parent workflow state                   |
+| `withParentWorkflowState` | Wraps a tool handler into an `ActivityToolHandler` with auto-fetched parent workflow state                         |
+| `createThreadManager`     | Generic Redis-backed thread manager factory                                                                        |
+| `toTree`                  | Generate file tree string from an `IFileSystem` instance                                                           |
+| `withSandbox`             | Wraps a handler to auto-resolve sandbox from context (pairs with `withAutoAppend`)                                 |
+| `NodeFsSandboxFileSystem` | `node:fs` adapter for `SandboxFileSystem` — read skills from the worker's local disk                               |
+| `FileSystemSkillProvider` | Load skills from a directory following the agentskills.io layout                                                   |
 | Tool handlers             | `bashHandler`, `editHandler`, `globHandler`, `readFileHandler`, `writeFileHandler`, `createAskUserQuestionHandler` |
 
 ### Thread Adapter Entry Points
 
 **LangChain** (`zeitlich/adapters/thread/langchain`):
 
-| Export                              | Description                                                            |
-| ----------------------------------- | ---------------------------------------------------------------------- |
-| `createLangChainAdapter`            | Unified adapter returning `createActivities`, `invoker`, `createModelInvoker` |
-| `createLangChainModelInvoker`       | Factory that returns a `ModelInvoker` backed by a LangChain chat model |
-| `invokeLangChainModel`              | One-shot model invocation convenience function                         |
-| `createLangChainThreadManager`      | Thread manager with LangChain `StoredMessage` helpers                  |
+| Export                         | Description                                                                   |
+| ------------------------------ | ----------------------------------------------------------------------------- |
+| `createLangChainAdapter`       | Unified adapter returning `createActivities`, `invoker`, `createModelInvoker` |
+| `createLangChainModelInvoker`  | Factory that returns a `ModelInvoker` backed by a LangChain chat model        |
+| `invokeLangChainModel`         | One-shot model invocation convenience function                                |
+| `createLangChainThreadManager` | Thread manager with LangChain `StoredMessage` helpers                         |
 
 **Google GenAI** (`zeitlich/adapters/thread/google-genai`):
 
-| Export                              | Description                                                            |
-| ----------------------------------- | ---------------------------------------------------------------------- |
-| `createGoogleGenAIAdapter`          | Unified adapter returning `createActivities`, `invoker`, `createModelInvoker` |
-| `createGoogleGenAIModelInvoker`     | Factory that returns a `ModelInvoker` backed by the `@google/genai` SDK |
-| `invokeGoogleGenAIModel`            | One-shot model invocation convenience function                         |
-| `createGoogleGenAIThreadManager`    | Thread manager with Google GenAI `Content` helpers                     |
+| Export                           | Description                                                                   |
+| -------------------------------- | ----------------------------------------------------------------------------- |
+| `createGoogleGenAIAdapter`       | Unified adapter returning `createActivities`, `invoker`, `createModelInvoker` |
+| `createGoogleGenAIModelInvoker`  | Factory that returns a `ModelInvoker` backed by the `@google/genai` SDK       |
+| `invokeGoogleGenAIModel`         | One-shot model invocation convenience function                                |
+| `createGoogleGenAIThreadManager` | Thread manager with Google GenAI `Content` helpers                            |
 
 ### Types
 
-| Export                  | Description                                                                  |
-| ----------------------- | ---------------------------------------------------------------------------- |
-| `AgentStatus`           | `"RUNNING" \| "WAITING_FOR_INPUT" \| "COMPLETED" \| "FAILED" \| "CANCELLED"` |
-| `MessageContent`        | Framework-agnostic message content (`string \| ContentPart[]`)               |
-| `ToolMessageContent`    | Content returned by a tool handler (`string`)                                |
-| `ModelInvoker`          | Generic model invocation contract                                            |
-| `ModelInvokerConfig`    | Configuration passed to a model invoker                                      |
-| `ToolDefinition`        | Tool definition with name, description, and Zod schema                       |
-| `ToolWithHandler`       | Tool definition combined with its handler                                    |
-| `RouterContext`          | Base context every tool handler receives (`threadId`, `toolCallId`, `toolName`, `sandboxId?`) |
-| `Hooks`                 | Combined session lifecycle + tool execution hooks                            |
-| `ToolRouterHooks`       | Narrowed hook interface for tool execution only (pre/post/failure)            |
-| `ThreadInit`            | Thread initialization strategy: `"new"`, `"continue"`, or `"fork"`               |
-| `SandboxInit`           | Sandbox initialization strategy: `"new"`, `"continue"`, `"fork"`, `"from-snapshot"`, or `"inherit"` |
-| `SandboxShutdown`       | Sandbox exit policy: `"destroy" \| "pause" \| "keep" \| "snapshot"`                |
-| `SubagentSandboxShutdown` | Extended shutdown with `"pause-until-parent-close"`                             |
-| `SubagentSandboxConfig` | Subagent sandbox strategy: `"none" \| "inherit" \| "own"` with `continuation: "continue" \| "fork" \| "snapshot"` |
-| `SubagentDefinition`    | Callable subagent workflow with embedded metadata (from `defineSubagentWorkflow`) |
-| `SubagentConfig`        | Resolved subagent configuration consumed by `createSession`                  |
-| `AgentState`            | Generic agent state type                                                     |
+| Export                    | Description                                                                                                       |
+| ------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `AgentStatus`             | `"RUNNING" \| "WAITING_FOR_INPUT" \| "COMPLETED" \| "FAILED" \| "CANCELLED"`                                      |
+| `MessageContent`          | Framework-agnostic message content (`string \| ContentPart[]`)                                                    |
+| `ToolMessageContent`      | Content returned by a tool handler (`string`)                                                                     |
+| `ModelInvoker`            | Generic model invocation contract                                                                                 |
+| `ModelInvokerConfig`      | Configuration passed to a model invoker                                                                           |
+| `ToolDefinition`          | Tool definition with name, description, and Zod schema                                                            |
+| `ToolWithHandler`         | Tool definition combined with its handler                                                                         |
+| `RouterContext`           | Base context every tool handler receives (`threadId`, `toolCallId`, `toolName`, `sandboxId?`)                     |
+| `Hooks`                   | Combined session lifecycle + tool execution hooks                                                                 |
+| `ToolRouterHooks`         | Narrowed hook interface for tool execution only (pre/post/failure)                                                |
+| `ThreadInit`              | Thread initialization strategy: `"new"`, `"continue"`, or `"fork"`                                                |
+| `SandboxInit`             | Sandbox initialization strategy: `"new"`, `"continue"`, `"fork"`, `"from-snapshot"`, or `"inherit"`               |
+| `SandboxShutdown`         | Sandbox exit policy: `"destroy" \| "pause" \| "keep" \| "snapshot"`                                               |
+| `SubagentSandboxShutdown` | Extended shutdown with `"pause-until-parent-close"`                                                               |
+| `SubagentSandboxConfig`   | Subagent sandbox strategy: `"none" \| "inherit" \| "own"` with `continuation: "continue" \| "fork" \| "snapshot"` |
+| `SubagentDefinition`      | Callable subagent workflow with embedded metadata (from `defineSubagentWorkflow`)                                 |
+| `SubagentConfig`          | Resolved subagent configuration consumed by `createSession`                                                       |
+| `AgentState`              | Generic agent state type                                                                                          |
 
 ## Architecture
 
@@ -1106,7 +1123,7 @@ const sinks: InjectedSinks<ZeitlichObservabilitySinks> = {
   },
 };
 
-const worker = await Worker.create({ sinks, /* ... */ });
+const worker = await Worker.create({ sinks /* ... */ });
 ```
 
 **2. Wire hooks in your workflow:**

@@ -9,7 +9,7 @@ import {
 } from "./thread-manager";
 import { getActivityContext } from "../../../lib/activity";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+ 
 export interface LangChainModelInvokerConfig<
   TModel extends BaseChatModel<any> = BaseChatModel<any>,
 > {
@@ -40,7 +40,7 @@ export interface LangChainModelInvokerConfig<
  * return { ...createRunAgentActivity(client, invoker, "myAgent") };
  * ```
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+ 
 export function createLangChainModelInvoker<
   TModel extends BaseChatModel<any> = BaseChatModel<any>,
 >({ redis, model, hooks }: LangChainModelInvokerConfig<TModel>) {
@@ -110,7 +110,7 @@ export function createLangChainModelInvoker<
  * Convenience wrapper around createLangChainModelInvoker for cases where
  * you don't need to reuse the invoker.
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+ 
 export async function invokeLangChainModel<
   TModel extends BaseChatModel<any> = BaseChatModel<any>,
 >({

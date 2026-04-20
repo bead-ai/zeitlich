@@ -53,7 +53,7 @@ function createMockResolver(): {
         id,
         typeof content === "string"
           ? content
-          : new TextDecoder().decode(content),
+          : new TextDecoder().decode(content)
       );
     },
 
@@ -63,7 +63,7 @@ function createMockResolver(): {
         id,
         typeof content === "string"
           ? content
-          : new TextDecoder().decode(content),
+          : new TextDecoder().decode(content)
       );
       const size =
         typeof content === "string"
@@ -286,9 +286,7 @@ describe("VirtualFileSystem", () => {
   });
 
   it("rm force does not throw for missing path", async () => {
-    await expect(
-      fs.rm("/nonexistent", { force: true }),
-    ).resolves.not.toThrow();
+    await expect(fs.rm("/nonexistent", { force: true })).resolves.not.toThrow();
   });
 
   // --- cp / mv ---
@@ -320,7 +318,7 @@ describe("VirtualFileSystem", () => {
 
   it("readlink throws SandboxNotSupportedError", async () => {
     await expect(fs.readlink("/src/index.ts")).rejects.toThrow(
-      SandboxNotSupportedError,
+      SandboxNotSupportedError
     );
   });
 });
@@ -349,7 +347,7 @@ describe("VirtualFileSystem — inlineFiles", () => {
       resolver,
       ctx,
       "/",
-      inlineFiles,
+      inlineFiles
     );
   }
 
@@ -418,7 +416,9 @@ describe("applyVirtualTreeMutations", () => {
     let fileTree = tree;
     return {
       get: (_key: "fileTree"): FileEntry[] => fileTree,
-      set: (_key: "fileTree", value: FileEntry[]): void => { fileTree = value; },
+      set: (_key: "fileTree", value: FileEntry[]): void => {
+        fileTree = value;
+      },
       current: (): FileEntry[] => fileTree,
     };
   }
@@ -490,9 +490,7 @@ describe("applyVirtualTreeMutations", () => {
   it("does not mutate the original array passed to the state manager", () => {
     const original = [...sampleTree];
     const sm = mockStateManager(sampleTree);
-    applyVirtualTreeMutations(sm, [
-      { type: "remove", path: "/src/index.ts" },
-    ]);
+    applyVirtualTreeMutations(sm, [{ type: "remove", path: "/src/index.ts" }]);
     expect(sampleTree).toEqual(original);
   });
 });

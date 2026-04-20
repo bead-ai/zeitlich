@@ -25,7 +25,7 @@ import type { ThreadOps } from "../session/types";
 export function createThreadOpsProxy(
   adapterPrefix: string,
   scope?: string,
-  options?: Parameters<typeof proxyActivities>[0],
+  options?: Parameters<typeof proxyActivities>[0]
 ): ActivityInterfaceFor<ThreadOps> {
   const resolvedScope = scope ?? workflowInfo().workflowType;
 
@@ -39,11 +39,10 @@ export function createThreadOpsProxy(
         maximumInterval: "15m",
         backoffCoefficient: 4,
       },
-    },
+    }
   );
 
-  const prefix =
-    `${adapterPrefix}${resolvedScope.charAt(0).toUpperCase()}${resolvedScope.slice(1)}`;
+  const prefix = `${adapterPrefix}${resolvedScope.charAt(0).toUpperCase()}${resolvedScope.slice(1)}`;
   const p = (key: string): string =>
     `${prefix}${key.charAt(0).toUpperCase()}${key.slice(1)}`;
 

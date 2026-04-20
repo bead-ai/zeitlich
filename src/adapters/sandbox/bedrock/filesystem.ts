@@ -26,9 +26,7 @@ async function consumeStream(
         event.resourceNotFoundException.message ?? "Resource not found"
       );
     if ("validationException" in event && event.validationException)
-      throw new Error(
-        event.validationException.message ?? "Validation error"
-      );
+      throw new Error(event.validationException.message ?? "Validation error");
     if ("internalServerException" in event && event.internalServerException)
       throw new Error(
         event.internalServerException.message ?? "Internal server error"
@@ -185,9 +183,7 @@ export class BedrockSandboxFileSystem implements SandboxFileSystem {
   async appendFile(path: string, content: string | Uint8Array): Promise<void> {
     const norm = this.normalisePath(path);
     const addition =
-      typeof content === "string"
-        ? content
-        : new TextDecoder().decode(content);
+      typeof content === "string" ? content : new TextDecoder().decode(content);
     const escaped = addition.replace(/'/g, "'\\''");
     const { exitCode, stderr } = await this.execShell(
       `printf '%s' '${escaped}' >> "${norm}"`
@@ -227,9 +223,7 @@ export class BedrockSandboxFileSystem implements SandboxFileSystem {
   async mkdir(path: string, options?: { recursive?: boolean }): Promise<void> {
     const norm = this.normalisePath(path);
     const flag = options?.recursive ? "-p " : "";
-    const { exitCode, stderr } = await this.execShell(
-      `mkdir ${flag}"${norm}"`
-    );
+    const { exitCode, stderr } = await this.execShell(`mkdir ${flag}"${norm}"`);
     if (exitCode !== 0) throw new Error(`mkdir failed: ${stderr}`);
   }
 
@@ -287,7 +281,8 @@ export class BedrockSandboxFileSystem implements SandboxFileSystem {
   ): Promise<void> {
     const norm = this.normalisePath(path);
     if (options?.recursive || options?.force) {
-      const flags = `${options?.recursive ? "-r" : ""} ${options?.force ? "-f" : ""}`.trim();
+      const flags =
+        `${options?.recursive ? "-r" : ""} ${options?.force ? "-f" : ""}`.trim();
       const { exitCode, stderr } = await this.execShell(
         `rm ${flags} "${norm}"`
       );
@@ -301,8 +296,7 @@ export class BedrockSandboxFileSystem implements SandboxFileSystem {
       paths: [rel],
     });
     if (result.isError) {
-      const msg =
-        result.content?.map((b) => b.text).join("") ?? "rm failed";
+      const msg = result.content?.map((b) => b.text).join("") ?? "rm failed";
       throw new Error(msg);
     }
   }
