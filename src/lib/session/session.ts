@@ -146,6 +146,32 @@ export async function createSession<
     truncateThread,
   } = threadOps;
 
+  // --- Local thread-length tracking --------------------------------------
+  // The session is the only writer into the thread, so we keep a local
+  // counter instead of querying Redis every turn. Direct append activities
+  // called from the session increment it below; router-driven appends go
+  // through the wrapped `countedAppendToolResult` which increments on
+  // success. `getThreadLength` is only called once at session start, and
+  // only when the thread may already contain messages (continue / fork).
+  let threadLength = 0;
+
+  const countedAppendToolResult = Object.assign(
+    async (...args: Parameters<typeof appendToolResult>) => {
+      const result = await appendToolResult(...args);
+      threadLength += 1;
+      return result;
+    },
+    {
+      executeWithOptions: async (
+        ...args: Parameters<typeof appendToolResult.executeWithOptions>
+      ) => {
+        const result = await appendToolResult.executeWithOptions(...args);
+        threadLength += 1;
+        return result;
+      },
+    },
+  ) as typeof appendToolResult;
+
   const plugins: ToolMap[string][] = [];
   let destroySubagentSandboxes: (() => Promise<void>) | undefined;
   let cleanupSubagentSnapshots: (() => Promise<void>) | undefined;
@@ -165,7 +191,7 @@ export async function createSession<
 
   const toolRouter = createToolRouter({
     tools,
-    appendToolResult,
+    appendToolResult: countedAppendToolResult,
     threadId,
     threadKey,
     hooks,
@@ -354,8 +380,12 @@ export async function createSession<
       // --- Thread lifecycle: new, continue, or fork ----------------------
       if (threadMode === "fork" && sourceThreadId) {
         await forkThread(sourceThreadId, threadId, threadKey);
+        // Forked thread inherits the source's messages — query once so
+        // our local counter starts from the right baseline.
+        threadLength = await getThreadLength(threadId, threadKey);
       } else if (threadMode === "continue") {
-        // "continue" — thread already exists, just append the new message
+        // "continue" — thread already exists; query length once.
+        threadLength = await getThreadLength(threadId, threadKey);
       } else {
         if (appendSystemPrompt) {
           if (
@@ -368,8 +398,10 @@ export async function createSession<
             });
           }
           await appendSystemMessage(threadId, uuid4(), systemPrompt, threadKey);
+          threadLength += 1;
         } else {
           await initializeThread(threadId, threadKey);
+          threadLength = 0;
         }
       }
       await appendHumanMessage(
@@ -378,6 +410,7 @@ export async function createSession<
         await buildContextMessage(),
         threadKey
       );
+      threadLength += 1;
 
       let exitReason: SessionExitReason = "completed";
       let finalMessage: M | null = null;
@@ -403,10 +436,13 @@ export async function createSession<
           });
 
           // Snapshot thread length *before* appending the assistant message
-          // so we can roll everything back to this point on a rewind.
-          const preAssistantLength = await getThreadLength(threadId, threadKey);
+          // so we can roll everything back to this point on a rewind. The
+          // session is the sole writer into the thread, so the local
+          // counter is authoritative without another activity call.
+          const preAssistantLength = threadLength;
 
           await appendAgentMessage(threadId, uuid4(), message, threadKey);
+          threadLength += 1;
 
           if (usage) {
             stateManager.updateUsage(usage);
@@ -432,7 +468,7 @@ export async function createSession<
             try {
               parsedToolCalls.push(toolRouter.parseToolCall(tc));
             } catch (error) {
-              await appendToolResult(uuid4(), {
+              await countedAppendToolResult(uuid4(), {
                 threadId,
                 threadKey,
                 toolCallId: tc.id ?? "",
@@ -473,6 +509,7 @@ export async function createSession<
             // rewind still consumes one of the `maxTurns` budget so a
             // misbehaving tool cannot spin the session forever.
             await truncateThread(threadId, preAssistantLength, threadKey);
+            threadLength = preAssistantLength;
             continue;
           }
 

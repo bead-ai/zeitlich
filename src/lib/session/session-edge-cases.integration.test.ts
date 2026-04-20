@@ -1885,6 +1885,65 @@ describe("createSession edge cases", () => {
     expect(truncateOps).toHaveLength(1);
   });
 
+  it("does not call getThreadLength during the normal turn loop (length tracked locally)", async () => {
+    const { ops, log } = createMockThreadOps();
+
+    const session = await createSession({
+      agentName: "TestAgent",
+      thread: { mode: "new", threadId: "thread-1" },
+      runAgent: createScriptedRunAgent([
+        {
+          message: "t1",
+          toolCalls: [{ id: "tc-1", name: "Echo", args: { text: "a" } }],
+        },
+        {
+          message: "t2",
+          toolCalls: [{ id: "tc-2", name: "Echo", args: { text: "b" } }],
+        },
+        { message: "done", toolCalls: [] },
+      ]),
+      threadOps: ops,
+      tools: { Echo: createEchoTool() },
+      buildContextMessage: () => "go",
+    });
+
+    const stateManager = createAgentStateManager({
+      initialState: { systemPrompt: "test" },
+    });
+
+    await session.runSession({ stateManager });
+
+    const lengthCalls = log.filter((l) => l.op === "getThreadLength");
+    expect(lengthCalls).toHaveLength(0);
+  });
+
+  it("queries getThreadLength once on continue mode to seed the local counter", async () => {
+    const { ops, log } = createMockThreadOps();
+
+    // Prime the mock thread with a system + human message so "continue"
+    // picks up a non-zero baseline length.
+    await ops.appendSystemMessage("thread-1", "sys-1", "sys", undefined);
+    await ops.appendHumanMessage("thread-1", "hm-1", "prev", undefined);
+    log.length = 0;
+
+    const session = await createSession({
+      agentName: "TestAgent",
+      thread: { mode: "continue", threadId: "thread-1" },
+      runAgent: createScriptedRunAgent([{ message: "done", toolCalls: [] }]),
+      threadOps: ops,
+      buildContextMessage: () => "follow-up",
+    });
+
+    const stateManager = createAgentStateManager({
+      initialState: { systemPrompt: "test" },
+    });
+
+    await session.runSession({ stateManager });
+
+    const lengthCalls = log.filter((l) => l.op === "getThreadLength");
+    expect(lengthCalls).toHaveLength(1);
+  });
+
   it("bails out with max_turns when a tool keeps requesting rewind", async () => {
     const { ops, log } = createMockThreadOps();
 
