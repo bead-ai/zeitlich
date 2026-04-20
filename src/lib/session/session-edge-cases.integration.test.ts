@@ -29,6 +29,16 @@ vi.mock("@temporalio/workflow", () => {
     }
   }
 
+  class MockCancellationScope {
+    cancellable: boolean;
+    constructor(opts?: { cancellable?: boolean }) {
+      this.cancellable = opts?.cancellable ?? true;
+    }
+    async run<T>(fn: () => Promise<T>): Promise<T> {
+      return fn();
+    }
+    cancel(): void {}
+  }
   return {
     proxyActivities: <T>() => ({}) as T,
     condition: async (fn: () => boolean) => fn(),
@@ -42,6 +52,8 @@ vi.mock("@temporalio/workflow", () => {
     uuid4: () =>
       `00000000-0000-0000-0000-${String(++idCounter).padStart(12, "0")}`,
     ApplicationFailure: MockApplicationFailure,
+    CancellationScope: MockCancellationScope,
+    isCancellation: (_err: unknown) => false,
     log: {
       trace: () => {},
       debug: () => {},
@@ -61,6 +73,7 @@ type TurnScript = {
   message: unknown;
   toolCalls: RawToolCall[];
   usage?: TokenUsage;
+  threadLengthAtCall?: number;
 };
 
 /**
@@ -102,6 +115,9 @@ function createMockThreadOps() {
     forkThread: async (source, target) => {
       log.push({ op: "forkThread", args: [source, target] });
     },
+    truncateThread: async (threadId, length) => {
+      log.push({ op: "truncateThread", args: [threadId, length] });
+    },
   });
   return { ops, log };
 }
@@ -113,12 +129,18 @@ function createScriptedRunAgent(
   return async () => {
     const turn = turns[call++];
     if (!turn) {
-      return { message: "done", rawToolCalls: [], usage: undefined };
+      return {
+        message: "done",
+        rawToolCalls: [],
+        usage: undefined,
+        threadLengthAtCall: 0,
+      };
     }
     return {
       message: turn.message,
       rawToolCalls: turn.toolCalls,
       usage: turn.usage,
+      threadLengthAtCall: turn.threadLengthAtCall ?? 0,
     };
   };
 }
@@ -774,6 +796,9 @@ describe("createSession edge cases", () => {
       },
       forkThread: async (source, target) => {
         log.push({ op: "forkThread", args: [source, target] });
+      },
+      truncateThread: async (threadId, length) => {
+        log.push({ op: "truncateThread", args: [threadId, length] });
       },
     });
 
@@ -1658,5 +1683,244 @@ describe("createSession edge cases", () => {
     expect(sandboxLog).not.toContain("resume:kept-sb");
     expect(sandboxLog).not.toContain("pause:kept-sb");
     expect(sandboxLog).not.toContain("destroy:kept-sb");
+  });
+
+  // --- Rewind flow: tool requests rewind and turn is retried -------------
+
+  it("rewinds the turn when a tool handler returns rewind:true", async () => {
+    const { ops, log } = createMockThreadOps();
+
+    let rewindAttempts = 0;
+    const rewindTool = defineTool({
+      name: "Rewind" as const,
+      description: "rewinds once then succeeds",
+      schema: z.object({}),
+      handler: async () => {
+        rewindAttempts += 1;
+        if (rewindAttempts === 1) {
+          return {
+            toolResponse: "ignored",
+            data: null,
+            rewind: true,
+          };
+        }
+        return { toolResponse: "ok", data: null };
+      },
+    });
+
+    const session = await createSession({
+      agentName: "TestAgent",
+      thread: { mode: "new", threadId: "thread-1" },
+      runAgent: createScriptedRunAgent([
+        {
+          message: "attempt-1",
+          toolCalls: [{ id: "tc-1", name: "Rewind", args: {} }],
+        },
+        {
+          message: "attempt-2",
+          toolCalls: [{ id: "tc-2", name: "Rewind", args: {} }],
+        },
+        { message: "done", toolCalls: [] },
+      ]),
+      threadOps: ops,
+      tools: { Rewind: rewindTool },
+      buildContextMessage: () => "go",
+    });
+
+    const stateManager = createAgentStateManager({
+      initialState: { systemPrompt: "test" },
+    });
+
+    const result = await session.runSession({ stateManager });
+
+    expect(result.exitReason).toBe("completed");
+    expect(result.finalMessage).toBe("done");
+    expect(rewindAttempts).toBe(2);
+
+    const truncateOps = log.filter((l) => l.op === "truncateThread");
+    expect(truncateOps).toHaveLength(1);
+
+    const noRewindToolResult = log.filter((l) => {
+      if (l.op !== "appendToolResult") return false;
+      const config = l.args[1] as ToolResultConfig;
+      return config.toolCallId === "tc-1";
+    });
+    expect(noRewindToolResult).toHaveLength(0);
+
+    const agentAppends = log.filter((l) => l.op === "appendAgentMessage");
+    expect(agentAppends).toHaveLength(3);
+  });
+
+  it("truncates the thread back to the pre-assistant state so sibling tool results are dropped on rewind", async () => {
+    const { ops, log } = createMockThreadOps();
+
+    let rewindFired = false;
+
+    const siblingTool = defineTool({
+      name: "Sibling" as const,
+      description: "sibling",
+      schema: z.object({}),
+      handler: async () => ({ toolResponse: "sibling-ok", data: null }),
+    });
+
+    const rewindTool = defineTool({
+      name: "Rewind" as const,
+      description: "rewinds",
+      schema: z.object({}),
+      handler: async () => {
+        if (!rewindFired) {
+          rewindFired = true;
+          return { toolResponse: "ignored", data: null, rewind: true };
+        }
+        return { toolResponse: "ok", data: null };
+      },
+    });
+
+    const session = await createSession({
+      agentName: "TestAgent",
+      thread: { mode: "new", threadId: "thread-1" },
+      runAgent: createScriptedRunAgent([
+        {
+          message: "parallel",
+          toolCalls: [
+            { id: "tc-sibling", name: "Sibling", args: {} },
+            { id: "tc-rewind", name: "Rewind", args: {} },
+          ],
+          // Invoker reports 2 stored messages (system + human) at the
+          // moment the LLM was called.
+          threadLengthAtCall: 2,
+        },
+        { message: "done", toolCalls: [], threadLengthAtCall: 2 },
+      ]),
+      threadOps: ops,
+      tools: { Rewind: rewindTool, Sibling: siblingTool },
+      buildContextMessage: () => "go",
+    });
+
+    const stateManager = createAgentStateManager({
+      initialState: { systemPrompt: "test" },
+    });
+
+    const result = await session.runSession({ stateManager });
+
+    expect(result.exitReason).toBe("completed");
+
+    // Exactly one truncate fired — back to the pre-assistant-message
+    // length that runAgent reported.
+    const truncateOps = log.filter((l) => l.op === "truncateThread");
+    expect(truncateOps).toHaveLength(1);
+    const truncateOp = truncateOps[0];
+    if (!truncateOp) throw new Error("expected truncate op");
+    expect(truncateOp.args[1]).toBe(2);
+
+    // Rewinding tool never appends its own result.
+    const rewindResultAppends = log.filter((l) => {
+      if (l.op !== "appendToolResult") return false;
+      const config = l.args[1] as ToolResultConfig;
+      return config.toolCallId === "tc-rewind";
+    });
+    expect(rewindResultAppends).toHaveLength(0);
+
+    // Two assistant messages expected: one from the rewound turn, one from
+    // the successful retry.
+    const agentAppends = log.filter((l) => l.op === "appendAgentMessage");
+    expect(agentAppends).toHaveLength(2);
+  });
+
+  it("does not rewind when the rewinding tool is no longer present after retry", async () => {
+    const { ops, log } = createMockThreadOps();
+
+    let attempts = 0;
+    const rewindOnce = defineTool({
+      name: "RewindOnce" as const,
+      description: "rewinds once",
+      schema: z.object({}),
+      handler: async () => {
+        attempts += 1;
+        if (attempts === 1) {
+          return { toolResponse: "ignored", data: null, rewind: true };
+        }
+        return { toolResponse: "ok", data: null };
+      },
+    });
+
+    const session = await createSession({
+      agentName: "TestAgent",
+      thread: { mode: "new", threadId: "thread-1" },
+      maxTurns: 5,
+      runAgent: createScriptedRunAgent([
+        {
+          message: "call-1",
+          toolCalls: [{ id: "tc-1", name: "RewindOnce", args: {} }],
+        },
+        {
+          message: "call-2",
+          toolCalls: [{ id: "tc-2", name: "RewindOnce", args: {} }],
+        },
+        { message: "done", toolCalls: [] },
+      ]),
+      threadOps: ops,
+      tools: { RewindOnce: rewindOnce },
+      buildContextMessage: () => "go",
+    });
+
+    const stateManager = createAgentStateManager({
+      initialState: { systemPrompt: "test" },
+    });
+
+    const result = await session.runSession({ stateManager });
+
+    expect(result.exitReason).toBe("completed");
+    expect(result.finalMessage).toBe("done");
+    // Each rewind still consumes a turn from the `maxTurns` budget:
+    // turn 1 (rewound) + turn 2 (successful tool call) + turn 3 (done) = 3.
+    expect(result.usage.turns).toBe(3);
+    expect(attempts).toBe(2);
+
+    const truncateOps = log.filter((l) => l.op === "truncateThread");
+    expect(truncateOps).toHaveLength(1);
+  });
+
+  it("bails out with max_turns when a tool keeps requesting rewind", async () => {
+    const { ops, log } = createMockThreadOps();
+
+    let attempts = 0;
+    const alwaysRewind = defineTool({
+      name: "AlwaysRewind" as const,
+      description: "always rewinds",
+      schema: z.object({}),
+      handler: async () => {
+        attempts += 1;
+        return { toolResponse: "ignored", data: null, rewind: true };
+      },
+    });
+
+    const session = await createSession({
+      agentName: "TestAgent",
+      thread: { mode: "new", threadId: "thread-1" },
+      maxTurns: 3,
+      runAgent: createScriptedRunAgent([
+        { message: "t1", toolCalls: [{ id: "tc-1", name: "AlwaysRewind", args: {} }] },
+        { message: "t2", toolCalls: [{ id: "tc-2", name: "AlwaysRewind", args: {} }] },
+        { message: "t3", toolCalls: [{ id: "tc-3", name: "AlwaysRewind", args: {} }] },
+        { message: "t4", toolCalls: [{ id: "tc-4", name: "AlwaysRewind", args: {} }] },
+      ]),
+      threadOps: ops,
+      tools: { AlwaysRewind: alwaysRewind },
+      buildContextMessage: () => "go",
+    });
+
+    const stateManager = createAgentStateManager({
+      initialState: { systemPrompt: "test" },
+    });
+
+    const result = await session.runSession({ stateManager });
+
+    expect(result.exitReason).toBe("max_turns");
+    expect(result.usage.turns).toBe(3);
+    expect(attempts).toBe(3);
+
+    const truncateOps = log.filter((l) => l.op === "truncateThread");
+    expect(truncateOps).toHaveLength(3);
   });
 });

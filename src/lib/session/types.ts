@@ -59,6 +59,18 @@ export interface ThreadOps<TContent = string> {
     targetThreadId: string,
     threadKey?: string
   ): Promise<void>;
+  /**
+   * Truncate the thread back to `length` messages. Used by the session's
+   * rewind flow to roll the thread back before retrying a turn. The
+   * session obtains `length` from `AgentResponse.threadLengthAtCall`,
+   * which the model invoker computes for free from the messages it
+   * loaded before invoking the LLM.
+   */
+  truncateThread(
+    threadId: string,
+    length: number,
+    threadKey?: string
+  ): Promise<void>;
 }
 
 /**

@@ -73,7 +73,8 @@ export function createGoogleGenAIModelInvoker({
       key: threadKey,
       hooks,
     });
-    const { contents, systemInstruction } = await thread.prepareForInvocation();
+    const { contents, systemInstruction, storedLength } =
+      await thread.prepareForInvocation();
 
     const functionDeclarations = toFunctionDeclarations(state.tools);
     const tools =
@@ -116,6 +117,7 @@ export function createGoogleGenAIModelInvoker({
         outputTokens: lastChunk.usageMetadata?.candidatesTokenCount,
         cachedReadTokens: lastChunk.usageMetadata?.cachedContentTokenCount,
       },
+      threadLengthAtCall: storedLength,
     };
   };
 }

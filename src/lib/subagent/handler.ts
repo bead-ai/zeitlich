@@ -1,10 +1,10 @@
 import {
+  startChild,
   workflowInfo,
   setHandler,
   condition,
   log,
   ApplicationFailure,
-  executeChild,
 } from "@temporalio/workflow";
 import { getShortId } from "../thread/id";
 import type { ToolHandlerResponse, RouterContext } from "../tool-router";
@@ -59,7 +59,7 @@ function resolveSandboxConfig(
  * Creates a Subagent tool handler that spawns child workflows for configured subagents.
  *
  * Sandbox and snapshot cleanup happens inside the parent via each subagent's
- * `sandbox.proxy` — the proxy factory is invoked once per subagent with
+ * `sandboxProxy` — the proxy factory is invoked once per subagent with
  * `scope = agentName` so it resolves to the same activities the child uses.
  *
  * @param subagents - Array of subagent configurations
@@ -79,11 +79,11 @@ export function createSubagentHandler<
 } {
   const { taskQueue: parentTaskQueue } = workflowInfo();
 
-  /** Sandbox ops proxy per subagent, built eagerly from `sandbox.proxy` factories. */
+  /** Sandbox ops proxy per subagent, built eagerly from `sandboxProxy` factories. */
   const agentSandboxOps = new Map<string, SandboxOps>();
   for (const cfg of subagents) {
-    if (cfg.sandbox && cfg.sandbox !== "none") {
-      agentSandboxOps.set(cfg.agentName, cfg.sandbox.proxy(cfg.agentName));
+    if (cfg.sandboxProxy) {
+      agentSandboxOps.set(cfg.agentName, cfg.sandboxProxy(cfg.agentName));
     }
   }
 
@@ -148,7 +148,7 @@ export function createSubagentHandler<
       !agentSandboxOps.has(config.agentName)
     ) {
       throw ApplicationFailure.create({
-        message: `Subagent "${config.agentName}" uses a sandbox but no \`sandbox.proxy\` is configured on its SubagentConfig`,
+        message: `Subagent "${config.agentName}" uses a sandbox but no \`sandboxProxy\` is configured on its SubagentConfig`,
         nonRetryable: true,
       });
     }
@@ -309,10 +309,12 @@ export function createSubagentHandler<
       sandboxSource: sandboxCfg.source,
     });
 
-    const childResult = await executeChild(config.workflow, childOpts);
+    const childHandle = await startChild(config.workflow, childOpts);
 
     const effectiveShutdown =
       sandboxShutdownOverride ?? sandboxCfg.shutdown ?? "destroy";
+
+    const childResult = await childHandle.result();
 
     log.info("subagent completed", {
       subagent: config.agentName,
@@ -445,7 +447,7 @@ export function createSubagentHandler<
         const ops = agentSandboxOps.get(agentName);
         if (!ops) {
           log.warn(
-            "Skipping sandbox destroy — no sandbox.proxy registered for agent",
+            "Skipping sandbox destroy — no sandboxProxy registered for agent",
             { agentName, sandboxId }
           );
           return;
@@ -477,7 +479,7 @@ export function createSubagentHandler<
         const ops = agentSandboxOps.get(agentName);
         if (!ops) {
           log.warn(
-            "Skipping snapshot delete — no sandbox.proxy registered for agent",
+            "Skipping snapshot delete — no sandboxProxy registered for agent",
             { agentName }
           );
           return;

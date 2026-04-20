@@ -104,5 +104,23 @@ export function createThreadManager<T>(
     async delete(): Promise<void> {
       await redis.del(redisKey, metaKey);
     },
+
+    async length(): Promise<number> {
+      await assertThreadExists();
+      return redis.llen(redisKey);
+    },
+
+    async truncate(length: number): Promise<void> {
+      await assertThreadExists();
+      if (length <= 0) {
+        await redis.del(redisKey);
+        await redis.expire(metaKey, THREAD_TTL_SECONDS);
+      } else {
+        await redis.ltrim(redisKey, 0, length - 1);
+        await redis.expire(redisKey, THREAD_TTL_SECONDS);
+      }
+      // Dedup keys for removed messages are left to expire via their TTL.
+      // Post-truncate appends use fresh ids so collisions do not occur in practice.
+    },
   };
 }

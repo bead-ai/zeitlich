@@ -94,6 +94,8 @@ export type {
   // Other
   AppendToolResultFn,
   ProcessToolCallsContext,
+  ProcessToolCallsResult,
+  RewindSignal,
 } from "./lib/tool-router";
 
 // Session & message lifecycle hooks

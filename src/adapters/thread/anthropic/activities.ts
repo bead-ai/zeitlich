@@ -212,6 +212,15 @@ export function createAnthropicAdapter(
       });
       await thread.fork(targetThreadId);
     },
+
+    async truncateThread(
+      threadId: string,
+      length: number,
+      threadKey?: string,
+    ): Promise<void> {
+      const thread = createAnthropicThreadManager({ redis, threadId, key: threadKey });
+      await thread.truncate(length);
+    },
   };
 
   function createActivities<S extends string = "">(

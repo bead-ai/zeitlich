@@ -142,6 +142,7 @@ export async function createSession<
     appendSystemMessage,
     appendAgentMessage,
     forkThread,
+    truncateThread,
   } = threadOps;
 
   const plugins: ToolMap[string][] = [];
@@ -393,12 +394,23 @@ export async function createSession<
 
           stateManager.setTools(toolRouter.getToolDefinitions());
 
-          const { message, rawToolCalls, usage } = await runAgent({
+          const {
+            message,
+            rawToolCalls,
+            usage,
+            threadLengthAtCall,
+          } = await runAgent({
             threadId,
             threadKey,
             agentName,
             metadata,
           });
+
+          // The invoker loaded the thread right before calling the LLM,
+          // so it already knows how many messages were stored at that
+          // point — we use that directly as the rewind snapshot instead
+          // of a separate activity round-trip.
+          const preAssistantLength = threadLengthAtCall;
 
           await appendAgentMessage(threadId, uuid4(), message, threadKey);
 
@@ -450,6 +462,33 @@ export async function createSession<
             if (result.usage) {
               stateManager.updateUsage(result.usage);
             }
+          }
+
+          const rewind = toolCallResults.rewind;
+          if (rewind) {
+            log.info("rewinding turn", {
+              agentName,
+              threadId,
+              turn: currentTurn,
+              toolCallId: rewind.toolCallId,
+              toolName: rewind.toolName,
+            });
+            if (preAssistantLength === undefined) {
+              throw ApplicationFailure.create({
+                message:
+                  "Rewind requested but runAgent did not report " +
+                  "`threadLengthAtCall`; the adapter must populate it to " +
+                  "support rewinds.",
+                nonRetryable: true,
+              });
+            }
+            // Drop the assistant message + any already-saved tool results
+            // so the LLM call can be retried from the pre-assistant state.
+            // The turn counter is intentionally NOT rolled back — each
+            // rewind still consumes one of the `maxTurns` budget so a
+            // misbehaving tool cannot spin the session forever.
+            await truncateThread(threadId, preAssistantLength, threadKey);
+            continue;
           }
 
           if (stateManager.getStatus() === "WAITING_FOR_INPUT") {

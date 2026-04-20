@@ -33,6 +33,16 @@ vi.mock("@temporalio/workflow", () => {
     }
   }
 
+  class MockCancellationScope {
+    cancellable: boolean;
+    constructor(opts?: { cancellable?: boolean }) {
+      this.cancellable = opts?.cancellable ?? true;
+    }
+    async run<T>(fn: () => Promise<T>): Promise<T> {
+      return fn();
+    }
+    cancel(): void {}
+  }
   return {
     proxyActivities: <T>() => ({}) as T,
     condition: async (fn: () => boolean) => fn(),
@@ -46,6 +56,8 @@ vi.mock("@temporalio/workflow", () => {
     uuid4: () =>
       `00000000-0000-0000-0000-${String(++idCounter).padStart(12, "0")}`,
     ApplicationFailure: MockApplicationFailure,
+    CancellationScope: MockCancellationScope,
+    isCancellation: (_err: unknown) => false,
     log: {
       trace: () => {},
       debug: () => {},
@@ -105,6 +117,9 @@ function createMockThreadOps() {
     forkThread: async (source, target) => {
       log.push({ op: "forkThread", args: [source, target] });
     },
+    truncateThread: async (threadId, length) => {
+      log.push({ op: "truncateThread", args: [threadId, length] });
+    },
   });
 
   return { ops, log };
@@ -123,12 +138,18 @@ function createScriptedRunAgent(
   return async () => {
     const turn = turns[call++];
     if (!turn) {
-      return { message: "done", rawToolCalls: [], usage: undefined };
+      return {
+        message: "done",
+        rawToolCalls: [],
+        usage: undefined,
+        threadLengthAtCall: 0,
+      };
     }
     return {
       message: turn.message,
       rawToolCalls: turn.toolCalls,
       usage: turn.usage,
+      threadLengthAtCall: 0,
     };
   };
 }
