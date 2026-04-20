@@ -2,6 +2,32 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.37](https://github.com/bead-ai/zeitlich/compare/v0.2.36...v0.2.37) (2026-04-20)
+
+
+### Features
+
+* add ctx to onPostCreat hook ([f5f876a](https://github.com/bead-ai/zeitlich/commit/f5f876a4aef3e1d8eb1edd2a7a4157838c24514c))
+* **sandbox:** add snapshot-driven continuation for subagents ([#90](https://github.com/bead-ai/zeitlich/issues/90)) ([fb3e770](https://github.com/bead-ai/zeitlich/commit/fb3e770a98ea254e9b991ca0e0babdd3ed3dedf7))
+
+
+### Bug Fixes
+
+* add missing e2b options ([93652ee](https://github.com/bead-ai/zeitlich/commit/93652ee98b33792d0cb89360213f8ac02731ff74))
+* update sandbox readiness handling in session and workflow ([7c5bb29](https://github.com/bead-ai/zeitlich/commit/7c5bb29c7feab58ec07490d3516b889049b5cc14))
+
+
+### Code Refactoring
+
+* **sandbox:** update onPostCreate hook to receive live sandbox instance ([b935c0f](https://github.com/bead-ai/zeitlich/commit/b935c0fb420cc142ebf41c6ebed021c8f8a504fb))
+* **subagent:** delegate snapshot cleanup to owning child workflows ([#91](https://github.com/bead-ai/zeitlich/issues/91)) ([be99ce0](https://github.com/bead-ai/zeitlich/commit/be99ce0c0adbe50694f1bfdc3cd1f5686c7b1e18))
+* **subagent:** update sandbox configuration to include proxy property ([953ea78](https://github.com/bead-ai/zeitlich/commit/953ea78ae08e9d26faf1c0b7f923e592e229736e))
+
+
+### Miscellaneous Chores
+
+* release 0.2.37 ([890bc70](https://github.com/bead-ai/zeitlich/commit/890bc706f0c99538bad19e92014cfaf0733287a0))
+
 ## [0.2.36](https://github.com/bead-ai/zeitlich/compare/v0.2.35...v0.2.36) (2026-04-15)
 
 ### Bug Fixes
