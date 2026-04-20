@@ -97,39 +97,28 @@ function toActivityInterface(raw: ThreadOps): ActivityInterfaceFor<ThreadOps> {
 
 function createMockThreadOps() {
   const log: { op: string; args: unknown[] }[] = [];
-  let threadLength = 0;
 
   const ops = toActivityInterface({
     initializeThread: async (threadId) => {
       log.push({ op: "initializeThread", args: [threadId] });
-      threadLength = 0;
     },
     appendHumanMessage: async (threadId, id, content) => {
       log.push({ op: "appendHumanMessage", args: [threadId, id, content] });
-      threadLength += 1;
     },
     appendToolResult: async (id, config) => {
       log.push({ op: "appendToolResult", args: [id, config] });
-      threadLength += 1;
     },
     appendSystemMessage: async (threadId, id, content) => {
       log.push({ op: "appendSystemMessage", args: [threadId, id, content] });
-      threadLength += 1;
     },
     appendAgentMessage: async (threadId, id, message) => {
       log.push({ op: "appendAgentMessage", args: [threadId, id, message] });
-      threadLength += 1;
     },
     forkThread: async (source, target) => {
       log.push({ op: "forkThread", args: [source, target] });
     },
-    getThreadLength: async (threadId) => {
-      log.push({ op: "getThreadLength", args: [threadId] });
-      return threadLength;
-    },
     truncateThread: async (threadId, length) => {
       log.push({ op: "truncateThread", args: [threadId, length] });
-      threadLength = length;
     },
   });
 
@@ -149,12 +138,18 @@ function createScriptedRunAgent(
   return async () => {
     const turn = turns[call++];
     if (!turn) {
-      return { message: "done", rawToolCalls: [], usage: undefined };
+      return {
+        message: "done",
+        rawToolCalls: [],
+        usage: undefined,
+        threadLengthAtCall: 0,
+      };
     }
     return {
       message: turn.message,
       rawToolCalls: turn.toolCalls,
       usage: turn.usage,
+      threadLengthAtCall: 0,
     };
   };
 }

@@ -62,7 +62,7 @@ export function createAnthropicModelInvoker({
     const { heartbeat, signal } = getActivityContext();
 
     const thread = createAnthropicThreadManager({ redis, threadId, key: threadKey, hooks });
-    const { messages, system } = await thread.prepareForInvocation();
+    const { messages, system, storedLength } = await thread.prepareForInvocation();
 
     const anthropicTools = toAnthropicTools(state.tools);
     const tools = anthropicTools.length > 0 ? anthropicTools : undefined;
@@ -101,6 +101,7 @@ export function createAnthropicModelInvoker({
         cachedWriteTokens: response.usage.cache_creation_input_tokens ?? undefined,
         cachedReadTokens: response.usage.cache_read_input_tokens ?? undefined,
       },
+      threadLengthAtCall: storedLength,
     };
   };
 }

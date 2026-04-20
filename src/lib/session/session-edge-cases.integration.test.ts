@@ -67,6 +67,7 @@ type TurnScript = {
   message: unknown;
   toolCalls: RawToolCall[];
   usage?: TokenUsage;
+  threadLengthAtCall?: number;
 };
 
 /**
@@ -87,38 +88,27 @@ function toActivityInterface<TContent = string>(raw: ThreadOps<TContent>): Activ
 
 function createMockThreadOps() {
   const log: { op: string; args: unknown[] }[] = [];
-  let threadLength = 0;
   const ops = toActivityInterface({
     initializeThread: async (threadId) => {
       log.push({ op: "initializeThread", args: [threadId] });
-      threadLength = 0;
     },
     appendHumanMessage: async (threadId, id, content) => {
       log.push({ op: "appendHumanMessage", args: [threadId, id, content] });
-      threadLength += 1;
     },
     appendToolResult: async (id, config) => {
       log.push({ op: "appendToolResult", args: [id, config] });
-      threadLength += 1;
     },
     appendSystemMessage: async (threadId, id, content) => {
       log.push({ op: "appendSystemMessage", args: [threadId, id, content] });
-      threadLength += 1;
     },
     appendAgentMessage: async (threadId, id, message) => {
       log.push({ op: "appendAgentMessage", args: [threadId, id, message] });
-      threadLength += 1;
     },
     forkThread: async (source, target) => {
       log.push({ op: "forkThread", args: [source, target] });
     },
-    getThreadLength: async (threadId) => {
-      log.push({ op: "getThreadLength", args: [threadId] });
-      return threadLength;
-    },
     truncateThread: async (threadId, length) => {
       log.push({ op: "truncateThread", args: [threadId, length] });
-      threadLength = length;
     },
   });
   return { ops, log };
@@ -131,12 +121,18 @@ function createScriptedRunAgent(
   return async () => {
     const turn = turns[call++];
     if (!turn) {
-      return { message: "done", rawToolCalls: [], usage: undefined };
+      return {
+        message: "done",
+        rawToolCalls: [],
+        usage: undefined,
+        threadLengthAtCall: 0,
+      };
     }
     return {
       message: turn.message,
       rawToolCalls: turn.toolCalls,
       usage: turn.usage,
+      threadLengthAtCall: turn.threadLengthAtCall ?? 0,
     };
   };
 }
@@ -774,38 +770,27 @@ describe("createSession edge cases", () => {
   it("handles buildContextMessage returning SDK-native content array", async () => {
     type TestContent = string | { type: string; [key: string]: unknown }[];
     const log: { op: string; args: unknown[] }[] = [];
-    let threadLength = 0;
     const ops = toActivityInterface<TestContent>({
       initializeThread: async (threadId) => {
         log.push({ op: "initializeThread", args: [threadId] });
-        threadLength = 0;
       },
       appendHumanMessage: async (threadId, id, content) => {
         log.push({ op: "appendHumanMessage", args: [threadId, id, content] });
-        threadLength += 1;
       },
       appendToolResult: async (id, config) => {
         log.push({ op: "appendToolResult", args: [id, config] });
-        threadLength += 1;
       },
       appendSystemMessage: async (threadId, id, content) => {
         log.push({ op: "appendSystemMessage", args: [threadId, id, content] });
-        threadLength += 1;
       },
       appendAgentMessage: async (threadId, id, message) => {
         log.push({ op: "appendAgentMessage", args: [threadId, id, message] });
-        threadLength += 1;
       },
       forkThread: async (source, target) => {
         log.push({ op: "forkThread", args: [source, target] });
       },
-      getThreadLength: async (threadId) => {
-        log.push({ op: "getThreadLength", args: [threadId] });
-        return threadLength;
-      },
       truncateThread: async (threadId, length) => {
         log.push({ op: "truncateThread", args: [threadId, length] });
-        threadLength = length;
       },
     });
 
@@ -1793,8 +1778,11 @@ describe("createSession edge cases", () => {
             { id: "tc-sibling", name: "Sibling", args: {} },
             { id: "tc-rewind", name: "Rewind", args: {} },
           ],
+          // Invoker reports 2 stored messages (system + human) at the
+          // moment the LLM was called.
+          threadLengthAtCall: 2,
         },
-        { message: "done", toolCalls: [] },
+        { message: "done", toolCalls: [], threadLengthAtCall: 2 },
       ]),
       threadOps: ops,
       tools: { Rewind: rewindTool, Sibling: siblingTool },
@@ -1810,7 +1798,7 @@ describe("createSession edge cases", () => {
     expect(result.exitReason).toBe("completed");
 
     // Exactly one truncate fired — back to the pre-assistant-message
-    // length (system + human context = 2).
+    // length that runAgent reported.
     const truncateOps = log.filter((l) => l.op === "truncateThread");
     expect(truncateOps).toHaveLength(1);
     const truncateOp = truncateOps[0];
@@ -1883,65 +1871,6 @@ describe("createSession edge cases", () => {
 
     const truncateOps = log.filter((l) => l.op === "truncateThread");
     expect(truncateOps).toHaveLength(1);
-  });
-
-  it("does not call getThreadLength during the normal turn loop (length tracked locally)", async () => {
-    const { ops, log } = createMockThreadOps();
-
-    const session = await createSession({
-      agentName: "TestAgent",
-      thread: { mode: "new", threadId: "thread-1" },
-      runAgent: createScriptedRunAgent([
-        {
-          message: "t1",
-          toolCalls: [{ id: "tc-1", name: "Echo", args: { text: "a" } }],
-        },
-        {
-          message: "t2",
-          toolCalls: [{ id: "tc-2", name: "Echo", args: { text: "b" } }],
-        },
-        { message: "done", toolCalls: [] },
-      ]),
-      threadOps: ops,
-      tools: { Echo: createEchoTool() },
-      buildContextMessage: () => "go",
-    });
-
-    const stateManager = createAgentStateManager({
-      initialState: { systemPrompt: "test" },
-    });
-
-    await session.runSession({ stateManager });
-
-    const lengthCalls = log.filter((l) => l.op === "getThreadLength");
-    expect(lengthCalls).toHaveLength(0);
-  });
-
-  it("queries getThreadLength once on continue mode to seed the local counter", async () => {
-    const { ops, log } = createMockThreadOps();
-
-    // Prime the mock thread with a system + human message so "continue"
-    // picks up a non-zero baseline length.
-    await ops.appendSystemMessage("thread-1", "sys-1", "sys", undefined);
-    await ops.appendHumanMessage("thread-1", "hm-1", "prev", undefined);
-    log.length = 0;
-
-    const session = await createSession({
-      agentName: "TestAgent",
-      thread: { mode: "continue", threadId: "thread-1" },
-      runAgent: createScriptedRunAgent([{ message: "done", toolCalls: [] }]),
-      threadOps: ops,
-      buildContextMessage: () => "follow-up",
-    });
-
-    const stateManager = createAgentStateManager({
-      initialState: { systemPrompt: "test" },
-    });
-
-    await session.runSession({ stateManager });
-
-    const lengthCalls = log.filter((l) => l.op === "getThreadLength");
-    expect(lengthCalls).toHaveLength(1);
   });
 
   it("bails out with max_turns when a tool keeps requesting rewind", async () => {

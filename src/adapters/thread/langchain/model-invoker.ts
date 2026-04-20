@@ -58,7 +58,7 @@ export function createLangChainModelInvoker<
     });
     const runId = uuidv4();
 
-    const { messages } = await thread.prepareForInvocation();
+    const { messages, storedLength } = await thread.prepareForInvocation();
 
     const heartbeatInterval = heartbeat
       ? setInterval(() => heartbeat(), 30_000)
@@ -97,6 +97,7 @@ export function createLangChainModelInvoker<
             response.usage_metadata?.input_token_details?.cache_read ||
             (providerUsage.cacheReadInputTokens as number | undefined),
         },
+        threadLengthAtCall: storedLength,
       };
     } finally {
       if (heartbeatInterval) clearInterval(heartbeatInterval);

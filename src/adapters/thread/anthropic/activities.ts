@@ -189,14 +189,6 @@ export function createAnthropicAdapter(
       await thread.fork(targetThreadId);
     },
 
-    async getThreadLength(
-      threadId: string,
-      threadKey?: string,
-    ): Promise<number> {
-      const thread = createAnthropicThreadManager({ redis, threadId, key: threadKey });
-      return thread.length();
-    },
-
     async truncateThread(
       threadId: string,
       length: number,

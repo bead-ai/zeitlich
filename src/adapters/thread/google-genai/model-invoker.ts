@@ -59,7 +59,7 @@ export function createGoogleGenAIModelInvoker({
     const { heartbeat, signal } = getActivityContext();
 
     const thread = createGoogleGenAIThreadManager({ redis, threadId, key: threadKey, hooks });
-    const { contents, systemInstruction } =
+    const { contents, systemInstruction, storedLength } =
       await thread.prepareForInvocation();
 
     const functionDeclarations = toFunctionDeclarations(state.tools);
@@ -103,6 +103,7 @@ export function createGoogleGenAIModelInvoker({
         outputTokens: lastChunk.usageMetadata?.candidatesTokenCount,
         cachedReadTokens: lastChunk.usageMetadata?.cachedContentTokenCount,
       },
+      threadLengthAtCall: storedLength,
     };
   };
 }

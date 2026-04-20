@@ -34,6 +34,8 @@ export interface GoogleGenAIThreadManagerConfig {
 export interface GoogleGenAIInvocationPayload {
   contents: Content[];
   systemInstruction?: Part[];
+  /** Number of stored messages loaded from Redis before preparation. */
+  storedLength: number;
 }
 
 /** Thread manager with Google GenAI Content convenience helpers */
@@ -175,6 +177,7 @@ export function createGoogleGenAIThreadManager(
           ? contents.map((msg, i) => onPreparedMessage(msg, i, contents))
           : contents,
         ...(systemInstruction && systemInstruction.length > 0 ? { systemInstruction } : {}),
+        storedLength: stored.length,
       };
     },
   };
