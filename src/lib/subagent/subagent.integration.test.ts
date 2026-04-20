@@ -119,9 +119,9 @@ function makeMockSandboxOps() {
 
 /**
  * Default no-op sandbox proxy factory — satisfies the runtime check that
- * every sandbox-using subagent must declare a `sandboxProxy`. Tests that
+ * every sandbox-using subagent must declare `sandbox.proxy`. Tests that
  * need to assert on destroy/cleanup create their own mock ops and wire
- * them through `sandboxProxy: () => opsMock`.
+ * them through `sandbox: { ..., proxy: () => opsMock }`.
  */
 const noopSandboxProxy = () => makeMockSandboxOps();
 
@@ -385,8 +385,11 @@ describe("createSubagentHandler", () => {
       agentName: "inherit-agent",
       description: "Inherits sandbox",
       workflow: mockWorkflow(),
-      sandbox: { source: "inherit", continuation: "continue" },
-      sandboxProxy: noopSandboxProxy,
+      sandbox: {
+        source: "inherit",
+        continuation: "continue",
+        proxy: noopSandboxProxy,
+      },
     };
 
     const { handler } = createSubagentHandler([inheritSubagent]);
@@ -415,8 +418,11 @@ describe("createSubagentHandler", () => {
       agentName: "inherit-agent",
       description: "Inherits sandbox",
       workflow: mockWorkflow(),
-      sandbox: { source: "inherit", continuation: "continue" },
-      sandboxProxy: noopSandboxProxy,
+      sandbox: {
+        source: "inherit",
+        continuation: "continue",
+        proxy: noopSandboxProxy,
+      },
     };
 
     const { handler } = createSubagentHandler([inheritSubagent]);
@@ -437,8 +443,7 @@ describe("createSubagentHandler", () => {
       agentName: "own-agent",
       description: "Own sandbox",
       workflow: mockWorkflow(),
-      sandbox: { source: "own", continuation: "fork" },
-      sandboxProxy: noopSandboxProxy,
+      sandbox: { source: "own", continuation: "fork", proxy: noopSandboxProxy },
     };
 
     const { handler } = createSubagentHandler([ownSubagent]);
@@ -519,8 +524,7 @@ describe("createSubagentHandler", () => {
       agentName: "own-agent",
       description: "Own sandbox",
       workflow: mockWorkflow(),
-      sandbox: { source: "own", continuation: "fork" },
-      sandboxProxy: noopSandboxProxy,
+      sandbox: { source: "own", continuation: "fork", proxy: noopSandboxProxy },
     };
 
     const { handler } = createSubagentHandler([ownSubagent]);
@@ -682,8 +686,7 @@ describe("createSubagentHandler", () => {
       description: "Sandbox continuation",
       workflow: mockWorkflow(),
       thread: "fork",
-      sandbox: { source: "own", continuation: "fork" },
-      sandboxProxy: noopSandboxProxy,
+      sandbox: { source: "own", continuation: "fork", proxy: noopSandboxProxy },
     };
 
     const { handler } = createSubagentHandler([contSandboxSubagent]);
@@ -739,8 +742,7 @@ describe("createSubagentHandler", () => {
       description: "Sandbox continuation",
       workflow: mockWorkflow(),
       thread: "fork",
-      sandbox: { source: "own", continuation: "fork" },
-      sandboxProxy: noopSandboxProxy,
+      sandbox: { source: "own", continuation: "fork", proxy: noopSandboxProxy },
     };
 
     const { handler } = createSubagentHandler([contSandboxSubagent]);
@@ -795,8 +797,7 @@ describe("createSubagentHandler", () => {
       agentName: "own-agent",
       description: "Own sandbox",
       workflow: mockWorkflow(),
-      sandbox: { source: "own", continuation: "fork" },
-      sandboxProxy: () => opsMock,
+      sandbox: { source: "own", continuation: "fork", proxy: () => opsMock },
     };
 
     const { handler, destroySubagentSandboxes } = createSubagentHandler([
@@ -813,7 +814,7 @@ describe("createSubagentHandler", () => {
     expect(opsMock.destroySandbox).not.toHaveBeenCalled();
   });
 
-  it("destroys sandbox via sandboxProxy for own + pause-until-parent-close", async () => {
+  it("destroys sandbox via sandbox.proxy for own + pause-until-parent-close", async () => {
     nextStartChildResult = () => ({
       toolResponse: "done",
       data: null,
@@ -830,8 +831,8 @@ describe("createSubagentHandler", () => {
         source: "own",
         continuation: "fork",
         shutdown: "pause-until-parent-close",
+        proxy: () => opsMock,
       },
-      sandboxProxy: () => opsMock,
     };
 
     const { handler, destroySubagentSandboxes } = createSubagentHandler([
@@ -854,8 +855,11 @@ describe("createSubagentHandler", () => {
       agentName: "inherit-agent",
       description: "Inherits sandbox",
       workflow: mockWorkflow(),
-      sandbox: { source: "inherit", continuation: "continue" },
-      sandboxProxy: () => opsMock,
+      sandbox: {
+        source: "inherit",
+        continuation: "continue",
+        proxy: () => opsMock,
+      },
     };
 
     const { handler, destroySubagentSandboxes } = createSubagentHandler([
@@ -964,8 +968,11 @@ describe("createSubagentHandler", () => {
       agentName: "inherit-fork",
       description: "Inherit fork",
       workflow: mockWorkflow(),
-      sandbox: { source: "inherit", continuation: "fork" },
-      sandboxProxy: noopSandboxProxy,
+      sandbox: {
+        source: "inherit",
+        continuation: "fork",
+        proxy: noopSandboxProxy,
+      },
     };
 
     const { handler } = createSubagentHandler([config]);
@@ -1007,8 +1014,11 @@ describe("createSubagentHandler", () => {
       description: "Own continue",
       workflow: mockWorkflow(),
       thread: "continue",
-      sandbox: { source: "own", continuation: "continue" },
-      sandboxProxy: noopSandboxProxy,
+      sandbox: {
+        source: "own",
+        continuation: "continue",
+        proxy: noopSandboxProxy,
+      },
     };
 
     const { handler } = createSubagentHandler([config]);
@@ -1062,8 +1072,12 @@ describe("createSubagentHandler", () => {
       agentName: "lazy-fork",
       description: "Lazy fork",
       workflow: mockWorkflow(),
-      sandbox: { source: "own", init: "once", continuation: "fork" },
-      sandboxProxy: noopSandboxProxy,
+      sandbox: {
+        source: "own",
+        init: "once",
+        continuation: "fork",
+        proxy: noopSandboxProxy,
+      },
     };
 
     const { handler } = createSubagentHandler([config]);
@@ -1119,8 +1133,12 @@ describe("createSubagentHandler", () => {
       agentName: "lazy-cont",
       description: "Lazy continue",
       workflow: mockWorkflow(),
-      sandbox: { source: "own", init: "once", continuation: "continue" },
-      sandboxProxy: noopSandboxProxy,
+      sandbox: {
+        source: "own",
+        init: "once",
+        continuation: "continue",
+        proxy: noopSandboxProxy,
+      },
     };
 
     const { handler } = createSubagentHandler([config]);
@@ -1167,8 +1185,12 @@ describe("createSubagentHandler", () => {
       agentName: "lazy-cleanup",
       description: "Lazy cleanup",
       workflow: mockWorkflow(),
-      sandbox: { source: "own", init: "once", continuation: "fork" },
-      sandboxProxy: () => opsMock,
+      sandbox: {
+        source: "own",
+        init: "once",
+        continuation: "fork",
+        proxy: () => opsMock,
+      },
     };
 
     const { handler, destroySubagentSandboxes } = createSubagentHandler([
@@ -1197,8 +1219,7 @@ describe("createSubagentHandler", () => {
       agentName: "own-agent",
       description: "Own sandbox",
       workflow: mockWorkflow(),
-      sandbox: { source: "own", continuation: "fork" },
-      sandboxProxy: noopSandboxProxy,
+      sandbox: { source: "own", continuation: "fork", proxy: noopSandboxProxy },
     };
 
     const { handler } = createSubagentHandler([ownSubagent]);
@@ -1328,8 +1349,8 @@ describe("createSubagentHandler", () => {
         source: "own",
         continuation: "fork",
         shutdown: "keep-until-parent-close",
+        proxy: () => opsMock,
       },
-      sandboxProxy: () => opsMock,
     };
 
     const { handler, destroySubagentSandboxes } = createSubagentHandler([
@@ -1352,8 +1373,12 @@ describe("createSubagentHandler", () => {
       agentName: "own-keep-plain",
       description: "Own sandbox keep",
       workflow: mockWorkflow(),
-      sandbox: { source: "own", continuation: "fork", shutdown: "keep" },
-      sandboxProxy: () => opsMock,
+      sandbox: {
+        source: "own",
+        continuation: "fork",
+        shutdown: "keep",
+        proxy: () => opsMock,
+      },
     };
 
     const { handler, destroySubagentSandboxes } = createSubagentHandler([
@@ -1392,8 +1417,8 @@ describe("createSubagentHandler", () => {
         init: "once",
         continuation: "fork",
         shutdown: "keep-until-parent-close",
+        proxy: noopSandboxProxy,
       },
-      sandboxProxy: noopSandboxProxy,
     };
 
     const { handler } = createSubagentHandler([config]);
@@ -1429,8 +1454,8 @@ describe("createSubagentHandler", () => {
         init: "once",
         continuation: "fork",
         shutdown: "pause",
+        proxy: noopSandboxProxy,
       },
-      sandboxProxy: noopSandboxProxy,
     };
 
     const { handler } = createSubagentHandler([config]);
@@ -1462,8 +1487,12 @@ describe("createSubagentHandler", () => {
       description: "Continue keep",
       workflow: mockWorkflow(),
       thread: "continue",
-      sandbox: { source: "own", continuation: "continue", shutdown: "keep" },
-      sandboxProxy: noopSandboxProxy,
+      sandbox: {
+        source: "own",
+        continuation: "continue",
+        shutdown: "keep",
+        proxy: noopSandboxProxy,
+      },
     };
 
     const { handler } = createSubagentHandler([config]);
@@ -1495,8 +1524,12 @@ describe("createSubagentHandler", () => {
       description: "Continue destroy",
       workflow: mockWorkflow(),
       thread: "continue",
-      sandbox: { source: "own", continuation: "continue", shutdown: "destroy" },
-      sandboxProxy: noopSandboxProxy,
+      sandbox: {
+        source: "own",
+        continuation: "continue",
+        shutdown: "destroy",
+        proxy: noopSandboxProxy,
+      },
     };
 
     const { handler } = createSubagentHandler([config]);
@@ -1541,8 +1574,12 @@ describe("createSubagentHandler", () => {
       description: "Snapshot-driven",
       workflow: mockWorkflow(),
       thread: "continue",
-      sandbox: { source: "own", init: "once", continuation: "snapshot" },
-      sandboxProxy: noopSandboxProxy,
+      sandbox: {
+        source: "own",
+        init: "once",
+        continuation: "snapshot",
+        proxy: noopSandboxProxy,
+      },
     };
 
     const { handler } = createSubagentHandler([config]);
@@ -1586,8 +1623,12 @@ describe("createSubagentHandler", () => {
       description: "Snapshot-driven",
       workflow: mockWorkflow(),
       thread: "continue",
-      sandbox: { source: "own", init: "once", continuation: "snapshot" },
-      sandboxProxy: noopSandboxProxy,
+      sandbox: {
+        source: "own",
+        init: "once",
+        continuation: "snapshot",
+        proxy: noopSandboxProxy,
+      },
     };
 
     const { handler } = createSubagentHandler([config]);
@@ -1657,8 +1698,12 @@ describe("createSubagentHandler", () => {
       description: "Snapshot-driven",
       workflow: mockWorkflow(),
       thread: "continue",
-      sandbox: { source: "own", init: "once", continuation: "snapshot" },
-      sandboxProxy: noopSandboxProxy,
+      sandbox: {
+        source: "own",
+        init: "once",
+        continuation: "snapshot",
+        proxy: noopSandboxProxy,
+      },
     };
 
     const { handler } = createSubagentHandler([config]);
@@ -1695,15 +1740,19 @@ describe("createSubagentHandler", () => {
     });
   });
 
-  it("deletes every stored snapshot via sandboxProxy during cleanup sweep", async () => {
+  it("deletes every stored snapshot via sandbox.proxy during cleanup sweep", async () => {
     const opsMock = makeMockSandboxOps();
     const config: SubagentConfig = {
       agentName: "snap-agent",
       description: "Snapshot-driven",
       workflow: mockWorkflow(),
       thread: "continue",
-      sandbox: { source: "own", init: "once", continuation: "snapshot" },
-      sandboxProxy: () => opsMock,
+      sandbox: {
+        source: "own",
+        init: "once",
+        continuation: "snapshot",
+        proxy: () => opsMock,
+      },
     };
 
     const { handler, cleanupSubagentSnapshots } = createSubagentHandler([
@@ -1758,7 +1807,7 @@ describe("createSubagentHandler", () => {
     await cleanupSubagentSnapshots();
 
     // Parent should have deleted both the latest thread snapshot and the
-    // per-agent base snapshot through the subagent's sandboxProxy.
+    // per-agent base snapshot through the subagent's sandbox.proxy.
     const deletedTags = opsMock.deleteSandboxSnapshot.mock.calls.map(
       (call) => (call[0] as { data: { tag: string } }).data.tag
     );
@@ -1772,8 +1821,12 @@ describe("createSubagentHandler", () => {
       description: "Snapshot-driven",
       workflow: mockWorkflow(),
       thread: "continue",
-      sandbox: { source: "own", init: "once", continuation: "snapshot" },
-      sandboxProxy: () => opsMock,
+      sandbox: {
+        source: "own",
+        init: "once",
+        continuation: "snapshot",
+        proxy: () => opsMock,
+      },
     };
 
     const { handler, cleanupSubagentSnapshots } = createSubagentHandler([
