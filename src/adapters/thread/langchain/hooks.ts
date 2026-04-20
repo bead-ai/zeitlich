@@ -12,8 +12,12 @@ type ContentBlock = MessageContent extends (infer U)[] | string ? U : never;
  */
 export function appendCachePoint(
   block: ContentBlock,
-  { maxBlocks = 4 }: { maxBlocks?: number } = {},
-): (message: BaseMessage, index: number, messages: readonly BaseMessage[]) => BaseMessage {
+  { maxBlocks = 4 }: { maxBlocks?: number } = {}
+): (
+  message: BaseMessage,
+  index: number,
+  messages: readonly BaseMessage[]
+) => BaseMessage {
   return (message, index, messages) => {
     const isLast = index === messages.length - 1;
 
@@ -23,13 +27,19 @@ export function appendCachePoint(
         if (content.some((b) => b.type === block.type)) return message;
         message.content = [...content, block];
       } else if (typeof content === "string") {
-        message.content = [{ type: "text", text: content }, block] satisfies MessageContent;
+        message.content = [
+          { type: "text", text: content },
+          block,
+        ] satisfies MessageContent;
       }
       return message;
     }
 
     const { content } = message;
-    if (!Array.isArray(content) || !content.some((b) => b.type === block.type)) {
+    if (
+      !Array.isArray(content) ||
+      !content.some((b) => b.type === block.type)
+    ) {
       return message;
     }
 
@@ -40,7 +50,10 @@ export function appendCachePoint(
       const msg = messages[i];
       if (!msg) continue;
       const c = msg.content;
-      if (Array.isArray(c) && c.some((b: ContentBlock) => b.type === block.type)) {
+      if (
+        Array.isArray(c) &&
+        c.some((b: ContentBlock) => b.type === block.type)
+      ) {
         cacheBlocksAfter++;
       }
     }

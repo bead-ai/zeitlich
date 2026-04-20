@@ -7,7 +7,10 @@ import type {
 import { posix } from "node:path";
 
 function toArrayBuffer(u8: Uint8Array): ArrayBuffer {
-  return u8.buffer.slice(u8.byteOffset, u8.byteOffset + u8.byteLength) as ArrayBuffer;
+  return u8.buffer.slice(
+    u8.byteOffset,
+    u8.byteOffset + u8.byteLength
+  ) as ArrayBuffer;
 }
 
 /**
@@ -59,9 +62,7 @@ export class E2bSandboxFileSystem implements SandboxFileSystem {
       // file doesn't exist yet — write from scratch
     }
     const addition =
-      typeof content === "string"
-        ? content
-        : new TextDecoder().decode(content);
+      typeof content === "string" ? content : new TextDecoder().decode(content);
     await this.sandbox.files.write(norm, existing + addition);
   }
 

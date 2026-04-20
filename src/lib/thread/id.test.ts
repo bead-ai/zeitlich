@@ -8,7 +8,7 @@ vi.mock("@temporalio/workflow", () => ({
     const bytes = Array.from({ length: 16 }, (_, i) =>
       ((uuidCounter * 31 + i * 7 + uuidCounter * i) & 0xff)
         .toString(16)
-        .padStart(2, "0"),
+        .padStart(2, "0")
     ).join("");
     return `${bytes.slice(0, 8)}-${bytes.slice(8, 12)}-${bytes.slice(12, 16)}-${bytes.slice(16, 20)}-${bytes.slice(20, 32)}`;
   },

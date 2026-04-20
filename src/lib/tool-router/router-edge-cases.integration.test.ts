@@ -348,7 +348,7 @@ describe("createToolRouter edge cases", () => {
       parallel: true,
     });
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     const results = await router.processToolCalls([
       { id: "tc-1", name: "Unknown1", args: {} },
       { id: "tc-2", name: "Unknown2", args: {} },

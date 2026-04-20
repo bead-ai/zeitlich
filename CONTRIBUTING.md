@@ -75,16 +75,16 @@ Two entry points exist due to Temporal's workflow sandboxing:
 
 This project uses [Conventional Commits](https://www.conventionalcommits.org/) for automatic changelog generation via release-please.
 
-| Prefix      | Use for                |
-| ----------- | ---------------------- |
-| `feat:`     | New features           |
-| `fix:`      | Bug fixes              |
-| `perf:`     | Performance changes    |
-| `refactor:` | Code refactoring       |
-| `docs:`     | Documentation          |
-| `chore:`    | Maintenance tasks      |
-| `test:`     | Tests                  |
-| `ci:`       | CI/CD changes          |
+| Prefix      | Use for             |
+| ----------- | ------------------- |
+| `feat:`     | New features        |
+| `fix:`      | Bug fixes           |
+| `perf:`     | Performance changes |
+| `refactor:` | Code refactoring    |
+| `docs:`     | Documentation       |
+| `chore:`    | Maintenance tasks   |
+| `test:`     | Tests               |
+| `ci:`       | CI/CD changes       |
 
 Example: `feat: add support for streaming tool responses`
 

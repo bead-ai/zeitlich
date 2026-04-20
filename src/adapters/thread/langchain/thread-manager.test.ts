@@ -91,7 +91,11 @@ describe("LangChain thread manager hooks", () => {
 
       await tm.prepareForInvocation();
 
-      const args = hook.mock.calls[0] as unknown as [unknown, number, unknown[]];
+      const args = hook.mock.calls[0] as unknown as [
+        unknown,
+        number,
+        unknown[],
+      ];
       expect(args[2]).toHaveLength(2);
     });
   });

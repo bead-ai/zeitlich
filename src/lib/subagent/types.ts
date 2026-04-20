@@ -78,13 +78,19 @@ export type InferSubagentResult<T extends SubagentConfig> =
  * Sandbox configuration for a subagent.
  *
  * - `"none"` — no sandbox (default).
- * - `{ source: "inherit", continuation }` — reuse the parent's sandbox.
+ * - `{ source: "inherit", continuation, proxy }` — reuse the parent's sandbox.
  *   `continuation: "continue"` shares the parent sandbox directly;
  *   `continuation: "fork"` forks from the parent on every call.
- * - `{ source: "own", init?, continuation }` — the child gets its own sandbox.
- *   `init: "per-call"` (default) creates fresh each call (thread continuation
- *   uses the previous sandbox). `init: "once"` creates on the first call and
- *   stores it for all subsequent calls.
+ * - `{ source: "own", init?, continuation, proxy }` — the child gets its own
+ *   sandbox. `init: "per-call"` (default) creates fresh each call (thread
+ *   continuation uses the previous sandbox). `init: "once"` creates on the
+ *   first call and stores it for all subsequent calls.
+ *
+ * `proxy` is a factory that returns workflow-safe sandbox ops matching the
+ * subagent's own activities. Called once inside `createSubagentHandler` with
+ * `scope = agentName`, so the returned proxy resolves to the same activity
+ * prefix the child session uses. The parent uses it to destroy lingering
+ * sandboxes and delete stored snapshots at shutdown.
  */
 export type SubagentSandboxConfig =
   | "none"
@@ -92,12 +98,14 @@ export type SubagentSandboxConfig =
       source: "inherit";
       continuation: "continue" | "fork";
       shutdown?: SubagentSandboxShutdown;
+      proxy: (scope: string) => SandboxOps;
     }
   | {
       source: "own";
       init?: "per-call" | "once";
       continuation: "continue" | "fork" | "snapshot";
       shutdown?: SubagentSandboxShutdown;
+      proxy: (scope: string) => SandboxOps;
     };
 
 /**
@@ -136,17 +144,6 @@ export interface SubagentConfig<TResult extends z.ZodType = z.ZodType> {
    * Sandbox strategy for this subagent.
    *
    * @see {@link SubagentSandboxConfig}
-   */
-  sandbox?: SubagentSandboxConfig;
-  /**
-   * Factory that returns workflow-safe sandbox ops matching the subagent's
-   * own activities. Called once inside `createSubagentHandler` with
-   * `scope = agentName`, so the returned proxy resolves to the same
-   * activity prefix the child session uses.
-   *
-   * Required whenever `sandbox` is anything other than `"none"` — the
-   * parent uses it to destroy lingering sandboxes and delete stored
-   * snapshots at shutdown.
    *
    * @example
    * ```ts
@@ -155,12 +152,15 @@ export interface SubagentConfig<TResult extends z.ZodType = z.ZodType> {
    * const researcher: SubagentConfig = {
    *   agentName: "researcher",
    *   workflow: researcherWorkflow,
-   *   sandbox: { source: "own", continuation: "snapshot" },
-   *   sandboxProxy: proxyDaytonaSandboxOps,
+   *   sandbox: {
+   *     source: "own",
+   *     continuation: "snapshot",
+   *     proxy: proxyDaytonaSandboxOps,
+   *   },
    * };
    * ```
    */
-  sandboxProxy?: (scope: string) => SandboxOps;
+  sandbox?: SubagentSandboxConfig;
 }
 
 /**

@@ -59,10 +59,13 @@ export async function queryParentWorkflowState<T>(
  * };
  * ```
  */
-export function createRunAgentActivity<R, S extends BaseAgentState = BaseAgentState>(
+export function createRunAgentActivity<
+  R,
+  S extends BaseAgentState = BaseAgentState,
+>(
   client: WorkflowClient,
   handler: (config: RunAgentConfig & { state: S }) => Promise<R>,
-  scope: string,
+  scope: string
 ): Record<string, (config: RunAgentConfig) => Promise<R>> {
   const name = `run${scope.charAt(0).toUpperCase()}${scope.slice(1)}`;
   return {
@@ -76,7 +79,9 @@ export function createRunAgentActivity<R, S extends BaseAgentState = BaseAgentSt
 /**
  * Context injected into tool handlers created via {@link withParentWorkflowState}.
  */
-export interface AgentStateContext<S extends BaseAgentState = BaseAgentState> extends RouterContext {
+export interface AgentStateContext<
+  S extends BaseAgentState = BaseAgentState,
+> extends RouterContext {
   state: S;
 }
 
@@ -101,12 +106,17 @@ export interface AgentStateContext<S extends BaseAgentState = BaseAgentState> ex
  * );
  * ```
  */
-export function withParentWorkflowState<TArgs, TResult, S extends BaseAgentState = BaseAgentState, TToolResponse = JsonValue>(
+export function withParentWorkflowState<
+  TArgs,
+  TResult,
+  S extends BaseAgentState = BaseAgentState,
+  TToolResponse = JsonValue,
+>(
   client: WorkflowClient,
   handler: (
     args: TArgs,
-    context: AgentStateContext<S>,
-  ) => Promise<ToolHandlerResponse<TResult, TToolResponse>>,
+    context: AgentStateContext<S>
+  ) => Promise<ToolHandlerResponse<TResult, TToolResponse>>
 ): ActivityToolHandler<TArgs, TResult, RouterContext, TToolResponse> {
   return async (args, context) => {
     const state = await queryParentWorkflowState<S>(client);

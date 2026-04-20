@@ -50,10 +50,13 @@ describe("defineWorkflow", () => {
       return { ok: true };
     });
 
-    await workflow({}, {
-      thread: { mode: "fork", threadId: "prev-1" },
-      sandbox: { mode: "continue", sandboxId: "sb-1" },
-    });
+    await workflow(
+      {},
+      {
+        thread: { mode: "fork", threadId: "prev-1" },
+        sandbox: { mode: "continue", sandboxId: "sb-1" },
+      }
+    );
 
     expect(capturedSession).toEqual({
       agentName: "test-workflow",

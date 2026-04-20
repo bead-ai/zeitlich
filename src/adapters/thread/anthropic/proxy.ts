@@ -27,7 +27,11 @@ const ADAPTER_PREFIX = "anthropic";
 
 export function proxyAnthropicThreadOps(
   scope?: string,
-  options?: Parameters<typeof createThreadOpsProxy>[2],
+  options?: Parameters<typeof createThreadOpsProxy>[2]
 ): ActivityInterfaceFor<ThreadOps<AnthropicContent>> {
-  return createThreadOpsProxy(ADAPTER_PREFIX, scope, options) as ActivityInterfaceFor<ThreadOps<AnthropicContent>>;
+  return createThreadOpsProxy(
+    ADAPTER_PREFIX,
+    scope,
+    options
+  ) as ActivityInterfaceFor<ThreadOps<AnthropicContent>>;
 }

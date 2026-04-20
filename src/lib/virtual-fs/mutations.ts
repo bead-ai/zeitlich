@@ -13,7 +13,7 @@ export function applyVirtualTreeMutations<TMeta = FileEntryMetadata>(
     get(key: "fileTree"): VirtualFileTree<TMeta>;
     set(key: "fileTree", value: VirtualFileTree<TMeta>): void;
   },
-  mutations: TreeMutation<TMeta>[],
+  mutations: TreeMutation<TMeta>[]
 ): VirtualFileTree<TMeta> {
   let tree = [...stateManager.get("fileTree")];
 
@@ -26,9 +26,7 @@ export function applyVirtualTreeMutations<TMeta = FileEntryMetadata>(
         tree = tree.filter((e) => e.path !== m.path);
         break;
       case "update":
-        tree = tree.map((e) =>
-          e.path === m.path ? { ...e, ...m.entry } : e
-        );
+        tree = tree.map((e) => (e.path === m.path ? { ...e, ...m.entry } : e));
         break;
     }
   }

@@ -3,11 +3,14 @@ import { HumanMessage, AIMessage } from "@langchain/core/messages";
 import type { BaseMessage } from "@langchain/core/messages";
 import { appendCachePoint } from "./hooks";
 
-const cacheBlock = { type: "cache_control" as const, cache_control: { type: "ephemeral" as const } };
+const cacheBlock = {
+  type: "cache_control" as const,
+  cache_control: { type: "ephemeral" as const },
+};
 
 function applyHook(
   messages: BaseMessage[],
-  hook: ReturnType<typeof appendCachePoint>,
+  hook: ReturnType<typeof appendCachePoint>
 ): BaseMessage[] {
   return messages.map((m, i, arr) => hook(m, i, arr));
 }
@@ -47,29 +50,25 @@ describe("appendCachePoint", () => {
   it("deduplicates within the last message", () => {
     const messages: BaseMessage[] = [
       new HumanMessage({
-        content: [
-          { type: "text", text: "hello" },
-          cacheBlock,
-        ],
+        content: [{ type: "text", text: "hello" }, cacheBlock],
       }),
     ];
     const hook = appendCachePoint(cacheBlock);
     const result = applyHook(messages, hook);
 
-    const blocks = (messageAt(result, 0).content as Array<{ type: string }>).filter(
-      (b) => b.type === cacheBlock.type,
-    );
+    const blocks = (
+      messageAt(result, 0).content as Array<{ type: string }>
+    ).filter((b) => b.type === cacheBlock.type);
     expect(blocks).toHaveLength(1);
   });
 
   it("strips old cache blocks when total would exceed maxBlocks", () => {
-    const messages: BaseMessage[] = Array.from({ length: 6 }, (_, i) =>
-      new HumanMessage({
-        content: [
-          { type: "text", text: `msg ${i}` },
-          cacheBlock,
-        ],
-      }),
+    const messages: BaseMessage[] = Array.from(
+      { length: 6 },
+      (_, i) =>
+        new HumanMessage({
+          content: [{ type: "text", text: `msg ${i}` }, cacheBlock],
+        })
     );
     const hook = appendCachePoint(cacheBlock, { maxBlocks: 4 });
     const result = applyHook(messages, hook);
@@ -78,13 +77,12 @@ describe("appendCachePoint", () => {
   });
 
   it("keeps the most recent cache blocks", () => {
-    const messages: BaseMessage[] = Array.from({ length: 6 }, (_, i) =>
-      new HumanMessage({
-        content: [
-          { type: "text", text: `msg ${i}` },
-          cacheBlock,
-        ],
-      }),
+    const messages: BaseMessage[] = Array.from(
+      { length: 6 },
+      (_, i) =>
+        new HumanMessage({
+          content: [{ type: "text", text: `msg ${i}` }, cacheBlock],
+        })
     );
     const hook = appendCachePoint(cacheBlock, { maxBlocks: 4 });
     const result = applyHook(messages, hook);
@@ -101,13 +99,12 @@ describe("appendCachePoint", () => {
   });
 
   it("respects a custom maxBlocks value", () => {
-    const messages: BaseMessage[] = Array.from({ length: 5 }, (_, i) =>
-      new HumanMessage({
-        content: [
-          { type: "text", text: `msg ${i}` },
-          cacheBlock,
-        ],
-      }),
+    const messages: BaseMessage[] = Array.from(
+      { length: 5 },
+      (_, i) =>
+        new HumanMessage({
+          content: [{ type: "text", text: `msg ${i}` }, cacheBlock],
+        })
     );
     const hook = appendCachePoint(cacheBlock, { maxBlocks: 2 });
     const result = applyHook(messages, hook);
@@ -141,13 +138,12 @@ describe("appendCachePoint", () => {
   });
 
   it("defaults maxBlocks to 4", () => {
-    const messages: BaseMessage[] = Array.from({ length: 8 }, (_, i) =>
-      new HumanMessage({
-        content: [
-          { type: "text", text: `msg ${i}` },
-          cacheBlock,
-        ],
-      }),
+    const messages: BaseMessage[] = Array.from(
+      { length: 8 },
+      (_, i) =>
+        new HumanMessage({
+          content: [{ type: "text", text: `msg ${i}` }, cacheBlock],
+        })
     );
     const hook = appendCachePoint(cacheBlock);
     const result = applyHook(messages, hook);
@@ -165,22 +161,13 @@ describe("appendCachePoint", () => {
         ],
       }),
       new HumanMessage({
-        content: [
-          { type: "text", text: "msg 1" },
-          cacheBlock,
-        ],
+        content: [{ type: "text", text: "msg 1" }, cacheBlock],
       }),
       new HumanMessage({
-        content: [
-          { type: "text", text: "msg 2" },
-          cacheBlock,
-        ],
+        content: [{ type: "text", text: "msg 2" }, cacheBlock],
       }),
       new HumanMessage({
-        content: [
-          { type: "text", text: "msg 3" },
-          cacheBlock,
-        ],
+        content: [{ type: "text", text: "msg 3" }, cacheBlock],
       }),
       new HumanMessage("last"),
     ];

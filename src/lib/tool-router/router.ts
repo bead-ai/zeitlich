@@ -162,7 +162,8 @@ export function createToolRouter<T extends ToolMap>(
 
     return {
       content: JSON.stringify({
-        error: "The tool encountered an error. Please try again or use a different approach.",
+        error:
+          "The tool encountered an error. Please try again or use a different approach.",
       }),
       result: { error: errorStr, suppressed: true },
     };
@@ -201,7 +202,7 @@ export function createToolRouter<T extends ToolMap>(
   async function processToolCall(
     toolCall: ParsedToolCallUnion<T>,
     turn: number,
-    sandboxId?: string,
+    sandboxId?: string
   ): Promise<ToolCallResultUnion<TResults> | null> {
     const startTime = Date.now();
     const tool = toolMap.get(toolCall.name);

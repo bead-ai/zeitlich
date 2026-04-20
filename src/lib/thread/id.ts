@@ -1,7 +1,6 @@
 import { uuid4 } from "@temporalio/workflow";
 
-const BASE62 =
-  "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+const BASE62 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
 
 /**
  * Generate a compact, workflow-deterministic identifier.

@@ -27,7 +27,11 @@ const ADAPTER_PREFIX = "langChain";
 
 export function proxyLangChainThreadOps(
   scope?: string,
-  options?: Parameters<typeof createThreadOpsProxy>[2],
+  options?: Parameters<typeof createThreadOpsProxy>[2]
 ): ActivityInterfaceFor<ThreadOps<LangChainContent>> {
-  return createThreadOpsProxy(ADAPTER_PREFIX, scope, options) as ActivityInterfaceFor<ThreadOps<LangChainContent>>;
+  return createThreadOpsProxy(
+    ADAPTER_PREFIX,
+    scope,
+    options
+  ) as ActivityInterfaceFor<ThreadOps<LangChainContent>>;
 }

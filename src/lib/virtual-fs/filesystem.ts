@@ -67,7 +67,7 @@ export class VirtualFileSystem<
     private resolver: FileResolver<TCtx, TMeta>,
     private ctx: TCtx,
     workspaceBase = "/",
-    inlineFiles?: Record<string, string>,
+    inlineFiles?: Record<string, string>
   ) {
     this.workspaceBase = normalisePath(workspaceBase);
     this.entries = new Map(

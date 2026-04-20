@@ -1,9 +1,6 @@
 import { proxySinks } from "@temporalio/workflow";
 import type { ZeitlichObservabilitySinks } from "./sinks";
-import type {
-  SessionStartHook,
-  SessionEndHook,
-} from "../hooks/types";
+import type { SessionStartHook, SessionEndHook } from "../hooks/types";
 import type {
   PostToolUseHook,
   PostToolUseFailureHook,
@@ -39,7 +36,9 @@ export interface ObservabilityHooks {
  *
  * @param agentName - Agent name attached to every emitted event
  */
-export function createObservabilityHooks(agentName: string): ObservabilityHooks {
+export function createObservabilityHooks(
+  agentName: string
+): ObservabilityHooks {
   const { zeitlichMetrics } = proxySinks<ZeitlichObservabilitySinks>();
   let sessionStartMs = Date.now();
 

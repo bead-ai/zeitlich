@@ -124,7 +124,10 @@ export type AppendToolResultFn = ActivityFunctionWithOptions<
  * Tools that don't return additional data should use `data: null` (TResult defaults to null).
  * Tools that may fail to produce data should type TResult as `SomeType | null`.
  */
-export interface ToolHandlerResponse<TResult = null, TToolResponse = JsonValue> {
+export interface ToolHandlerResponse<
+  TResult = null,
+  TToolResponse = JsonValue,
+> {
   /** Content sent back to the LLM as the tool call response */
   toolResponse: TToolResponse;
   /** Data returned to the workflow and hooks for further processing */
@@ -172,7 +175,9 @@ export type ToolHandler<
 > = (
   args: TArgs,
   context: TContext
-) => ToolHandlerResponse<TResult, TToolResponse> | Promise<ToolHandlerResponse<TResult, TToolResponse>>;
+) =>
+  | ToolHandlerResponse<TResult, TToolResponse>
+  | Promise<ToolHandlerResponse<TResult, TToolResponse>>;
 
 /**
  * Activity-compatible tool handler that always returns a Promise.
@@ -195,7 +200,10 @@ export type ActivityToolHandler<
   TResult,
   TContext extends RouterContext = RouterContext,
   TToolResponse = JsonValue,
-> = (args: TArgs, context: TContext) => Promise<ToolHandlerResponse<TResult, TToolResponse>>;
+> = (
+  args: TArgs,
+  context: TContext
+) => Promise<ToolHandlerResponse<TResult, TToolResponse>>;
 
 /**
  * Extract the args type for a specific tool name from a tool map.

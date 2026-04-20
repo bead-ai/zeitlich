@@ -27,7 +27,11 @@ const ADAPTER_PREFIX = "googleGenAI";
 
 export function proxyGoogleGenAIThreadOps(
   scope?: string,
-  options?: Parameters<typeof createThreadOpsProxy>[2],
+  options?: Parameters<typeof createThreadOpsProxy>[2]
 ): ActivityInterfaceFor<ThreadOps<GoogleGenAIContent>> {
-  return createThreadOpsProxy(ADAPTER_PREFIX, scope, options) as ActivityInterfaceFor<ThreadOps<GoogleGenAIContent>>;
+  return createThreadOpsProxy(
+    ADAPTER_PREFIX,
+    scope,
+    options
+  ) as ActivityInterfaceFor<ThreadOps<GoogleGenAIContent>>;
 }
