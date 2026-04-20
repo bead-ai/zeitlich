@@ -55,7 +55,7 @@ export interface SandboxManagerHooks<
    * commands, seed files, or capture identifiers without an extra
    * `provider.get()` round-trip.
    */
-  onPostCreate?: (sandbox: Sandbox) => Promise<void>;
+  onPostCreate?: (sandbox: Sandbox, ctx: TCtx) => Promise<void>;
 }
 
 /**
@@ -153,7 +153,7 @@ export class SandboxManager<
     const { sandbox } = await this.provider.create(providerOptions);
 
     if (this.hooks.onPostCreate) {
-      await this.hooks.onPostCreate(sandbox);
+      await this.hooks.onPostCreate(sandbox, ctx ?? ({} as TCtx));
     }
 
     return { sandboxId: sandbox.id };
