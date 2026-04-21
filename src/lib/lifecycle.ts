@@ -19,7 +19,7 @@ export type ThreadInit =
 // Sandbox lifecycle
 // ============================================================================
 
-import type { SandboxSnapshot } from "./sandbox/types";
+import type { SandboxCreateOptions, SandboxSnapshot } from "./sandbox/types";
 
 /**
  * Sandbox initialization strategy.
@@ -31,17 +31,25 @@ import type { SandboxSnapshot } from "./sandbox/types";
  *   Paused sandboxes are automatically resumed. The shutdown policy applies
  *   on exit.
  * - `"fork"` — fork from an existing (or paused) sandbox; a new sandbox is
- *   created and owned by this session.
+ *   created and owned by this session. Optionally pass `options` (the
+ *   resolved create options from the source sandbox) so the provider can
+ *   re-apply sandbox-level config (e.g. network policy) that isn't carried
+ *   across fork.
  * - `"from-snapshot"` — restore a fresh sandbox from a previously captured
  *   {@link SandboxSnapshot}. The new sandbox is owned by this session.
+ *   `options` overrides anything persisted inside the snapshot.
  * - `"inherit"` — use a sandbox owned by someone else (e.g. a parent agent).
  *   The session will **not** manage its lifecycle on exit.
  */
 export type SandboxInit =
   | { mode: "new"; ctx?: unknown }
   | { mode: "continue"; sandboxId: string }
-  | { mode: "fork"; sandboxId: string }
-  | { mode: "from-snapshot"; snapshot: SandboxSnapshot }
+  | { mode: "fork"; sandboxId: string; options?: SandboxCreateOptions }
+  | {
+      mode: "from-snapshot";
+      snapshot: SandboxSnapshot;
+      options?: SandboxCreateOptions;
+    }
   | {
       mode: "inherit";
       sandboxId: string;

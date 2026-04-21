@@ -239,15 +239,24 @@ export class BedrockSandboxProvider implements SandboxProvider<
     // Bedrock sandboxes don't support pause, so resume is a no-op
   }
 
-  async snapshot(_sandboxId: string): Promise<SandboxSnapshot> {
+  async snapshot(
+    _sandboxId: string,
+    _options?: BedrockSandboxCreateOptions
+  ): Promise<SandboxSnapshot> {
     throw new SandboxNotSupportedError("snapshot");
   }
 
-  async restore(_snapshot: SandboxSnapshot): Promise<never> {
+  async restore(
+    _snapshot: SandboxSnapshot,
+    _options?: BedrockSandboxCreateOptions
+  ): Promise<never> {
     throw new SandboxNotSupportedError("restore");
   }
 
-  async fork(_sandboxId: string): Promise<Sandbox> {
+  async fork(
+    _sandboxId: string,
+    _options?: BedrockSandboxCreateOptions
+  ): Promise<Sandbox> {
     throw new SandboxNotSupportedError("fork");
   }
 

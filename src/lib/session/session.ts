@@ -7,7 +7,11 @@ import {
 } from "@temporalio/workflow";
 import type { SessionExitReason } from "../types";
 import type { SessionConfig, ZeitlichSession } from "./types";
-import type { SandboxOps, SandboxSnapshot } from "../sandbox/types";
+import type {
+  SandboxCreateOptions,
+  SandboxOps,
+  SandboxSnapshot,
+} from "../sandbox/types";
 import type {
   AgentState,
   AgentStateManager,
@@ -220,6 +224,13 @@ export async function createSession<
       let baseSnapshot: SandboxSnapshot | undefined;
       let exitSnapshot: SandboxSnapshot | undefined;
       let freshlyCreated = false;
+      /**
+       * The fully-resolved create options the session used (either returned
+       * from `createSandbox` after the onPreCreate merge, or inherited from
+       * the `SandboxInit` that spawned us via fork/restore). Carried through
+       * so we can re-apply it on any later snapshot/fork the session takes.
+       */
+      let sandboxAppliedOptions: SandboxCreateOptions | undefined;
 
       if (sandboxMode === "inherit") {
         const inheritInit = sandboxInit as {
@@ -254,9 +265,16 @@ export async function createSession<
             nonRetryable: true,
           });
         }
+        const forkInit = sandboxInit as {
+          mode: "fork";
+          sandboxId: string;
+          options?: SandboxCreateOptions;
+        };
         sandboxId = await sandboxOps.forkSandbox(
-          (sandboxInit as { mode: "fork"; sandboxId: string }).sandboxId
+          forkInit.sandboxId,
+          forkInit.options
         );
+        sandboxAppliedOptions = forkInit.options;
         sandboxOwned = true;
       } else if (sandboxMode === "from-snapshot") {
         if (!sandboxOps) {
@@ -265,10 +283,16 @@ export async function createSession<
             nonRetryable: true,
           });
         }
-        const snap = (
-          sandboxInit as { mode: "from-snapshot"; snapshot: SandboxSnapshot }
-        ).snapshot;
-        sandboxId = await sandboxOps.restoreSandbox(snap);
+        const restoreInit = sandboxInit as {
+          mode: "from-snapshot";
+          snapshot: SandboxSnapshot;
+          options?: SandboxCreateOptions;
+        };
+        sandboxId = await sandboxOps.restoreSandbox(
+          restoreInit.snapshot,
+          restoreInit.options
+        );
+        sandboxAppliedOptions = restoreInit.options;
         sandboxOwned = true;
       } else if (sandboxOps) {
         const skillFiles = skills ? collectSkillFiles(skills) : undefined;
@@ -280,6 +304,7 @@ export async function createSession<
         const result = await sandboxOps.createSandbox(createOptions, ctx);
         if (result) {
           sandboxId = result.sandboxId;
+          sandboxAppliedOptions = result.appliedOptions;
           sandboxOwned = true;
           freshlyCreated = true;
         }
@@ -287,7 +312,8 @@ export async function createSession<
 
       // Capture a base snapshot immediately after seeding so it can be reused
       // as a template for future runs that want to skip the (potentially
-      // expensive) seed step.
+      // expensive) seed step. Forward `appliedOptions` so the provider can
+      // persist them inside the snapshot for later re-application on restore.
       if (
         sandboxId &&
         sandboxOwned &&
@@ -295,11 +321,14 @@ export async function createSession<
         sandboxShutdown === "snapshot" &&
         sandboxOps
       ) {
-        baseSnapshot = await sandboxOps.snapshotSandbox(sandboxId);
+        baseSnapshot = await sandboxOps.snapshotSandbox(
+          sandboxId,
+          sandboxAppliedOptions
+        );
       }
 
       if (sandboxId && sandboxOwned && onSandboxReady) {
-        onSandboxReady(sandboxId);
+        onSandboxReady(sandboxId, sandboxAppliedOptions);
       }
 
       // --- Virtual filesystem init (independent of sandbox) ----------------
@@ -539,7 +568,10 @@ export async function createSession<
             case "keep-until-parent-close":
               break;
             case "snapshot":
-              exitSnapshot = await sandboxOps.snapshotSandbox(sandboxId);
+              exitSnapshot = await sandboxOps.snapshotSandbox(
+                sandboxId,
+                sandboxAppliedOptions
+              );
               await sandboxOps.destroySandbox(sandboxId);
               break;
           }
@@ -573,6 +605,9 @@ export async function createSession<
         sandboxId,
         ...(baseSnapshot && { baseSnapshot }),
         ...(exitSnapshot && { snapshot: exitSnapshot }),
+        ...(sandboxAppliedOptions && {
+          appliedOptions: sandboxAppliedOptions,
+        }),
       } as Awaited<ReturnType<ZeitlichSession<M, boolean>["runSession"]>>;
     },
   };

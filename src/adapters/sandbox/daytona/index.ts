@@ -149,17 +149,26 @@ export class DaytonaSandboxProvider implements SandboxProvider<
     // Daytona sandboxes don't support pause, so resume is a no-op
   }
 
-  async fork(_sandboxId: string): Promise<Sandbox> {
+  async fork(
+    _sandboxId: string,
+    _options?: DaytonaSandboxCreateOptions
+  ): Promise<Sandbox> {
     throw new Error("Not implemented");
   }
 
-  async snapshot(_sandboxId: string): Promise<SandboxSnapshot> {
+  async snapshot(
+    _sandboxId: string,
+    _options?: DaytonaSandboxCreateOptions
+  ): Promise<SandboxSnapshot> {
     throw new SandboxNotSupportedError(
       "snapshot (use Daytona's native snapshot API directly)"
     );
   }
 
-  async restore(_snapshot: SandboxSnapshot): Promise<never> {
+  async restore(
+    _snapshot: SandboxSnapshot,
+    _options?: DaytonaSandboxCreateOptions
+  ): Promise<never> {
     throw new SandboxNotSupportedError(
       "restore (use Daytona's native snapshot API directly)"
     );

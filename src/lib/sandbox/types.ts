@@ -158,11 +158,37 @@ export interface SandboxProvider<
   pause(sandboxId: string, ttlSeconds?: number): Promise<void>;
   /** Resume a paused sandbox. No-op if already running. */
   resume(sandboxId: string): Promise<void>;
-  snapshot(sandboxId: string): Promise<SandboxSnapshot>;
-  restore(snapshot: SandboxSnapshot): Promise<Sandbox>;
+  /**
+   * Capture a snapshot of a running sandbox.
+   *
+   * `options` are the create options that produced the sandbox. Providers that
+   * can't inherit them across snapshot/restore (e.g. E2B — network policy is
+   * a create-time input, not part of the snapshotted state) may persist them
+   * inside the returned {@link SandboxSnapshot.data} so {@link restore} and
+   * {@link fork} can re-apply them transparently. Stable serialisable fields
+   * only — providers MUST strip seed-only fields like `initialFiles`.
+   */
+  snapshot(
+    sandboxId: string,
+    options?: TOptions
+  ): Promise<SandboxSnapshot>;
+  /**
+   * Restore a sandbox from a snapshot. `options` overrides anything the
+   * provider persisted at snapshot time.
+   */
+  restore(
+    snapshot: SandboxSnapshot,
+    options?: TOptions
+  ): Promise<Sandbox>;
   /** Delete a previously captured snapshot. No-op if already deleted. */
   deleteSnapshot(snapshot: SandboxSnapshot): Promise<void>;
-  fork(sandboxId: string): Promise<Sandbox>;
+  /**
+   * Fork a running sandbox into a new one. `options` are the create options
+   * that produced the source sandbox — providers that don't inherit config
+   * (e.g. E2B) re-apply them to the fork so network policy and related
+   * sandbox-level config survive.
+   */
+  fork(sandboxId: string, options?: TOptions): Promise<Sandbox>;
 }
 
 // ============================================================================
@@ -173,20 +199,50 @@ export interface SandboxOps<
   TOptions extends SandboxCreateOptions = SandboxCreateOptions,
   TCtx = unknown,
 > {
+  /**
+   * Create a sandbox.
+   *
+   * The returned `appliedOptions` are the fully-resolved create options
+   * (after any {@link SandboxManagerHooks.onPreCreate} merge) that the
+   * provider actually used. Callers should stash them so they can be
+   * re-applied on subsequent `forkSandbox` / `snapshotSandbox` /
+   * `restoreSandbox` calls for the same sandbox lineage — which some
+   * providers (e.g. E2B) require for sandbox-level config like network
+   * policy to survive snapshot/fork.
+   */
   createSandbox(
     options?: TOptions,
     ctx?: TCtx
-  ): Promise<{ sandboxId: string } | null>;
+  ): Promise<{ sandboxId: string; appliedOptions?: TOptions } | null>;
   destroySandbox(sandboxId: string): Promise<void>;
   pauseSandbox(sandboxId: string): Promise<void>;
   /** Resume a paused sandbox. No-op if already running. */
   resumeSandbox(sandboxId: string): Promise<void>;
-  snapshotSandbox(sandboxId: string): Promise<SandboxSnapshot>;
-  /** Create a fresh sandbox from a previously captured snapshot. */
-  restoreSandbox(snapshot: SandboxSnapshot): Promise<string>;
+  /**
+   * Capture a snapshot. `options` (when supplied) are persisted alongside the
+   * snapshot so {@link restoreSandbox} can re-apply them — see
+   * {@link SandboxProvider.snapshot}.
+   */
+  snapshotSandbox(
+    sandboxId: string,
+    options?: TOptions
+  ): Promise<SandboxSnapshot>;
+  /**
+   * Create a fresh sandbox from a previously captured snapshot.
+   * `options` overrides anything persisted inside the snapshot.
+   */
+  restoreSandbox(
+    snapshot: SandboxSnapshot,
+    options?: TOptions
+  ): Promise<string>;
   /** Delete a previously captured snapshot. No-op if already deleted. */
   deleteSandboxSnapshot(snapshot: SandboxSnapshot): Promise<void>;
-  forkSandbox(sandboxId: string): Promise<string>;
+  /**
+   * Fork a running sandbox. `options` are re-applied to the fork so
+   * sandbox-level config (e.g. network policy) survives — see
+   * {@link SandboxProvider.fork}.
+   */
+  forkSandbox(sandboxId: string, options?: TOptions): Promise<string>;
 }
 
 /**

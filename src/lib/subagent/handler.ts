@@ -22,7 +22,11 @@ import type {
   SandboxInit,
   SubagentSandboxShutdown,
 } from "../lifecycle";
-import type { SandboxOps, SandboxSnapshot } from "../sandbox/types";
+import type {
+  SandboxCreateOptions,
+  SandboxOps,
+  SandboxSnapshot,
+} from "../sandbox/types";
 import { childSandboxReadySignal } from "./signals";
 
 /** Normalized sandbox config after resolving the union. */
@@ -97,10 +101,22 @@ export function createSubagentHandler<
     string,
     { agentName: string; sandboxId: string }
   >();
-  /** Maps childThreadId → sandboxId for sandbox continuation across invocations (init: per-call) */
-  const threadSandboxes = new Map<string, string>();
-  /** Maps agentName → sandboxId for persistent sandboxes (init: once) */
-  const persistentSandboxes = new Map<string, string>();
+  /**
+   * Maps childThreadId → `{ sandboxId, options? }` for sandbox continuation
+   * across invocations (init: per-call). `options` carry the resolved create
+   * options from the session that originally made this sandbox, so later
+   * fork/continue reuse can re-apply sandbox-level config (e.g. network
+   * policy) that providers like E2B don't preserve across fork.
+   */
+  const threadSandboxes = new Map<
+    string,
+    { sandboxId: string; options?: SandboxCreateOptions }
+  >();
+  /** Maps agentName → `{ sandboxId, options? }` for persistent sandboxes (init: once) */
+  const persistentSandboxes = new Map<
+    string,
+    { sandboxId: string; options?: SandboxCreateOptions }
+  >();
   /** Tracks agents whose first lazy sandbox creation is in-flight (guards concurrent init) */
   const persistentSandboxCreating = new Set<string>();
   /** Reverse lookup: childWorkflowId → agentName for in-flight lazy creators */
@@ -118,13 +134,19 @@ export function createSubagentHandler<
   /** Tracks agents whose first snapshot-backed sandbox creation is in-flight */
   const persistentBaseSnapshotCreating = new Set<string>();
 
-  setHandler(childSandboxReadySignal, ({ childWorkflowId, sandboxId }) => {
-    const agentName = lazyCreatorAgent.get(childWorkflowId);
-    if (agentName && !persistentSandboxes.has(agentName)) {
-      persistentSandboxes.set(agentName, sandboxId);
-      lazyCreatorAgent.delete(childWorkflowId);
+  setHandler(
+    childSandboxReadySignal,
+    ({ childWorkflowId, sandboxId, appliedOptions }) => {
+      const agentName = lazyCreatorAgent.get(childWorkflowId);
+      if (agentName && !persistentSandboxes.has(agentName)) {
+        persistentSandboxes.set(agentName, {
+          sandboxId,
+          ...(appliedOptions && { options: appliedOptions }),
+        });
+        lazyCreatorAgent.delete(childWorkflowId);
+      }
     }
-  });
+  );
 
   const handler = async (
     args: SubagentArgs,
@@ -224,14 +246,16 @@ export function createSubagentHandler<
     } else if (sandboxCfg.source === "own") {
       const isLazy = sandboxCfg.init === "once";
 
-      let baseSandboxId: string | undefined;
+      let baseEntry:
+        | { sandboxId: string; options?: SandboxCreateOptions }
+        | undefined;
       if (isLazy) {
-        baseSandboxId = persistentSandboxes.get(config.agentName);
-        if (!baseSandboxId) {
+        baseEntry = persistentSandboxes.get(config.agentName);
+        if (!baseEntry) {
           if (persistentSandboxCreating.has(config.agentName)) {
             // Another call is already creating — wait for it to finish
             await condition(() => persistentSandboxes.has(config.agentName));
-            baseSandboxId = persistentSandboxes.get(config.agentName);
+            baseEntry = persistentSandboxes.get(config.agentName);
           } else {
             // We're the first concurrent caller — claim the creator role
             persistentSandboxCreating.add(config.agentName);
@@ -239,14 +263,19 @@ export function createSubagentHandler<
           }
         }
       } else if (continuationThreadId) {
-        baseSandboxId = threadSandboxes.get(continuationThreadId);
+        baseEntry = threadSandboxes.get(continuationThreadId);
       }
 
-      if (baseSandboxId) {
-        sandbox = {
-          mode: sandboxCfg.continuation === "continue" ? "continue" : "fork",
-          sandboxId: baseSandboxId,
-        };
+      if (baseEntry) {
+        if (sandboxCfg.continuation === "continue") {
+          sandbox = { mode: "continue", sandboxId: baseEntry.sandboxId };
+        } else {
+          sandbox = {
+            mode: "fork",
+            sandboxId: baseEntry.sandboxId,
+            ...(baseEntry.options && { options: baseEntry.options }),
+          };
+        }
       }
 
       // Ensure the sandbox survives for future continuation/fork:
@@ -328,6 +357,7 @@ export function createSubagentHandler<
       sandboxId: childSandboxId,
       snapshot: childSnapshot,
       baseSnapshot: childBaseSnapshot,
+      appliedOptions: childAppliedOptions,
       metadata,
     } = childResult;
 
@@ -339,14 +369,20 @@ export function createSubagentHandler<
         !persistentSandboxes.has(config.agentName)
       ) {
         // Fallback: signal may have already set this via childSandboxReadySignal
-        persistentSandboxes.set(config.agentName, childSandboxId);
+        persistentSandboxes.set(config.agentName, {
+          sandboxId: childSandboxId,
+          ...(childAppliedOptions && { options: childAppliedOptions }),
+        });
       } else if (
         allowsContinuation &&
         childThreadId &&
         sandboxCfg.source === "own" &&
         sandboxCfg.continuation !== "snapshot"
       ) {
-        threadSandboxes.set(childThreadId, childSandboxId);
+        threadSandboxes.set(childThreadId, {
+          sandboxId: childSandboxId,
+          ...(childAppliedOptions && { options: childAppliedOptions }),
+        });
       }
     }
 
