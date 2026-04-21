@@ -183,7 +183,10 @@ export class InMemorySandboxProvider implements SandboxProvider {
     return { sandbox };
   }
 
-  async snapshot(sandboxId: string): Promise<SandboxSnapshot> {
+  async snapshot(
+    sandboxId: string,
+    _options?: SandboxCreateOptions
+  ): Promise<SandboxSnapshot> {
     const sandbox = this.sandboxes.get(sandboxId);
     if (!sandbox) throw new SandboxNotFoundError(sandboxId);
 
@@ -210,7 +213,10 @@ export class InMemorySandboxProvider implements SandboxProvider {
     };
   }
 
-  async fork(sandboxId: string): Promise<Sandbox> {
+  async fork(
+    sandboxId: string,
+    _options?: SandboxCreateOptions
+  ): Promise<Sandbox> {
     const sandbox = await this.get(sandboxId);
 
     const entries = await sandbox.fs.readdirWithFileTypes("/");
@@ -228,7 +234,10 @@ export class InMemorySandboxProvider implements SandboxProvider {
     return newSandbox.sandbox;
   }
 
-  async restore(snapshot: SandboxSnapshot): Promise<Sandbox> {
+  async restore(
+    snapshot: SandboxSnapshot,
+    _options?: SandboxCreateOptions
+  ): Promise<Sandbox> {
     const { files } = snapshot.data as { files: Record<string, string> };
     const initialFiles: InitialFiles = {};
     for (const [path, content] of Object.entries(files)) {

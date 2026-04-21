@@ -76,11 +76,19 @@ export class E2bSandboxProvider implements SandboxProvider<
   private readonly defaultTemplate?: string;
   private readonly defaultWorkspaceBase: string;
   private readonly defaultTimeoutMs?: number;
+  private readonly defaultAllowInternetAccess?: boolean;
+  private readonly defaultNetwork?: E2bSandboxConfig["network"];
+  private readonly defaultMetadata?: E2bSandboxConfig["metadata"];
+  private readonly defaultLifecycle?: E2bSandboxConfig["lifecycle"];
 
   constructor(config?: E2bSandboxConfig) {
     this.defaultTemplate = config?.template;
     this.defaultWorkspaceBase = config?.workspaceBase ?? "/home/user";
     this.defaultTimeoutMs = config?.timeoutMs;
+    this.defaultAllowInternetAccess = config?.allowInternetAccess;
+    this.defaultNetwork = config?.network;
+    this.defaultMetadata = config?.metadata;
+    this.defaultLifecycle = config?.lifecycle;
   }
 
   async create(
@@ -142,7 +150,10 @@ export class E2bSandboxProvider implements SandboxProvider<
     await E2bSdkSandbox.connect(sandboxId);
   }
 
-  async snapshot(sandboxId: string): Promise<SandboxSnapshot> {
+  async snapshot(
+    sandboxId: string,
+    _options?: E2bSandboxCreateOptions
+  ): Promise<SandboxSnapshot> {
     const { snapshotId } = await E2bSdkSandbox.createSnapshot(sandboxId);
     return {
       sandboxId,
@@ -152,14 +163,18 @@ export class E2bSandboxProvider implements SandboxProvider<
     };
   }
 
-  async restore(snapshot: SandboxSnapshot): Promise<Sandbox> {
+  async restore(
+    snapshot: SandboxSnapshot,
+    options?: E2bSandboxCreateOptions
+  ): Promise<Sandbox> {
     const data = snapshot.data as { snapshotId?: string } | null;
     if (!data?.snapshotId) {
       throw new SandboxNotSupportedError(
         "restore: snapshot is missing snapshotId"
       );
     }
-    const sdkSandbox = await E2bSdkSandbox.create(data.snapshotId);
+    const sdkOpts = this.buildSdkCreateOpts(options);
+    const sdkSandbox = await E2bSdkSandbox.create(data.snapshotId, sdkOpts);
     return new E2bSandboxImpl(
       sdkSandbox.sandboxId,
       sdkSandbox,
@@ -177,9 +192,13 @@ export class E2bSandboxProvider implements SandboxProvider<
     }
   }
 
-  async fork(sandboxId: string): Promise<Sandbox> {
+  async fork(
+    sandboxId: string,
+    options?: E2bSandboxCreateOptions
+  ): Promise<Sandbox> {
     const { snapshotId } = await E2bSdkSandbox.createSnapshot(sandboxId);
-    const sdkSandbox = await E2bSdkSandbox.create(snapshotId);
+    const sdkOpts = this.buildSdkCreateOpts(options);
+    const sdkSandbox = await E2bSdkSandbox.create(snapshotId, sdkOpts);
     return new E2bSandboxImpl(
       sdkSandbox.sandboxId,
       sdkSandbox,
@@ -188,22 +207,25 @@ export class E2bSandboxProvider implements SandboxProvider<
   }
 
   private buildSdkCreateOpts(options?: E2bSandboxCreateOptions) {
+    const network = options?.network ?? this.defaultNetwork;
+    const lifecycle = options?.lifecycle ?? this.defaultLifecycle;
     return {
       envs: options?.env,
       timeoutMs: options?.timeoutMs ?? this.defaultTimeoutMs,
-      metadata: options?.metadata,
-      allowInternetAccess: options?.allowInternetAccess,
-      network: options?.network
+      metadata: options?.metadata ?? this.defaultMetadata,
+      allowInternetAccess:
+        options?.allowInternetAccess ?? this.defaultAllowInternetAccess,
+      network: network
         ? {
-            allowOut: options.network.allowOut,
-            denyOut: options.network.denyOut,
-            allowPublicTraffic: options.network.allowPublicTraffic,
+            allowOut: network.allowOut,
+            denyOut: network.denyOut,
+            allowPublicTraffic: network.allowPublicTraffic,
           }
         : undefined,
-      lifecycle: options?.lifecycle
+      lifecycle: lifecycle
         ? {
-            onTimeout: options.lifecycle.onTimeout,
-            autoResume: options.lifecycle.autoResume,
+            onTimeout: lifecycle.onTimeout,
+            autoResume: lifecycle.autoResume,
           }
         : undefined,
     };

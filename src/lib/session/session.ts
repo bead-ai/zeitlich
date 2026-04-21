@@ -7,7 +7,11 @@ import {
 } from "@temporalio/workflow";
 import type { SessionExitReason } from "../types";
 import type { SessionConfig, ZeitlichSession } from "./types";
-import type { SandboxOps, SandboxSnapshot } from "../sandbox/types";
+import type {
+  SandboxCreateOptions,
+  SandboxOps,
+  SandboxSnapshot,
+} from "../sandbox/types";
 import type {
   AgentState,
   AgentStateManager,
@@ -254,8 +258,14 @@ export async function createSession<
             nonRetryable: true,
           });
         }
+        const forkInit = sandboxInit as {
+          mode: "fork";
+          sandboxId: string;
+          options?: SandboxCreateOptions;
+        };
         sandboxId = await sandboxOps.forkSandbox(
-          (sandboxInit as { mode: "fork"; sandboxId: string }).sandboxId
+          forkInit.sandboxId,
+          forkInit.options
         );
         sandboxOwned = true;
       } else if (sandboxMode === "from-snapshot") {
@@ -265,10 +275,15 @@ export async function createSession<
             nonRetryable: true,
           });
         }
-        const snap = (
-          sandboxInit as { mode: "from-snapshot"; snapshot: SandboxSnapshot }
-        ).snapshot;
-        sandboxId = await sandboxOps.restoreSandbox(snap);
+        const restoreInit = sandboxInit as {
+          mode: "from-snapshot";
+          snapshot: SandboxSnapshot;
+          options?: SandboxCreateOptions;
+        };
+        sandboxId = await sandboxOps.restoreSandbox(
+          restoreInit.snapshot,
+          restoreInit.options
+        );
         sandboxOwned = true;
       } else if (sandboxOps) {
         const skillFiles = skills ? collectSkillFiles(skills) : undefined;

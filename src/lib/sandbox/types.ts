@@ -158,11 +158,23 @@ export interface SandboxProvider<
   pause(sandboxId: string, ttlSeconds?: number): Promise<void>;
   /** Resume a paused sandbox. No-op if already running. */
   resume(sandboxId: string): Promise<void>;
-  snapshot(sandboxId: string): Promise<SandboxSnapshot>;
-  restore(snapshot: SandboxSnapshot): Promise<Sandbox>;
+  /**
+   * Capture a snapshot of a running sandbox. `options` is a per-call override
+   * merged on top of the provider's static defaults.
+   */
+  snapshot(sandboxId: string, options?: TOptions): Promise<SandboxSnapshot>;
+  /**
+   * Restore a sandbox from a snapshot. `options` is a per-call override
+   * merged on top of the provider's static defaults.
+   */
+  restore(snapshot: SandboxSnapshot, options?: TOptions): Promise<Sandbox>;
   /** Delete a previously captured snapshot. No-op if already deleted. */
   deleteSnapshot(snapshot: SandboxSnapshot): Promise<void>;
-  fork(sandboxId: string): Promise<Sandbox>;
+  /**
+   * Fork a running sandbox into a new one. `options` is a per-call override
+   * merged on top of the provider's static defaults.
+   */
+  fork(sandboxId: string, options?: TOptions): Promise<Sandbox>;
 }
 
 // ============================================================================
@@ -181,12 +193,20 @@ export interface SandboxOps<
   pauseSandbox(sandboxId: string): Promise<void>;
   /** Resume a paused sandbox. No-op if already running. */
   resumeSandbox(sandboxId: string): Promise<void>;
-  snapshotSandbox(sandboxId: string): Promise<SandboxSnapshot>;
-  /** Create a fresh sandbox from a previously captured snapshot. */
-  restoreSandbox(snapshot: SandboxSnapshot): Promise<string>;
+  /** Capture a snapshot. `options` is a per-call override merged on top of provider defaults. */
+  snapshotSandbox(
+    sandboxId: string,
+    options?: TOptions
+  ): Promise<SandboxSnapshot>;
+  /** Create a fresh sandbox from a snapshot. `options` is a per-call override merged on top of provider defaults. */
+  restoreSandbox(
+    snapshot: SandboxSnapshot,
+    options?: TOptions
+  ): Promise<string>;
   /** Delete a previously captured snapshot. No-op if already deleted. */
   deleteSandboxSnapshot(snapshot: SandboxSnapshot): Promise<void>;
-  forkSandbox(sandboxId: string): Promise<string>;
+  /** Fork a running sandbox. `options` is a per-call override merged on top of provider defaults. */
+  forkSandbox(sandboxId: string, options?: TOptions): Promise<string>;
 }
 
 /**

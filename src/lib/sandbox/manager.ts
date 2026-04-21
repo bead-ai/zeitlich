@@ -120,9 +120,7 @@ export class SandboxManager<
   async create(
     options?: TOptions,
     ctx?: TCtx
-  ): Promise<{
-    sandboxId: string;
-  } | null> {
+  ): Promise<{ sandboxId: string } | null> {
     let providerOptions = options;
 
     if (this.hooks.onPreCreate) {
@@ -175,12 +173,15 @@ export class SandboxManager<
     await this.provider.resume(id);
   }
 
-  async snapshot(id: string): Promise<SandboxSnapshot> {
-    return this.provider.snapshot(id);
+  async snapshot(id: string, options?: TOptions): Promise<SandboxSnapshot> {
+    return this.provider.snapshot(id, options);
   }
 
-  async restore(snapshot: SandboxSnapshot): Promise<string> {
-    const sandbox = await this.provider.restore(snapshot);
+  async restore(
+    snapshot: SandboxSnapshot,
+    options?: TOptions
+  ): Promise<string> {
+    const sandbox = await this.provider.restore(snapshot, options);
     return sandbox.id;
   }
 
@@ -188,8 +189,8 @@ export class SandboxManager<
     await this.provider.deleteSnapshot(snapshot);
   }
 
-  async fork(sandboxId: string): Promise<string> {
-    const sandbox = await this.provider.fork(sandboxId);
+  async fork(sandboxId: string, options?: TOptions): Promise<string> {
+    const sandbox = await this.provider.fork(sandboxId, options);
     return sandbox.id;
   }
 
@@ -221,9 +222,7 @@ export class SandboxManager<
       createSandbox: async (
         options?: TOptions,
         ctx?: TCtx
-      ): Promise<{
-        sandboxId: string;
-      } | null> => {
+      ): Promise<{ sandboxId: string } | null> => {
         return this.create(options, ctx);
       },
       destroySandbox: async (sandboxId: string): Promise<void> => {
@@ -238,19 +237,28 @@ export class SandboxManager<
       resumeSandbox: async (sandboxId: string): Promise<void> => {
         await this.resume(sandboxId);
       },
-      snapshotSandbox: async (sandboxId: string): Promise<SandboxSnapshot> => {
-        return this.snapshot(sandboxId);
+      snapshotSandbox: async (
+        sandboxId: string,
+        options?: TOptions
+      ): Promise<SandboxSnapshot> => {
+        return this.snapshot(sandboxId, options);
       },
-      restoreSandbox: async (snapshot: SandboxSnapshot): Promise<string> => {
-        return this.restore(snapshot);
+      restoreSandbox: async (
+        snapshot: SandboxSnapshot,
+        options?: TOptions
+      ): Promise<string> => {
+        return this.restore(snapshot, options);
       },
       deleteSandboxSnapshot: async (
         snapshot: SandboxSnapshot
       ): Promise<void> => {
         await this.deleteSnapshot(snapshot);
       },
-      forkSandbox: async (sandboxId: string): Promise<string> => {
-        return this.fork(sandboxId);
+      forkSandbox: async (
+        sandboxId: string,
+        options?: TOptions
+      ): Promise<string> => {
+        return this.fork(sandboxId, options);
       },
     };
     const cap = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1);
