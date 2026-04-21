@@ -2,6 +2,24 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.38](https://github.com/bead-ai/zeitlich/compare/v0.2.37...v0.2.38) (2026-04-21)
+
+
+### Features
+
+* **sandbox:** provider defaults and per-call options on snapshot/restore/fork ([#94](https://github.com/bead-ai/zeitlich/issues/94)) ([ff69033](https://github.com/bead-ai/zeitlich/commit/ff690332b85afc2694067eb24f267aa7af3c4910))
+* **thread:** allow tool handlers to request a rewind ([#92](https://github.com/bead-ai/zeitlich/issues/92)) ([e140187](https://github.com/bead-ai/zeitlich/commit/e140187fc4bc5b3a26aeb9f0255865360c68e8e8))
+
+
+### Code Refactoring
+
+* **subagent:** rename startChild to executeChild in integration tests ([c6baecd](https://github.com/bead-ai/zeitlich/commit/c6baecde8d8d1800f7cad4129dc403a09fc8f397))
+
+
+### Miscellaneous Chores
+
+* release 0.2.38 ([f677e3f](https://github.com/bead-ai/zeitlich/commit/f677e3feb681cc44a813e445563650cdc5eb9ded))
+
 ## [0.2.37](https://github.com/bead-ai/zeitlich/compare/v0.2.36...v0.2.37) (2026-04-20)
 
 
