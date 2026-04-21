@@ -10,11 +10,7 @@ import type {
   SandboxInit,
   SubagentSandboxShutdown,
 } from "../lifecycle";
-import type {
-  SandboxCreateOptions,
-  SandboxOps,
-  SandboxSnapshot,
-} from "../sandbox/types";
+import type { SandboxOps, SandboxSnapshot } from "../sandbox/types";
 
 /** ToolHandlerResponse with threadId required (subagents must always surface their thread) */
 export type SubagentHandlerResponse<
@@ -31,15 +27,6 @@ export type SubagentHandlerResponse<
    * first call that actually created the sandbox.
    */
   baseSnapshot?: SandboxSnapshot;
-  /**
-   * Fully-resolved create options the child session used when it freshly
-   * created a sandbox. Propagated up to the parent handler so subsequent
-   * fork/continue calls for the same subagent can re-apply sandbox-level
-   * config (e.g. network policy) that isn't preserved across fork on some
-   * providers. Absent when the child inherited or restored an existing
-   * sandbox.
-   */
-  appliedOptions?: SandboxCreateOptions;
 };
 
 /**
@@ -227,13 +214,6 @@ export type SubagentFnResult<
 export interface ChildSandboxReadySignalPayload {
   childWorkflowId: string;
   sandboxId: string;
-  /**
-   * Fully-resolved create options used when the child freshly created the
-   * sandbox. Propagated so the parent handler can record them alongside the
-   * sandbox ID and re-apply them on later fork/continue calls — see
-   * {@link SandboxOps.createSandbox}.
-   */
-  appliedOptions?: SandboxCreateOptions;
 }
 
 /**
@@ -248,14 +228,6 @@ export interface SubagentSessionInput {
   sandbox?: SandboxInit;
   /** Sandbox shutdown policy (default: "destroy") */
   sandboxShutdown?: SubagentSandboxShutdown;
-  /**
-   * Called by the session as soon as the sandbox is created, before the
-   * agent loop starts. `appliedOptions` carry the resolved create options
-   * when the session freshly created a sandbox — see
-   * {@link SandboxOps.createSandbox}.
-   */
-  onSandboxReady?: (
-    sandboxId: string,
-    appliedOptions?: SandboxCreateOptions
-  ) => void;
+  /** Called by the session as soon as the sandbox is created, before the agent loop starts. */
+  onSandboxReady?: (sandboxId: string) => void;
 }

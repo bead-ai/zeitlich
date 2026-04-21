@@ -8,11 +8,7 @@ import type {
 import type { Hooks } from "../hooks/types";
 import type { SubagentConfig } from "../subagent/types";
 import type { Skill } from "../skills/types";
-import type {
-  SandboxCreateOptions,
-  SandboxOps,
-  SandboxSnapshot,
-} from "../sandbox/types";
+import type { SandboxOps, SandboxSnapshot } from "../sandbox/types";
 import type { VirtualFsOps } from "../virtual-fs/types";
 import type { RunAgentActivity } from "../model/types";
 import type { AgentStateManager, JsonSerializable } from "../state/types";
@@ -199,17 +195,8 @@ export interface SessionConfig<
   /**
    * Called as soon as the sandbox is created (or resumed/forked), before the
    * agent loop starts. Useful for signalling sandbox readiness to a parent.
-   *
-   * `appliedOptions` are the fully-resolved create options the provider used
-   * (only populated when the sandbox was freshly created via `mode: "new"`
-   * and hooks have run). Propagate them if the parent needs to re-apply
-   * sandbox-level config on later fork/restore — see
-   * {@link SandboxOps.createSandbox}.
    */
-  onSandboxReady?: (
-    sandboxId: string,
-    appliedOptions?: SandboxCreateOptions
-  ) => void;
+  onSandboxReady?: (sandboxId: string) => void;
 
   // ---------------------------------------------------------------------------
   // Virtual filesystem
@@ -252,14 +239,6 @@ export type SessionResult<
    * threads that want to skip re-seeding.
    */
   baseSnapshot?: SandboxSnapshot;
-  /**
-   * Fully-resolved create options (after `onPreCreate` merge) used when the
-   * session freshly created a sandbox via `sandbox.mode === "new"`.
-   * Surfaced so parent handlers can re-apply sandbox-level config (e.g.
-   * network policy) on later fork/restore. Absent when the session inherited
-   * or forked an existing sandbox.
-   */
-  appliedOptions?: SandboxCreateOptions;
 } & (HasSandbox extends true
   ? { sandboxId: string }
   : { sandboxId?: undefined });

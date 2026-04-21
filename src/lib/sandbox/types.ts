@@ -159,34 +159,20 @@ export interface SandboxProvider<
   /** Resume a paused sandbox. No-op if already running. */
   resume(sandboxId: string): Promise<void>;
   /**
-   * Capture a snapshot of a running sandbox.
-   *
-   * `options` are the create options that produced the sandbox. Providers that
-   * can't inherit them across snapshot/restore (e.g. E2B — network policy is
-   * a create-time input, not part of the snapshotted state) may persist them
-   * inside the returned {@link SandboxSnapshot.data} so {@link restore} and
-   * {@link fork} can re-apply them transparently. Stable serialisable fields
-   * only — providers MUST strip seed-only fields like `initialFiles`.
+   * Capture a snapshot of a running sandbox. `options` is a per-call override
+   * merged on top of the provider's static defaults.
    */
-  snapshot(
-    sandboxId: string,
-    options?: TOptions
-  ): Promise<SandboxSnapshot>;
+  snapshot(sandboxId: string, options?: TOptions): Promise<SandboxSnapshot>;
   /**
-   * Restore a sandbox from a snapshot. `options` overrides anything the
-   * provider persisted at snapshot time.
+   * Restore a sandbox from a snapshot. `options` is a per-call override
+   * merged on top of the provider's static defaults.
    */
-  restore(
-    snapshot: SandboxSnapshot,
-    options?: TOptions
-  ): Promise<Sandbox>;
+  restore(snapshot: SandboxSnapshot, options?: TOptions): Promise<Sandbox>;
   /** Delete a previously captured snapshot. No-op if already deleted. */
   deleteSnapshot(snapshot: SandboxSnapshot): Promise<void>;
   /**
-   * Fork a running sandbox into a new one. `options` are the create options
-   * that produced the source sandbox — providers that don't inherit config
-   * (e.g. E2B) re-apply them to the fork so network policy and related
-   * sandbox-level config survive.
+   * Fork a running sandbox into a new one. `options` is a per-call override
+   * merged on top of the provider's static defaults.
    */
   fork(sandboxId: string, options?: TOptions): Promise<Sandbox>;
 }
@@ -199,49 +185,27 @@ export interface SandboxOps<
   TOptions extends SandboxCreateOptions = SandboxCreateOptions,
   TCtx = unknown,
 > {
-  /**
-   * Create a sandbox.
-   *
-   * The returned `appliedOptions` are the fully-resolved create options
-   * (after any {@link SandboxManagerHooks.onPreCreate} merge) that the
-   * provider actually used. Callers should stash them so they can be
-   * re-applied on subsequent `forkSandbox` / `snapshotSandbox` /
-   * `restoreSandbox` calls for the same sandbox lineage — which some
-   * providers (e.g. E2B) require for sandbox-level config like network
-   * policy to survive snapshot/fork.
-   */
   createSandbox(
     options?: TOptions,
     ctx?: TCtx
-  ): Promise<{ sandboxId: string; appliedOptions?: TOptions } | null>;
+  ): Promise<{ sandboxId: string } | null>;
   destroySandbox(sandboxId: string): Promise<void>;
   pauseSandbox(sandboxId: string): Promise<void>;
   /** Resume a paused sandbox. No-op if already running. */
   resumeSandbox(sandboxId: string): Promise<void>;
-  /**
-   * Capture a snapshot. `options` (when supplied) are persisted alongside the
-   * snapshot so {@link restoreSandbox} can re-apply them — see
-   * {@link SandboxProvider.snapshot}.
-   */
+  /** Capture a snapshot. `options` is a per-call override merged on top of provider defaults. */
   snapshotSandbox(
     sandboxId: string,
     options?: TOptions
   ): Promise<SandboxSnapshot>;
-  /**
-   * Create a fresh sandbox from a previously captured snapshot.
-   * `options` overrides anything persisted inside the snapshot.
-   */
+  /** Create a fresh sandbox from a snapshot. `options` is a per-call override merged on top of provider defaults. */
   restoreSandbox(
     snapshot: SandboxSnapshot,
     options?: TOptions
   ): Promise<string>;
   /** Delete a previously captured snapshot. No-op if already deleted. */
   deleteSandboxSnapshot(snapshot: SandboxSnapshot): Promise<void>;
-  /**
-   * Fork a running sandbox. `options` are re-applied to the fork so
-   * sandbox-level config (e.g. network policy) survives — see
-   * {@link SandboxProvider.fork}.
-   */
+  /** Fork a running sandbox. `options` is a per-call override merged on top of provider defaults. */
   forkSandbox(sandboxId: string, options?: TOptions): Promise<string>;
 }
 

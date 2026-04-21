@@ -31,13 +31,12 @@ import type { SandboxCreateOptions, SandboxSnapshot } from "./sandbox/types";
  *   Paused sandboxes are automatically resumed. The shutdown policy applies
  *   on exit.
  * - `"fork"` — fork from an existing (or paused) sandbox; a new sandbox is
- *   created and owned by this session. Optionally pass `options` (the
- *   resolved create options from the source sandbox) so the provider can
- *   re-apply sandbox-level config (e.g. network policy) that isn't carried
- *   across fork.
+ *   created and owned by this session. `options` is an optional per-call
+ *   override merged on top of the provider's static defaults.
  * - `"from-snapshot"` — restore a fresh sandbox from a previously captured
  *   {@link SandboxSnapshot}. The new sandbox is owned by this session.
- *   `options` overrides anything persisted inside the snapshot.
+ *   `options` is an optional per-call override merged on top of the
+ *   provider's static defaults.
  * - `"inherit"` — use a sandbox owned by someone else (e.g. a parent agent).
  *   The session will **not** manage its lifecycle on exit.
  */

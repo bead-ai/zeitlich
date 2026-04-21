@@ -130,13 +130,12 @@ export function defineSubagentWorkflow(
       sandboxShutdown: effectiveShutdown,
       ...(workflowInput.thread && { thread: workflowInput.thread }),
       ...(workflowInput.sandbox && { sandbox: workflowInput.sandbox }),
-      onSandboxReady: (sandboxId, appliedOptions) => {
+      onSandboxReady: (sandboxId: string) => {
         const isReuse = workflowInput.sandbox?.mode === "continue";
         if (!isReuse) {
           void parentHandle.signal(childSandboxReadySignal, {
             childWorkflowId: workflowInfo().workflowId,
             sandboxId,
-            ...(appliedOptions && { appliedOptions }),
           });
         }
       },

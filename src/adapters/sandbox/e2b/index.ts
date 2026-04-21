@@ -76,11 +76,19 @@ export class E2bSandboxProvider implements SandboxProvider<
   private readonly defaultTemplate?: string;
   private readonly defaultWorkspaceBase: string;
   private readonly defaultTimeoutMs?: number;
+  private readonly defaultAllowInternetAccess?: boolean;
+  private readonly defaultNetwork?: E2bSandboxConfig["network"];
+  private readonly defaultMetadata?: E2bSandboxConfig["metadata"];
+  private readonly defaultLifecycle?: E2bSandboxConfig["lifecycle"];
 
   constructor(config?: E2bSandboxConfig) {
     this.defaultTemplate = config?.template;
     this.defaultWorkspaceBase = config?.workspaceBase ?? "/home/user";
     this.defaultTimeoutMs = config?.timeoutMs;
+    this.defaultAllowInternetAccess = config?.allowInternetAccess;
+    this.defaultNetwork = config?.network;
+    this.defaultMetadata = config?.metadata;
+    this.defaultLifecycle = config?.lifecycle;
   }
 
   async create(
@@ -144,23 +152,13 @@ export class E2bSandboxProvider implements SandboxProvider<
 
   async snapshot(
     sandboxId: string,
-    options?: E2bSandboxCreateOptions
+    _options?: E2bSandboxCreateOptions
   ): Promise<SandboxSnapshot> {
     const { snapshotId } = await E2bSdkSandbox.createSnapshot(sandboxId);
-    // E2B doesn't carry sandbox-level config (network policy, metadata,
-    // lifecycle, timeoutMs, …) across snapshot/restore — those are pure
-    // create-time inputs. Persist them inside the snapshot so `restore` can
-    // re-apply them transparently. Strip `initialFiles` — the files are
-    // already baked into the snapshot and re-applying them on every restore
-    // would overwrite agent-modified state with stale seed content.
-    const persistedOptions = sanitizeOptionsForSnapshot(options);
     return {
       sandboxId,
       providerId: this.id,
-      data: {
-        snapshotId,
-        ...(persistedOptions && { createOptions: persistedOptions }),
-      },
+      data: { snapshotId },
       createdAt: new Date().toISOString(),
     };
   }
@@ -169,18 +167,13 @@ export class E2bSandboxProvider implements SandboxProvider<
     snapshot: SandboxSnapshot,
     options?: E2bSandboxCreateOptions
   ): Promise<Sandbox> {
-    const data = snapshot.data as {
-      snapshotId?: string;
-      createOptions?: E2bSandboxCreateOptions;
-    } | null;
+    const data = snapshot.data as { snapshotId?: string } | null;
     if (!data?.snapshotId) {
       throw new SandboxNotSupportedError(
         "restore: snapshot is missing snapshotId"
       );
     }
-    // Caller overrides win over anything persisted at snapshot time.
-    const effective = mergeOptions(data.createOptions, options);
-    const sdkOpts = this.buildSdkCreateOpts(effective);
+    const sdkOpts = this.buildSdkCreateOpts(options);
     const sdkSandbox = await E2bSdkSandbox.create(data.snapshotId, sdkOpts);
     return new E2bSandboxImpl(
       sdkSandbox.sandboxId,
@@ -204,12 +197,7 @@ export class E2bSandboxProvider implements SandboxProvider<
     options?: E2bSandboxCreateOptions
   ): Promise<Sandbox> {
     const { snapshotId } = await E2bSdkSandbox.createSnapshot(sandboxId);
-    // Re-apply sandbox-level config from the source sandbox — E2B treats
-    // `create(snapshotId, opts)` as a fresh create, so without this the fork
-    // would come up with default (unrestricted) network/timeout/etc.
-    const sdkOpts = this.buildSdkCreateOpts(
-      sanitizeOptionsForSnapshot(options)
-    );
+    const sdkOpts = this.buildSdkCreateOpts(options);
     const sdkSandbox = await E2bSdkSandbox.create(snapshotId, sdkOpts);
     return new E2bSandboxImpl(
       sdkSandbox.sandboxId,
@@ -219,56 +207,29 @@ export class E2bSandboxProvider implements SandboxProvider<
   }
 
   private buildSdkCreateOpts(options?: E2bSandboxCreateOptions) {
+    const network = options?.network ?? this.defaultNetwork;
+    const lifecycle = options?.lifecycle ?? this.defaultLifecycle;
     return {
       envs: options?.env,
       timeoutMs: options?.timeoutMs ?? this.defaultTimeoutMs,
-      metadata: options?.metadata,
-      allowInternetAccess: options?.allowInternetAccess,
-      network: options?.network
+      metadata: options?.metadata ?? this.defaultMetadata,
+      allowInternetAccess:
+        options?.allowInternetAccess ?? this.defaultAllowInternetAccess,
+      network: network
         ? {
-            allowOut: options.network.allowOut,
-            denyOut: options.network.denyOut,
-            allowPublicTraffic: options.network.allowPublicTraffic,
+            allowOut: network.allowOut,
+            denyOut: network.denyOut,
+            allowPublicTraffic: network.allowPublicTraffic,
           }
         : undefined,
-      lifecycle: options?.lifecycle
+      lifecycle: lifecycle
         ? {
-            onTimeout: options.lifecycle.onTimeout,
-            autoResume: options.lifecycle.autoResume,
+            onTimeout: lifecycle.onTimeout,
+            autoResume: lifecycle.autoResume,
           }
         : undefined,
     };
   }
-}
-
-/**
- * Strip fields that shouldn't survive into a snapshot or fork: `initialFiles`
- * is a seed concept (files are already baked into the snapshot), `id` is
- * per-sandbox. Returns `undefined` when the remainder is empty so snapshots
- * stay minimal for callers that never pass options.
- */
-function sanitizeOptionsForSnapshot(
-  options?: E2bSandboxCreateOptions
-): E2bSandboxCreateOptions | undefined {
-  if (!options) return undefined;
-  const { initialFiles: _initialFiles, id: _id, ...rest } = options;
-  return Object.keys(rest).length > 0
-    ? (rest as E2bSandboxCreateOptions)
-    : undefined;
-}
-
-/**
- * Shallow merge — `override` wins per top-level key. `network` and `lifecycle`
- * are treated as atomic values (overriding `network` replaces the whole
- * block). That matches how the E2B API treats them.
- */
-function mergeOptions(
-  base?: E2bSandboxCreateOptions,
-  override?: E2bSandboxCreateOptions
-): E2bSandboxCreateOptions | undefined {
-  if (!base) return override;
-  if (!override) return base;
-  return { ...base, ...override };
 }
 
 // Re-exports

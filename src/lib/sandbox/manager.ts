@@ -120,10 +120,7 @@ export class SandboxManager<
   async create(
     options?: TOptions,
     ctx?: TCtx
-  ): Promise<{
-    sandboxId: string;
-    appliedOptions?: TOptions;
-  } | null> {
+  ): Promise<{ sandboxId: string } | null> {
     let providerOptions = options;
 
     if (this.hooks.onPreCreate) {
@@ -157,10 +154,7 @@ export class SandboxManager<
       await this.hooks.onPostCreate(sandbox, ctx ?? ({} as TCtx));
     }
 
-    return {
-      sandboxId: sandbox.id,
-      ...(providerOptions !== undefined && { appliedOptions: providerOptions }),
-    };
+    return { sandboxId: sandbox.id };
   }
 
   async getSandbox(id: string): Promise<TSandbox> {
@@ -228,10 +222,7 @@ export class SandboxManager<
       createSandbox: async (
         options?: TOptions,
         ctx?: TCtx
-      ): Promise<{
-        sandboxId: string;
-        appliedOptions?: TOptions;
-      } | null> => {
+      ): Promise<{ sandboxId: string } | null> => {
         return this.create(options, ctx);
       },
       destroySandbox: async (sandboxId: string): Promise<void> => {
