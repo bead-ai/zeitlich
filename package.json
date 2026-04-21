@@ -210,7 +210,7 @@
     "node": ">=18"
   },
   "devDependencies": {
-    "@anthropic-ai/sdk": "^0.80.0",
+    "@anthropic-ai/sdk": "^0.81.0",
     "@aws-sdk/client-bedrock-agentcore": "^3.900.0",
     "@daytonaio/sdk": "^0.158.1",
     "@e2b/code-interpreter": "^2.3.3",
