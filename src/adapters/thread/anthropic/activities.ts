@@ -203,8 +203,7 @@ export function createAnthropicAdapter(
     async forkThread(
       sourceThreadId: string,
       targetThreadId: string,
-      threadKey?: string,
-      options?: { transform?: boolean }
+      threadKey?: string
     ): Promise<void> {
       const thread = createAnthropicThreadManager({
         redis,
@@ -212,11 +211,7 @@ export function createAnthropicAdapter(
         key: threadKey,
         hooks: config.hooks,
       });
-      if (options?.transform) {
-        await thread.forkWithTransform(targetThreadId);
-      } else {
-        await thread.fork(targetThreadId);
-      }
+      await thread.forkWithTransform(targetThreadId);
     },
 
     async truncateThread(

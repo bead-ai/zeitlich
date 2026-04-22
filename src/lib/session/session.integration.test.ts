@@ -114,11 +114,8 @@ function createMockThreadOps() {
     appendAgentMessage: async (threadId, id, message) => {
       log.push({ op: "appendAgentMessage", args: [threadId, id, message] });
     },
-    forkThread: async (source, target, threadKey, options) => {
-      log.push({
-        op: "forkThread",
-        args: [source, target, threadKey, options ?? { transform: false }],
-      });
+    forkThread: async (source, target) => {
+      log.push({ op: "forkThread", args: [source, target] });
     },
     truncateThread: async (threadId, messageId) => {
       log.push({ op: "truncateThread", args: [threadId, messageId] });
@@ -513,42 +510,9 @@ describe("createSession integration", () => {
     const forkOps = log.filter((l) => l.op === "forkThread");
     expect(forkOps).toHaveLength(1);
     expect(at(forkOps, 0).args[0]).toBe("source-thread");
-    // transform defaults to false when not passed
-    expect(at(forkOps, 0).args[3]).toEqual({ transform: false });
 
     const systemOps = log.filter((l) => l.op === "appendSystemMessage");
     expect(systemOps).toHaveLength(0);
-  });
-
-  it("passes transform: true to forkThread when thread.transform is set", async () => {
-    const { ops, log } = createMockThreadOps();
-
-    const session = await createSession({
-      agentName: "TestAgent",
-      thread: {
-        mode: "fork",
-        threadId: "source-thread",
-        transform: true,
-      },
-      runAgent: createScriptedRunAgent([
-        { message: "continued", toolCalls: [] },
-      ]),
-      threadOps: ops,
-      buildContextMessage: () => "continue",
-    });
-
-    const stateManager = createAgentStateManager({
-      initialState: { systemPrompt: "test" },
-    });
-
-    const result = await session.runSession({ stateManager });
-
-    expect(result.exitReason).toBe("completed");
-
-    const forkOps = log.filter((l) => l.op === "forkThread");
-    expect(forkOps).toHaveLength(1);
-    expect(at(forkOps, 0).args[0]).toBe("source-thread");
-    expect(at(forkOps, 0).args[3]).toEqual({ transform: true });
   });
 
   // --- Sandbox lifecycle ---

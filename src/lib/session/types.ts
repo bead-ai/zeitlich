@@ -55,15 +55,14 @@ export interface ThreadOps<TContent = string> {
   ): Promise<void>;
   /**
    * Copy all messages from sourceThreadId into a new thread at
-   * targetThreadId. When `options.transform` is `true`, the adapter applies
-   * its `onForkPrepareThread` and/or `onForkTransform` hooks (if configured)
-   * to the forked thread before returning.
+   * targetThreadId. Adapters that have `onForkPrepareThread` and/or
+   * `onForkTransform` hooks configured apply them once to the new thread
+   * before returning.
    */
   forkThread(
     sourceThreadId: string,
     targetThreadId: string,
-    threadKey?: string,
-    options?: { transform?: boolean }
+    threadKey?: string
   ): Promise<void>;
   /**
    * Truncate the thread starting at `messageId`: that message and every

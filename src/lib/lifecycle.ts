@@ -8,14 +8,14 @@
  * - `"new"` — start a fresh thread (optionally specify its ID).
  * - `"continue"` — append directly to an existing thread in-place.
  * - `"fork"` — copy all messages from an existing thread into a new one and
- *   continue there. When `transform` is `true`, the adapter's
- *   `onForkPrepareThread` and/or `onForkTransform` hooks are applied once to
- *   the forked thread before the session starts.
+ *   continue there. When the adapter has `onForkPrepareThread` and/or
+ *   `onForkTransform` hooks configured, they are applied once to the forked
+ *   thread before the session starts.
  */
 export type ThreadInit =
   | { mode: "new"; threadId?: string }
   | { mode: "continue"; threadId: string }
-  | { mode: "fork"; threadId: string; transform?: boolean };
+  | { mode: "fork"; threadId: string };
 
 // ============================================================================
 // Sandbox lifecycle

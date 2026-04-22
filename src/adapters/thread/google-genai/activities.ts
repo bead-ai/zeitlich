@@ -213,8 +213,7 @@ export function createGoogleGenAIAdapter(
     async forkThread(
       sourceThreadId: string,
       targetThreadId: string,
-      threadKey?: string,
-      options?: { transform?: boolean }
+      threadKey?: string
     ): Promise<void> {
       const thread = createGoogleGenAIThreadManager({
         redis,
@@ -222,11 +221,7 @@ export function createGoogleGenAIAdapter(
         key: threadKey,
         hooks: config.hooks,
       });
-      if (options?.transform) {
-        await thread.forkWithTransform(targetThreadId);
-      } else {
-        await thread.fork(targetThreadId);
-      }
+      await thread.forkWithTransform(targetThreadId);
     },
 
     async truncateThread(
