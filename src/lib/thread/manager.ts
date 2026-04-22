@@ -110,17 +110,38 @@ export function createThreadManager<T>(
       return redis.llen(redisKey);
     },
 
-    async truncate(length: number): Promise<void> {
+    async truncateFromId(messageId: string): Promise<void> {
       await assertThreadExists();
-      if (length <= 0) {
+      if (!idOf) {
+        throw new Error(
+          "truncateFromId requires the thread manager to be configured with `idOf`"
+        );
+      }
+      const data = await redis.lrange(redisKey, 0, -1);
+      let idx = -1;
+      const removedIds: string[] = [];
+      for (let i = 0; i < data.length; i++) {
+        const id = idOf(deserialize(data[i]));
+        if (idx === -1 && id === messageId) idx = i;
+        if (idx !== -1) removedIds.push(id);
+      }
+      if (idx === -1) return;
+      if (idx === 0) {
         await redis.del(redisKey);
         await redis.expire(metaKey, THREAD_TTL_SECONDS);
       } else {
-        await redis.ltrim(redisKey, 0, length - 1);
+        await redis.ltrim(redisKey, 0, idx - 1);
         await redis.expire(redisKey, THREAD_TTL_SECONDS);
       }
-      // Dedup keys for removed messages are left to expire via their TTL.
-      // Post-truncate appends use fresh ids so collisions do not occur in practice.
+      // Clear dedup markers for the removed messages so that a rewind
+      // retry which reuses the same ids (e.g. the same assistantId) can
+      // re-append without the idempotent-append Lua script treating it
+      // as a duplicate.
+      if (removedIds.length > 0) {
+        await redis.del(
+          ...removedIds.map((id) => getThreadKey(threadId, `dedup:${id}`))
+        );
+      }
     },
   };
 }
