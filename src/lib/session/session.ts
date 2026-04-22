@@ -366,7 +366,10 @@ export async function createSession<
 
       // --- Thread lifecycle: new, continue, or fork ----------------------
       if (threadMode === "fork" && sourceThreadId) {
-        await forkThread(sourceThreadId, threadId, threadKey);
+        const transform =
+          (threadInit as { mode: "fork"; transform?: boolean }).transform ===
+          true;
+        await forkThread(sourceThreadId, threadId, threadKey, { transform });
       } else if (threadMode === "continue") {
         // "continue" — thread already exists, just append the new message
       } else {

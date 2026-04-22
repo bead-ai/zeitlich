@@ -49,6 +49,12 @@ export interface LangChainThreadManager extends ProviderThreadManager<
   LangChainSystemContent
 > {
   appendAIMessage(id: string, content: string | MessageContent): Promise<void>;
+  /**
+   * Fork this thread into `newThreadId` and apply the adapter's fork-time
+   * hooks (`onForkPrepareThread` then `onForkTransform`) to the new thread.
+   * If neither hook is configured, this is equivalent to {@link fork}.
+   */
+  forkWithTransform(newThreadId: string): Promise<LangChainThreadManager>;
   prepareForInvocation(): Promise<LangChainInvocationPayload>;
 }
 
@@ -111,6 +117,29 @@ export function createLangChainThreadManager(
       await base.append([
         new AIMessage({ id, content: content as MessageContent }).toDict(),
       ]);
+    },
+
+    async forkWithTransform(
+      newThreadId: string
+    ): Promise<LangChainThreadManager> {
+      const forked = createLangChainThreadManager({
+        ...config,
+        threadId: newThreadId,
+      });
+      await base.fork(newThreadId);
+      const { onForkPrepareThread, onForkTransform } = config.hooks ?? {};
+      if (!onForkPrepareThread && !onForkTransform) {
+        return forked;
+      }
+      let next = await forked.load();
+      if (onForkPrepareThread) {
+        next = await onForkPrepareThread(next);
+      }
+      if (onForkTransform) {
+        next = next.map((msg, i) => onForkTransform(msg, i, next));
+      }
+      await forked.replaceAll(next);
+      return forked;
     },
 
     async appendToolResult(

@@ -186,14 +186,20 @@ export function createLangChainAdapter(
     async forkThread(
       sourceThreadId: string,
       targetThreadId: string,
-      threadKey?: string
+      threadKey?: string,
+      options?: { transform?: boolean }
     ): Promise<void> {
       const thread = createLangChainThreadManager({
         redis,
         threadId: sourceThreadId,
         key: threadKey,
+        hooks: config.hooks,
       });
-      await thread.fork(targetThreadId);
+      if (options?.transform) {
+        await thread.forkWithTransform(targetThreadId);
+      } else {
+        await thread.fork(targetThreadId);
+      }
     },
 
     async truncateThread(

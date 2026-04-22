@@ -101,6 +101,30 @@ export function createThreadManager<T>(
       return forked;
     },
 
+    async replaceAll(messages: T[]): Promise<void> {
+      await assertThreadExists();
+      if (!idOf) {
+        throw new Error(
+          "replaceAll requires the thread manager to be configured with `idOf`"
+        );
+      }
+      const existing = await redis.lrange(redisKey, 0, -1);
+      const existingIds = existing
+        .map((raw) => idOf(deserialize(raw)))
+        .filter((id): id is string => typeof id === "string");
+      await redis.del(redisKey);
+      if (existingIds.length > 0) {
+        await redis.del(
+          ...existingIds.map((id) => getThreadKey(threadId, `dedup:${id}`))
+        );
+      }
+      if (messages.length > 0) {
+        await redis.rpush(redisKey, ...messages.map(serialize));
+        await redis.expire(redisKey, THREAD_TTL_SECONDS);
+      }
+      await redis.expire(metaKey, THREAD_TTL_SECONDS);
+    },
+
     async delete(): Promise<void> {
       await redis.del(redisKey, metaKey);
     },

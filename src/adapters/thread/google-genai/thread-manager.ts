@@ -47,6 +47,12 @@ export interface GoogleGenAIThreadManager extends ProviderThreadManager<
   GoogleGenAISystemContent
 > {
   appendModelContent(id: string, parts: Part[]): Promise<void>;
+  /**
+   * Fork this thread into `newThreadId` and apply the adapter's fork-time
+   * hooks (`onForkPrepareThread` then `onForkTransform`) to the new thread.
+   * If neither hook is configured, this is equivalent to {@link fork}.
+   */
+  forkWithTransform(newThreadId: string): Promise<GoogleGenAIThreadManager>;
   prepareForInvocation(): Promise<GoogleGenAIInvocationPayload>;
 }
 
@@ -142,6 +148,29 @@ export function createGoogleGenAIThreadManager(
           content: { role: "model", parts },
         },
       ]);
+    },
+
+    async forkWithTransform(
+      newThreadId: string
+    ): Promise<GoogleGenAIThreadManager> {
+      const forked = createGoogleGenAIThreadManager({
+        ...config,
+        threadId: newThreadId,
+      });
+      await base.fork(newThreadId);
+      const { onForkPrepareThread, onForkTransform } = config.hooks ?? {};
+      if (!onForkPrepareThread && !onForkTransform) {
+        return forked;
+      }
+      let next = await forked.load();
+      if (onForkPrepareThread) {
+        next = await onForkPrepareThread(next);
+      }
+      if (onForkTransform) {
+        next = next.map((msg, i) => onForkTransform(msg, i, next));
+      }
+      await forked.replaceAll(next);
+      return forked;
     },
 
     async appendToolResult(
