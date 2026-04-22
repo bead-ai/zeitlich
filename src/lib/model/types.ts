@@ -8,16 +8,6 @@ export interface AgentResponse<M = unknown> {
   message: M;
   rawToolCalls: RawToolCall[];
   usage?: TokenUsage;
-  /**
-   * Number of stored messages in the thread at the moment the LLM was
-   * invoked — i.e. *before* the assistant message is appended. The
-   * session uses this as a rewind snapshot so it can roll the thread
-   * back to this exact state if a tool requests a rewind.
-   *
-   * Adapters compute this for free from the array of stored messages
-   * they load when preparing the payload.
-   */
-  threadLengthAtCall?: number;
 }
 
 /**

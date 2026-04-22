@@ -92,6 +92,18 @@ export interface RunAgentConfig extends AgentConfig {
   threadKey?: string;
   /** Metadata for the session */
   metadata?: Record<string, unknown>;
+  /**
+   * The id under which the assistant message produced by this call will
+   * be appended. The activity truncates the thread from this id on
+   * entry (no-op on the first attempt) so that:
+   *
+   * - Rewind retries can reuse the same id and the previous (bad)
+   *   assistant + its tool results are wiped before the retry LLM call.
+   * - Resetting the Temporal workflow to this activity restores the
+   *   pre-call thread state: replay re-truncates, re-invokes, and
+   *   appends under the same id.
+   */
+  assistantMessageId: string;
 }
 
 /**
