@@ -194,7 +194,7 @@ export function createLangChainAdapter(
         key: threadKey,
         hooks: config.hooks,
       });
-      await thread.forkWithTransform(targetThreadId);
+      await thread.fork(targetThreadId);
     },
 
     async truncateThread(

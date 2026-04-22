@@ -78,7 +78,7 @@ async function seed(
   await tm.append(messages);
 }
 
-describe("LangChain forkWithTransform", () => {
+describe("LangChain fork + transform hooks", () => {
   it("falls back to plain fork when no hooks are set", async () => {
     const redis = createStatefulRedis();
     await seed(redis, "src", [humanMsg, aiMsg]);
@@ -87,7 +87,7 @@ describe("LangChain forkWithTransform", () => {
       redis: redis as never,
       threadId: "src",
     });
-    const forked = await tm.forkWithTransform("dst");
+    const forked = await tm.fork("dst");
     expect(await forked.load()).toEqual([humanMsg, aiMsg]);
   });
 
@@ -111,7 +111,7 @@ describe("LangChain forkWithTransform", () => {
       },
     });
 
-    const forked = await tm.forkWithTransform("dst");
+    const forked = await tm.fork("dst");
     const loaded = await forked.load();
 
     expect(order).toEqual(["prepare", "transform", "transform"]);
@@ -135,7 +135,7 @@ describe("LangChain forkWithTransform", () => {
       },
     });
 
-    await tm.forkWithTransform("dst");
+    await tm.fork("dst");
     expect(await tm.load()).toEqual([humanMsg, aiMsg]);
   });
 });

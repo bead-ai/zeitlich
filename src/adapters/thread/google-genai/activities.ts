@@ -221,7 +221,7 @@ export function createGoogleGenAIAdapter(
         key: threadKey,
         hooks: config.hooks,
       });
-      await thread.forkWithTransform(targetThreadId);
+      await thread.fork(targetThreadId);
     },
 
     async truncateThread(

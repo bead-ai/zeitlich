@@ -99,7 +99,7 @@ async function seedSource(
   await tm.append(messages);
 }
 
-describe("Anthropic forkWithTransform", () => {
+describe("Anthropic fork + transform hooks", () => {
   it("behaves like fork when neither onFork hook is configured", async () => {
     const redis = createStatefulRedis();
     await seedSource(redis, "src", [userMsg, assistantMsg]);
@@ -108,7 +108,7 @@ describe("Anthropic forkWithTransform", () => {
       redis: redis as never,
       threadId: "src",
     });
-    const forked = await tm.forkWithTransform("dst");
+    const forked = await tm.fork("dst");
     const loaded = await forked.load();
 
     expect(loaded).toEqual([userMsg, assistantMsg]);
@@ -151,7 +151,7 @@ describe("Anthropic forkWithTransform", () => {
       threadId: "src",
       hooks: { onForkTransform },
     });
-    const forked = await tm.forkWithTransform("dst");
+    const forked = await tm.fork("dst");
     const loaded = await forked.load();
 
     expect(onForkTransform).toHaveBeenCalledTimes(3);
@@ -200,7 +200,7 @@ describe("Anthropic forkWithTransform", () => {
       threadId: "src",
       hooks: { onForkPrepareThread },
     });
-    const forked = await tm.forkWithTransform("dst");
+    const forked = await tm.fork("dst");
     const loaded = await forked.load();
 
     expect(onForkPrepareThread).toHaveBeenCalledTimes(1);
@@ -245,7 +245,7 @@ describe("Anthropic forkWithTransform", () => {
       threadId: "src",
       hooks: { onForkPrepareThread, onForkTransform },
     });
-    const forked = await tm.forkWithTransform("dst");
+    const forked = await tm.fork("dst");
     const loaded = await forked.load();
 
     // prepare runs once, transform once per survivor.
@@ -278,7 +278,7 @@ describe("Anthropic forkWithTransform", () => {
       threadId: "src",
       hooks: { onForkTransform },
     });
-    await tm.forkWithTransform("dst");
+    await tm.fork("dst");
 
     // After replaceAll, dedup markers from the pre-replacement writes must be
     // gone — otherwise an append with the same id would be silently skipped.

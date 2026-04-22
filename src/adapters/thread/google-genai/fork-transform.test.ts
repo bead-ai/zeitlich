@@ -82,7 +82,7 @@ async function seed(
   await tm.append(messages);
 }
 
-describe("Google GenAI forkWithTransform", () => {
+describe("Google GenAI fork + transform hooks", () => {
   it("falls back to plain fork when no hooks are set", async () => {
     const redis = createStatefulRedis();
     await seed(redis, "src", [userContent, modelContent]);
@@ -91,7 +91,7 @@ describe("Google GenAI forkWithTransform", () => {
       redis: redis as never,
       threadId: "src",
     });
-    const forked = await tm.forkWithTransform("dst");
+    const forked = await tm.fork("dst");
     expect(await forked.load()).toEqual([userContent, modelContent]);
   });
 
@@ -118,7 +118,7 @@ describe("Google GenAI forkWithTransform", () => {
       },
     });
 
-    const forked = await tm.forkWithTransform("dst");
+    const forked = await tm.fork("dst");
     const loaded = await forked.load();
 
     expect(order).toEqual(["prepare", "transform", "transform"]);
@@ -142,7 +142,7 @@ describe("Google GenAI forkWithTransform", () => {
       },
     });
 
-    await tm.forkWithTransform("dst");
+    await tm.fork("dst");
     expect(await tm.load()).toEqual([userContent, modelContent]);
   });
 });
