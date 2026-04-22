@@ -34,6 +34,15 @@ export interface BaseThreadManager<T> {
    * forks — each call creates an independent copy.
    */
   fork(newThreadId: string): Promise<BaseThreadManager<T>>;
+  /**
+   * Atomically replace the entire contents of the thread with `messages`.
+   * The existing list is cleared, the new messages are appended in order,
+   * and dedup markers from prior appends are cleared so future idempotent
+   * appends with ids that were removed aren't silently skipped.
+   *
+   * Requires the thread manager to be configured with `idOf`.
+   */
+  replaceAll(messages: T[]): Promise<void>;
   /** Delete the thread */
   delete(): Promise<void>;
   /** Get the number of stored messages currently in the thread */
@@ -89,6 +98,27 @@ export interface ThreadManagerHooks<TStored, TPrepared = TStored> {
     index: number,
     messages: readonly TPrepared[]
   ) => TPrepared;
+  /**
+   * One-shot list-level pre-pass applied once when a thread is forked with
+   * `transform: true`. Runs before {@link onForkTransform}. May filter,
+   * compact, prepend, or otherwise rewrite the whole forked thread — so the
+   * returned length need not match the input length. Async, so implementations
+   * may call an LLM or other I/O.
+   */
+  onForkPrepareThread?: (
+    messages: readonly TStored[]
+  ) => TStored[] | Promise<TStored[]>;
+  /**
+   * Per-message final pass applied once when a thread is forked with
+   * `transform: true`. Runs after {@link onForkPrepareThread}. Pure 1:1 map —
+   * must return a value for every input message; length cannot change. Same
+   * shape as {@link onPreparedMessage}.
+   */
+  onForkTransform?: (
+    message: TStored,
+    index: number,
+    messages: readonly TStored[]
+  ) => TStored;
 }
 
 export interface ProviderThreadManager<

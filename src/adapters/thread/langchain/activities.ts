@@ -192,6 +192,7 @@ export function createLangChainAdapter(
         redis,
         threadId: sourceThreadId,
         key: threadKey,
+        hooks: config.hooks,
       });
       await thread.fork(targetThreadId);
     },

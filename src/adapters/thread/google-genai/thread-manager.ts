@@ -200,5 +200,31 @@ export function createGoogleGenAIThreadManager(
     },
   };
 
-  return Object.assign(base, helpers);
+  const manager = Object.assign(base, helpers);
+
+  const originalFork = manager.fork.bind(manager);
+  manager.fork = async (
+    newThreadId: string
+  ): Promise<GoogleGenAIThreadManager> => {
+    await originalFork(newThreadId);
+    const forked = createGoogleGenAIThreadManager({
+      ...config,
+      threadId: newThreadId,
+    });
+    const { onForkPrepareThread, onForkTransform } = config.hooks ?? {};
+    if (!onForkPrepareThread && !onForkTransform) {
+      return forked;
+    }
+    let next = await forked.load();
+    if (onForkPrepareThread) {
+      next = await onForkPrepareThread(next);
+    }
+    if (onForkTransform) {
+      next = next.map((msg, i) => onForkTransform(msg, i, next));
+    }
+    await forked.replaceAll(next);
+    return forked;
+  };
+
+  return manager;
 }

@@ -53,7 +53,12 @@ export interface ThreadOps<TContent = string> {
     content: unknown,
     threadKey?: string
   ): Promise<void>;
-  /** Copy all messages from sourceThreadId into a new thread at targetThreadId */
+  /**
+   * Copy all messages from sourceThreadId into a new thread at
+   * targetThreadId. Adapters that have `onForkPrepareThread` and/or
+   * `onForkTransform` hooks configured apply them once to the new thread
+   * before returning.
+   */
   forkThread(
     sourceThreadId: string,
     targetThreadId: string,
