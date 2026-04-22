@@ -121,7 +121,9 @@ export function createThreadManager<T>(
       let idx = -1;
       const removedIds: string[] = [];
       for (let i = 0; i < data.length; i++) {
-        const id = idOf(deserialize(data[i]));
+        const raw = data[i];
+        if (raw === undefined) continue;
+        const id = idOf(deserialize(raw));
         if (idx === -1 && id === messageId) idx = i;
         if (idx !== -1) removedIds.push(id);
       }

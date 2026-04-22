@@ -146,7 +146,6 @@ export async function createSession<
     appendSystemMessage,
     appendAgentMessage,
     forkThread,
-    truncateThread,
   } = threadOps;
 
   const plugins: ToolMap[string][] = [];
@@ -397,6 +396,13 @@ export async function createSession<
       let finalMessage: M | null = null;
 
       try {
+        // Per-turn assistant message id. Pre-generated in the workflow
+        // so the runAgent activity can truncate the thread from this id
+        // on entry (deterministic rewind + time-travel via Temporal
+        // workflow reset). On a rewind retry we keep the same id so the
+        // prior attempt's assistant + tool results are wiped by the next
+        // runAgent call.
+        let assistantId: string | undefined;
         while (
           stateManager.isRunning() &&
           !stateManager.isTerminal() &&
@@ -409,25 +415,17 @@ export async function createSession<
 
           stateManager.setTools(toolRouter.getToolDefinitions());
 
-          const {
-            message,
-            rawToolCalls,
-            usage,
-            threadLengthAtCall,
-          } = await runAgent({
+          assistantId ??= uuid4();
+
+          const { message, rawToolCalls, usage } = await runAgent({
             threadId,
             threadKey,
             agentName,
             metadata,
+            assistantMessageId: assistantId,
           });
 
-          // The invoker loaded the thread right before calling the LLM,
-          // so it already knows how many messages were stored at that
-          // point — we use that directly as the rewind snapshot instead
-          // of a separate activity round-trip.
-          const preAssistantLength = threadLengthAtCall;
-
-          await appendAgentMessage(threadId, uuid4(), message, threadKey);
+          await appendAgentMessage(threadId, assistantId, message, threadKey);
 
           if (usage) {
             stateManager.updateUsage(usage);
@@ -488,23 +486,18 @@ export async function createSession<
               toolCallId: rewind.toolCallId,
               toolName: rewind.toolName,
             });
-            if (preAssistantLength === undefined) {
-              throw ApplicationFailure.create({
-                message:
-                  "Rewind requested but runAgent did not report " +
-                  "`threadLengthAtCall`; the adapter must populate it to " +
-                  "support rewinds.",
-                nonRetryable: true,
-              });
-            }
-            // Drop the assistant message + any already-saved tool results
-            // so the LLM call can be retried from the pre-assistant state.
-            // The turn counter is intentionally NOT rolled back — each
+            // Keep the same assistantId for the retry. The next
+            // runAgent call will call truncateFromId(assistantId) on
+            // entry, wiping the bad assistant message + any already
+            // appended tool results before re-invoking the LLM. The
+            // turn counter is intentionally NOT rolled back — each
             // rewind still consumes one of the `maxTurns` budget so a
             // misbehaving tool cannot spin the session forever.
-            await truncateThread(threadId, preAssistantLength, threadKey);
             continue;
           }
+
+          // Turn committed: fresh id for the next turn.
+          assistantId = undefined;
 
           if (stateManager.getStatus() === "WAITING_FOR_INPUT") {
             const conditionMet = await condition(
