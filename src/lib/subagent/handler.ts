@@ -25,6 +25,22 @@ import type {
 import type { SandboxOps, SandboxSnapshot } from "../sandbox/types";
 import { childSandboxReadySignal } from "./signals";
 
+/**
+ * Default `workflowRunTimeout` applied to every subagent child workflow
+ * unless overridden via `SubagentConfig.workflowOptions.workflowRunTimeout`.
+ *
+ * Chosen as a safety bound: Temporal retries failing workflow tasks forever
+ * by default, so a child that fails to initialize (e.g. missing workflow
+ * export) or is otherwise broken will never reach a terminal state on its
+ * own and the parent's `Subagent` tool call would hang indefinitely. A
+ * bounded run timeout guarantees the child is eventually terminated and the
+ * parent receives a structured `ChildWorkflowFailure` it can surface to the
+ * agent. One hour is generous enough for realistic agent sessions while
+ * still catching hangs; agents that legitimately need longer should set an
+ * explicit `workflowOptions.workflowRunTimeout`.
+ */
+export const DEFAULT_SUBAGENT_WORKFLOW_RUN_TIMEOUT = "1h";
+
 /** Normalized sandbox config after resolving the union. */
 interface ResolvedSandboxConfig {
   source: "none" | "inherit" | "own";
@@ -333,6 +349,11 @@ export function createSubagentHandler<
           : config.context;
 
     const childOpts = {
+      // Apply a bounded run timeout by default so a child workflow that
+      // fails to initialize or otherwise never reaches a terminal state
+      // cannot hang the parent's `Subagent` tool call forever. Callers can
+      // raise, lower, or disable it via `workflowOptions.workflowRunTimeout`.
+      workflowRunTimeout: DEFAULT_SUBAGENT_WORKFLOW_RUN_TIMEOUT,
       ...(config.workflowOptions ?? {}),
       workflowId: childWorkflowId,
       args:

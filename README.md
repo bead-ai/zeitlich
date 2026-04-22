@@ -484,7 +484,9 @@ The `Subagent` tool is automatically added when subagents are configured, allowi
 
 #### Child workflow timeouts
 
-You can forward any `ChildWorkflowOptions` to a subagent's underlying `executeChild` call via the `workflowOptions` field on `defineSubagent`. This is the recommended place to configure a `workflowRunTimeout` (and/or `workflowExecutionTimeout`), which guarantees that a child which fails to initialize or repeatedly fails workflow tasks is eventually terminated by the Temporal server — otherwise the parent's `Subagent` tool call can hang indefinitely waiting for a result that will never arrive.
+Every subagent child workflow runs with a default `workflowRunTimeout` of `1h` (exported as `DEFAULT_SUBAGENT_WORKFLOW_RUN_TIMEOUT`). This is a safety bound: without it, a child that fails to initialize or repeatedly fails workflow tasks is retried forever by Temporal and the parent's `Subagent` tool call would hang indefinitely. With it, Temporal eventually terminates the child and the parent receives a structured `ChildWorkflowFailure` which the tool router surfaces to the LLM through the normal failure-hook pipeline (`onPostToolUseFailure`, per-subagent `onExecutionFailure`).
+
+You can override the default — or set any other `ChildWorkflowOptions` — via the `workflowOptions` field:
 
 ```typescript
 export const researcherSubagent = defineSubagent(researcherWorkflow, {
@@ -495,8 +497,6 @@ export const researcherSubagent = defineSubagent(researcherWorkflow, {
   },
 });
 ```
-
-When Temporal terminates a child, the parent's call rejects with a `ChildWorkflowFailure`, which the tool router surfaces to the LLM through the normal failure-hook pipeline (`onPostToolUseFailure`, per-subagent `onExecutionFailure`).
 
 `workflowId`, `taskQueue`, and `args` are managed by the subagent handler itself and cannot be overridden via `workflowOptions` — use the top-level `taskQueue` field on `SubagentConfig` to route a subagent to a different task queue.
 

@@ -57,7 +57,11 @@ export {
   hasNoOtherToolCalls,
   defineTool,
 } from "./lib/tool-router";
-export { defineSubagent, defineSubagentWorkflow } from "./lib/subagent";
+export {
+  defineSubagent,
+  defineSubagentWorkflow,
+  DEFAULT_SUBAGENT_WORKFLOW_RUN_TIMEOUT,
+} from "./lib/subagent";
 export type {
   // Tool definition types
   ToolDefinition,
@@ -153,6 +157,7 @@ export { proxyRunAgent } from "./lib/model/proxy";
 // Subagent types
 export type {
   SubagentConfig,
+  SubagentChildWorkflowOptions,
   SubagentDefinition,
   SubagentFnResult,
   SubagentHooks,

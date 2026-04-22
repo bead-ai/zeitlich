@@ -1871,6 +1871,55 @@ describe("createSubagentHandler", () => {
     ).rejects.toThrow("Child Workflow execution failed: timeout");
   });
 
+  it("applies a default workflowRunTimeout when workflowOptions is omitted", async () => {
+    const { executeChild } = await import("@temporalio/workflow");
+    const execMock = executeChild as ReturnType<typeof vi.fn>;
+
+    const { DEFAULT_SUBAGENT_WORKFLOW_RUN_TIMEOUT } = await import("./handler");
+
+    const { handler } = createSubagentHandler([
+      {
+        agentName: "researcher",
+        description: "Researches topics",
+        workflow: mockWorkflow("researcherWorkflow"),
+      },
+    ]);
+
+    await handler(
+      { subagent: "researcher", description: "test", prompt: "hi" },
+      { threadId: "t", toolCallId: "tc", toolName: "Subagent" }
+    );
+
+    const lastCall = execMock.mock.calls[execMock.mock.calls.length - 1];
+    if (!lastCall) throw new Error("expected executeChild call");
+    expect(lastCall[1].workflowRunTimeout).toBe(
+      DEFAULT_SUBAGENT_WORKFLOW_RUN_TIMEOUT
+    );
+  });
+
+  it("lets workflowOptions.workflowRunTimeout override the default", async () => {
+    const { executeChild } = await import("@temporalio/workflow");
+    const execMock = executeChild as ReturnType<typeof vi.fn>;
+
+    const { handler } = createSubagentHandler([
+      {
+        agentName: "researcher",
+        description: "Researches topics",
+        workflow: mockWorkflow("researcherWorkflow"),
+        workflowOptions: { workflowRunTimeout: "30s" },
+      },
+    ]);
+
+    await handler(
+      { subagent: "researcher", description: "test", prompt: "hi" },
+      { threadId: "t", toolCallId: "tc", toolName: "Subagent" }
+    );
+
+    const lastCall = execMock.mock.calls[execMock.mock.calls.length - 1];
+    if (!lastCall) throw new Error("expected executeChild call");
+    expect(lastCall[1].workflowRunTimeout).toBe("30s");
+  });
+
   it("forwards workflowOptions to executeChild", async () => {
     const { executeChild } = await import("@temporalio/workflow");
     const execMock = executeChild as ReturnType<typeof vi.fn>;
