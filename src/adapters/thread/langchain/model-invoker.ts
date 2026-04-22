@@ -47,7 +47,8 @@ export function createLangChainModelInvoker<
   return async function invokeLangChainModel(
     config: ModelInvokerConfig
   ): Promise<AgentResponse<StoredMessage>> {
-    const { threadId, threadKey, agentName, state, metadata } = config;
+    const { threadId, threadKey, agentName, state, metadata, assistantMessageId } =
+      config;
     const { heartbeat, signal } = getActivityContext();
 
     const thread = createLangChainThreadManager({
@@ -58,7 +59,12 @@ export function createLangChainModelInvoker<
     });
     const runId = uuidv4();
 
-    const { messages, storedLength } = await thread.prepareForInvocation();
+    // Truncate the thread starting at the id the assistant message
+    // will be stored under. No-op on the first attempt; on rewind
+    // retry / Temporal reset it wipes the prior attempt's assistant
+    // + tool results so the LLM sees the original pre-call state.
+    await thread.truncateFromId(assistantMessageId);
+    const { messages } = await thread.prepareForInvocation();
 
     const heartbeatInterval = heartbeat
       ? setInterval(() => heartbeat(), 30_000)
@@ -97,7 +103,6 @@ export function createLangChainModelInvoker<
             response.usage_metadata?.input_token_details?.cache_read ||
             (providerUsage.cacheReadInputTokens as number | undefined),
         },
-        threadLengthAtCall: storedLength,
       };
     } finally {
       if (heartbeatInterval) clearInterval(heartbeatInterval);

@@ -29,6 +29,13 @@ export interface ModelInvokerConfig {
   agentName: string;
   state: BaseAgentState;
   metadata?: Record<string, unknown>;
+  /**
+   * The id the assistant message produced by this call will be stored
+   * under. Invokers truncate the thread from this id on entry so that
+   * rewind retries and Temporal workflow resets restore the pre-call
+   * state before re-invoking the LLM. See {@link RunAgentConfig}.
+   */
+  assistantMessageId: string;
 }
 
 /**

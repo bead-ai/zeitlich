@@ -61,7 +61,7 @@ export function createAnthropicModelInvoker({
   return async function invokeAnthropicModel(
     config: ModelInvokerConfig
   ): Promise<AgentResponse<Anthropic.Messages.Message>> {
-    const { threadId, threadKey, state } = config;
+    const { threadId, threadKey, state, assistantMessageId } = config;
     const { heartbeat, signal } = getActivityContext();
 
     const thread = createAnthropicThreadManager({
@@ -70,8 +70,13 @@ export function createAnthropicModelInvoker({
       key: threadKey,
       hooks,
     });
-    const { messages, system, storedLength } =
-      await thread.prepareForInvocation();
+    // Truncate the thread starting at the id the assistant message
+    // will be stored under. On the happy path this is a no-op; on a
+    // rewind retry or a Temporal workflow reset it wipes the prior
+    // attempt's assistant + tool results so the LLM sees the same
+    // pre-call state that it saw originally.
+    await thread.truncateFromId(assistantMessageId);
+    const { messages, system } = await thread.prepareForInvocation();
 
     const anthropicTools = toAnthropicTools(state.tools);
     const tools = anthropicTools.length > 0 ? anthropicTools : undefined;
@@ -111,7 +116,6 @@ export function createAnthropicModelInvoker({
           response.usage.cache_creation_input_tokens ?? undefined,
         cachedReadTokens: response.usage.cache_read_input_tokens ?? undefined,
       },
-      threadLengthAtCall: storedLength,
     };
   };
 }

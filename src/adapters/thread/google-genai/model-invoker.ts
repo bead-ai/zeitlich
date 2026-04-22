@@ -64,7 +64,7 @@ export function createGoogleGenAIModelInvoker({
   return async function invokeGoogleGenAIModel(
     config: ModelInvokerConfig
   ): Promise<AgentResponse<Content>> {
-    const { threadId, threadKey, state } = config;
+    const { threadId, threadKey, state, assistantMessageId } = config;
     const { heartbeat, signal } = getActivityContext();
 
     const thread = createGoogleGenAIThreadManager({
@@ -73,7 +73,12 @@ export function createGoogleGenAIModelInvoker({
       key: threadKey,
       hooks,
     });
-    const { contents, systemInstruction, storedLength } =
+    // Truncate the thread starting at the id the assistant message
+    // will be stored under. No-op on the first attempt; on rewind
+    // retry / Temporal reset it wipes the prior attempt's assistant
+    // + tool results so the LLM sees the original pre-call state.
+    await thread.truncateFromId(assistantMessageId);
+    const { contents, systemInstruction } =
       await thread.prepareForInvocation();
 
     const functionDeclarations = toFunctionDeclarations(state.tools);
@@ -117,7 +122,6 @@ export function createGoogleGenAIModelInvoker({
         outputTokens: lastChunk.usageMetadata?.candidatesTokenCount,
         cachedReadTokens: lastChunk.usageMetadata?.cachedContentTokenCount,
       },
-      threadLengthAtCall: storedLength,
     };
   };
 }

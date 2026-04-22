@@ -39,8 +39,6 @@ export interface LangChainThreadManagerConfig {
 /** Prepared payload ready to send to a LangChain chat model */
 export interface LangChainInvocationPayload {
   messages: BaseMessage[];
-  /** Number of stored messages loaded from Redis before preparation. */
-  storedLength: number;
 }
 
 /** Thread manager with LangChain StoredMessage convenience helpers */
@@ -141,7 +139,6 @@ export function createLangChainThreadManager(
         messages: onPreparedMessage
           ? messages.map((msg, i) => onPreparedMessage(msg, i, messages))
           : messages,
-        storedLength: stored.length,
       };
     },
   };
