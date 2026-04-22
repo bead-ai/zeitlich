@@ -1,4 +1,5 @@
 export type {
+  SubagentChildWorkflowOptions,
   SubagentConfig,
   SubagentContext,
   SubagentDefinition,
@@ -13,7 +14,10 @@ export type {
 } from "./types";
 export { createSubagentTool, SUBAGENT_TOOL_NAME } from "./tool";
 export type { SubagentArgs } from "./tool";
-export { createSubagentHandler } from "./handler";
+export {
+  createSubagentHandler,
+  DEFAULT_SUBAGENT_WORKFLOW_RUN_TIMEOUT,
+} from "./handler";
 export { defineSubagent } from "./define";
 export { defineSubagentWorkflow } from "./workflow";
 export { buildSubagentRegistration } from "./register";

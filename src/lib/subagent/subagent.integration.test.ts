@@ -1843,6 +1843,195 @@ describe("createSubagentHandler", () => {
 
     expect(opsMock.deleteSandboxSnapshot).not.toHaveBeenCalled();
   });
+
+  // -------------------------------------------------------------------------
+  // Child workflow failure propagation
+  // -------------------------------------------------------------------------
+
+  it("propagates executeChild failure to the caller instead of hanging", async () => {
+    const { executeChild } = await import("@temporalio/workflow");
+    const execMock = executeChild as ReturnType<typeof vi.fn>;
+    execMock.mockImplementationOnce(async () => {
+      throw new Error("Child Workflow execution failed: timeout");
+    });
+
+    const { handler } = createSubagentHandler([
+      {
+        agentName: "researcher",
+        description: "Researches topics",
+        workflow: mockWorkflow("researcherWorkflow"),
+      },
+    ]);
+
+    await expect(
+      handler(
+        { subagent: "researcher", description: "test", prompt: "hi" },
+        { threadId: "t", toolCallId: "tc", toolName: "Subagent" }
+      )
+    ).rejects.toThrow("Child Workflow execution failed: timeout");
+  });
+
+  it("applies a default workflowRunTimeout when workflowOptions is omitted", async () => {
+    const { executeChild } = await import("@temporalio/workflow");
+    const execMock = executeChild as ReturnType<typeof vi.fn>;
+
+    const { DEFAULT_SUBAGENT_WORKFLOW_RUN_TIMEOUT } = await import("./handler");
+
+    const { handler } = createSubagentHandler([
+      {
+        agentName: "researcher",
+        description: "Researches topics",
+        workflow: mockWorkflow("researcherWorkflow"),
+      },
+    ]);
+
+    await handler(
+      { subagent: "researcher", description: "test", prompt: "hi" },
+      { threadId: "t", toolCallId: "tc", toolName: "Subagent" }
+    );
+
+    const lastCall = execMock.mock.calls[execMock.mock.calls.length - 1];
+    if (!lastCall) throw new Error("expected executeChild call");
+    expect(lastCall[1].workflowRunTimeout).toBe(
+      DEFAULT_SUBAGENT_WORKFLOW_RUN_TIMEOUT
+    );
+  });
+
+  it("lets workflowOptions.workflowRunTimeout override the default", async () => {
+    const { executeChild } = await import("@temporalio/workflow");
+    const execMock = executeChild as ReturnType<typeof vi.fn>;
+
+    const { handler } = createSubagentHandler([
+      {
+        agentName: "researcher",
+        description: "Researches topics",
+        workflow: mockWorkflow("researcherWorkflow"),
+        workflowOptions: { workflowRunTimeout: "30s" },
+      },
+    ]);
+
+    await handler(
+      { subagent: "researcher", description: "test", prompt: "hi" },
+      { threadId: "t", toolCallId: "tc", toolName: "Subagent" }
+    );
+
+    const lastCall = execMock.mock.calls[execMock.mock.calls.length - 1];
+    if (!lastCall) throw new Error("expected executeChild call");
+    expect(lastCall[1].workflowRunTimeout).toBe("30s");
+  });
+
+  it("forwards workflowOptions to executeChild", async () => {
+    const { executeChild } = await import("@temporalio/workflow");
+    const execMock = executeChild as ReturnType<typeof vi.fn>;
+
+    const { handler } = createSubagentHandler([
+      {
+        agentName: "researcher",
+        description: "Researches topics",
+        workflow: mockWorkflow("researcherWorkflow"),
+        workflowOptions: {
+          workflowRunTimeout: "5m",
+          workflowTaskTimeout: "30s",
+          retry: { maximumAttempts: 1 },
+        },
+      },
+    ]);
+
+    await handler(
+      { subagent: "researcher", description: "test", prompt: "hi" },
+      { threadId: "t", toolCallId: "tc", toolName: "Subagent" }
+    );
+
+    const lastCall = execMock.mock.calls[execMock.mock.calls.length - 1];
+    if (!lastCall) throw new Error("expected executeChild call");
+    expect(lastCall[1]).toMatchObject({
+      workflowRunTimeout: "5m",
+      workflowTaskTimeout: "30s",
+      retry: { maximumAttempts: 1 },
+    });
+  });
+
+  it("does not let workflowOptions override workflowId, taskQueue, or args", async () => {
+    const { executeChild } = await import("@temporalio/workflow");
+    const execMock = executeChild as ReturnType<typeof vi.fn>;
+
+    const { handler } = createSubagentHandler([
+      {
+        agentName: "researcher",
+        description: "Researches topics",
+        workflow: mockWorkflow("researcherWorkflow"),
+        taskQueue: "my-queue",
+        workflowOptions: {
+          // Intentionally violates the public Omit<> type to prove the
+          // handler still wins at runtime. Cast removes the type error.
+          ...({
+            workflowId: "forbidden-id",
+            taskQueue: "forbidden-queue",
+            args: ["forbidden"],
+          } as Record<string, unknown>),
+        },
+      },
+    ]);
+
+    await handler(
+      { subagent: "researcher", description: "test", prompt: "hello" },
+      { threadId: "t", toolCallId: "tc", toolName: "Subagent" }
+    );
+
+    const lastCall = execMock.mock.calls[execMock.mock.calls.length - 1];
+    if (!lastCall) throw new Error("expected executeChild call");
+    expect(lastCall[1].workflowId).not.toBe("forbidden-id");
+    expect(lastCall[1].workflowId).toMatch(/^researcher-/);
+    expect(lastCall[1].taskQueue).toBe("my-queue");
+    expect(lastCall[1].args[0]).toBe("hello");
+  });
+
+  it("clears lazy-creator bookkeeping on failure so the next call can re-try", async () => {
+    const opsMock = makeMockSandboxOps();
+    const { executeChild } = await import("@temporalio/workflow");
+    const execMock = executeChild as ReturnType<typeof vi.fn>;
+
+    const lazySubagent: SubagentConfig = {
+      agentName: "lazy",
+      description: "Lazy sandbox init",
+      workflow: mockWorkflow(),
+      sandbox: {
+        source: "own",
+        init: "once",
+        continuation: "fork",
+        proxy: () => opsMock,
+      },
+    };
+
+    const { handler } = createSubagentHandler([lazySubagent]);
+
+    execMock.mockImplementationOnce(async () => {
+      throw new Error("init failed");
+    });
+
+    await expect(
+      handler(
+        { subagent: "lazy", description: "test", prompt: "first" },
+        { threadId: "t", toolCallId: "tc-1", toolName: "Subagent" }
+      )
+    ).rejects.toThrow("init failed");
+
+    // A second call must be able to take the creator role again (no stranded
+    // "creating" flag) and succeed.
+    nextStartChildResult = () => ({
+      toolResponse: "ok",
+      data: null,
+      threadId: "child-t-2",
+      sandboxId: "child-sb-2",
+    });
+
+    const result = await handler(
+      { subagent: "lazy", description: "test", prompt: "second" },
+      { threadId: "t", toolCallId: "tc-2", toolName: "Subagent" }
+    );
+
+    expect(result.toolResponse).toBe("ok");
+  });
 });
 
 // ---------------------------------------------------------------------------

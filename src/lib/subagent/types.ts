@@ -1,4 +1,5 @@
 import type { z } from "zod";
+import type { ChildWorkflowOptions } from "@temporalio/workflow";
 import type { JsonValue } from "../state/types";
 import type {
   ToolHandlerResponse,
@@ -11,6 +12,22 @@ import type {
   SubagentSandboxShutdown,
 } from "../lifecycle";
 import type { SandboxOps, SandboxSnapshot } from "../sandbox/types";
+
+/**
+ * Subset of {@link ChildWorkflowOptions} that callers may override when a
+ * subagent is invoked. `workflowId`, `taskQueue`, and `args` are managed by
+ * the subagent handler itself and therefore cannot be set here.
+ *
+ * Configuring `workflowRunTimeout` (or `workflowExecutionTimeout`) is strongly
+ * recommended: it is the only reliable way to guarantee that a child workflow
+ * which fails during initialization or repeatedly fails workflow tasks will
+ * eventually be terminated, allowing the parent's `Subagent` tool call to fail
+ * deterministically instead of hanging forever waiting for a result.
+ */
+export type SubagentChildWorkflowOptions = Omit<
+  ChildWorkflowOptions,
+  "workflowId" | "taskQueue" | "args"
+>;
 
 /** ToolHandlerResponse with threadId required (subagents must always surface their thread) */
 export type SubagentHandlerResponse<
@@ -124,6 +141,24 @@ export interface SubagentConfig<TResult extends z.ZodType = z.ZodType> {
   workflow: SubagentWorkflow<TResult>;
   /** Optional task queue - defaults to parent's queue if not specified */
   taskQueue?: string;
+  /**
+   * Optional child workflow options forwarded to `executeChild` when the
+   * subagent is spawned. Use this to configure timeouts, retry policies, or
+   * parent-close behavior for the child workflow.
+   *
+   * **Recommended:** configure a `workflowRunTimeout` (or
+   * `workflowExecutionTimeout`) so that a child workflow that fails to
+   * initialize — or repeatedly fails workflow tasks without ever reaching a
+   * terminal state — is eventually terminated by the Temporal server. Without
+   * such a timeout, the parent's `Subagent` tool call can hang indefinitely
+   * waiting for the child to finish. When Temporal terminates the child, the
+   * tool call fails with a structured `ChildWorkflowFailure` that the router's
+   * failure hooks can handle just like any other tool error.
+   *
+   * `workflowId`, `taskQueue`, and `args` are managed by the subagent handler
+   * and cannot be overridden here.
+   */
+  workflowOptions?: SubagentChildWorkflowOptions;
   /** Optional Zod schema to validate the child workflow's result. If omitted, result is passed through as-is. */
   resultSchema?: TResult;
   /** Optional context passed to the subagent — a static object or a function evaluated at invocation time */
