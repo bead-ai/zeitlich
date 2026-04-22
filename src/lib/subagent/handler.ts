@@ -103,6 +103,14 @@ export function createSubagentHandler<
   const persistentSandboxes = new Map<string, string>();
   /** Tracks agents whose first lazy sandbox creation is in-flight (guards concurrent init) */
   const persistentSandboxCreating = new Set<string>();
+  /**
+   * Latest failure from a lazy-creator call, keyed by agentName. Populated
+   * when a creator's `executeChild` throws, consumed by concurrent waiters so
+   * they fail deterministically instead of hanging on a condition predicate
+   * that will never be satisfied. Cleared once observed by all current
+   * waiters (on the next successful creator attempt).
+   */
+  const persistentSandboxCreationError = new Map<string, unknown>();
   /** Reverse lookup: childWorkflowId → agentName for in-flight lazy creators */
   const lazyCreatorAgent = new Map<string, string>();
   /** Maps childThreadId → latest snapshot for sandbox continuation via snapshots */
@@ -117,6 +125,8 @@ export function createSubagentHandler<
   const persistentBaseSnapshot = new Map<string, SandboxSnapshot>();
   /** Tracks agents whose first snapshot-backed sandbox creation is in-flight */
   const persistentBaseSnapshotCreating = new Set<string>();
+  /** Latest failure from a snapshot-base creator call, keyed by agentName. */
+  const persistentBaseSnapshotCreationError = new Map<string, unknown>();
 
   setHandler(childSandboxReadySignal, ({ childWorkflowId, sandboxId }) => {
     const agentName = lazyCreatorAgent.get(childWorkflowId);
@@ -208,8 +218,23 @@ export function createSubagentHandler<
         baseSnap = persistentBaseSnapshot.get(config.agentName);
         if (!baseSnap) {
           if (persistentBaseSnapshotCreating.has(config.agentName)) {
-            await condition(() => persistentBaseSnapshot.has(config.agentName));
+            await condition(
+              () =>
+                persistentBaseSnapshot.has(config.agentName) ||
+                persistentBaseSnapshotCreationError.has(config.agentName) ||
+                !persistentBaseSnapshotCreating.has(config.agentName)
+            );
+            const creatorErr = persistentBaseSnapshotCreationError.get(
+              config.agentName
+            );
+            if (creatorErr !== undefined) {
+              throw creatorErr;
+            }
             baseSnap = persistentBaseSnapshot.get(config.agentName);
+            if (!baseSnap) {
+              persistentBaseSnapshotCreating.add(config.agentName);
+              isSnapshotBaseCreator = true;
+            }
           } else {
             persistentBaseSnapshotCreating.add(config.agentName);
             isSnapshotBaseCreator = true;
@@ -229,9 +254,27 @@ export function createSubagentHandler<
         baseSandboxId = persistentSandboxes.get(config.agentName);
         if (!baseSandboxId) {
           if (persistentSandboxCreating.has(config.agentName)) {
-            // Another call is already creating — wait for it to finish
-            await condition(() => persistentSandboxes.has(config.agentName));
+            // Another call is already creating — wait for it to finish.
+            // Also break out if the creator failed, so we can either fail
+            // fast with the same error or (if no one has re-claimed the
+            // creator role yet) take over ourselves.
+            await condition(
+              () =>
+                persistentSandboxes.has(config.agentName) ||
+                persistentSandboxCreationError.has(config.agentName) ||
+                !persistentSandboxCreating.has(config.agentName)
+            );
+            const creatorErr = persistentSandboxCreationError.get(
+              config.agentName
+            );
+            if (creatorErr !== undefined) {
+              throw creatorErr;
+            }
             baseSandboxId = persistentSandboxes.get(config.agentName);
+            if (!baseSandboxId) {
+              persistentSandboxCreating.add(config.agentName);
+              isLazyCreator = true;
+            }
           } else {
             // We're the first concurrent caller — claim the creator role
             persistentSandboxCreating.add(config.agentName);
@@ -290,6 +333,7 @@ export function createSubagentHandler<
           : config.context;
 
     const childOpts = {
+      ...(config.workflowOptions ?? {}),
       workflowId: childWorkflowId,
       args:
         resolvedContext === undefined
@@ -309,7 +353,34 @@ export function createSubagentHandler<
       sandboxSource: sandboxCfg.source,
     });
 
-    const childResult = await executeChild(config.workflow, childOpts);
+    // Always clear in-flight creator bookkeeping, even if `executeChild`
+    // throws. Otherwise a failing subagent would strand other concurrent
+    // callers waiting on `condition(() => persistentSandboxes.has(...))` /
+    // `persistentBaseSnapshot.has(...)` forever, because those conditions are
+    // only ever satisfied on the success path below. When we were the
+    // creator, also publish the error so any already-waiting concurrent
+    // callers fail with the same error instead of silently retrying or
+    // hanging.
+    let childResult: Awaited<ReturnType<typeof executeChild>>;
+    try {
+      childResult = await executeChild(config.workflow, childOpts);
+    } catch (err) {
+      log.warn("subagent failed", {
+        subagent: config.agentName,
+        childWorkflowId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      if (isLazyCreator) {
+        persistentSandboxCreating.delete(config.agentName);
+        persistentSandboxCreationError.set(config.agentName, err);
+        lazyCreatorAgent.delete(childWorkflowId);
+      }
+      if (isSnapshotBaseCreator) {
+        persistentBaseSnapshotCreating.delete(config.agentName);
+        persistentBaseSnapshotCreationError.set(config.agentName, err);
+      }
+      throw err;
+    }
 
     const effectiveShutdown =
       sandboxShutdownOverride ?? sandboxCfg.shutdown ?? "destroy";
@@ -386,10 +457,12 @@ export function createSubagentHandler<
 
     if (isLazyCreator) {
       persistentSandboxCreating.delete(config.agentName);
+      persistentSandboxCreationError.delete(config.agentName);
       lazyCreatorAgent.delete(childWorkflowId);
     }
     if (isSnapshotBaseCreator) {
       persistentBaseSnapshotCreating.delete(config.agentName);
+      persistentBaseSnapshotCreationError.delete(config.agentName);
     }
 
     if (!toolResponse) {
