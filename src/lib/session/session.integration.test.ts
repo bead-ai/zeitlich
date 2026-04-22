@@ -117,8 +117,8 @@ function createMockThreadOps() {
     forkThread: async (source, target) => {
       log.push({ op: "forkThread", args: [source, target] });
     },
-    truncateThread: async (threadId, length) => {
-      log.push({ op: "truncateThread", args: [threadId, length] });
+    truncateThread: async (threadId, messageId) => {
+      log.push({ op: "truncateThread", args: [threadId, messageId] });
     },
   });
 
@@ -142,14 +142,12 @@ function createScriptedRunAgent(
         message: "done",
         rawToolCalls: [],
         usage: undefined,
-        threadLengthAtCall: 0,
       };
     }
     return {
       message: turn.message,
       rawToolCalls: turn.toolCalls,
       usage: turn.usage,
-      threadLengthAtCall: 0,
     };
   };
 }
