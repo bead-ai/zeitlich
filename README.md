@@ -482,6 +482,24 @@ const session = await createSession({
 
 The `Subagent` tool is automatically added when subagents are configured, allowing the LLM to spawn child workflows.
 
+#### Child workflow timeouts
+
+You can forward any `ChildWorkflowOptions` to a subagent's underlying `executeChild` call via the `workflowOptions` field on `defineSubagent`. This is the recommended place to configure a `workflowRunTimeout` (and/or `workflowExecutionTimeout`), which guarantees that a child which fails to initialize or repeatedly fails workflow tasks is eventually terminated by the Temporal server — otherwise the parent's `Subagent` tool call can hang indefinitely waiting for a result that will never arrive.
+
+```typescript
+export const researcherSubagent = defineSubagent(researcherWorkflow, {
+  workflowOptions: {
+    workflowRunTimeout: "10m",
+    workflowTaskTimeout: "1m",
+    retry: { maximumAttempts: 2 },
+  },
+});
+```
+
+When Temporal terminates a child, the parent's call rejects with a `ChildWorkflowFailure`, which the tool router surfaces to the LLM through the normal failure-hook pipeline (`onPostToolUseFailure`, per-subagent `onExecutionFailure`).
+
+`workflowId`, `taskQueue`, and `args` are managed by the subagent handler itself and cannot be overridden via `workflowOptions` — use the top-level `taskQueue` field on `SubagentConfig` to route a subagent to a different task queue.
+
 ### Skills
 
 Zeitlich has first-class support for the [agentskills.io](https://agentskills.io) specification. Skills are reusable instruction sets that an agent can load on-demand via the built-in `ReadSkill` tool — progressive disclosure keeps token usage low while giving agents access to rich, domain-specific guidance.
