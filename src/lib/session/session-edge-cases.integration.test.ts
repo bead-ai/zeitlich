@@ -73,7 +73,6 @@ type TurnScript = {
   message: unknown;
   toolCalls: RawToolCall[];
   usage?: TokenUsage;
-  threadLengthAtCall?: number;
 };
 
 /**
@@ -115,32 +114,32 @@ function createMockThreadOps() {
     forkThread: async (source, target) => {
       log.push({ op: "forkThread", args: [source, target] });
     },
-    truncateThread: async (threadId, length) => {
-      log.push({ op: "truncateThread", args: [threadId, length] });
+    truncateThread: async (threadId, messageId) => {
+      log.push({ op: "truncateThread", args: [threadId, messageId] });
     },
   });
   return { ops, log };
 }
 
 function createScriptedRunAgent(
-  turns: TurnScript[]
+  turns: TurnScript[],
+  assistantIdLog?: string[]
 ): RunAgentActivity<unknown> {
   let call = 0;
-  return async () => {
+  return async (config) => {
+    assistantIdLog?.push(config.assistantMessageId);
     const turn = turns[call++];
     if (!turn) {
       return {
         message: "done",
         rawToolCalls: [],
         usage: undefined,
-        threadLengthAtCall: 0,
       };
     }
     return {
       message: turn.message,
       rawToolCalls: turn.toolCalls,
       usage: turn.usage,
-      threadLengthAtCall: turn.threadLengthAtCall ?? 0,
     };
   };
 }
@@ -797,8 +796,8 @@ describe("createSession edge cases", () => {
       forkThread: async (source, target) => {
         log.push({ op: "forkThread", args: [source, target] });
       },
-      truncateThread: async (threadId, length) => {
-        log.push({ op: "truncateThread", args: [threadId, length] });
+      truncateThread: async (threadId, messageId) => {
+        log.push({ op: "truncateThread", args: [threadId, messageId] });
       },
     });
 
@@ -1686,6 +1685,14 @@ describe("createSession edge cases", () => {
   });
 
   // --- Rewind flow: tool requests rewind and turn is retried -------------
+  //
+  // The session no longer issues an explicit truncateThread on rewind.
+  // Instead it reuses the pre-generated assistantMessageId for the retry,
+  // and the runAgent activity itself truncates the thread from that id
+  // on entry. These tests assert the observable behaviour: the rewinding
+  // tool's result is not appended, turns are consumed as expected, and
+  // the retry invocation receives the same assistantMessageId so the
+  // invoker can wipe the prior attempt.
 
   it("rewinds the turn when a tool handler returns rewind:true", async () => {
     const { ops, log } = createMockThreadOps();
@@ -1708,20 +1715,24 @@ describe("createSession edge cases", () => {
       },
     });
 
+    const assistantIds: string[] = [];
     const session = await createSession({
       agentName: "TestAgent",
       thread: { mode: "new", threadId: "thread-1" },
-      runAgent: createScriptedRunAgent([
-        {
-          message: "attempt-1",
-          toolCalls: [{ id: "tc-1", name: "Rewind", args: {} }],
-        },
-        {
-          message: "attempt-2",
-          toolCalls: [{ id: "tc-2", name: "Rewind", args: {} }],
-        },
-        { message: "done", toolCalls: [] },
-      ]),
+      runAgent: createScriptedRunAgent(
+        [
+          {
+            message: "attempt-1",
+            toolCalls: [{ id: "tc-1", name: "Rewind", args: {} }],
+          },
+          {
+            message: "attempt-2",
+            toolCalls: [{ id: "tc-2", name: "Rewind", args: {} }],
+          },
+          { message: "done", toolCalls: [] },
+        ],
+        assistantIds
+      ),
       threadOps: ops,
       tools: { Rewind: rewindTool },
       buildContextMessage: () => "go",
@@ -1737,8 +1748,16 @@ describe("createSession edge cases", () => {
     expect(result.finalMessage).toBe("done");
     expect(rewindAttempts).toBe(2);
 
+    // Session does not call truncateThread directly on rewind — the
+    // invoker truncates on entry via the reused assistantMessageId.
     const truncateOps = log.filter((l) => l.op === "truncateThread");
-    expect(truncateOps).toHaveLength(1);
+    expect(truncateOps).toHaveLength(0);
+
+    // The first and second calls reuse the same assistantMessageId
+    // (rewind retry), then the third uses a fresh id.
+    expect(assistantIds).toHaveLength(3);
+    expect(assistantIds[0]).toBe(assistantIds[1]);
+    expect(assistantIds[1]).not.toBe(assistantIds[2]);
 
     const noRewindToolResult = log.filter((l) => {
       if (l.op !== "appendToolResult") return false;
@@ -1749,9 +1768,15 @@ describe("createSession edge cases", () => {
 
     const agentAppends = log.filter((l) => l.op === "appendAgentMessage");
     expect(agentAppends).toHaveLength(3);
+    // The first two assistant appends reuse the same id — the second
+    // will be a no-op in the real adapter because truncateFromId clears
+    // the dedup marker for the old one before the retry invocation.
+    const asstIds = agentAppends.map((l) => l.args[1]);
+    expect(asstIds[0]).toBe(asstIds[1]);
+    expect(asstIds[1]).not.toBe(asstIds[2]);
   });
 
-  it("truncates the thread back to the pre-assistant state so sibling tool results are dropped on rewind", async () => {
+  it("reuses the assistantMessageId on rewind even with sibling tool calls", async () => {
     const { ops, log } = createMockThreadOps();
 
     let rewindFired = false;
@@ -1776,22 +1801,23 @@ describe("createSession edge cases", () => {
       },
     });
 
+    const assistantIds: string[] = [];
     const session = await createSession({
       agentName: "TestAgent",
       thread: { mode: "new", threadId: "thread-1" },
-      runAgent: createScriptedRunAgent([
-        {
-          message: "parallel",
-          toolCalls: [
-            { id: "tc-sibling", name: "Sibling", args: {} },
-            { id: "tc-rewind", name: "Rewind", args: {} },
-          ],
-          // Invoker reports 2 stored messages (system + human) at the
-          // moment the LLM was called.
-          threadLengthAtCall: 2,
-        },
-        { message: "done", toolCalls: [], threadLengthAtCall: 2 },
-      ]),
+      runAgent: createScriptedRunAgent(
+        [
+          {
+            message: "parallel",
+            toolCalls: [
+              { id: "tc-sibling", name: "Sibling", args: {} },
+              { id: "tc-rewind", name: "Rewind", args: {} },
+            ],
+          },
+          { message: "done", toolCalls: [] },
+        ],
+        assistantIds
+      ),
       threadOps: ops,
       tools: { Rewind: rewindTool, Sibling: siblingTool },
       buildContextMessage: () => "go",
@@ -1805,13 +1831,15 @@ describe("createSession edge cases", () => {
 
     expect(result.exitReason).toBe("completed");
 
-    // Exactly one truncate fired — back to the pre-assistant-message
-    // length that runAgent reported.
+    // No explicit truncate from the session — the invoker will do it
+    // on entry using the reused assistantMessageId.
     const truncateOps = log.filter((l) => l.op === "truncateThread");
-    expect(truncateOps).toHaveLength(1);
-    const truncateOp = truncateOps[0];
-    if (!truncateOp) throw new Error("expected truncate op");
-    expect(truncateOp.args[1]).toBe(2);
+    expect(truncateOps).toHaveLength(0);
+
+    // The rewound turn and its retry share one assistantMessageId; the
+    // final `done` turn gets a fresh one.
+    expect(assistantIds).toHaveLength(2);
+    expect(assistantIds[0]).toBe(assistantIds[1]);
 
     // Rewinding tool never appends its own result.
     const rewindResultAppends = log.filter((l) => {
@@ -1821,10 +1849,11 @@ describe("createSession edge cases", () => {
     });
     expect(rewindResultAppends).toHaveLength(0);
 
-    // Two assistant messages expected: one from the rewound turn, one from
-    // the successful retry.
+    // Two assistant messages expected: one from the rewound turn, one
+    // from the successful retry — sharing the same id.
     const agentAppends = log.filter((l) => l.op === "appendAgentMessage");
     expect(agentAppends).toHaveLength(2);
+    expect(agentAppends[0]?.args[1]).toBe(agentAppends[1]?.args[1]);
   });
 
   it("does not rewind when the rewinding tool is no longer present after retry", async () => {
@@ -1844,21 +1873,25 @@ describe("createSession edge cases", () => {
       },
     });
 
+    const assistantIds: string[] = [];
     const session = await createSession({
       agentName: "TestAgent",
       thread: { mode: "new", threadId: "thread-1" },
       maxTurns: 5,
-      runAgent: createScriptedRunAgent([
-        {
-          message: "call-1",
-          toolCalls: [{ id: "tc-1", name: "RewindOnce", args: {} }],
-        },
-        {
-          message: "call-2",
-          toolCalls: [{ id: "tc-2", name: "RewindOnce", args: {} }],
-        },
-        { message: "done", toolCalls: [] },
-      ]),
+      runAgent: createScriptedRunAgent(
+        [
+          {
+            message: "call-1",
+            toolCalls: [{ id: "tc-1", name: "RewindOnce", args: {} }],
+          },
+          {
+            message: "call-2",
+            toolCalls: [{ id: "tc-2", name: "RewindOnce", args: {} }],
+          },
+          { message: "done", toolCalls: [] },
+        ],
+        assistantIds
+      ),
       threadOps: ops,
       tools: { RewindOnce: rewindOnce },
       buildContextMessage: () => "go",
@@ -1878,7 +1911,12 @@ describe("createSession edge cases", () => {
     expect(attempts).toBe(2);
 
     const truncateOps = log.filter((l) => l.op === "truncateThread");
-    expect(truncateOps).toHaveLength(1);
+    expect(truncateOps).toHaveLength(0);
+
+    // Turn 1 rewound → call 1 & 2 share an id, call 3 fresh.
+    expect(assistantIds).toHaveLength(3);
+    expect(assistantIds[0]).toBe(assistantIds[1]);
+    expect(assistantIds[1]).not.toBe(assistantIds[2]);
   });
 
   it("bails out with max_turns when a tool keeps requesting rewind", async () => {
@@ -1895,16 +1933,20 @@ describe("createSession edge cases", () => {
       },
     });
 
+    const assistantIds: string[] = [];
     const session = await createSession({
       agentName: "TestAgent",
       thread: { mode: "new", threadId: "thread-1" },
       maxTurns: 3,
-      runAgent: createScriptedRunAgent([
-        { message: "t1", toolCalls: [{ id: "tc-1", name: "AlwaysRewind", args: {} }] },
-        { message: "t2", toolCalls: [{ id: "tc-2", name: "AlwaysRewind", args: {} }] },
-        { message: "t3", toolCalls: [{ id: "tc-3", name: "AlwaysRewind", args: {} }] },
-        { message: "t4", toolCalls: [{ id: "tc-4", name: "AlwaysRewind", args: {} }] },
-      ]),
+      runAgent: createScriptedRunAgent(
+        [
+          { message: "t1", toolCalls: [{ id: "tc-1", name: "AlwaysRewind", args: {} }] },
+          { message: "t2", toolCalls: [{ id: "tc-2", name: "AlwaysRewind", args: {} }] },
+          { message: "t3", toolCalls: [{ id: "tc-3", name: "AlwaysRewind", args: {} }] },
+          { message: "t4", toolCalls: [{ id: "tc-4", name: "AlwaysRewind", args: {} }] },
+        ],
+        assistantIds
+      ),
       threadOps: ops,
       tools: { AlwaysRewind: alwaysRewind },
       buildContextMessage: () => "go",
@@ -1920,7 +1962,14 @@ describe("createSession edge cases", () => {
     expect(result.usage.turns).toBe(3);
     expect(attempts).toBe(3);
 
+    // Session does not issue explicit truncates; invoker-side
+    // truncation isn't visible here because runAgent is mocked.
     const truncateOps = log.filter((l) => l.op === "truncateThread");
-    expect(truncateOps).toHaveLength(3);
+    expect(truncateOps).toHaveLength(0);
+
+    // Every attempt reuses the same assistantMessageId — the LLM call
+    // truncates-from-id on each replay.
+    expect(assistantIds).toHaveLength(3);
+    expect(new Set(assistantIds).size).toBe(1);
   });
 });

@@ -8,16 +8,6 @@ export interface AgentResponse<M = unknown> {
   message: M;
   rawToolCalls: RawToolCall[];
   usage?: TokenUsage;
-  /**
-   * Number of stored messages in the thread at the moment the LLM was
-   * invoked — i.e. *before* the assistant message is appended. The
-   * session uses this as a rewind snapshot so it can roll the thread
-   * back to this exact state if a tool requests a rewind.
-   *
-   * Adapters compute this for free from the array of stored messages
-   * they load when preparing the payload.
-   */
-  threadLengthAtCall?: number;
 }
 
 /**
@@ -39,6 +29,13 @@ export interface ModelInvokerConfig {
   agentName: string;
   state: BaseAgentState;
   metadata?: Record<string, unknown>;
+  /**
+   * The id the assistant message produced by this call will be stored
+   * under. Invokers truncate the thread from this id on entry so that
+   * rewind retries and Temporal workflow resets restore the pre-call
+   * state before re-invoking the LLM. See {@link RunAgentConfig}.
+   */
+  assistantMessageId: string;
 }
 
 /**

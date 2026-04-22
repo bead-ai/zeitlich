@@ -225,7 +225,7 @@ export function createGoogleGenAIAdapter(
 
     async truncateThread(
       threadId: string,
-      length: number,
+      messageId: string,
       threadKey?: string,
     ): Promise<void> {
       const thread = createGoogleGenAIThreadManager({
@@ -233,7 +233,7 @@ export function createGoogleGenAIAdapter(
         threadId,
         key: threadKey,
       });
-      await thread.truncate(length);
+      await thread.truncateFromId(messageId);
     },
   };
 

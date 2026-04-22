@@ -39,12 +39,20 @@ export interface BaseThreadManager<T> {
   /** Get the number of stored messages currently in the thread */
   length(): Promise<number>;
   /**
-   * Truncate the thread to the given length (inclusive). Any messages
-   * beyond `length` are removed. When `length` is 0 the thread ends up
-   * empty (but still exists). Also clears any dedup markers so that
-   * subsequent appends with the same ids replay correctly.
+   * Truncate the thread starting at the message with id `messageId`.
+   * That message and every message after it are removed. If `messageId`
+   * is not present in the thread this is a no-op — useful as the
+   * "truncate on entry" step of the `runAgent` activity, which becomes a
+   * no-op on the first attempt and a cleanup on Temporal workflow reset
+   * or in-workflow rewind retries.
+   *
+   * Dedup markers for removed single-message appends are also cleared so
+   * that appending the same id again (e.g. the same assistant message id
+   * on a rewind retry) is not silently skipped.
+   *
+   * Requires the thread manager to be configured with `idOf`.
    */
-  truncate(length: number): Promise<void>;
+  truncateFromId(messageId: string): Promise<void>;
 }
 
 /**

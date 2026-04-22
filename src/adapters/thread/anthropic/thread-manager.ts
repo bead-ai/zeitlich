@@ -41,8 +41,6 @@ export interface AnthropicThreadManagerConfig {
 export interface AnthropicInvocationPayload {
   messages: Anthropic.Messages.MessageParam[];
   system?: string | Anthropic.Messages.TextBlockParam[];
-  /** Number of stored messages loaded from Redis before preparation. */
-  storedLength: number;
 }
 
 /** Thread manager with Anthropic MessageParam convenience helpers */
@@ -222,7 +220,6 @@ export function createAnthropicThreadManager(
           ? messages.map((msg, i) => onPreparedMessage(msg, i, messages))
           : messages,
         ...(system ? { system } : {}),
-        storedLength: stored.length,
       };
     },
   };

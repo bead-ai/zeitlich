@@ -140,14 +140,16 @@ export interface ToolHandlerResponse<
    */
   resultAppended?: boolean;
   /**
-   * When true, the session will rewind: any in-flight parallel tool calls
-   * are cancelled, previously appended tool results and the triggering
-   * assistant message are removed from the thread, and the LLM call that
-   * produced the tool calls is retried.
+   * When true, the session will rewind: any in-flight parallel tool
+   * calls are cancelled and the LLM call is retried. The session reuses
+   * the same `assistantMessageId` for the retry; the next `runAgent`
+   * activity truncates the thread from that id on entry, wiping the
+   * triggering assistant message and any tool results already appended
+   * before re-invoking the LLM.
    *
    * The `toolResponse` for a rewinding tool call is ignored (never
-   * appended) since the session truncates the thread back to the
-   * pre-invocation state.
+   * appended) since the thread is rewound back to the pre-assistant
+   * state on the next invocation.
    */
   rewind?: boolean;
   /** Token usage from the tool execution (e.g. child agent invocations) */
@@ -291,8 +293,9 @@ export interface ProcessToolCallsContext {
 
 /**
  * Signal that a tool handler requested a rewind. Attached to the
- * {@link ProcessToolCallsResult} so the session can roll the thread
- * back to the pre-invocation snapshot and retry the LLM call.
+ * {@link ProcessToolCallsResult} so the session can reuse the same
+ * `assistantMessageId` for the retry; the next `runAgent` activity
+ * then truncates the thread from that id on entry.
  */
 export interface RewindSignal {
   toolCallId: string;

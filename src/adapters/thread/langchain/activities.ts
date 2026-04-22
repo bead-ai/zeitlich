@@ -198,11 +198,11 @@ export function createLangChainAdapter(
 
     async truncateThread(
       threadId: string,
-      length: number,
+      messageId: string,
       threadKey?: string,
     ): Promise<void> {
       const thread = createLangChainThreadManager({ redis, threadId, key: threadKey });
-      await thread.truncate(length);
+      await thread.truncateFromId(messageId);
     },
   };
 

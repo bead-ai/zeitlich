@@ -60,15 +60,20 @@ export interface ThreadOps<TContent = string> {
     threadKey?: string
   ): Promise<void>;
   /**
-   * Truncate the thread back to `length` messages. Used by the session's
-   * rewind flow to roll the thread back before retrying a turn. The
-   * session obtains `length` from `AgentResponse.threadLengthAtCall`,
-   * which the model invoker computes for free from the messages it
-   * loaded before invoking the LLM.
+   * Truncate the thread starting at `messageId`: that message and every
+   * message after it are removed. If `messageId` is not present the call
+   * is a no-op.
+   *
+   * The `runAgent` activity invokes this on entry with the pre-generated
+   * `assistantMessageId`. On the happy path the id is not yet in the
+   * thread and the call is a no-op. On a rewind retry (same assistant
+   * id reused) or a Temporal workflow reset-to-this-activity the id is
+   * present, so the bad assistant + any tool results it produced are
+   * wiped and the call is then replayable.
    */
   truncateThread(
     threadId: string,
-    length: number,
+    messageId: string,
     threadKey?: string
   ): Promise<void>;
 }
