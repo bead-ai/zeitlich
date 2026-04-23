@@ -111,6 +111,7 @@ export async function createSession<
   sandbox: sandboxInit,
   sandboxShutdown = "destroy",
   onSandboxReady,
+  onSessionExit,
   virtualFs: virtualFsConfig,
   virtualFsOps,
 }: SessionConfig<T, M, TContent>): Promise<ZeitlichSession<M, boolean>> {
@@ -313,7 +314,10 @@ export async function createSession<
       }
 
       if (sandboxId && sandboxOwned && onSandboxReady) {
-        onSandboxReady(sandboxId);
+        onSandboxReady({
+          sandboxId,
+          ...(baseSnapshot && { baseSnapshot }),
+        });
       }
 
       // --- Virtual filesystem init (independent of sandbox) ----------------
@@ -572,6 +576,13 @@ export async function createSession<
         ...(baseSnapshot && { hasBaseSnapshot: true }),
         ...(exitSnapshot && { hasExitSnapshot: true }),
       });
+
+      if (onSessionExit) {
+        onSessionExit({
+          ...(sandboxId && { sandboxId }),
+          ...(exitSnapshot && { snapshot: exitSnapshot }),
+        });
+      }
 
       return {
         threadId,

@@ -205,8 +205,25 @@ export interface SessionConfig<
   /**
    * Called as soon as the sandbox is created (or resumed/forked), before the
    * agent loop starts. Useful for signalling sandbox readiness to a parent.
+   *
+   * `baseSnapshot` is only populated when the sandbox was freshly created
+   * this run and `sandboxShutdown === "snapshot"` — i.e. when the session
+   * captured a seed snapshot intended for reuse.
    */
-  onSandboxReady?: (sandboxId: string) => void;
+  onSandboxReady?: (args: {
+    sandboxId: string;
+    baseSnapshot?: SandboxSnapshot;
+  }) => void;
+  /**
+   * Called right before `runSession` returns, with the session's sandbox
+   * outputs. Useful for callers (e.g. `defineSubagentWorkflow`) that want to
+   * forward these fields to their own return value without requiring user
+   * code to manually thread them through.
+   */
+  onSessionExit?: (result: {
+    sandboxId?: string;
+    snapshot?: SandboxSnapshot;
+  }) => void;
 
   // ---------------------------------------------------------------------------
   // Virtual filesystem

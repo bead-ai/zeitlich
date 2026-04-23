@@ -2239,6 +2239,7 @@ describe("defineSubagentWorkflow", () => {
       sandboxShutdown: "destroy",
       thread: { mode: "fork", threadId: "prev-42" },
       onSandboxReady: expect.any(Function),
+      onSessionExit: expect.any(Function),
     });
   });
 
@@ -2258,6 +2259,7 @@ describe("defineSubagentWorkflow", () => {
       sandboxShutdown: "destroy",
       sandbox: { mode: "inherit", sandboxId: "sb-123" },
       onSandboxReady: expect.any(Function),
+      onSessionExit: expect.any(Function),
     });
   });
 
@@ -2277,6 +2279,7 @@ describe("defineSubagentWorkflow", () => {
       sandboxShutdown: "destroy",
       sandbox: { mode: "fork", sandboxId: "prev-sb-1" },
       onSandboxReady: expect.any(Function),
+      onSessionExit: expect.any(Function),
     });
   });
 
@@ -2300,6 +2303,7 @@ describe("defineSubagentWorkflow", () => {
       thread: { mode: "fork", threadId: "prev-t" },
       sandbox: { mode: "fork", sandboxId: "prev-sb" },
       onSandboxReady: expect.any(Function),
+      onSessionExit: expect.any(Function),
     });
   });
 
@@ -2370,6 +2374,7 @@ describe("defineSubagentWorkflow", () => {
       agentName: "test",
       sandboxShutdown: "destroy",
       onSandboxReady: expect.any(Function),
+      onSessionExit: expect.any(Function),
     });
   });
 
