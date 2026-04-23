@@ -245,6 +245,7 @@ export interface SessionConfig<
    * code to manually thread them through.
    */
   onSessionExit?: (result: {
+    threadId: string;
     sandboxId?: string;
     snapshot?: SandboxSnapshot;
   }) => void;

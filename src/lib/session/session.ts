@@ -617,6 +617,7 @@ export async function createSession<
         onSessionExit({
           ...(sandboxId && { sandboxId }),
           ...(exitSnapshot && { snapshot: exitSnapshot }),
+          threadId,
         });
       }
 
