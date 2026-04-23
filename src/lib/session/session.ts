@@ -16,6 +16,7 @@ import type {
   AgentState,
   AgentStateManager,
   JsonSerializable,
+  PersistedThreadState,
 } from "../state/types";
 import { createToolRouter } from "../tool-router/router";
 import type { ParsedToolCallUnion, ToolMap } from "../tool-router/types";
@@ -372,19 +373,22 @@ export async function createSession<
       const systemPrompt = stateManager.getSystemPrompt();
 
       // --- Thread lifecycle: new, continue, or fork ----------------------
+      const rehydrateFromSlice = (slice: PersistedThreadState): void => {
+        stateManager.mergeUpdate({
+          tasks: new Map(slice.tasks),
+          ...slice.custom,
+        } as Partial<AgentState<TState>>);
+      };
+
       if (threadMode === "fork" && sourceThreadId) {
         await forkThread(sourceThreadId, threadId, threadKey);
         await forkThreadState(sourceThreadId, threadId, threadKey);
         const forkedSlice = await loadThreadState(threadId, threadKey);
-        if (forkedSlice) {
-          stateManager.applyPersistedSlice(forkedSlice);
-        }
+        if (forkedSlice) rehydrateFromSlice(forkedSlice);
       } else if (threadMode === "continue") {
         // "continue" — thread already exists, just append the new message
         const continuedSlice = await loadThreadState(threadId, threadKey);
-        if (continuedSlice) {
-          stateManager.applyPersistedSlice(continuedSlice);
-        }
+        if (continuedSlice) rehydrateFromSlice(continuedSlice);
       } else {
         if (appendSystemPrompt) {
           if (

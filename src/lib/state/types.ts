@@ -142,17 +142,10 @@ export interface AgentStateManager<TCustom extends JsonSerializable<TCustom>> {
   /**
    * Snapshot the fields that should survive across workflow runs
    * (tasks + all custom state). Safe to pass directly to
-   * {@link ThreadOps.saveThreadState}.
+   * {@link ThreadOps.saveThreadState}. Rehydrate on the next run with
+   * `mergeUpdate({ tasks: new Map(slice.tasks), ...slice.custom })`.
    */
   getPersistedSlice(): PersistedThreadState;
-
-  /**
-   * Apply a previously persisted slice produced by
-   * {@link AgentStateManager.getPersistedSlice}. Replaces the task map
-   * and merges the custom fields into current custom state, then bumps
-   * the state version.
-   */
-  applyPersistedSlice(slice: PersistedThreadState): void;
 
   /** Update the usage */
   updateUsage(usage: TokenUsage): void;

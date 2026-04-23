@@ -180,8 +180,17 @@ export function createAgentStateManager<
       version++;
     },
 
-    mergeUpdate(update: Partial<TCustom>): void {
-      Object.assign(customState as object, update);
+    mergeUpdate(update: Partial<AgentState<TCustom>>): void {
+      const { tasks: nextTasks, ...rest } = update as Partial<
+        AgentState<TCustom>
+      > & { tasks?: Map<string, WorkflowTask> };
+      if (nextTasks) {
+        tasks.clear();
+        for (const [id, task] of nextTasks) {
+          tasks.set(id, task);
+        }
+      }
+      Object.assign(customState as object, rest);
       version++;
     },
 
@@ -233,15 +242,6 @@ export function createAgentStateManager<
         tasks: Array.from(tasks.entries()),
         custom: { ...(customState as unknown as Record<string, JsonValue>) },
       };
-    },
-
-    applyPersistedSlice(slice: PersistedThreadState): void {
-      tasks.clear();
-      for (const [id, task] of slice.tasks) {
-        tasks.set(id, task);
-      }
-      Object.assign(customState as object, slice.custom);
-      version++;
     },
 
     updateUsage(usage: {

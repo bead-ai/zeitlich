@@ -385,7 +385,7 @@ describe("createAgentStateManager integration", () => {
     expect("tools" in slice.custom).toBe(false);
   });
 
-  it("applyPersistedSlice replaces tasks, merges custom, bumps version", () => {
+  it("mergeUpdate replaces the task map when given a tasks field", () => {
     const sm = createAgentStateManager<{ label: string; extra?: string }>({
       initialState: {
         systemPrompt: "test",
@@ -417,9 +417,10 @@ describe("createAgentStateManager integration", () => {
       blocks: [],
     };
 
-    sm.applyPersistedSlice({
-      tasks: [["task-new", incoming]],
-      custom: { label: "restored", extra: "extra-value" },
+    sm.mergeUpdate({
+      tasks: new Map([["task-new", incoming]]),
+      label: "restored",
+      extra: "extra-value",
     });
 
     expect(sm.getTasks()).toEqual([incoming]);
@@ -429,7 +430,7 @@ describe("createAgentStateManager integration", () => {
     expect(sm.getVersion()).toBe(versionBefore + 1);
   });
 
-  it("get/applyPersistedSlice round-trips tasks + custom state", () => {
+  it("getPersistedSlice + mergeUpdate round-trips tasks + custom state", () => {
     const original = createAgentStateManager<{ answer: number }>({
       initialState: { systemPrompt: "test", answer: 42 },
     });
@@ -450,7 +451,10 @@ describe("createAgentStateManager integration", () => {
     const restored = createAgentStateManager<{ answer: number }>({
       initialState: { systemPrompt: "test", answer: 0 },
     });
-    restored.applyPersistedSlice(slice);
+    restored.mergeUpdate({
+      tasks: new Map(slice.tasks),
+      ...slice.custom,
+    });
 
     expect(restored.getTasks()).toEqual([task]);
     expect(restored.get("answer")).toBe(42);
