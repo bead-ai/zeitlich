@@ -350,4 +350,109 @@ describe("createAgentStateManager integration", () => {
     sm.incrementTurns();
     expect(sm.getTotalUsage().turns).toBe(2);
   });
+
+  // --- Persisted slice round-trip ---
+
+  it("getPersistedSlice snapshots tasks + custom state, omits runtime bookkeeping", () => {
+    const sm = createAgentStateManager<{ label: string; count: number }>({
+      initialState: {
+        systemPrompt: "test",
+        label: "original",
+        count: 1,
+      },
+    });
+
+    const task: WorkflowTask = {
+      id: "task-1",
+      subject: "subject",
+      description: "description",
+      activeForm: "doing",
+      status: "pending",
+      metadata: {},
+      blockedBy: [],
+      blocks: [],
+    };
+    sm.setTask(task);
+    sm.incrementTurns();
+    sm.updateUsage({ inputTokens: 42 });
+
+    const slice = sm.getPersistedSlice();
+    expect(slice.tasks).toEqual([["task-1", task]]);
+    expect(slice.custom).toEqual({ label: "original", count: 1 });
+    expect("status" in slice.custom).toBe(false);
+    expect("version" in slice.custom).toBe(false);
+    expect("turns" in slice.custom).toBe(false);
+    expect("tools" in slice.custom).toBe(false);
+  });
+
+  it("applyPersistedSlice replaces tasks, merges custom, bumps version", () => {
+    const sm = createAgentStateManager<{ label: string; extra?: string }>({
+      initialState: {
+        systemPrompt: "test",
+        label: "original",
+      },
+    });
+
+    const existing: WorkflowTask = {
+      id: "task-pre",
+      subject: "pre",
+      description: "pre",
+      activeForm: "pre",
+      status: "pending",
+      metadata: {},
+      blockedBy: [],
+      blocks: [],
+    };
+    sm.setTask(existing);
+    const versionBefore = sm.getVersion();
+
+    const incoming: WorkflowTask = {
+      id: "task-new",
+      subject: "new",
+      description: "new",
+      activeForm: "new",
+      status: "in_progress",
+      metadata: { foo: "bar" },
+      blockedBy: [],
+      blocks: [],
+    };
+
+    sm.applyPersistedSlice({
+      tasks: [["task-new", incoming]],
+      custom: { label: "restored", extra: "extra-value" },
+    });
+
+    expect(sm.getTasks()).toEqual([incoming]);
+    expect(sm.getTask("task-pre")).toBeUndefined();
+    expect(sm.get("label")).toBe("restored");
+    expect(sm.get("extra")).toBe("extra-value");
+    expect(sm.getVersion()).toBe(versionBefore + 1);
+  });
+
+  it("get/applyPersistedSlice round-trips tasks + custom state", () => {
+    const original = createAgentStateManager<{ answer: number }>({
+      initialState: { systemPrompt: "test", answer: 42 },
+    });
+    const task: WorkflowTask = {
+      id: "t",
+      subject: "s",
+      description: "d",
+      activeForm: "doing",
+      status: "completed",
+      metadata: { a: "b" },
+      blockedBy: ["x"],
+      blocks: ["y"],
+    };
+    original.setTask(task);
+
+    const slice = original.getPersistedSlice();
+
+    const restored = createAgentStateManager<{ answer: number }>({
+      initialState: { systemPrompt: "test", answer: 0 },
+    });
+    restored.applyPersistedSlice(slice);
+
+    expect(restored.getTasks()).toEqual([task]);
+    expect(restored.get("answer")).toBe(42);
+  });
 });

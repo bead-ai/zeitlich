@@ -1122,4 +1122,163 @@ describe("createSession integration", () => {
     ]);
     expect(sandboxLog).not.toContain("create");
   });
+
+  // --- Persistent thread state ---
+
+  it("saves tasks + custom state to the thread store on session exit", async () => {
+    const { ops, log, stateStore } = createMockThreadOps();
+
+    const writeTasks = defineTool({
+      name: "WriteTasks" as const,
+      description: "create tasks via state manager",
+      schema: z.object({}),
+      handler: async (
+        _args: Record<string, never>,
+        _ctx: RouterContext
+      ): Promise<ToolHandlerResponse<null>> => ({
+        toolResponse: "ok",
+        data: null,
+      }),
+    });
+
+    const session = await createSession({
+      agentName: "TestAgent",
+      thread: { mode: "new", threadId: "thread-save" },
+      runAgent: createScriptedRunAgent([
+        {
+          message: "doing work",
+          toolCalls: [{ id: "tc-1", name: "WriteTasks", args: {} }],
+        },
+        { message: "done", toolCalls: [] },
+      ]),
+      threadOps: ops,
+      tools: { WriteTasks: writeTasks },
+      buildContextMessage: () => "go",
+    });
+
+    const stateManager = createAgentStateManager<{ note: string }>({
+      initialState: { systemPrompt: "test", note: "hello" },
+    });
+
+    stateManager.setTask({
+      id: "task-A",
+      subject: "A",
+      description: "A",
+      activeForm: "doing A",
+      status: "in_progress",
+      metadata: { priority: "high" },
+      blockedBy: [],
+      blocks: [],
+    });
+
+    const result = await session.runSession({ stateManager });
+    expect(result.exitReason).toBe("completed");
+
+    const saves = log.filter((l) => l.op === "saveThreadState");
+    expect(saves).toHaveLength(1);
+    const saved = stateStore.get("thread-save");
+    expect(saved).toBeDefined();
+    expect(saved?.tasks).toHaveLength(1);
+    if (saved) {
+      expect(at(saved.tasks, 0)[0]).toBe("task-A");
+    }
+    expect(saved?.custom).toEqual({ note: "hello" });
+  });
+
+  it("rehydrates tasks + custom state on continue before the agent loop runs", async () => {
+    const { ops, stateStore } = createMockThreadOps();
+
+    stateStore.set("thread-cont", {
+      tasks: [
+        [
+          "task-restored",
+          {
+            id: "task-restored",
+            subject: "restored",
+            description: "restored",
+            activeForm: "restoring",
+            status: "pending",
+            metadata: {},
+            blockedBy: [],
+            blocks: [],
+          },
+        ],
+      ],
+      custom: { label: "from-prior-run" },
+    });
+
+    type State = { label: string };
+    let observedTasksBeforeFirstTurn: string[] = [];
+    let observedLabelBeforeFirstTurn: string | undefined;
+
+    const session = await createSession({
+      agentName: "TestAgent",
+      thread: { mode: "continue", threadId: "thread-cont" },
+      runAgent: async () => {
+        observedTasksBeforeFirstTurn = stateManager.getTasks().map((t) => t.id);
+        observedLabelBeforeFirstTurn = stateManager.get("label");
+        return { message: "done", rawToolCalls: [], usage: undefined };
+      },
+      threadOps: ops,
+      buildContextMessage: () => "continue please",
+    });
+
+    const stateManager = createAgentStateManager<State>({
+      initialState: { systemPrompt: "test", label: "initial" },
+    });
+
+    await session.runSession({ stateManager });
+
+    expect(observedTasksBeforeFirstTurn).toEqual(["task-restored"]);
+    expect(observedLabelBeforeFirstTurn).toBe("from-prior-run");
+  });
+
+  it("fork copies the source thread's state slice into the new thread", async () => {
+    const { ops, log, stateStore } = createMockThreadOps();
+
+    stateStore.set("source-thread", {
+      tasks: [
+        [
+          "task-src",
+          {
+            id: "task-src",
+            subject: "src",
+            description: "src",
+            activeForm: "src",
+            status: "completed",
+            metadata: {},
+            blockedBy: [],
+            blocks: [],
+          },
+        ],
+      ],
+      custom: { counter: 3 },
+    });
+
+    const session = await createSession({
+      agentName: "TestAgent",
+      thread: { mode: "fork", threadId: "source-thread" },
+      runAgent: createScriptedRunAgent([{ message: "done", toolCalls: [] }]),
+      threadOps: ops,
+      buildContextMessage: () => "continue",
+    });
+
+    type State = { counter: number };
+    const stateManager = createAgentStateManager<State>({
+      initialState: { systemPrompt: "test", counter: 0 },
+    });
+
+    const result = await session.runSession({ stateManager });
+    expect(result.exitReason).toBe("completed");
+
+    const forkStateOps = log.filter((l) => l.op === "forkThreadState");
+    expect(forkStateOps).toHaveLength(1);
+    expect(at(forkStateOps, 0).args[0]).toBe("source-thread");
+
+    expect(stateManager.getTask("task-src")).toBeDefined();
+    expect(stateManager.get("counter")).toBe(3);
+
+    const newThreadSlice = stateStore.get(result.threadId);
+    expect(newThreadSlice?.tasks).toHaveLength(1);
+  });
 });

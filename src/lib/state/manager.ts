@@ -69,11 +69,19 @@ export function createAgentStateManager<
   const tasks = new Map<string, WorkflowTask>(initialState?.tasks);
 
   const {
-    status: _,
-    version: __,
-    turns: ___,
-    tasks: ____,
-    tools: _____,
+    status: _status,
+    version: _version,
+    turns: _turns,
+    tasks: _tasks,
+    tools: _tools,
+    systemPrompt: _systemPrompt,
+    fileTree: _fileTree,
+    inlineFiles: _inlineFiles,
+    virtualFsCtx: _virtualFsCtx,
+    totalInputTokens: _totalInputTokens,
+    totalOutputTokens: _totalOutputTokens,
+    cachedWriteTokens: _cachedWriteTokens,
+    cachedReadTokens: _cachedReadTokens,
     ...custom
   } = initialState ?? {};
   const customState = custom as TCustom;
