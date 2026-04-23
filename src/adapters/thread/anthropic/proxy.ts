@@ -22,15 +22,16 @@ import { type ActivityInterfaceFor } from "@temporalio/workflow";
 import type { ThreadOps } from "../../../lib/session/types";
 import type { AnthropicContent } from "./thread-manager";
 import { createThreadOpsProxy } from "../../../lib/thread/proxy";
+import { ADAPTER_ID } from "./adapter-id";
 
-const ADAPTER_PREFIX = "anthropic";
+export { ADAPTER_ID, type AdapterId } from "./adapter-id";
 
 export function proxyAnthropicThreadOps(
   scope?: string,
   options?: Parameters<typeof createThreadOpsProxy>[2]
 ): ActivityInterfaceFor<ThreadOps<AnthropicContent>> {
   return createThreadOpsProxy(
-    ADAPTER_PREFIX,
+    ADAPTER_ID,
     scope,
     options
   ) as ActivityInterfaceFor<ThreadOps<AnthropicContent>>;

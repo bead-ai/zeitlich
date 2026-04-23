@@ -4,6 +4,7 @@ export default defineConfig({
   entry: {
     index: "src/index.ts",
     workflow: "src/workflow.ts",
+    "adapters/thread/index": "src/adapters/thread/index.ts",
     "adapters/thread/langchain/index": "src/adapters/thread/langchain/index.ts",
     "adapters/thread/langchain/workflow":
       "src/adapters/thread/langchain/proxy.ts",

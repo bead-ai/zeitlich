@@ -22,15 +22,16 @@ import { type ActivityInterfaceFor } from "@temporalio/workflow";
 import type { ThreadOps } from "../../../lib/session/types";
 import type { GoogleGenAIContent } from "./thread-manager";
 import { createThreadOpsProxy } from "../../../lib/thread/proxy";
+import { ADAPTER_ID } from "./adapter-id";
 
-const ADAPTER_PREFIX = "googleGenAI";
+export { ADAPTER_ID, type AdapterId } from "./adapter-id";
 
 export function proxyGoogleGenAIThreadOps(
   scope?: string,
   options?: Parameters<typeof createThreadOpsProxy>[2]
 ): ActivityInterfaceFor<ThreadOps<GoogleGenAIContent>> {
   return createThreadOpsProxy(
-    ADAPTER_PREFIX,
+    ADAPTER_ID,
     scope,
     options
   ) as ActivityInterfaceFor<ThreadOps<GoogleGenAIContent>>;

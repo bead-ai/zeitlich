@@ -17,6 +17,9 @@
  * ```
  */
 
+// Adapter identity (wire format — matches Temporal activity-name prefix)
+export { ADAPTER_ID, type AdapterId } from "./adapter-id";
+
 // Adapter (primary API)
 export {
   createGoogleGenAIAdapter,

@@ -27,6 +27,16 @@
         "default": "./dist/workflow.js"
       }
     },
+    "./adapters/thread": {
+      "import": {
+        "types": "./dist/adapters/thread/index.d.ts",
+        "default": "./dist/adapters/thread/index.js"
+      },
+      "require": {
+        "types": "./dist/adapters/thread/index.d.ts",
+        "default": "./dist/adapters/thread/index.js"
+      }
+    },
     "./adapters/thread/langchain": {
       "import": {
         "types": "./dist/adapters/thread/langchain/index.d.ts",

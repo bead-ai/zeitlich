@@ -19,12 +19,11 @@ import {
   type GoogleGenAIThreadManagerHooks,
 } from "./thread-manager";
 import { createGoogleGenAIModelInvoker } from "./model-invoker";
-
-const ADAPTER_PREFIX = "googleGenAI" as const;
+import { ADAPTER_ID } from "./adapter-id";
 
 export type GoogleGenAIThreadOps<TScope extends string = ""> =
   PrefixedThreadOps<
-    ScopedPrefix<TScope, typeof ADAPTER_PREFIX>,
+    ScopedPrefix<TScope, typeof ADAPTER_ID>,
     GoogleGenAIContent
   >;
 
@@ -242,8 +241,8 @@ export function createGoogleGenAIAdapter(
     scope?: S
   ): GoogleGenAIThreadOps<S> {
     const prefix = scope
-      ? `${ADAPTER_PREFIX}${scope.charAt(0).toUpperCase()}${scope.slice(1)}`
-      : ADAPTER_PREFIX;
+      ? `${ADAPTER_ID}${scope.charAt(0).toUpperCase()}${scope.slice(1)}`
+      : ADAPTER_ID;
     const cap = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1);
     return Object.fromEntries(
       Object.entries(threadOps).map(([k, v]) => [`${prefix}${cap(k)}`, v])
