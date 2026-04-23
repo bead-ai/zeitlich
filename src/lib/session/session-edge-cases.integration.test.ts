@@ -2,6 +2,7 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import { z } from "zod";
 import type { ToolResultConfig, TokenUsage } from "../types";
 import type { ThreadOps } from "./types";
+import type { PersistedThreadState } from "../state/types";
 import type { RunAgentActivity } from "../model/types";
 import type { RawToolCall } from "../tool-router/types";
 import type { SandboxOps } from "../sandbox/types";
@@ -95,6 +96,7 @@ function toActivityInterface<TContent = string>(
 
 function createMockThreadOps() {
   const log: { op: string; args: unknown[] }[] = [];
+  const stateStore = new Map<string, PersistedThreadState>();
   const ops = toActivityInterface({
     initializeThread: async (threadId) => {
       log.push({ op: "initializeThread", args: [threadId] });
@@ -117,8 +119,21 @@ function createMockThreadOps() {
     truncateThread: async (threadId, messageId) => {
       log.push({ op: "truncateThread", args: [threadId, messageId] });
     },
+    loadThreadState: async (threadId) => {
+      log.push({ op: "loadThreadState", args: [threadId] });
+      return stateStore.get(threadId) ?? null;
+    },
+    saveThreadState: async (threadId, state) => {
+      log.push({ op: "saveThreadState", args: [threadId, state] });
+      stateStore.set(threadId, state);
+    },
+    forkThreadState: async (source, target) => {
+      log.push({ op: "forkThreadState", args: [source, target] });
+      const src = stateStore.get(source);
+      if (src) stateStore.set(target, src);
+    },
   });
-  return { ops, log };
+  return { ops, log, stateStore };
 }
 
 function createScriptedRunAgent(
@@ -798,6 +813,16 @@ describe("createSession edge cases", () => {
       },
       truncateThread: async (threadId, messageId) => {
         log.push({ op: "truncateThread", args: [threadId, messageId] });
+      },
+      loadThreadState: async (threadId) => {
+        log.push({ op: "loadThreadState", args: [threadId] });
+        return null;
+      },
+      saveThreadState: async (threadId, state) => {
+        log.push({ op: "saveThreadState", args: [threadId, state] });
+      },
+      forkThreadState: async (source, target) => {
+        log.push({ op: "forkThreadState", args: [source, target] });
       },
     });
 

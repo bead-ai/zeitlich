@@ -1,5 +1,5 @@
 import type Redis from "ioredis";
-import type { JsonValue } from "../state/types";
+import type { JsonValue, PersistedThreadState } from "../state/types";
 export interface ThreadManagerConfig<T> {
   redis: Redis;
   threadId: string;
@@ -62,6 +62,25 @@ export interface BaseThreadManager<T> {
    * Requires the thread manager to be configured with `idOf`.
    */
   truncateFromId(messageId: string): Promise<void>;
+  /**
+   * Load the persisted state slice associated with this thread, or
+   * `null` if none has been saved yet. Safe to call on any thread —
+   * treats a missing slice as a non-error.
+   */
+  loadState(): Promise<PersistedThreadState | null>;
+  /**
+   * Overwrite the persisted state slice for this thread. The thread
+   * itself must already exist (same TTL as the message list).
+   */
+  saveState(state: PersistedThreadState): Promise<void>;
+  /**
+   * Copy the persisted state slice from this thread into `newThreadId`.
+   * No-op if there is nothing to copy. The destination thread must
+   * already exist.
+   */
+  forkState(newThreadId: string): Promise<void>;
+  /** Delete just the persisted state slice, leaving messages intact. */
+  deleteState(): Promise<void>;
 }
 
 /**

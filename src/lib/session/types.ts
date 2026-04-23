@@ -11,7 +11,11 @@ import type { Skill } from "../skills/types";
 import type { SandboxOps, SandboxSnapshot } from "../sandbox/types";
 import type { VirtualFsOps } from "../virtual-fs/types";
 import type { RunAgentActivity } from "../model/types";
-import type { AgentStateManager, JsonSerializable } from "../state/types";
+import type {
+  AgentStateManager,
+  JsonSerializable,
+  PersistedThreadState,
+} from "../state/types";
 import type { ActivityInterfaceFor } from "@temporalio/workflow";
 import type {
   ThreadInit,
@@ -79,6 +83,35 @@ export interface ThreadOps<TContent = string> {
   truncateThread(
     threadId: string,
     messageId: string,
+    threadKey?: string
+  ): Promise<void>;
+  /**
+   * Load the persisted state slice (tasks + custom state) associated with
+   * the thread, or `null` if none has been saved yet. Called on session
+   * start for `continue`/`fork` threads to rehydrate {@link AgentStateManager}.
+   */
+  loadThreadState(
+    threadId: string,
+    threadKey?: string
+  ): Promise<PersistedThreadState | null>;
+  /**
+   * Overwrite the persisted state slice for the thread. Called once from
+   * the session's `finally` block on every exit path so that "finish,
+   * store, continue later" works regardless of exit reason.
+   */
+  saveThreadState(
+    threadId: string,
+    state: PersistedThreadState,
+    threadKey?: string
+  ): Promise<void>;
+  /**
+   * Copy the persisted state slice from `sourceThreadId` into
+   * `targetThreadId`. Called when the session starts a forked thread so
+   * the new thread begins with the source's tasks + custom state.
+   */
+  forkThreadState(
+    sourceThreadId: string,
+    targetThreadId: string,
     threadKey?: string
   ): Promise<void>;
 }

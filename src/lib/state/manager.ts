@@ -11,7 +11,13 @@ import {
   isTerminalStatus,
 } from "../types";
 import type { ToolDefinition } from "../tool-router/types";
-import type { AgentState, AgentStateManager, JsonSerializable } from "./types";
+import type {
+  AgentState,
+  AgentStateManager,
+  JsonSerializable,
+  JsonValue,
+  PersistedThreadState,
+} from "./types";
 import { z } from "zod";
 
 /**
@@ -212,6 +218,22 @@ export function createAgentStateManager<
         version++;
       }
       return deleted;
+    },
+
+    getPersistedSlice(): PersistedThreadState {
+      return {
+        tasks: Array.from(tasks.entries()),
+        custom: { ...(customState as unknown as Record<string, JsonValue>) },
+      };
+    },
+
+    applyPersistedSlice(slice: PersistedThreadState): void {
+      tasks.clear();
+      for (const [id, task] of slice.tasks) {
+        tasks.set(id, task);
+      }
+      Object.assign(customState as object, slice.custom);
+      version++;
     },
 
     updateUsage(usage: {

@@ -147,6 +147,9 @@ export async function createSession<
     appendSystemMessage,
     appendAgentMessage,
     forkThread,
+    loadThreadState,
+    saveThreadState,
+    forkThreadState,
   } = threadOps;
 
   const plugins: ToolMap[string][] = [];
@@ -371,8 +374,17 @@ export async function createSession<
       // --- Thread lifecycle: new, continue, or fork ----------------------
       if (threadMode === "fork" && sourceThreadId) {
         await forkThread(sourceThreadId, threadId, threadKey);
+        await forkThreadState(sourceThreadId, threadId, threadKey);
+        const forkedSlice = await loadThreadState(threadId, threadKey);
+        if (forkedSlice) {
+          stateManager.applyPersistedSlice(forkedSlice);
+        }
       } else if (threadMode === "continue") {
         // "continue" — thread already exists, just append the new message
+        const continuedSlice = await loadThreadState(threadId, threadKey);
+        if (continuedSlice) {
+          stateManager.applyPersistedSlice(continuedSlice);
+        }
       } else {
         if (appendSystemPrompt) {
           if (
@@ -536,6 +548,28 @@ export async function createSession<
         });
         throw ApplicationFailure.fromError(error);
       } finally {
+        // Persist the task map + custom state slice alongside the thread so
+        // a future `continue` / `fork` run can rehydrate it. Runs on every
+        // exit path (completed, failed, cancelled, max_turns,
+        // waiting_for_input timeout). Best-effort: failures here must not
+        // mask the original exit reason / error.
+        try {
+          await saveThreadState(
+            threadId,
+            stateManager.getPersistedSlice(),
+            threadKey
+          );
+        } catch (persistError) {
+          log.warn("failed to persist thread state", {
+            agentName,
+            threadId,
+            error:
+              persistError instanceof Error
+                ? persistError.message
+                : String(persistError),
+          });
+        }
+
         await callSessionEnd(exitReason, stateManager.getTurns());
 
         if (sandboxOwned && sandboxId && sandboxOps) {

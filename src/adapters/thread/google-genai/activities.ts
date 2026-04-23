@@ -1,6 +1,7 @@
 import type Redis from "ioredis";
 import type { GoogleGenAI, Content, Part } from "@google/genai";
 import type { ToolResultConfig } from "../../../lib/types";
+import type { PersistedThreadState } from "../../../lib/state/types";
 import type {
   ActivityToolHandler,
   RouterContext,
@@ -234,6 +235,44 @@ export function createGoogleGenAIAdapter(
         key: threadKey,
       });
       await thread.truncateFromId(messageId);
+    },
+
+    async loadThreadState(
+      threadId: string,
+      threadKey?: string
+    ): Promise<PersistedThreadState | null> {
+      const thread = createGoogleGenAIThreadManager({
+        redis,
+        threadId,
+        key: threadKey,
+      });
+      return thread.loadState();
+    },
+
+    async saveThreadState(
+      threadId: string,
+      state: PersistedThreadState,
+      threadKey?: string
+    ): Promise<void> {
+      const thread = createGoogleGenAIThreadManager({
+        redis,
+        threadId,
+        key: threadKey,
+      });
+      await thread.saveState(state);
+    },
+
+    async forkThreadState(
+      sourceThreadId: string,
+      targetThreadId: string,
+      threadKey?: string
+    ): Promise<void> {
+      const thread = createGoogleGenAIThreadManager({
+        redis,
+        threadId: sourceThreadId,
+        key: threadKey,
+      });
+      await thread.forkState(targetThreadId);
     },
   };
 

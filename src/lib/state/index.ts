@@ -6,4 +6,5 @@ export type {
   JsonSerializable,
   AgentState,
   AgentStateManager,
+  PersistedThreadState,
 } from "./types";

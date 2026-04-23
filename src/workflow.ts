@@ -54,6 +54,7 @@ export type {
   JsonSerializable,
   JsonValue,
   JsonPrimitive,
+  PersistedThreadState,
 } from "./lib/state";
 
 // Tool router (includes registry functionality)
