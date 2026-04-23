@@ -58,9 +58,10 @@ export interface ThreadOps<TContent = string> {
     threadKey?: string
   ): Promise<void>;
   /**
-   * Copy all messages from sourceThreadId into a new thread at
-   * targetThreadId. Adapters that have `onForkPrepareThread` and/or
-   * `onForkTransform` hooks configured apply them once to the new thread
+   * Copy all messages AND the persisted state slice (tasks + custom
+   * state) from `sourceThreadId` into a new thread at `targetThreadId`.
+   * Adapters that have `onForkPrepareThread` and/or `onForkTransform`
+   * hooks configured apply them once to the new thread's messages
    * before returning.
    */
   forkThread(
@@ -102,16 +103,6 @@ export interface ThreadOps<TContent = string> {
   saveThreadState(
     threadId: string,
     state: PersistedThreadState,
-    threadKey?: string
-  ): Promise<void>;
-  /**
-   * Copy the persisted state slice from `sourceThreadId` into
-   * `targetThreadId`. Called when the session starts a forked thread so
-   * the new thread begins with the source's tasks + custom state.
-   */
-  forkThreadState(
-    sourceThreadId: string,
-    targetThreadId: string,
     threadKey?: string
   ): Promise<void>;
 }

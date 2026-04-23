@@ -118,6 +118,8 @@ function createMockThreadOps() {
     },
     forkThread: async (source, target) => {
       log.push({ op: "forkThread", args: [source, target] });
+      const src = stateStore.get(source);
+      if (src) stateStore.set(target, src);
     },
     truncateThread: async (threadId, messageId) => {
       log.push({ op: "truncateThread", args: [threadId, messageId] });
@@ -129,11 +131,6 @@ function createMockThreadOps() {
     saveThreadState: async (threadId, state) => {
       log.push({ op: "saveThreadState", args: [threadId, state] });
       stateStore.set(threadId, state);
-    },
-    forkThreadState: async (source, target) => {
-      log.push({ op: "forkThreadState", args: [source, target] });
-      const src = stateStore.get(source);
-      if (src) stateStore.set(target, src);
     },
   });
 
@@ -1271,9 +1268,9 @@ describe("createSession integration", () => {
     const result = await session.runSession({ stateManager });
     expect(result.exitReason).toBe("completed");
 
-    const forkStateOps = log.filter((l) => l.op === "forkThreadState");
-    expect(forkStateOps).toHaveLength(1);
-    expect(at(forkStateOps, 0).args[0]).toBe("source-thread");
+    const forkOps = log.filter((l) => l.op === "forkThread");
+    expect(forkOps).toHaveLength(1);
+    expect(at(forkOps, 0).args[0]).toBe("source-thread");
 
     expect(stateManager.getTask("task-src")).toBeDefined();
     expect(stateManager.get("counter")).toBe(3);

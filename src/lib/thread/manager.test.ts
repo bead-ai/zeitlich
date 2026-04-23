@@ -95,26 +95,22 @@ describe("createThreadManager state persistence", () => {
     await expect(tm.saveState(baseSlice)).rejects.toThrow(/does not exist/);
   });
 
-  it("forkState copies the slice to the destination thread", async () => {
+  it("fork copies the persisted state slice to the new thread", async () => {
     await initThread("source");
-    await initThread("target");
     const src = createThreadManager({ redis, threadId: "source" });
     await src.saveState(baseSlice);
 
-    await src.forkState("target");
+    const dst = await src.fork("target");
 
-    const dst = createThreadManager({ redis, threadId: "target" });
     expect(await dst.loadState()).toEqual(baseSlice);
   });
 
-  it("forkState is a no-op when source has no slice", async () => {
+  it("fork leaves the new thread's slice null when source has none", async () => {
     await initThread("source");
-    await initThread("target");
     const src = createThreadManager({ redis, threadId: "source" });
 
-    await src.forkState("target");
+    const dst = await src.fork("target");
 
-    const dst = createThreadManager({ redis, threadId: "target" });
     expect(await dst.loadState()).toBeNull();
   });
 

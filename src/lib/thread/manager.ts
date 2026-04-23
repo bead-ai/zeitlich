@@ -94,6 +94,7 @@ export function createThreadManager<T>(
     async fork(newThreadId: string): Promise<BaseThreadManager<T>> {
       await assertThreadExists();
       const data = await redis.lrange(redisKey, 0, -1);
+      const stateRaw = await redis.get(stateKey);
       const forked = createThreadManager({
         ...config,
         threadId: newThreadId,
@@ -103,6 +104,10 @@ export function createThreadManager<T>(
         const newKey = getThreadListKey(key, newThreadId);
         await redis.rpush(newKey, ...data);
         await redis.expire(newKey, THREAD_TTL_SECONDS);
+      }
+      if (stateRaw != null) {
+        const newStateKey = getThreadStateKey(key, newThreadId);
+        await redis.set(newStateKey, stateRaw, "EX", THREAD_TTL_SECONDS);
       }
       return forked;
     },
@@ -149,13 +154,6 @@ export function createThreadManager<T>(
         "EX",
         THREAD_TTL_SECONDS
       );
-    },
-
-    async forkState(newThreadId: string): Promise<void> {
-      const raw = await redis.get(stateKey);
-      if (raw == null) return;
-      const newStateKey = getThreadStateKey(key, newThreadId);
-      await redis.set(newStateKey, raw, "EX", THREAD_TTL_SECONDS);
     },
 
     async deleteState(): Promise<void> {

@@ -115,6 +115,8 @@ function createMockThreadOps() {
     },
     forkThread: async (source, target) => {
       log.push({ op: "forkThread", args: [source, target] });
+      const src = stateStore.get(source);
+      if (src) stateStore.set(target, src);
     },
     truncateThread: async (threadId, messageId) => {
       log.push({ op: "truncateThread", args: [threadId, messageId] });
@@ -126,11 +128,6 @@ function createMockThreadOps() {
     saveThreadState: async (threadId, state) => {
       log.push({ op: "saveThreadState", args: [threadId, state] });
       stateStore.set(threadId, state);
-    },
-    forkThreadState: async (source, target) => {
-      log.push({ op: "forkThreadState", args: [source, target] });
-      const src = stateStore.get(source);
-      if (src) stateStore.set(target, src);
     },
   });
   return { ops, log, stateStore };
@@ -820,9 +817,6 @@ describe("createSession edge cases", () => {
       },
       saveThreadState: async (threadId, state) => {
         log.push({ op: "saveThreadState", args: [threadId, state] });
-      },
-      forkThreadState: async (source, target) => {
-        log.push({ op: "forkThreadState", args: [source, target] });
       },
     });
 

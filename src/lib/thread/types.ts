@@ -71,14 +71,11 @@ export interface BaseThreadManager<T> {
   /**
    * Overwrite the persisted state slice for this thread. The thread
    * itself must already exist (same TTL as the message list).
+   *
+   * Note: {@link BaseThreadManager.fork} already copies the slice to
+   * the new thread, so there's no separate `forkState` method.
    */
   saveState(state: PersistedThreadState): Promise<void>;
-  /**
-   * Copy the persisted state slice from this thread into `newThreadId`.
-   * No-op if there is nothing to copy. The destination thread must
-   * already exist.
-   */
-  forkState(newThreadId: string): Promise<void>;
   /** Delete just the persisted state slice, leaving messages intact. */
   deleteState(): Promise<void>;
 }

@@ -150,7 +150,6 @@ export async function createSession<
     forkThread,
     loadThreadState,
     saveThreadState,
-    forkThreadState,
   } = threadOps;
 
   const plugins: ToolMap[string][] = [];
@@ -382,7 +381,6 @@ export async function createSession<
 
       if (threadMode === "fork" && sourceThreadId) {
         await forkThread(sourceThreadId, threadId, threadKey);
-        await forkThreadState(sourceThreadId, threadId, threadKey);
         const forkedSlice = await loadThreadState(threadId, threadKey);
         if (forkedSlice) rehydrateFromSlice(forkedSlice);
       } else if (threadMode === "continue") {

@@ -247,19 +247,6 @@ export function createAnthropicAdapter(
       });
       await thread.saveState(state);
     },
-
-    async forkThreadState(
-      sourceThreadId: string,
-      targetThreadId: string,
-      threadKey?: string
-    ): Promise<void> {
-      const thread = createAnthropicThreadManager({
-        redis,
-        threadId: sourceThreadId,
-        key: threadKey,
-      });
-      await thread.forkState(targetThreadId);
-    },
   };
 
   function createActivities<S extends string = "">(
