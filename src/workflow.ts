@@ -40,6 +40,11 @@ export type {
 
 // Thread utilities
 export { getShortId } from "./lib/thread/id";
+export {
+  THREAD_TTL_SECONDS,
+  getThreadListKey,
+  getThreadMetaKey,
+} from "./lib/thread/keys";
 
 // State management
 export { createAgentStateManager } from "./lib/state";
