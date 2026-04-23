@@ -1842,10 +1842,7 @@ describe("createSubagentHandler", () => {
     // intentionally omits baseSnapshot — only the signal path can populate
     // the map for this call.
     execMock.mockImplementationOnce(
-      async (
-        _wf: unknown,
-        opts: { workflowId: string; args: unknown[] }
-      ) => {
+      async (_wf: unknown, opts: { workflowId: string; args: unknown[] }) => {
         const reg = setHandlerMock.mock.calls
           .filter(
             ([sig]) => (sig as { name?: string })?.name === "childSandboxReady"
@@ -1917,10 +1914,7 @@ describe("createSubagentHandler", () => {
     const { handler } = createSubagentHandler([config]);
 
     execMock.mockImplementationOnce(
-      async (
-        _wf: unknown,
-        opts: { workflowId: string; args: unknown[] }
-      ) => {
+      async (_wf: unknown, opts: { workflowId: string; args: unknown[] }) => {
         const reg = setHandlerMock.mock.calls
           .filter(
             ([sig]) => (sig as { name?: string })?.name === "childSandboxReady"
@@ -2604,7 +2598,11 @@ describe("defineSubagentWorkflow", () => {
     const workflow = defineSubagentWorkflow(
       { name: "test", description: "test agent" },
       async (_prompt, sessionInput) => {
-        sessionInput.onSessionExit?.({ sandboxId: "sb-1", snapshot });
+        sessionInput.onSessionExit?.({
+          sandboxId: "sb-1",
+          snapshot,
+          threadId: "t",
+        });
         return { toolResponse: "ok", data: null, threadId: "t" };
       }
     );
@@ -2626,6 +2624,7 @@ describe("defineSubagentWorkflow", () => {
             data: { tag: "session" },
             createdAt: new Date().toISOString(),
           },
+          threadId: "t",
         });
         return {
           toolResponse: "ok",

@@ -33,18 +33,7 @@ export type SubagentChildWorkflowOptions = Omit<
 export type SubagentHandlerResponse<
   TResult = null,
   TToolResponse = JsonValue,
-> = ToolHandlerResponse<TResult, TToolResponse> & {
-  threadId: string;
-  sandboxId?: string;
-  /** Snapshot captured on session exit when `sandboxShutdown === "snapshot"`. */
-  snapshot?: SandboxSnapshot;
-  /**
-   * Snapshot captured immediately after the sandbox was seeded (before the
-   * first agent turn) when `continuation === "snapshot"`. Only set on the
-   * first call that actually created the sandbox.
-   */
-  baseSnapshot?: SandboxSnapshot;
-};
+> = ToolHandlerResponse<TResult, TToolResponse>;
 
 /**
  * Raw workflow input fields passed from parent to child workflow.
@@ -288,5 +277,6 @@ export interface SubagentSessionInput {
   onSessionExit?: (result: {
     sandboxId?: string;
     snapshot?: SandboxSnapshot;
+    threadId: string;
   }) => void;
 }

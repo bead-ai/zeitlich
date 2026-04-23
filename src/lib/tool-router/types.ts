@@ -2,6 +2,7 @@ import type { TokenUsage, ToolResultConfig } from "../types";
 import type { JsonValue } from "../state/types";
 import type { z } from "zod";
 import type { ActivityFunctionWithOptions } from "@temporalio/workflow";
+import type { SandboxSnapshot } from "../sandbox/types";
 
 // ============================================================================
 // Tool Definition Types
@@ -158,6 +159,10 @@ export interface ToolHandlerResponse<
   threadId?: string;
   /** Sandbox ID created or used by the handler (e.g. child agent sandbox) */
   sandboxId?: string;
+  /** Snapshot captured on exit when `sandboxShutdown === "snapshot"`. */
+  snapshot?: SandboxSnapshot;
+  /** Snapshot captured immediately after sandbox seeding (before the agent loop starts) when `sandbox.mode === "new"` and `sandboxShutdown === "snapshot"`. Intended as a reusable "base" for new threads that want to skip re-seeding. */
+  baseSnapshot?: SandboxSnapshot;
   /** Unvalidated metadata passthrough from handler to hooks (e.g. infrastructure state) */
   metadata?: Record<string, unknown>;
 }

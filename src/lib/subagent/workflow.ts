@@ -131,7 +131,7 @@ export function defineSubagentWorkflow(
     let capturedSandboxId: string | undefined;
     let capturedSnapshot: SandboxSnapshot | undefined;
     let capturedBaseSnapshot: SandboxSnapshot | undefined;
-
+    let capturedThreadId: string | undefined;
     const sessionInput: SubagentSessionInput = {
       agentName: config.name,
       sandboxShutdown: effectiveShutdown,
@@ -148,9 +148,10 @@ export function defineSubagentWorkflow(
           });
         }
       },
-      onSessionExit: ({ sandboxId, snapshot }) => {
+      onSessionExit: ({ sandboxId, snapshot, threadId }) => {
         capturedSandboxId = sandboxId;
         capturedSnapshot = snapshot;
+        capturedThreadId = threadId;
       },
     };
 
@@ -161,14 +162,12 @@ export function defineSubagentWorkflow(
     // result take precedence.
     return {
       ...result,
-      ...(capturedSandboxId !== undefined &&
-        result.sandboxId === undefined && { sandboxId: capturedSandboxId }),
-      ...(capturedSnapshot !== undefined &&
-        result.snapshot === undefined && { snapshot: capturedSnapshot }),
-      ...(capturedBaseSnapshot !== undefined &&
-        result.baseSnapshot === undefined && {
-          baseSnapshot: capturedBaseSnapshot,
-        }),
+      ...(capturedThreadId !== undefined && { threadId: capturedThreadId }),
+      ...(capturedSandboxId !== undefined && { sandboxId: capturedSandboxId }),
+      ...(capturedSnapshot !== undefined && { snapshot: capturedSnapshot }),
+      ...(capturedBaseSnapshot !== undefined && {
+        baseSnapshot: capturedBaseSnapshot,
+      }),
     };
   };
 
