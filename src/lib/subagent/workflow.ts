@@ -12,6 +12,7 @@ import type {
   SubagentSessionInput,
 } from "./types";
 import type { SubagentSandboxShutdown } from "../lifecycle";
+import type { SandboxSnapshot } from "../sandbox/types";
 import { childSandboxReadySignal } from "./signals";
 
 /**
@@ -50,6 +51,8 @@ import { childSandboxReadySignal } from "./signals";
  *     });
  *
  *     const { finalMessage, threadId } = await session.runSession({ stateManager });
+ *     // `sandboxId`, `snapshot`, and `baseSnapshot` are auto-forwarded
+ *     // from the session — no need to thread them through manually.
  *     return { toolResponse: finalMessage ?? "No response", data: null, threadId };
  *   },
  * );
@@ -125,23 +128,48 @@ export function defineSubagentWorkflow(
     }
     const parentHandle = getExternalWorkflowHandle(parent.workflowId);
 
+    let capturedSandboxId: string | undefined;
+    let capturedSnapshot: SandboxSnapshot | undefined;
+    let capturedBaseSnapshot: SandboxSnapshot | undefined;
+
     const sessionInput: SubagentSessionInput = {
       agentName: config.name,
       sandboxShutdown: effectiveShutdown,
       ...(workflowInput.thread && { thread: workflowInput.thread }),
       ...(workflowInput.sandbox && { sandbox: workflowInput.sandbox }),
-      onSandboxReady: (sandboxId: string) => {
+      onSandboxReady: ({ sandboxId, baseSnapshot }) => {
+        capturedBaseSnapshot = baseSnapshot;
         const isReuse = workflowInput.sandbox?.mode === "continue";
         if (!isReuse) {
           void parentHandle.signal(childSandboxReadySignal, {
             childWorkflowId: workflowInfo().workflowId,
             sandboxId,
+            ...(baseSnapshot && { baseSnapshot }),
           });
         }
       },
+      onSessionExit: ({ sandboxId, snapshot }) => {
+        capturedSandboxId = sandboxId;
+        capturedSnapshot = snapshot;
+      },
     };
 
-    return fn(prompt, sessionInput, context ?? {});
+    const result = await fn(prompt, sessionInput, context ?? {});
+
+    // Auto-forward sandbox outputs captured from the session so user code
+    // never has to thread them through manually. Explicit values on the fn
+    // result take precedence.
+    return {
+      ...result,
+      ...(capturedSandboxId !== undefined &&
+        result.sandboxId === undefined && { sandboxId: capturedSandboxId }),
+      ...(capturedSnapshot !== undefined &&
+        result.snapshot === undefined && { snapshot: capturedSnapshot }),
+      ...(capturedBaseSnapshot !== undefined &&
+        result.baseSnapshot === undefined && {
+          baseSnapshot: capturedBaseSnapshot,
+        }),
+    };
   };
 
   // for temporal workflow name

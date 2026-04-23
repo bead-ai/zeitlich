@@ -249,6 +249,13 @@ export type SubagentFnResult<
 export interface ChildSandboxReadySignalPayload {
   childWorkflowId: string;
   sandboxId: string;
+  /**
+   * Present only when the session captured a seed snapshot on this run
+   * (`continuation === "snapshot"` + fresh creation). Allows the parent to
+   * publish the reusable base snapshot to concurrent waiters without
+   * blocking on the child workflow's completion.
+   */
+  baseSnapshot?: SandboxSnapshot;
 }
 
 /**
@@ -263,6 +270,23 @@ export interface SubagentSessionInput {
   sandbox?: SandboxInit;
   /** Sandbox shutdown policy (default: "destroy") */
   sandboxShutdown?: SubagentSandboxShutdown;
-  /** Called by the session as soon as the sandbox is created, before the agent loop starts. */
-  onSandboxReady?: (sandboxId: string) => void;
+  /**
+   * Called by the session as soon as the sandbox is created, before the
+   * agent loop starts. `baseSnapshot` is populated only when the session
+   * captured a seed snapshot (fresh creation + `sandboxShutdown === "snapshot"`).
+   */
+  onSandboxReady?: (args: {
+    sandboxId: string;
+    baseSnapshot?: SandboxSnapshot;
+  }) => void;
+  /**
+   * Called by the session right before `runSession` returns. Installed by
+   * `defineSubagentWorkflow` to capture sandbox outputs and auto-forward
+   * them to the subagent's final result so user code never has to thread
+   * `sandboxId` / `snapshot` manually.
+   */
+  onSessionExit?: (result: {
+    sandboxId?: string;
+    snapshot?: SandboxSnapshot;
+  }) => void;
 }
