@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.40](https://github.com/bead-ai/zeitlich/compare/v0.2.39...v0.2.40) (2026-04-23)
+
+
+### Bug Fixes
+
+* missing onSessionExit input ([064bfbf](https://github.com/bead-ai/zeitlich/commit/064bfbf501ea00d3fd361f6d736bafbd828a415f))
+
+
+### Miscellaneous Chores
+
+* release 0.2.40 ([917e5bb](https://github.com/bead-ai/zeitlich/commit/917e5bb5a5e5d5bb259f15c00438fbef1da59c0e))
+
 ## [0.2.39](https://github.com/bead-ai/zeitlich/compare/v0.2.38...v0.2.39) (2026-04-23)
 
 
