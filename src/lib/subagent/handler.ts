@@ -12,6 +12,7 @@ import type { JsonValue } from "../state/types";
 import type {
   InferSubagentResult,
   SubagentConfig,
+  SubagentFnResult,
   SubagentSandboxConfig,
   SubagentWorkflowInput,
 } from "./types";
@@ -129,6 +130,8 @@ export function createSubagentHandler<
   const persistentSandboxCreationError = new Map<string, unknown>();
   /** Reverse lookup: childWorkflowId → agentName for in-flight lazy creators */
   const lazyCreatorAgent = new Map<string, string>();
+  /** Reverse lookup: childWorkflowId → agentName for in-flight snapshot-base creators */
+  const snapshotBaseCreatorAgent = new Map<string, string>();
   /** Maps childThreadId → latest snapshot for sandbox continuation via snapshots */
   const threadSnapshots = new Map<
     string,
@@ -144,13 +147,21 @@ export function createSubagentHandler<
   /** Latest failure from a snapshot-base creator call, keyed by agentName. */
   const persistentBaseSnapshotCreationError = new Map<string, unknown>();
 
-  setHandler(childSandboxReadySignal, ({ childWorkflowId, sandboxId }) => {
-    const agentName = lazyCreatorAgent.get(childWorkflowId);
-    if (agentName && !persistentSandboxes.has(agentName)) {
-      persistentSandboxes.set(agentName, sandboxId);
-      lazyCreatorAgent.delete(childWorkflowId);
+  setHandler(
+    childSandboxReadySignal,
+    ({ childWorkflowId, sandboxId, baseSnapshot }) => {
+      const lazyAgent = lazyCreatorAgent.get(childWorkflowId);
+      if (lazyAgent && !persistentSandboxes.has(lazyAgent)) {
+        persistentSandboxes.set(lazyAgent, sandboxId);
+        lazyCreatorAgent.delete(childWorkflowId);
+      }
+      const snapAgent = snapshotBaseCreatorAgent.get(childWorkflowId);
+      if (snapAgent && baseSnapshot && !persistentBaseSnapshot.has(snapAgent)) {
+        persistentBaseSnapshot.set(snapAgent, baseSnapshot);
+        snapshotBaseCreatorAgent.delete(childWorkflowId);
+      }
     }
-  });
+  );
 
   const handler = async (
     args: SubagentArgs,
@@ -366,6 +377,9 @@ export function createSubagentHandler<
     if (isLazyCreator) {
       lazyCreatorAgent.set(childWorkflowId, config.agentName);
     }
+    if (isSnapshotBaseCreator) {
+      snapshotBaseCreatorAgent.set(childWorkflowId, config.agentName);
+    }
 
     log.info("subagent spawned", {
       subagent: config.agentName,
@@ -382,9 +396,12 @@ export function createSubagentHandler<
     // creator, also publish the error so any already-waiting concurrent
     // callers fail with the same error instead of silently retrying or
     // hanging.
-    let childResult: Awaited<ReturnType<typeof executeChild>>;
+    let childResult: SubagentFnResult<InferSubagentResult<T[number]> | null>;
     try {
-      childResult = await executeChild(config.workflow, childOpts);
+      childResult = (await executeChild(
+        config.workflow,
+        childOpts
+      )) as SubagentFnResult<InferSubagentResult<T[number]> | null>;
     } catch (err) {
       log.warn("subagent failed", {
         subagent: config.agentName,
@@ -399,6 +416,7 @@ export function createSubagentHandler<
       if (isSnapshotBaseCreator) {
         persistentBaseSnapshotCreating.delete(config.agentName);
         persistentBaseSnapshotCreationError.set(config.agentName, err);
+        snapshotBaseCreatorAgent.delete(childWorkflowId);
       }
       throw err;
     }
@@ -484,6 +502,7 @@ export function createSubagentHandler<
     if (isSnapshotBaseCreator) {
       persistentBaseSnapshotCreating.delete(config.agentName);
       persistentBaseSnapshotCreationError.delete(config.agentName);
+      snapshotBaseCreatorAgent.delete(childWorkflowId);
     }
 
     if (!toolResponse) {
