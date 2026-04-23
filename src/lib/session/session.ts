@@ -16,6 +16,7 @@ import type {
   AgentState,
   AgentStateManager,
   JsonSerializable,
+  PersistedThreadState,
 } from "../state/types";
 import { createToolRouter } from "../tool-router/router";
 import type { ParsedToolCallUnion, ToolMap } from "../tool-router/types";
@@ -147,6 +148,8 @@ export async function createSession<
     appendSystemMessage,
     appendAgentMessage,
     forkThread,
+    loadThreadState,
+    saveThreadState,
   } = threadOps;
 
   const plugins: ToolMap[string][] = [];
@@ -369,10 +372,21 @@ export async function createSession<
       const systemPrompt = stateManager.getSystemPrompt();
 
       // --- Thread lifecycle: new, continue, or fork ----------------------
+      const rehydrateFromSlice = (slice: PersistedThreadState): void => {
+        stateManager.mergeUpdate({
+          tasks: new Map(slice.tasks),
+          ...slice.custom,
+        } as Partial<AgentState<TState>>);
+      };
+
       if (threadMode === "fork" && sourceThreadId) {
         await forkThread(sourceThreadId, threadId, threadKey);
+        const forkedSlice = await loadThreadState(threadId, threadKey);
+        if (forkedSlice) rehydrateFromSlice(forkedSlice);
       } else if (threadMode === "continue") {
         // "continue" — thread already exists, just append the new message
+        const continuedSlice = await loadThreadState(threadId, threadKey);
+        if (continuedSlice) rehydrateFromSlice(continuedSlice);
       } else {
         if (appendSystemPrompt) {
           if (
@@ -536,6 +550,28 @@ export async function createSession<
         });
         throw ApplicationFailure.fromError(error);
       } finally {
+        // Persist the task map + custom state slice alongside the thread so
+        // a future `continue` / `fork` run can rehydrate it. Runs on every
+        // exit path (completed, failed, cancelled, max_turns,
+        // waiting_for_input timeout). Best-effort: failures here must not
+        // mask the original exit reason / error.
+        try {
+          await saveThreadState(
+            threadId,
+            stateManager.getPersistedSlice(),
+            threadKey
+          );
+        } catch (persistError) {
+          log.warn("failed to persist thread state", {
+            agentName,
+            threadId,
+            error:
+              persistError instanceof Error
+                ? persistError.message
+                : String(persistError),
+          });
+        }
+
         await callSessionEnd(exitReason, stateManager.getTurns());
 
         if (sandboxOwned && sandboxId && sandboxOps) {

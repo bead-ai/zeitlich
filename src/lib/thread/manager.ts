@@ -1,8 +1,10 @@
+import type { PersistedThreadState } from "../state/types";
 import type { ThreadManagerConfig, BaseThreadManager } from "./types";
 import {
   THREAD_TTL_SECONDS,
   getThreadListKey,
   getThreadMetaKey,
+  getThreadStateKey,
 } from "./keys";
 
 /**
@@ -47,6 +49,7 @@ export function createThreadManager<T>(
   } = config;
   const redisKey = getThreadListKey(key, threadId);
   const metaKey = getThreadMetaKey(key, threadId);
+  const stateKey = getThreadStateKey(key, threadId);
 
   async function assertThreadExists(): Promise<void> {
     const exists = await redis.exists(metaKey);
@@ -91,6 +94,7 @@ export function createThreadManager<T>(
     async fork(newThreadId: string): Promise<BaseThreadManager<T>> {
       await assertThreadExists();
       const data = await redis.lrange(redisKey, 0, -1);
+      const stateRaw = await redis.get(stateKey);
       const forked = createThreadManager({
         ...config,
         threadId: newThreadId,
@@ -100,6 +104,10 @@ export function createThreadManager<T>(
         const newKey = getThreadListKey(key, newThreadId);
         await redis.rpush(newKey, ...data);
         await redis.expire(newKey, THREAD_TTL_SECONDS);
+      }
+      if (stateRaw != null) {
+        const newStateKey = getThreadStateKey(key, newThreadId);
+        await redis.set(newStateKey, stateRaw, "EX", THREAD_TTL_SECONDS);
       }
       return forked;
     },
@@ -129,7 +137,27 @@ export function createThreadManager<T>(
     },
 
     async delete(): Promise<void> {
-      await redis.del(redisKey, metaKey);
+      await redis.del(redisKey, metaKey, stateKey);
+    },
+
+    async loadState(): Promise<PersistedThreadState | null> {
+      const raw = await redis.get(stateKey);
+      if (raw == null) return null;
+      return JSON.parse(raw) as PersistedThreadState;
+    },
+
+    async saveState(state: PersistedThreadState): Promise<void> {
+      await assertThreadExists();
+      await redis.set(
+        stateKey,
+        JSON.stringify(state),
+        "EX",
+        THREAD_TTL_SECONDS
+      );
+    },
+
+    async deleteState(): Promise<void> {
+      await redis.del(stateKey);
     },
 
     async length(): Promise<number> {

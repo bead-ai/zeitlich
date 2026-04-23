@@ -72,3 +72,23 @@ export function getThreadMetaKey(
 ): string {
   return `${threadKey}:meta:thread:${threadId}`;
 }
+
+/**
+ * Build the Redis key that stores a thread's persisted state slice
+ * (tasks + custom state) written by zeitlich's session loop on every
+ * exit path.
+ *
+ * Consumers can read this key with `redis.get(getThreadStateKey(key, id))`
+ * and `JSON.parse` the result into a {@link PersistedThreadState}.
+ *
+ * @param threadKey - Thread key (defaults to `"messages"` inside the
+ *                    thread manager, but downstream adapters may pass
+ *                    their own value).
+ * @param threadId  - Thread id as provided to the thread manager.
+ */
+export function getThreadStateKey(
+  threadKey: string,
+  threadId: string
+): string {
+  return `${threadKey}:state:thread:${threadId}`;
+}

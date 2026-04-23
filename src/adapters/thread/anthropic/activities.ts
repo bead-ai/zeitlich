@@ -1,6 +1,7 @@
 import type Redis from "ioredis";
 import type Anthropic from "@anthropic-ai/sdk";
 import type { ToolResultConfig } from "../../../lib/types";
+import type { PersistedThreadState } from "../../../lib/state/types";
 import type {
   ActivityToolHandler,
   RouterContext,
@@ -220,6 +221,31 @@ export function createAnthropicAdapter(
     ): Promise<void> {
       const thread = createAnthropicThreadManager({ redis, threadId, key: threadKey });
       await thread.truncateFromId(messageId);
+    },
+
+    async loadThreadState(
+      threadId: string,
+      threadKey?: string
+    ): Promise<PersistedThreadState | null> {
+      const thread = createAnthropicThreadManager({
+        redis,
+        threadId,
+        key: threadKey,
+      });
+      return thread.loadState();
+    },
+
+    async saveThreadState(
+      threadId: string,
+      state: PersistedThreadState,
+      threadKey?: string
+    ): Promise<void> {
+      const thread = createAnthropicThreadManager({
+        redis,
+        threadId,
+        key: threadKey,
+      });
+      await thread.saveState(state);
     },
   };
 

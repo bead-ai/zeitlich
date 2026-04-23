@@ -54,5 +54,7 @@ export function createThreadOpsProxy(
     appendSystemMessage: acts[p("appendSystemMessage")],
     forkThread: acts[p("forkThread")],
     truncateThread: acts[p("truncateThread")],
+    loadThreadState: acts[p("loadThreadState")],
+    saveThreadState: acts[p("saveThreadState")],
   } as ActivityInterfaceFor<ThreadOps>;
 }

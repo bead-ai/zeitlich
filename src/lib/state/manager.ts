@@ -11,7 +11,13 @@ import {
   isTerminalStatus,
 } from "../types";
 import type { ToolDefinition } from "../tool-router/types";
-import type { AgentState, AgentStateManager, JsonSerializable } from "./types";
+import type {
+  AgentState,
+  AgentStateManager,
+  JsonSerializable,
+  JsonValue,
+  PersistedThreadState,
+} from "./types";
 import { z } from "zod";
 
 /**
@@ -63,11 +69,19 @@ export function createAgentStateManager<
   const tasks = new Map<string, WorkflowTask>(initialState?.tasks);
 
   const {
-    status: _,
-    version: __,
-    turns: ___,
-    tasks: ____,
-    tools: _____,
+    status: _status,
+    version: _version,
+    turns: _turns,
+    tasks: _tasks,
+    tools: _tools,
+    systemPrompt: _systemPrompt,
+    fileTree: _fileTree,
+    inlineFiles: _inlineFiles,
+    virtualFsCtx: _virtualFsCtx,
+    totalInputTokens: _totalInputTokens,
+    totalOutputTokens: _totalOutputTokens,
+    cachedWriteTokens: _cachedWriteTokens,
+    cachedReadTokens: _cachedReadTokens,
     ...custom
   } = initialState ?? {};
   const customState = custom as TCustom;
@@ -166,8 +180,17 @@ export function createAgentStateManager<
       version++;
     },
 
-    mergeUpdate(update: Partial<TCustom>): void {
-      Object.assign(customState as object, update);
+    mergeUpdate(update: Partial<AgentState<TCustom>>): void {
+      const { tasks: nextTasks, ...rest } = update as Partial<
+        AgentState<TCustom>
+      > & { tasks?: Map<string, WorkflowTask> };
+      if (nextTasks) {
+        tasks.clear();
+        for (const [id, task] of nextTasks) {
+          tasks.set(id, task);
+        }
+      }
+      Object.assign(customState as object, rest);
       version++;
     },
 
@@ -212,6 +235,13 @@ export function createAgentStateManager<
         version++;
       }
       return deleted;
+    },
+
+    getPersistedSlice(): PersistedThreadState {
+      return {
+        tasks: Array.from(tasks.entries()),
+        custom: { ...(customState as unknown as Record<string, JsonValue>) },
+      };
     },
 
     updateUsage(usage: {

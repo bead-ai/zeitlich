@@ -47,6 +47,7 @@ function createStatefulRedis() {
       strings.set(key, value);
       return "OK";
     }),
+    get: vi.fn(async (key: string) => strings.get(key) ?? null),
     expire: vi.fn(async (_key: string, _ttl: number) => 1),
     llen: vi.fn(async (key: string) => (lists.get(key) ?? []).length),
     eval: vi.fn(

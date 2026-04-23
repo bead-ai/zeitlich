@@ -49,6 +49,23 @@ export type AgentState<TCustom extends JsonSerializable<TCustom>> =
   BaseAgentState & TCustom;
 
 /**
+ * The slice of agent state that is persisted alongside the thread in the
+ * thread store (e.g. Redis) so that a workflow can terminate, store its
+ * state, and be continued or forked later with that state rehydrated.
+ *
+ * Only fields that make sense to carry across workflow runs belong here.
+ * Runtime bookkeeping like status, version, turns, tools, fileTree, token
+ * counters, and the system prompt is intentionally NOT persisted — each run
+ * rebuilds those from scratch.
+ */
+export interface PersistedThreadState {
+  /** Task map serialized as entries so it round-trips through JSON. */
+  tasks: [string, WorkflowTask][];
+  /** All custom state fields declared by the caller. */
+  custom: Record<string, JsonValue>;
+}
+
+/**
  * Agent state manager interface
  * Note: Temporal handlers must be set up in the workflow file due to
  * Temporal's workflow isolation requirements. This manager provides
@@ -121,6 +138,14 @@ export interface AgentStateManager<TCustom extends JsonSerializable<TCustom>> {
 
   /** Set the tools (converts Zod schemas to JSON Schema for serialization) */
   setTools(newTools: ToolDefinition[]): void;
+
+  /**
+   * Snapshot the fields that should survive across workflow runs
+   * (tasks + all custom state). Safe to pass directly to
+   * {@link ThreadOps.saveThreadState}. Rehydrate on the next run with
+   * `mergeUpdate({ tasks: new Map(slice.tasks), ...slice.custom })`.
+   */
+  getPersistedSlice(): PersistedThreadState;
 
   /** Update the usage */
   updateUsage(usage: TokenUsage): void;
