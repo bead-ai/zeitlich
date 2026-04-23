@@ -2,6 +2,38 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.39](https://github.com/bead-ai/zeitlich/compare/v0.2.38...v0.2.39) (2026-04-23)
+
+
+### ⚠ BREAKING CHANGES
+
+* persist tasks + custom state slice alongside thread ([#103](https://github.com/bead-ai/zeitlich/issues/103))
+* RunAgentConfig now requires `assistantMessageId`. The session pre-generates the id the upcoming assistant message will be stored under and threads it through the runAgent activity so the activity itself can truncate the thread from that id on entry — giving deterministic rewinds (reuse the same id) and free time-travel via Temporal workflow reset.
+
+### Features
+
+* id-based thread rewinds via pre-assigned assistantMessageId ([#98](https://github.com/bead-ai/zeitlich/issues/98)) ([9ab46a2](https://github.com/bead-ai/zeitlich/commit/9ab46a2604576546793c393ecbc08fa2a4784db3))
+* persist tasks + custom state slice alongside thread ([#103](https://github.com/bead-ai/zeitlich/issues/103)) ([79eaca2](https://github.com/bead-ai/zeitlich/commit/79eaca29734145e5b6fae763839791cfd9a45ca0))
+* **thread:** add fork-time transform hooks ([#100](https://github.com/bead-ai/zeitlich/issues/100)) ([0c98a39](https://github.com/bead-ai/zeitlich/commit/0c98a39d3068ad6c93e5055ab5123e4742f7534a))
+* **thread:** expose adapter identity, key-layout helpers, and thread TTL ([bdfdc7b](https://github.com/bead-ai/zeitlich/commit/bdfdc7b021b6c6da788df39277649770c86a135b))
+* **thread:** expose adapter identity, key-layout helpers, and thread TTL ([527955c](https://github.com/bead-ai/zeitlich/commit/527955cf93fd57579e4e33197218e175f5a8a0bf))
+
+
+### Bug Fixes
+
+* linting ([362ef6e](https://github.com/bead-ai/zeitlich/commit/362ef6e350c84609e26192e8de709ce4f8af22a0))
+* **subagent:** propagate child workflow failures instead of hanging ([#99](https://github.com/bead-ai/zeitlich/issues/99)) ([901d2e6](https://github.com/bead-ai/zeitlich/commit/901d2e6bab68e631a8bb5d2fbef1853bc03fc64e))
+
+
+### Documentation
+
+* expand RELEASING.md with troubleshooting and release-as guidance ([#97](https://github.com/bead-ai/zeitlich/issues/97)) ([011dfd2](https://github.com/bead-ai/zeitlich/commit/011dfd26e77945cca5a656f09dcbc30ce88b3b66))
+
+
+### Miscellaneous Chores
+
+* release 0.2.39 ([f2f9784](https://github.com/bead-ai/zeitlich/commit/f2f9784bc17a3df91f75e52faa9a33a5feb92a22))
+
 ## [0.2.38](https://github.com/bead-ai/zeitlich/compare/v0.2.37...v0.2.38) (2026-04-21)
 
 
