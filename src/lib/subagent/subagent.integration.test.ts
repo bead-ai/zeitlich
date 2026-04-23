@@ -1810,6 +1810,179 @@ describe("createSubagentHandler", () => {
     expect(deletedTags.sort()).toEqual(["base", "exit-2"]);
   });
 
+  it("publishes persistentBaseSnapshot from childSandboxReadySignal before child completes", async () => {
+    const { setHandler, executeChild } = await import("@temporalio/workflow");
+    const setHandlerMock = setHandler as ReturnType<typeof vi.fn>;
+    const execMock = executeChild as ReturnType<typeof vi.fn>;
+
+    const signalBase = {
+      sandboxId: "sb-signal",
+      providerId: "test",
+      data: { tag: "signal-base" },
+      createdAt: new Date().toISOString(),
+    };
+
+    const config: SubagentConfig = {
+      agentName: "snap-agent",
+      description: "Snapshot-driven",
+      workflow: mockWorkflow(),
+      thread: "continue",
+      sandbox: {
+        source: "own",
+        init: "once",
+        continuation: "snapshot",
+        proxy: noopSandboxProxy,
+      },
+    };
+
+    const { handler } = createSubagentHandler([config]);
+
+    // Fire the signal from inside executeChild so persistentBaseSnapshot is
+    // set before the child's own result is returned. The child result itself
+    // intentionally omits baseSnapshot — only the signal path can populate
+    // the map for this call.
+    execMock.mockImplementationOnce(
+      async (
+        _wf: unknown,
+        opts: { workflowId: string; args: unknown[] }
+      ) => {
+        const reg = setHandlerMock.mock.calls
+          .filter(
+            ([sig]) => (sig as { name?: string })?.name === "childSandboxReady"
+          )
+          .at(-1);
+        const signalHandler = reg?.[1] as
+          | ((p: {
+              childWorkflowId: string;
+              sandboxId: string;
+              baseSnapshot?: unknown;
+            }) => void)
+          | undefined;
+        signalHandler?.({
+          childWorkflowId: opts.workflowId,
+          sandboxId: "sb-signal",
+          baseSnapshot: signalBase,
+        });
+        return {
+          toolResponse: "first",
+          data: null,
+          threadId: "child-sig-1",
+        };
+      }
+    );
+
+    await handler(
+      { subagent: "snap-agent", description: "test", prompt: "first" },
+      { threadId: "t", toolCallId: "tc-1", toolName: "Subagent" }
+    );
+
+    // Second call on a new thread must boot from the signal-published base.
+    nextStartChildResult = () => ({
+      toolResponse: "second",
+      data: null,
+      threadId: "child-sig-2",
+    });
+
+    await handler(
+      { subagent: "snap-agent", description: "test", prompt: "second" },
+      { threadId: "t", toolCallId: "tc-2", toolName: "Subagent" }
+    );
+
+    const secondCall = execMock.mock.calls.at(-1);
+    if (!secondCall) throw new Error("expected executeChild call");
+    const secondInput = secondCall[1].args[1] as SubagentWorkflowInput;
+    expect(secondInput.sandbox).toEqual({
+      mode: "from-snapshot",
+      snapshot: expect.objectContaining({ data: { tag: "signal-base" } }),
+    });
+  });
+
+  it("ignores signal baseSnapshot for non-snapshot-base creators", async () => {
+    const { setHandler, executeChild } = await import("@temporalio/workflow");
+    const setHandlerMock = setHandler as ReturnType<typeof vi.fn>;
+    const execMock = executeChild as ReturnType<typeof vi.fn>;
+
+    const config: SubagentConfig = {
+      agentName: "lazy-fork-agent",
+      description: "Lazy fork (not snapshot)",
+      workflow: mockWorkflow(),
+      sandbox: {
+        source: "own",
+        init: "once",
+        continuation: "fork",
+        proxy: noopSandboxProxy,
+      },
+    };
+
+    const { handler } = createSubagentHandler([config]);
+
+    execMock.mockImplementationOnce(
+      async (
+        _wf: unknown,
+        opts: { workflowId: string; args: unknown[] }
+      ) => {
+        const reg = setHandlerMock.mock.calls
+          .filter(
+            ([sig]) => (sig as { name?: string })?.name === "childSandboxReady"
+          )
+          .at(-1);
+        const signalHandler = reg?.[1] as
+          | ((p: {
+              childWorkflowId: string;
+              sandboxId: string;
+              baseSnapshot?: unknown;
+            }) => void)
+          | undefined;
+        // Stray baseSnapshot on a non-snapshot path must not land in
+        // persistentBaseSnapshot, or it would corrupt a different agent's
+        // snapshot flow.
+        signalHandler?.({
+          childWorkflowId: opts.workflowId,
+          sandboxId: "sb-lazy",
+          baseSnapshot: {
+            sandboxId: "sb-lazy",
+            providerId: "test",
+            data: { tag: "should-be-ignored" },
+            createdAt: new Date().toISOString(),
+          },
+        });
+        return {
+          toolResponse: "first",
+          data: null,
+          threadId: "child-lazy-1",
+          sandboxId: "sb-lazy",
+        };
+      }
+    );
+
+    await handler(
+      { subagent: "lazy-fork-agent", description: "test", prompt: "first" },
+      { threadId: "t", toolCallId: "tc-1", toolName: "Subagent" }
+    );
+
+    // Second call should fork from the lazy-published sandbox, not restore
+    // from any snapshot.
+    nextStartChildResult = () => ({
+      toolResponse: "second",
+      data: null,
+      threadId: "child-lazy-2",
+      sandboxId: "sb-lazy",
+    });
+
+    await handler(
+      { subagent: "lazy-fork-agent", description: "test", prompt: "second" },
+      { threadId: "t", toolCallId: "tc-2", toolName: "Subagent" }
+    );
+
+    const secondCall = execMock.mock.calls.at(-1);
+    if (!secondCall) throw new Error("expected executeChild call");
+    const secondInput = secondCall[1].args[1] as SubagentWorkflowInput;
+    expect(secondInput.sandbox).toEqual({
+      mode: "fork",
+      sandboxId: "sb-lazy",
+    });
+  });
+
   it("does not call deleteSandboxSnapshot for children that produced no snapshots", async () => {
     const opsMock = makeMockSandboxOps();
     const config: SubagentConfig = {
@@ -2396,5 +2569,167 @@ describe("defineSubagentWorkflow", () => {
     await workflow("go", { sandboxShutdown: "keep-until-parent-close" });
 
     expect(capturedSession?.sandboxShutdown).toBe("keep-until-parent-close");
+  });
+
+  // -------------------------------------------------------------------------
+  // Auto-forwarding of session outputs + signal payload
+  // -------------------------------------------------------------------------
+
+  it("auto-forwards baseSnapshot captured via onSandboxReady", async () => {
+    const baseSnapshot = {
+      sandboxId: "sb-1",
+      providerId: "test",
+      data: { tag: "base" },
+      createdAt: new Date().toISOString(),
+    };
+    const workflow = defineSubagentWorkflow(
+      { name: "test", description: "test agent" },
+      async (_prompt, sessionInput) => {
+        sessionInput.onSandboxReady?.({ sandboxId: "sb-1", baseSnapshot });
+        return { toolResponse: "ok", data: null, threadId: "t" };
+      }
+    );
+
+    const result = await workflow("go", {});
+    expect(result.baseSnapshot).toEqual(baseSnapshot);
+  });
+
+  it("auto-forwards sandboxId and snapshot captured via onSessionExit", async () => {
+    const snapshot = {
+      sandboxId: "sb-1",
+      providerId: "test",
+      data: { tag: "exit" },
+      createdAt: new Date().toISOString(),
+    };
+    const workflow = defineSubagentWorkflow(
+      { name: "test", description: "test agent" },
+      async (_prompt, sessionInput) => {
+        sessionInput.onSessionExit?.({ sandboxId: "sb-1", snapshot });
+        return { toolResponse: "ok", data: null, threadId: "t" };
+      }
+    );
+
+    const result = await workflow("go", {});
+    expect(result.sandboxId).toBe("sb-1");
+    expect(result.snapshot).toEqual(snapshot);
+  });
+
+  it("fn-explicit sandbox outputs win over captured session outputs", async () => {
+    const workflow = defineSubagentWorkflow(
+      { name: "test", description: "test agent" },
+      async (_prompt, sessionInput) => {
+        sessionInput.onSessionExit?.({
+          sandboxId: "session-sb",
+          snapshot: {
+            sandboxId: "session-sb",
+            providerId: "test",
+            data: { tag: "session" },
+            createdAt: new Date().toISOString(),
+          },
+        });
+        return {
+          toolResponse: "ok",
+          data: null,
+          threadId: "t",
+          sandboxId: "explicit-sb",
+          snapshot: {
+            sandboxId: "explicit-sb",
+            providerId: "test",
+            data: { tag: "explicit" },
+            createdAt: new Date().toISOString(),
+          },
+        };
+      }
+    );
+
+    const result = await workflow("go", {});
+    expect(result.sandboxId).toBe("explicit-sb");
+    expect(
+      (result.snapshot as { data: { tag: string } } | undefined)?.data
+    ).toEqual({ tag: "explicit" });
+  });
+
+  it("signals parent with baseSnapshot via childSandboxReadySignal", async () => {
+    const { getExternalWorkflowHandle } = await import("@temporalio/workflow");
+    const ghMock = getExternalWorkflowHandle as ReturnType<typeof vi.fn>;
+    const baseSnapshot = {
+      sandboxId: "sb-1",
+      providerId: "test",
+      data: { tag: "base" },
+      createdAt: new Date().toISOString(),
+    };
+
+    const workflow = defineSubagentWorkflow(
+      { name: "test", description: "test agent" },
+      async (_prompt, sessionInput) => {
+        sessionInput.onSandboxReady?.({ sandboxId: "sb-1", baseSnapshot });
+        return { toolResponse: "ok", data: null, threadId: "t" };
+      }
+    );
+
+    await workflow("go", {});
+
+    const handle = ghMock.mock.results.at(-1)?.value as {
+      signal: ReturnType<typeof vi.fn>;
+    };
+    expect(handle.signal).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "childSandboxReady" }),
+      expect.objectContaining({
+        childWorkflowId: "child-wf-1",
+        sandboxId: "sb-1",
+        baseSnapshot,
+      })
+    );
+  });
+
+  it("omits baseSnapshot from signal when session did not capture one", async () => {
+    const { getExternalWorkflowHandle } = await import("@temporalio/workflow");
+    const ghMock = getExternalWorkflowHandle as ReturnType<typeof vi.fn>;
+
+    const workflow = defineSubagentWorkflow(
+      { name: "test", description: "test agent" },
+      async (_prompt, sessionInput) => {
+        sessionInput.onSandboxReady?.({ sandboxId: "sb-1" });
+        return { toolResponse: "ok", data: null, threadId: "t" };
+      }
+    );
+
+    await workflow("go", {});
+
+    const handle = ghMock.mock.results.at(-1)?.value as {
+      signal: ReturnType<typeof vi.fn>;
+    };
+    const payload = handle.signal.mock.calls.at(-1)?.[1] as {
+      childWorkflowId: string;
+      sandboxId: string;
+      baseSnapshot?: unknown;
+    };
+    expect(payload).toEqual({
+      childWorkflowId: "child-wf-1",
+      sandboxId: "sb-1",
+    });
+    expect(payload.baseSnapshot).toBeUndefined();
+  });
+
+  it("skips the signal when the sandbox is reused (continue mode)", async () => {
+    const { getExternalWorkflowHandle } = await import("@temporalio/workflow");
+    const ghMock = getExternalWorkflowHandle as ReturnType<typeof vi.fn>;
+
+    const workflow = defineSubagentWorkflow(
+      { name: "test", description: "test agent" },
+      async (_prompt, sessionInput) => {
+        sessionInput.onSandboxReady?.({ sandboxId: "sb-1" });
+        return { toolResponse: "ok", data: null, threadId: "t" };
+      }
+    );
+
+    await workflow("go", {
+      sandbox: { mode: "continue", sandboxId: "sb-1" },
+    });
+
+    const handle = ghMock.mock.results.at(-1)?.value as {
+      signal: ReturnType<typeof vi.fn>;
+    };
+    expect(handle.signal).not.toHaveBeenCalled();
   });
 });
