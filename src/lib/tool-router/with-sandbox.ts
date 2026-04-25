@@ -1,10 +1,31 @@
 import type { Sandbox } from "../sandbox/types";
+import { SandboxNotFoundError } from "../sandbox/types";
 import type { JsonValue } from "../state/types";
 import type {
   ActivityToolHandler,
   RouterContext,
   ToolHandlerResponse,
 } from "./types";
+
+/**
+ * Options for {@link withSandbox}.
+ */
+export interface WithSandboxOptions {
+  /**
+   * If `true`, a {@link SandboxNotFoundError} thrown by `manager.getSandbox`
+   * is translated into a structured tool-handler response (instead of
+   * propagating). This lets the agent return a graceful error to the model
+   * rather than crashing the workflow when the backing sandbox has been
+   * killed mid-run (e.g. because the E2B `timeoutMs` lifetime elapsed).
+   *
+   * Off by default to preserve the existing contract for callers that rely
+   * on the error bubbling out. New callers should generally enable this in
+   * combination with the E2B `keepAliveMs` provider option.
+   *
+   * @default false
+   */
+  translateSandboxNotFound?: boolean;
+}
 
 /**
  * Extended router context with a resolved {@link Sandbox} instance.
@@ -65,13 +86,15 @@ export function withSandbox<
   handler: (
     args: TArgs,
     context: RouterContext & { sandbox: TSandbox; sandboxId: string }
-  ) => Promise<ToolHandlerResponse<TResult, TToolResponse>>
+  ) => Promise<ToolHandlerResponse<TResult, TToolResponse>>,
+  options?: WithSandboxOptions
 ): ActivityToolHandler<
   TArgs,
   TResult | null,
   RouterContext,
   TToolResponse | string
 > {
+  const translateSandboxNotFound = options?.translateSandboxNotFound ?? false;
   return async (args, context) => {
     if (!context.sandboxId) {
       return {
@@ -79,7 +102,18 @@ export function withSandbox<
         data: null,
       };
     }
-    const sandbox = await manager.getSandbox(context.sandboxId);
+    let sandbox: TSandbox;
+    try {
+      sandbox = await manager.getSandbox(context.sandboxId);
+    } catch (err) {
+      if (translateSandboxNotFound && err instanceof SandboxNotFoundError) {
+        return {
+          toolResponse: `Error: the sandbox backing the ${context.toolName} tool is no longer available. The session cannot continue.`,
+          data: null,
+        };
+      }
+      throw err;
+    }
     return handler(args, { ...context, sandbox, sandboxId: context.sandboxId });
   };
 }

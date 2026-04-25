@@ -4,6 +4,7 @@ import { withSandbox } from "./with-sandbox";
 import type { RouterContext, ToolHandlerResponse } from "./types";
 import type { ToolResultConfig } from "../types";
 import type { Sandbox } from "../sandbox/types";
+import { SandboxNotFoundError } from "../sandbox/types";
 
 // ---------------------------------------------------------------------------
 // withAutoAppend
@@ -330,6 +331,95 @@ describe("withSandbox", () => {
         }
       )
     ).rejects.toThrow("sandbox not found");
+  });
+
+  it("propagates SandboxNotFoundError by default (no translate option)", async () => {
+    const manager = {
+      getSandbox: async (): Promise<Sandbox> => {
+        throw new SandboxNotFoundError("sb-gone");
+      },
+    };
+
+    const handler = async (): Promise<ToolHandlerResponse<null>> => ({
+      toolResponse: "ok",
+      data: null,
+    });
+
+    const wrapped = withSandbox(manager, handler);
+
+    await expect(
+      wrapped(
+        {},
+        {
+          threadId: "t",
+          toolCallId: "tc",
+          toolName: "Bash",
+          sandboxId: "sb-gone",
+        }
+      )
+    ).rejects.toBeInstanceOf(SandboxNotFoundError);
+  });
+
+  it("translates SandboxNotFoundError into a structured response when opted in", async () => {
+    const manager = {
+      getSandbox: async (): Promise<Sandbox> => {
+        throw new SandboxNotFoundError("sb-gone");
+      },
+    };
+
+    const innerCalled = vi.fn();
+    const handler = async (): Promise<ToolHandlerResponse<null>> => {
+      innerCalled();
+      return { toolResponse: "ok", data: null };
+    };
+
+    const wrapped = withSandbox(manager, handler, {
+      translateSandboxNotFound: true,
+    });
+
+    const result = await wrapped(
+      {},
+      {
+        threadId: "t",
+        toolCallId: "tc",
+        toolName: "Bash",
+        sandboxId: "sb-gone",
+      }
+    );
+
+    expect(result.toolResponse).toContain("Bash");
+    expect(result.toolResponse).toContain("no longer available");
+    expect(result.data).toBeNull();
+    expect(innerCalled).not.toHaveBeenCalled();
+  });
+
+  it("does not translate non-SandboxNotFoundError errors when translate option is set", async () => {
+    const manager = {
+      getSandbox: async (): Promise<Sandbox> => {
+        throw new Error("network down");
+      },
+    };
+
+    const handler = async (): Promise<ToolHandlerResponse<null>> => ({
+      toolResponse: "ok",
+      data: null,
+    });
+
+    const wrapped = withSandbox(manager, handler, {
+      translateSandboxNotFound: true,
+    });
+
+    await expect(
+      wrapped(
+        {},
+        {
+          threadId: "t",
+          toolCallId: "tc",
+          toolName: "Bash",
+          sandboxId: "sb-gone",
+        }
+      )
+    ).rejects.toThrow("network down");
   });
 
   it("passes all RouterContext fields through to inner handler", async () => {
