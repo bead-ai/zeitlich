@@ -117,9 +117,7 @@ export class E2bSandboxProvider implements SandboxProvider<
       workspaceBase
     );
 
-    if (options?.keepAliveMs !== undefined) {
-      this.keepAliveOverrides.set(sdkSandbox.sandboxId, options.keepAliveMs);
-    }
+    this.registerKeepAliveOverride(sdkSandbox.sandboxId, options);
 
     if (options?.initialFiles) {
       await Promise.all(
@@ -195,6 +193,7 @@ export class E2bSandboxProvider implements SandboxProvider<
     }
     const sdkOpts = this.buildSdkCreateOpts(options);
     const sdkSandbox = await E2bSdkSandbox.create(data.snapshotId, sdkOpts);
+    this.registerKeepAliveOverride(sdkSandbox.sandboxId, options);
     return new E2bSandboxImpl(
       sdkSandbox.sandboxId,
       sdkSandbox,
@@ -219,11 +218,29 @@ export class E2bSandboxProvider implements SandboxProvider<
     const { snapshotId } = await E2bSdkSandbox.createSnapshot(sandboxId);
     const sdkOpts = this.buildSdkCreateOpts(options);
     const sdkSandbox = await E2bSdkSandbox.create(snapshotId, sdkOpts);
+    this.registerKeepAliveOverride(sdkSandbox.sandboxId, options);
     return new E2bSandboxImpl(
       sdkSandbox.sandboxId,
       sdkSandbox,
       this.defaultWorkspaceBase
     );
+  }
+
+  /**
+   * Records the per-sandbox `keepAliveMs` override (if provided on
+   * {@link E2bSandboxCreateOptions}) so that subsequent `get()` calls on
+   * the new sandbox use that value instead of the provider default.
+   * Honoured by every code path that mints a fresh sandbox id —
+   * `create()`, `restore()`, and `fork()` — so a per-call override applies
+   * to the sandbox it was passed alongside.
+   */
+  private registerKeepAliveOverride(
+    sandboxId: string,
+    options?: E2bSandboxCreateOptions
+  ): void {
+    if (options?.keepAliveMs !== undefined) {
+      this.keepAliveOverrides.set(sandboxId, options.keepAliveMs);
+    }
   }
 
   private buildSdkCreateOpts(options?: E2bSandboxCreateOptions) {

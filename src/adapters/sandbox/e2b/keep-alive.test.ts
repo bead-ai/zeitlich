@@ -24,6 +24,7 @@ vi.mock("@e2b/code-interpreter", () => {
 const sdk = E2bSdkSandbox as unknown as {
   create: ReturnType<typeof vi.fn>;
   connect: ReturnType<typeof vi.fn>;
+  createSnapshot: ReturnType<typeof vi.fn>;
 };
 
 function makeFakeSdkSandbox(id = "sbx-1") {
@@ -40,6 +41,7 @@ describe("E2bSandboxProvider keep-alive", () => {
   beforeEach(() => {
     sdk.create.mockReset();
     sdk.connect.mockReset();
+    sdk.createSnapshot.mockReset();
   });
 
   it("forwards timeoutMs to connect() when keepAliveMs is configured at the provider level", async () => {
@@ -101,6 +103,43 @@ describe("E2bSandboxProvider keep-alive", () => {
     await expect(provider.get("missing")).rejects.toBeInstanceOf(
       SandboxNotFoundError
     );
+  });
+
+  it("honours per-call keepAliveMs passed to restore()", async () => {
+    const fakeRestored = makeFakeSdkSandbox("sbx-restored");
+    sdk.create.mockResolvedValue(fakeRestored);
+    sdk.connect.mockResolvedValue(fakeRestored);
+
+    const provider = new E2bSandboxProvider({ keepAliveMs: 60_000 });
+    await provider.restore(
+      {
+        sandboxId: "ignored",
+        providerId: "e2b",
+        data: { snapshotId: "snap-1" },
+        createdAt: new Date().toISOString(),
+      },
+      { keepAliveMs: 7_000 }
+    );
+
+    await provider.get("sbx-restored");
+    expect(sdk.connect).toHaveBeenCalledWith("sbx-restored", {
+      timeoutMs: 7_000,
+    });
+  });
+
+  it("honours per-call keepAliveMs passed to fork()", async () => {
+    sdk.createSnapshot.mockResolvedValue({ snapshotId: "snap-fork" });
+    const fakeForked = makeFakeSdkSandbox("sbx-forked");
+    sdk.create.mockResolvedValue(fakeForked);
+    sdk.connect.mockResolvedValue(fakeForked);
+
+    const provider = new E2bSandboxProvider({ keepAliveMs: 60_000 });
+    await provider.fork("sbx-source", { keepAliveMs: 3_000 });
+
+    await provider.get("sbx-forked");
+    expect(sdk.connect).toHaveBeenCalledWith("sbx-forked", {
+      timeoutMs: 3_000,
+    });
   });
 
   it("clears per-sandbox keepAlive override on destroy", async () => {

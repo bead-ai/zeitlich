@@ -57,6 +57,9 @@ tool invocation).
 
 Per-create `keepAliveMs` overrides the provider default for that sandbox only.
 The override is tracked internally by sandbox id and cleared on `destroy()`.
+Honoured by every code path that mints a fresh sandbox id — `create()`,
+`restore()`, and `fork()` — so a per-call override applies to the sandbox it
+was passed alongside.
 
 ```ts
 const { sandbox } = await provider.create({ keepAliveMs: 5 * 60 * 1000 });
