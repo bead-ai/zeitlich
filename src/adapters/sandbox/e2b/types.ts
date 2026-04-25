@@ -21,6 +21,18 @@ export interface E2bSandboxConfig {
   workspaceBase?: string;
   /** Sandbox idle timeout in milliseconds */
   timeoutMs?: number;
+  /**
+   * If set, every call to `provider.get(sandboxId)` extends the sandbox
+   * lifetime to at least this many milliseconds, refreshing the timeout
+   * on each tool invocation. The default `timeoutMs` then acts as a
+   * kill-on-abandon safety net rather than a hard cap on run length.
+   *
+   * E2B's `Sandbox.connect(sandboxId, { timeoutMs })` only extends the
+   * lifetime when the new value is longer than the time remaining, so
+   * setting this is safe when sessions are still active and idempotent
+   * when they aren't.
+   */
+  keepAliveMs?: number;
   /** Default outbound internet access policy */
   allowInternetAccess?: boolean;
   /** Default outbound network allow/deny rules */
@@ -36,4 +48,10 @@ export interface E2bSandboxCreateOptions extends SandboxCreateOptions {
   template?: string;
   /** Sandbox idle timeout in milliseconds — overrides the provider default */
   timeoutMs?: number;
+  /**
+   * Per-create override for the keep-alive refresh window applied on every
+   * `provider.get(sandboxId)` call. See {@link E2bSandboxConfig.keepAliveMs}
+   * for the full pattern.
+   */
+  keepAliveMs?: number;
 }

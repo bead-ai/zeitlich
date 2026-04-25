@@ -76,15 +76,24 @@ export class E2bSandboxProvider implements SandboxProvider<
   private readonly defaultTemplate?: string;
   private readonly defaultWorkspaceBase: string;
   private readonly defaultTimeoutMs?: number;
+  private readonly defaultKeepAliveMs?: number;
   private readonly defaultAllowInternetAccess?: boolean;
   private readonly defaultNetwork?: E2bSandboxConfig["network"];
   private readonly defaultMetadata?: E2bSandboxConfig["metadata"];
   private readonly defaultLifecycle?: E2bSandboxConfig["lifecycle"];
 
+  /**
+   * Per-create overrides for `keepAliveMs`, keyed by sandbox id. Populated
+   * by `create()` when the caller passes `options.keepAliveMs` and consulted
+   * by `get()` to pick the effective refresh window for that sandbox.
+   */
+  private readonly keepAliveOverrides = new Map<string, number>();
+
   constructor(config?: E2bSandboxConfig) {
     this.defaultTemplate = config?.template;
     this.defaultWorkspaceBase = config?.workspaceBase ?? "/home/user";
     this.defaultTimeoutMs = config?.timeoutMs;
+    this.defaultKeepAliveMs = config?.keepAliveMs;
     this.defaultAllowInternetAccess = config?.allowInternetAccess;
     this.defaultNetwork = config?.network;
     this.defaultMetadata = config?.metadata;
@@ -108,6 +117,10 @@ export class E2bSandboxProvider implements SandboxProvider<
       workspaceBase
     );
 
+    if (options?.keepAliveMs !== undefined) {
+      this.keepAliveOverrides.set(sdkSandbox.sandboxId, options.keepAliveMs);
+    }
+
     if (options?.initialFiles) {
       await Promise.all(
         Object.entries(options.initialFiles).map(([path, content]) =>
@@ -120,8 +133,13 @@ export class E2bSandboxProvider implements SandboxProvider<
   }
 
   async get(sandboxId: string): Promise<E2bSandbox> {
+    const keepAliveMs =
+      this.keepAliveOverrides.get(sandboxId) ?? this.defaultKeepAliveMs;
     try {
-      const sdkSandbox = await E2bSdkSandbox.connect(sandboxId);
+      const sdkSandbox =
+        keepAliveMs !== undefined
+          ? await E2bSdkSandbox.connect(sandboxId, { timeoutMs: keepAliveMs })
+          : await E2bSdkSandbox.connect(sandboxId);
       return new E2bSandboxImpl(
         sandboxId,
         sdkSandbox,
@@ -138,6 +156,8 @@ export class E2bSandboxProvider implements SandboxProvider<
       await sdkSandbox.kill();
     } catch {
       // Already gone or not found
+    } finally {
+      this.keepAliveOverrides.delete(sandboxId);
     }
   }
 
