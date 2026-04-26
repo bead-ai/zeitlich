@@ -895,6 +895,64 @@ describe("createSession integration", () => {
     });
   });
 
+  it("embeds skill resourceContents on synthetic file tree entries via inlineContent", async () => {
+    const { ops } = createMockThreadOps();
+
+    const session = await createSession({
+      agentName: "TestAgent",
+      thread: { mode: "new", threadId: "thread-1" },
+      runAgent: createScriptedRunAgent([{ message: "done", toolCalls: [] }]),
+      threadOps: ops,
+      buildContextMessage: () => "go",
+      virtualFs: { ctx: { projectId: "p" } },
+      virtualFsOps: {
+        resolveFileTree: async () => ({ fileTree: [] }),
+      },
+      skills: [
+        {
+          name: "test-skill",
+          description: "Test",
+          instructions: "Do test",
+          location: "/skills/test-skill",
+          resourceContents: {
+            "references/alpha.md": "# Alpha doc",
+            "references/beta.md": "# Beta doc",
+          },
+        },
+      ],
+      hooks: {
+        onSessionStart: async () => {},
+      },
+    });
+
+    const stateManager = createAgentStateManager({
+      initialState: { systemPrompt: "test" },
+    });
+
+    await session.runSession({ stateManager });
+
+    const capturedFileTree = stateManager.getCurrentState().fileTree;
+    expect(Array.isArray(capturedFileTree)).toBe(true);
+    const entries = capturedFileTree as Array<{
+      path: string;
+      inlineContent?: string;
+    }>;
+
+    const alpha = entries.find(
+      (e) => e.path === "/skills/test-skill/references/alpha.md"
+    );
+    const beta = entries.find(
+      (e) => e.path === "/skills/test-skill/references/beta.md"
+    );
+    expect(alpha?.inlineContent).toBe("# Alpha doc");
+    expect(beta?.inlineContent).toBe("# Beta doc");
+
+    expect(stateManager.getCurrentState().inlineFiles).toEqual({
+      "/skills/test-skill/references/alpha.md": "# Alpha doc",
+      "/skills/test-skill/references/beta.md": "# Beta doc",
+    });
+  });
+
   it("does not pass initialFiles when skills have no resourceContents", async () => {
     const { ops } = createMockThreadOps();
     let capturedOptions: Record<string, unknown> | undefined;

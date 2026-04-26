@@ -342,12 +342,23 @@ export async function createSession<
                 size: content.length,
                 mtime: new Date().toISOString(),
                 metadata: {},
+                // Carry the content directly on the entry so any handler that
+                // constructs a VirtualFileSystem from `fileTree` can read it
+                // without needing to also wire up `inlineFiles` from state.
+                inlineContent: content,
               })),
             ]
           : result.fileTree;
         stateManager.mergeUpdate({
           fileTree,
           virtualFsCtx: virtualFsConfig.ctx,
+          // `inlineFiles` is still the source of truth at read time:
+          // VirtualFileSystem checks the inlineFiles map first and only
+          // falls through to entry.inlineContent. Embedding the content on
+          // the entry is the migration target so that handlers building a
+          // VirtualFileSystem from `fileTree` alone (without forwarding
+          // `inlineFiles` from state) can read skill resources. Until a
+          // follow-up drops `inlineFiles`, both fields are populated.
           ...(skillFiles && { inlineFiles: skillFiles }),
         } as Partial<AgentState<TState>>);
       }

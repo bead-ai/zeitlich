@@ -20,6 +20,25 @@ export interface FileEntry<TMeta = FileEntryMetadata> {
   /** ISO-8601 date string (JSON-safe) */
   mtime: string;
   metadata: TMeta;
+  /**
+   * Optional inline content carried directly on the entry. When present the
+   * {@link VirtualFileSystem} returns this string from `readFile` /
+   * `readFileBuffer` (and uses it as the source for `cp` / `appendFile`)
+   * without consulting the resolver.
+   *
+   * Use this for files that exist purely in workflow state and have no
+   * backing in the consumer's data layer (e.g. skill resources bundled at
+   * session creation time). Because the content travels with the entry,
+   * any tool handler that constructs a `VirtualFileSystem` from `fileTree`
+   * sees the same content — no separate `inlineFiles` plumbing required.
+   *
+   * Read-only: entries with `inlineContent` reject in-place mutations
+   * (`writeFile`, `appendFile`, `rm`, `mv` of the entry, `cp` over the
+   * entry as destination). The resolver has no contract for the synthetic
+   * `id` these entries carry, so attempting a mutation throws an `EROFS`
+   * error instead of silently routing a doomed call through the resolver.
+   */
+  inlineContent?: string;
 }
 
 // ============================================================================

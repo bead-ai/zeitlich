@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeEach } from "vitest";
+import { describe, expect, it, beforeEach, vi } from "vitest";
 import type { FileEntry, FileResolver } from "./types";
 import { VirtualFileSystem } from "./filesystem";
 import { applyVirtualTreeMutations } from "./mutations";
@@ -384,6 +384,209 @@ describe("VirtualFileSystem — inlineFiles", () => {
   it("readFile throws ENOENT for paths not in tree or inline", async () => {
     const fs = createFsWithInline();
     await expect(fs.readFile("/nope.txt")).rejects.toThrow("ENOENT");
+  });
+});
+
+// ============================================================================
+// VirtualFileSystem — entry.inlineContent
+// ============================================================================
+
+describe("VirtualFileSystem — entry.inlineContent", () => {
+  const inlineEntry: FileEntry = {
+    id: "skill:code-review:checklist.md",
+    path: "/skills/code-review/checklist.md",
+    size: 18,
+    mtime: "2025-01-01T00:00:00.000Z",
+    metadata: {},
+    inlineContent: "# Review checklist",
+  };
+
+  function createFsWithInlineEntry(): VirtualFileSystem<TestCtx> {
+    const { resolver } = createMockResolver();
+    return new VirtualFileSystem([...sampleTree, inlineEntry], resolver, ctx);
+  }
+
+  it("readFile returns entry.inlineContent without hitting the resolver", async () => {
+    const { resolver, store } = createMockResolver();
+    const readFileSpy = vi.spyOn(resolver, "readFile");
+    const fs = new VirtualFileSystem(
+      [...sampleTree, inlineEntry],
+      resolver,
+      ctx
+    );
+
+    const content = await fs.readFile("/skills/code-review/checklist.md");
+    expect(content).toBe("# Review checklist");
+    expect(readFileSpy).not.toHaveBeenCalled();
+    expect(store.size).toBeGreaterThan(0);
+  });
+
+  it("readFileBuffer returns entry.inlineContent encoded as Uint8Array", async () => {
+    const fs = createFsWithInlineEntry();
+    const buf = await fs.readFileBuffer("/skills/code-review/checklist.md");
+    expect(buf).toBeInstanceOf(Uint8Array);
+    expect(new TextDecoder().decode(buf)).toBe("# Review checklist");
+  });
+
+  it("entry.inlineContent files participate in directory inference", async () => {
+    const fs = createFsWithInlineEntry();
+    expect(await fs.exists("/skills")).toBe(true);
+    expect(await fs.exists("/skills/code-review")).toBe(true);
+    expect(await fs.readdir("/skills/code-review")).toContain("checklist.md");
+  });
+
+  it("inlineFiles map still wins over entry.inlineContent for the same path", async () => {
+    const { resolver } = createMockResolver();
+    const fs = new VirtualFileSystem(
+      [...sampleTree, inlineEntry],
+      resolver,
+      ctx,
+      "/",
+      { "/skills/code-review/checklist.md": "OVERRIDE" }
+    );
+    expect(await fs.readFile("/skills/code-review/checklist.md")).toBe(
+      "OVERRIDE"
+    );
+  });
+
+  it("readFile resolves entry.inlineContent for non-normalized paths (no leading slash)", async () => {
+    const fs = createFsWithInlineEntry();
+    const content = await fs.readFile("skills/code-review/checklist.md");
+    expect(content).toBe("# Review checklist");
+  });
+
+  it("empty-string entry.inlineContent is served without falling through to the resolver", async () => {
+    const { resolver } = createMockResolver();
+    const readFileSpy = vi.spyOn(resolver, "readFile");
+    const fs = new VirtualFileSystem(
+      [
+        ...sampleTree,
+        {
+          id: "skill:empty",
+          path: "/skills/empty.md",
+          size: 0,
+          mtime: "2025-01-01T00:00:00.000Z",
+          metadata: {},
+          inlineContent: "",
+        } satisfies FileEntry,
+      ],
+      resolver,
+      ctx
+    );
+    expect(await fs.readFile("/skills/empty.md")).toBe("");
+    expect(readFileSpy).not.toHaveBeenCalled();
+  });
+
+  it("stat reports entry.inlineContent files as files", async () => {
+    const fs = createFsWithInlineEntry();
+    const stat = await fs.stat("/skills/code-review/checklist.md");
+    expect(stat.isFile).toBe(true);
+    expect(stat.isDirectory).toBe(false);
+  });
+
+  it("non-inline entries in the same tree still go through the resolver", async () => {
+    const { resolver } = createMockResolver();
+    const readFileSpy = vi.spyOn(resolver, "readFile");
+    const fs = new VirtualFileSystem(
+      [...sampleTree, inlineEntry],
+      resolver,
+      ctx
+    );
+    const content = await fs.readFile("/src/index.ts");
+    expect(content).toBe('console.log("hello");');
+    expect(readFileSpy).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ============================================================================
+// VirtualFileSystem — entry.inlineContent read-only contract
+// ============================================================================
+
+describe("VirtualFileSystem — entry.inlineContent read-only", () => {
+  const inlineEntry: FileEntry = {
+    id: "skill:demo:notes.md",
+    path: "/skills/demo/notes.md",
+    size: 8,
+    mtime: "2025-01-01T00:00:00.000Z",
+    metadata: {},
+    inlineContent: "original",
+  };
+
+  function makeFs(): {
+    fs: VirtualFileSystem<TestCtx>;
+    resolver: FileResolver<TestCtx>;
+    spies: {
+      writeFile: ReturnType<typeof vi.spyOn>;
+      deleteFile: ReturnType<typeof vi.spyOn>;
+    };
+  } {
+    const { resolver } = createMockResolver();
+    const writeFile = vi.spyOn(resolver, "writeFile");
+    const deleteFile = vi.spyOn(resolver, "deleteFile");
+    const fs = new VirtualFileSystem(
+      [...sampleTree, inlineEntry],
+      resolver,
+      ctx
+    );
+    return { fs, resolver, spies: { writeFile, deleteFile } };
+  }
+
+  it("writeFile on inline entry throws EROFS and never calls resolver.writeFile", async () => {
+    const { fs, spies } = makeFs();
+    await expect(fs.writeFile("/skills/demo/notes.md", "new")).rejects.toThrow(
+      /EROFS/
+    );
+    expect(spies.writeFile).not.toHaveBeenCalled();
+  });
+
+  it("appendFile on inline entry throws EROFS and never calls resolver.writeFile", async () => {
+    const { fs, spies } = makeFs();
+    await expect(
+      fs.appendFile("/skills/demo/notes.md", "more")
+    ).rejects.toThrow(/EROFS/);
+    expect(spies.writeFile).not.toHaveBeenCalled();
+  });
+
+  it("rm on inline entry throws EROFS and never calls resolver.deleteFile", async () => {
+    const { fs, spies } = makeFs();
+    await expect(fs.rm("/skills/demo/notes.md")).rejects.toThrow(/EROFS/);
+    expect(spies.deleteFile).not.toHaveBeenCalled();
+  });
+
+  it("rm recursive on a directory containing an inline entry throws EROFS", async () => {
+    const { fs, spies } = makeFs();
+    await expect(fs.rm("/skills", { recursive: true })).rejects.toThrow(
+      /EROFS/
+    );
+    expect(spies.deleteFile).not.toHaveBeenCalled();
+  });
+
+  it("mv of an inline entry throws EROFS (rm step rejects after copy)", async () => {
+    const { fs } = makeFs();
+    await expect(fs.mv("/skills/demo/notes.md", "/copy.md")).rejects.toThrow(
+      /EROFS/
+    );
+  });
+
+  it("cp from inline source to a fresh destination uses inlineContent and creates via resolver", async () => {
+    const { fs } = makeFs();
+    await fs.cp("/skills/demo/notes.md", "/copied.md");
+    expect(await fs.readFile("/copied.md")).toBe("original");
+    expect(await fs.exists("/copied.md")).toBe(true);
+  });
+
+  it("appendFile to a missing path under an inline-only directory delegates to writeFile", async () => {
+    const { fs } = makeFs();
+    await fs.appendFile("/skills/demo/new.md", "hello");
+    expect(await fs.readFile("/skills/demo/new.md")).toBe("hello");
+  });
+
+  it("cp over an inline destination throws EROFS", async () => {
+    const { fs, spies } = makeFs();
+    await expect(
+      fs.cp("/src/index.ts", "/skills/demo/notes.md")
+    ).rejects.toThrow(/EROFS/);
+    expect(spies.writeFile).not.toHaveBeenCalled();
   });
 });
 
