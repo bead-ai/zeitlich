@@ -19,8 +19,27 @@ export interface E2bSandboxConfig {
   template?: string;
   /** Default working directory inside the sandbox */
   workspaceBase?: string;
-  /** Sandbox idle timeout in milliseconds */
+  /**
+   * Sandbox lifetime in milliseconds. Despite the name, this is **not** an
+   * idle timeout: E2B kills the sandbox once this many milliseconds elapse
+   * from creation regardless of activity. Pair with {@link keepAliveMs} to
+   * refresh the lifetime on every `provider.get()` call so that this value
+   * acts as a kill-on-abandon safety net rather than a hard cap on run
+   * length.
+   */
   timeoutMs?: number;
+  /**
+   * If set, every call to `provider.get(sandboxId)` extends the sandbox
+   * lifetime to at least this many milliseconds, refreshing the timeout
+   * on each tool invocation. The default `timeoutMs` then acts as a
+   * kill-on-abandon safety net rather than a hard cap on run length.
+   *
+   * E2B's `Sandbox.connect(sandboxId, { timeoutMs })` only extends the
+   * lifetime when the new value is longer than the time remaining, so
+   * setting this is safe when sessions are still active and idempotent
+   * when they aren't.
+   */
+  keepAliveMs?: number;
   /** Default outbound internet access policy */
   allowInternetAccess?: boolean;
   /** Default outbound network allow/deny rules */
@@ -34,6 +53,16 @@ export interface E2bSandboxConfig {
 export interface E2bSandboxCreateOptions extends SandboxCreateOptions {
   /** Sandbox template name or ID — overrides the provider default */
   template?: string;
-  /** Sandbox idle timeout in milliseconds — overrides the provider default */
+  /**
+   * Sandbox lifetime in milliseconds — overrides the provider default. See
+   * {@link E2bSandboxConfig.timeoutMs} for the full semantics; pair with
+   * `keepAliveMs` to refresh on every `provider.get()` call.
+   */
   timeoutMs?: number;
+  /**
+   * Per-create override for the keep-alive refresh window applied on every
+   * `provider.get(sandboxId)` call. See {@link E2bSandboxConfig.keepAliveMs}
+   * for the full pattern.
+   */
+  keepAliveMs?: number;
 }
