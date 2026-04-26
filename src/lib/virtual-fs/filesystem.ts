@@ -104,7 +104,7 @@ export class VirtualFileSystem<
     if (inline !== undefined) return inline;
     const entry = this.entries.get(norm);
     if (!entry) throw new Error(`ENOENT: no such file: ${path}`);
-    return this.resolver.readFile(entry.id, this.ctx, entry.metadata);
+    return this.readEntryContent(entry);
   }
 
   async readFileBuffer(path: string): Promise<Uint8Array> {
@@ -113,7 +113,23 @@ export class VirtualFileSystem<
     if (inline !== undefined) return new TextEncoder().encode(inline);
     const entry = this.entries.get(norm);
     if (!entry) throw new Error(`ENOENT: no such file: ${path}`);
+    if (entry.inlineContent !== undefined) {
+      return new TextEncoder().encode(entry.inlineContent);
+    }
     return this.resolver.readFileBuffer(entry.id, this.ctx, entry.metadata);
+  }
+
+  /**
+   * Resolve the string content for an entry, preferring inline content
+   * carried on the entry itself before consulting the resolver. Used by
+   * `readFile`, `appendFile`, and `cp` so all read paths agree on the
+   * lookup precedence.
+   */
+  private readEntryContent(entry: FileEntry<TMeta>): Promise<string> {
+    if (entry.inlineContent !== undefined) {
+      return Promise.resolve(entry.inlineContent);
+    }
+    return this.resolver.readFile(entry.id, this.ctx, entry.metadata);
   }
 
   // --------------------------------------------------------------------------
@@ -196,6 +212,11 @@ export class VirtualFileSystem<
     const existing = this.entries.get(norm);
 
     if (existing) {
+      if (existing.inlineContent !== undefined) {
+        throw new Error(
+          `EROFS: cannot write to inline (read-only) entry: ${path}`
+        );
+      }
       await this.resolver.writeFile(
         existing.id,
         content,
@@ -230,11 +251,13 @@ export class VirtualFileSystem<
       return this.writeFile(path, content);
     }
 
-    const current = await this.resolver.readFile(
-      existing.id,
-      this.ctx,
-      existing.metadata
-    );
+    if (existing.inlineContent !== undefined) {
+      throw new Error(
+        `EROFS: cannot append to inline (read-only) entry: ${path}`
+      );
+    }
+
+    const current = await this.readEntryContent(existing);
     const appended =
       typeof content === "string"
         ? current + content
@@ -283,6 +306,11 @@ export class VirtualFileSystem<
     const entry = this.entries.get(norm);
 
     if (entry) {
+      if (entry.inlineContent !== undefined) {
+        throw new Error(
+          `EROFS: cannot remove inline (read-only) entry: ${path}`
+        );
+      }
       await this.resolver.deleteFile(entry.id, this.ctx, entry.metadata);
       this.entries.delete(norm);
       this.mutations.push({ type: "remove", path: norm });
@@ -296,6 +324,11 @@ export class VirtualFileSystem<
       const prefix = norm === "/" ? "/" : norm + "/";
       for (const [p, e] of this.entries) {
         if (p.startsWith(prefix)) {
+          if (e.inlineContent !== undefined) {
+            throw new Error(
+              `EROFS: cannot remove inline (read-only) entry: ${p}`
+            );
+          }
           await this.resolver.deleteFile(e.id, this.ctx, e.metadata);
           this.entries.delete(p);
           this.mutations.push({ type: "remove", path: p });
@@ -323,11 +356,7 @@ export class VirtualFileSystem<
 
     const entry = this.entries.get(normSrc);
     if (entry) {
-      const content = await this.resolver.readFile(
-        entry.id,
-        this.ctx,
-        entry.metadata
-      );
+      const content = await this.readEntryContent(entry);
       await this.writeFile(normDest, content);
       return;
     }
@@ -343,11 +372,7 @@ export class VirtualFileSystem<
     for (const [p, e] of this.entries) {
       if (p.startsWith(prefix)) {
         const relative = p.slice(normSrc.length);
-        const content = await this.resolver.readFile(
-          e.id,
-          this.ctx,
-          e.metadata
-        );
+        const content = await this.readEntryContent(e);
         await this.writeFile(normDest + relative, content);
       }
     }
