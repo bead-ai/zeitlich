@@ -13,6 +13,7 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { randomUUID } from "node:crypto";
 import { BedrockRuntimeSandboxProvider } from "../index";
 import type { BedrockRuntimeSandbox } from "../types";
 
@@ -181,4 +182,39 @@ describe.skipIf(!arn)("bedrock-runtime integration", () => {
     expect(await sandbox.fs.exists("from.txt")).toBe(false);
     expect(await sandbox.fs.readFile("to.txt")).toBe("moved");
   });
+});
+
+/**
+ * Documents AgentCore Runtime's implicit-session-creation behaviour:
+ * `provider.get(unknownId)` followed by `.exec(...)` does NOT error — the
+ * runtimeSessionId is the only handle, and AgentCore silently provisions
+ * a fresh session under whatever id the caller hands it on first invoke.
+ *
+ * Confirmed empirically against the live runtime; this test pins the
+ * behaviour so any future AWS change is loud, and the get() doc comment
+ * can rely on it.
+ */
+describe.skipIf(!arn)("bedrock-runtime get() with unknown runtimeSessionId", () => {
+  it("silently provisions a fresh session on first invoke", async () => {
+    if (!arn) throw new Error("BEDROCK_RUNTIME_TEST_ARN unset");
+    const provider = new BedrockRuntimeSandboxProvider({
+      agentRuntimeArn: arn,
+      clientConfig: { region },
+    });
+
+    const freshId = `zeitlich-probe-${randomUUID().replace(/-/g, "")}`;
+    const sandbox = await provider.get(freshId);
+
+    try {
+      const result = await sandbox.exec("echo hello-from-fresh-session");
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout.trim()).toBe("hello-from-fresh-session");
+    } finally {
+      try {
+        await sandbox.destroy();
+      } catch {
+        /* best-effort */
+      }
+    }
+  }, 120_000);
 });

@@ -1,3 +1,17 @@
+/**
+ * Bedrock AgentCore Runtime sandbox adapter.
+ *
+ * AgentCore is a GA AWS service (announced October 2025), so the SDK
+ * shapes used here — `BedrockAgentCoreClient`, `InvokeAgentRuntimeCommand`,
+ * `StopRuntimeSession` — are covered by AWS's standard API stability
+ * promise: additive changes only, no breaking renames.
+ *
+ * @see https://aws.amazon.com/about-aws/whats-new/2025/10/amazon-bedrock-agentcore-available/
+ *      AgentCore GA announcement
+ * @see https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/what-is-bedrock-agentcore.html
+ *      AgentCore service overview
+ */
+
 import {
   BedrockAgentCoreClient,
   InvokeAgentRuntimeCommandCommand,
@@ -25,8 +39,12 @@ import type {
 
 /**
  * AgentCore Runtime requires `runtimeSessionId` to be at least 33 characters.
- * Honour a caller-supplied id when it qualifies; otherwise generate a fresh
+ * The caller's id is honoured if it qualifies; otherwise we generate a fresh
  * one prefixed with `zeitlich-` and a UUID with hyphens stripped (32 chars).
+ *
+ * @see https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-sessions.html
+ *      "How to use sessions" — *"Generate a unique session ID for each user
+ *      or conversation with at least 33 characters"*
  */
 const SESSION_ID_MIN_LENGTH = 33;
 
@@ -48,6 +66,7 @@ class BedrockRuntimeSandboxImpl implements Sandbox {
     // `filesystemConfigurations.sessionStorage`. The adapter cannot detect
     // that, so we declare the capability and leave the runtime config to
     // the caller.
+    // See https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-persistent-filesystems.html#configure-session-storage
     persistence: true,
   };
 
@@ -175,18 +194,21 @@ export class BedrockRuntimeSandboxProvider
   }
 
   async get(sandboxId: string): Promise<BedrockRuntimeSandbox> {
-    // AgentCore Runtime has no GetRuntimeSession data-plane API — sessions
-    // are referenced purely by the (agentRuntimeArn, runtimeSessionId) pair
-    // the caller already holds. This handle does not validate the id.
+    // AgentCore Runtime has no GetRuntimeSession data-plane API in the
+    // bedrock-agentcore SDK — sessions are referenced purely by the
+    // (agentRuntimeArn, runtimeSessionId) pair the caller already holds.
+    // This handle does not validate the id; it is a thin local wrapper.
     //
     // Implications:
     //   - Reattaching to a known-good id resumes that session. Persistent
     //     filesystem (if enabled on the runtime) rehydrates on first invoke.
-    //   - Passing an unknown id silently creates a fresh session on first
-    //     invoke; AgentCore implicitly mints sessions from caller-supplied
-    //     ids. There is no "session not found" surface to throw on.
+    //   - Passing an unknown id silently provisions a fresh session on
+    //     first invoke; AgentCore mints sessions from caller-supplied ids
+    //     with no "session not found" surface to throw on. Verified by the
+    //     "silently provisions a fresh session on first invoke" integration
+    //     test.
     //
-    // See https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-sessions.html
+    // See https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-sessions.html#session-lifecycle
     return new BedrockRuntimeSandboxImpl(
       sandboxId,
       this.client,
@@ -221,8 +243,11 @@ export class BedrockRuntimeSandboxProvider
     //
     // See:
     //   https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-stop-session.html
-    //   https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-sessions.html
-    //   https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-persistent-filesystems.html
+    //     — instant termination of compute on Stop
+    //   https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-sessions.html#session-lifecycle
+    //     — "transitions back to Active on the next invocation"
+    //   https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-persistent-filesystems.html#session-storage-data-lifecycle
+    //     — 14-day idle GC of session-storage data
     await this.client.send(
       new StopRuntimeSessionCommand({
         agentRuntimeArn: this.agentRuntimeArn,
@@ -237,7 +262,7 @@ export class BedrockRuntimeSandboxProvider
     // Command call with the same runtimeSessionId provisions fresh compute
     // and rehydrates persistent filesystem state.
     //
-    // See https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-sessions.html
+    // See https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-sessions.html#session-lifecycle
   }
 
   async snapshot(
