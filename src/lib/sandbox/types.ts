@@ -69,7 +69,7 @@ export interface SandboxFileSystem {
 // ============================================================================
 
 export interface ExecOptions {
-  timeout?: number;
+  timeout?: number; // TODO: rename to explicit timeout MS
   cwd?: string;
   env?: Record<string, string>;
 }

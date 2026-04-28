@@ -176,6 +176,26 @@
         "types": "./dist/adapters/sandbox/bedrock/workflow.d.ts",
         "default": "./dist/adapters/sandbox/bedrock/workflow.js"
       }
+    },
+    "./adapters/sandbox/bedrock-runtime": {
+      "import": {
+        "types": "./dist/adapters/sandbox/bedrock-runtime/index.d.ts",
+        "default": "./dist/adapters/sandbox/bedrock-runtime/index.js"
+      },
+      "require": {
+        "types": "./dist/adapters/sandbox/bedrock-runtime/index.d.ts",
+        "default": "./dist/adapters/sandbox/bedrock-runtime/index.js"
+      }
+    },
+    "./adapters/sandbox/bedrock-runtime/workflow": {
+      "import": {
+        "types": "./dist/adapters/sandbox/bedrock-runtime/workflow.d.ts",
+        "default": "./dist/adapters/sandbox/bedrock-runtime/workflow.js"
+      },
+      "require": {
+        "types": "./dist/adapters/sandbox/bedrock-runtime/workflow.d.ts",
+        "default": "./dist/adapters/sandbox/bedrock-runtime/workflow.js"
+      }
     }
   },
   "files": [

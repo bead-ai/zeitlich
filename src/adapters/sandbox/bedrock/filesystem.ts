@@ -18,6 +18,8 @@ import {
   parseStat,
   parseFindEntries,
   parseLsLines,
+  type ShellCommand,
+  type ShellResult,
 } from "../../../lib/sandbox/shell";
 import { posix } from "node:path";
 
@@ -123,18 +125,15 @@ export class BedrockSandboxFileSystem implements SandboxFileSystem {
     return consumeStream(resp.stream);
   }
 
-  private async execShell(command: string): Promise<{
-    stdout: string;
-    stderr: string;
-    exitCode: number;
-  }> {
+  private async execShell(c: ShellCommand): Promise<ShellResult> {
     const result = await this.invoke("executeCommand" as ToolNameType, {
-      command,
+      command: c.command,
     });
     return {
       stdout: result.structuredContent?.stdout ?? "",
       stderr: result.structuredContent?.stderr ?? "",
       exitCode: result.structuredContent?.exitCode ?? 0,
+      op: c.op,
     };
   }
 
@@ -194,8 +193,7 @@ export class BedrockSandboxFileSystem implements SandboxFileSystem {
         ? Buffer.from(content, "utf-8")
         : Buffer.from(content);
     ok(
-      await this.execShell(sh.appendFromBase64(norm, buf.toString("base64"))),
-      "appendFile"
+      await this.execShell(sh.appendFromBase64(norm, buf.toString("base64")))
     );
   }
 
@@ -205,10 +203,7 @@ export class BedrockSandboxFileSystem implements SandboxFileSystem {
   }
 
   async stat(path: string): Promise<FileStat> {
-    const out = ok(
-      await this.execShell(sh.stat(this.normalisePath(path))),
-      "stat"
-    );
+    const out = ok(await this.execShell(sh.stat(this.normalisePath(path))));
     const { fileType, size, mtime } = parseStat(out);
     return {
       isFile: fileType === "regular file" || fileType === "regular empty file",
@@ -223,8 +218,7 @@ export class BedrockSandboxFileSystem implements SandboxFileSystem {
     ok(
       await this.execShell(
         sh.mkdir(this.normalisePath(path), options?.recursive)
-      ),
-      "mkdir"
+      )
     );
   }
 
@@ -242,17 +236,13 @@ export class BedrockSandboxFileSystem implements SandboxFileSystem {
     if (names.length > 0) return names;
 
     return parseLsLines(
-      ok(
-        await this.execShell(sh.readdir(this.normalisePath(path))),
-        "readdir"
-      )
+      ok(await this.execShell(sh.readdir(this.normalisePath(path))))
     );
   }
 
   async readdirWithFileTypes(path: string): Promise<DirentEntry[]> {
     const out = ok(
-      await this.execShell(sh.findEntries(this.normalisePath(path))),
-      "readdirWithFileTypes"
+      await this.execShell(sh.findEntries(this.normalisePath(path)))
     );
     return parseFindEntries(out).map((e) => ({
       name: e.name,
@@ -296,8 +286,7 @@ export class BedrockSandboxFileSystem implements SandboxFileSystem {
           this.normalisePath(dest),
           options?.recursive
         )
-      ),
-      "cp"
+      )
     );
   }
 
@@ -305,8 +294,7 @@ export class BedrockSandboxFileSystem implements SandboxFileSystem {
     ok(
       await this.execShell(
         sh.mv(this.normalisePath(src), this.normalisePath(dest))
-      ),
-      "mv"
+      )
     );
   }
 
