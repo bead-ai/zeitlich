@@ -19,6 +19,7 @@ import {
   SandboxNotFoundError,
   SandboxNotSupportedError,
 } from "../../../lib/sandbox/types";
+import { q, sh } from "../../../lib/sandbox/shell";
 import { BedrockSandboxFileSystem } from "./filesystem";
 import type {
   BedrockSandbox,
@@ -98,21 +99,17 @@ class BedrockSandboxImpl implements Sandbox {
   }
 
   async exec(command: string, options?: ExecOptions): Promise<ExecResult> {
-    let cmd = command;
-    if (options?.cwd) cmd = `cd "${options.cwd}" && ${cmd}`;
-    if (options?.env) {
-      const exports = Object.entries(options.env)
-        .map(([k, v]) => `export ${k}="${v.replace(/"/g, '\\"')}"`)
-        .join(" && ");
-      cmd = `${exports} && ${cmd}`;
-    }
+    const finalCmd = sh.withCwdAndEnv(command, {
+      cwd: options?.cwd,
+      env: options?.env,
+    });
 
     const resp = await this.client.send(
       new InvokeCodeInterpreterCommand({
         codeInterpreterIdentifier: this.codeInterpreterIdentifier,
         sessionId: this.sessionId,
         name: "executeCommand",
-        arguments: { command: cmd },
+        arguments: { command: finalCmd },
       })
     );
 
@@ -184,9 +181,9 @@ export class BedrockSandboxProvider implements SandboxProvider<
 
     if (options?.env) {
       const exports = Object.entries(options.env)
-        .map(([k, v]) => `${k}="${v.replace(/"/g, '\\"')}"`)
+        .map(([k, v]) => `${k}=${q(v)}`)
         .join(" ");
-      await sandbox.exec(`echo '${exports}' >> ~/.bashrc`);
+      await sandbox.exec(`echo ${q(exports)} >> ~/.bashrc`);
     }
 
     return { sandbox };

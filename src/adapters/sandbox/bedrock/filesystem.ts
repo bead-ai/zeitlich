@@ -12,6 +12,13 @@ import type {
   FileStat,
 } from "../../../lib/sandbox/types";
 import { SandboxNotSupportedError } from "../../../lib/sandbox/types";
+import {
+  ok,
+  sh,
+  parseStat,
+  parseFindEntries,
+  parseLsLines,
+} from "../../../lib/sandbox/shell";
 import { posix } from "node:path";
 
 async function consumeStream(
@@ -182,49 +189,43 @@ export class BedrockSandboxFileSystem implements SandboxFileSystem {
 
   async appendFile(path: string, content: string | Uint8Array): Promise<void> {
     const norm = this.normalisePath(path);
-    const addition =
-      typeof content === "string" ? content : new TextDecoder().decode(content);
-    const escaped = addition.replace(/'/g, "'\\''");
-    const { exitCode, stderr } = await this.execShell(
-      `printf '%s' '${escaped}' >> "${norm}"`
+    const buf =
+      typeof content === "string"
+        ? Buffer.from(content, "utf-8")
+        : Buffer.from(content);
+    ok(
+      await this.execShell(sh.appendFromBase64(norm, buf.toString("base64"))),
+      "appendFile"
     );
-    if (exitCode !== 0) throw new Error(`appendFile failed: ${stderr}`);
   }
 
   async exists(path: string): Promise<boolean> {
-    const norm = this.normalisePath(path);
-    const { exitCode } = await this.execShell(`test -e "${norm}"`);
-    return exitCode === 0;
+    const r = await this.execShell(sh.exists(this.normalisePath(path)));
+    return r.exitCode === 0;
   }
 
   async stat(path: string): Promise<FileStat> {
-    const norm = this.normalisePath(path);
-    const { stdout, exitCode, stderr } = await this.execShell(
-      `stat -c '%F %s %Y' "${norm}" 2>&1`
+    const out = ok(
+      await this.execShell(sh.stat(this.normalisePath(path))),
+      "stat"
     );
-    if (exitCode !== 0) throw new Error(`stat failed: ${stderr || stdout}`);
-
-    const parts = stdout.trim().split(" ");
-    const fileType = parts.slice(0, -2).join(" ");
-    const sizeStr = parts[parts.length - 2] ?? "0";
-    const mtimeStr = parts[parts.length - 1] ?? "0";
-    const size = parseInt(sizeStr, 10);
-    const mtimeEpoch = parseInt(mtimeStr, 10);
-
+    const { fileType, size, mtime } = parseStat(out);
     return {
       isFile: fileType === "regular file" || fileType === "regular empty file",
       isDirectory: fileType === "directory",
       isSymbolicLink: fileType === "symbolic link",
-      size: isNaN(size) ? 0 : size,
-      mtime: new Date(isNaN(mtimeEpoch) ? 0 : mtimeEpoch * 1000),
+      size,
+      mtime,
     };
   }
 
   async mkdir(path: string, options?: { recursive?: boolean }): Promise<void> {
-    const norm = this.normalisePath(path);
-    const flag = options?.recursive ? "-p " : "";
-    const { exitCode, stderr } = await this.execShell(`mkdir ${flag}"${norm}"`);
-    if (exitCode !== 0) throw new Error(`mkdir failed: ${stderr}`);
+    ok(
+      await this.execShell(
+        sh.mkdir(this.normalisePath(path), options?.recursive)
+      ),
+      "mkdir"
+    );
   }
 
   async readdir(path: string): Promise<string[]> {
@@ -240,54 +241,36 @@ export class BedrockSandboxFileSystem implements SandboxFileSystem {
 
     if (names.length > 0) return names;
 
-    const norm = this.normalisePath(path);
-    const { stdout, exitCode, stderr } = await this.execShell(
-      `ls -1A "${norm}"`
+    return parseLsLines(
+      ok(
+        await this.execShell(sh.readdir(this.normalisePath(path))),
+        "readdir"
+      )
     );
-    if (exitCode !== 0) throw new Error(`readdir failed: ${stderr}`);
-    return stdout
-      .trim()
-      .split("\n")
-      .filter((l) => l.length > 0);
   }
 
   async readdirWithFileTypes(path: string): Promise<DirentEntry[]> {
-    const norm = this.normalisePath(path);
-    const { stdout, exitCode, stderr } = await this.execShell(
-      `find "${norm}" -maxdepth 1 -mindepth 1 -printf '%y %f\\n'`
+    const out = ok(
+      await this.execShell(sh.findEntries(this.normalisePath(path))),
+      "readdirWithFileTypes"
     );
-    if (exitCode !== 0)
-      throw new Error(`readdirWithFileTypes failed: ${stderr}`);
-
-    return stdout
-      .trim()
-      .split("\n")
-      .filter((l) => l.length > 0)
-      .map((line) => {
-        const type = line.charAt(0);
-        const name = line.slice(2);
-        return {
-          name,
-          isFile: type === "f",
-          isDirectory: type === "d",
-          isSymbolicLink: type === "l",
-        };
-      });
+    return parseFindEntries(out).map((e) => ({
+      name: e.name,
+      isFile: e.type === "f",
+      isDirectory: e.type === "d",
+      isSymbolicLink: e.type === "l",
+    }));
   }
 
   async rm(
     path: string,
     options?: { recursive?: boolean; force?: boolean }
   ): Promise<void> {
-    const norm = this.normalisePath(path);
     if (options?.recursive || options?.force) {
-      const flags =
-        `${options?.recursive ? "-r" : ""} ${options?.force ? "-f" : ""}`.trim();
-      const { exitCode, stderr } = await this.execShell(
-        `rm ${flags} "${norm}"`
-      );
-      if (exitCode !== 0 && !options?.force)
-        throw new Error(`rm failed: ${stderr}`);
+      const r = await this.execShell(sh.rm(this.normalisePath(path), options));
+      if (r.exitCode !== 0 && !options?.force) {
+        throw new Error(`rm failed: ${r.stderr}`);
+      }
       return;
     }
 
@@ -306,32 +289,33 @@ export class BedrockSandboxFileSystem implements SandboxFileSystem {
     dest: string,
     options?: { recursive?: boolean }
   ): Promise<void> {
-    const normSrc = this.normalisePath(src);
-    const normDest = this.normalisePath(dest);
-    const flag = options?.recursive ? "-r " : "";
-    const { exitCode, stderr } = await this.execShell(
-      `cp ${flag}"${normSrc}" "${normDest}"`
+    ok(
+      await this.execShell(
+        sh.cp(
+          this.normalisePath(src),
+          this.normalisePath(dest),
+          options?.recursive
+        )
+      ),
+      "cp"
     );
-    if (exitCode !== 0) throw new Error(`cp failed: ${stderr}`);
   }
 
   async mv(src: string, dest: string): Promise<void> {
-    const normSrc = this.normalisePath(src);
-    const normDest = this.normalisePath(dest);
-    const { exitCode, stderr } = await this.execShell(
-      `mv "${normSrc}" "${normDest}"`
+    ok(
+      await this.execShell(
+        sh.mv(this.normalisePath(src), this.normalisePath(dest))
+      ),
+      "mv"
     );
-    if (exitCode !== 0) throw new Error(`mv failed: ${stderr}`);
   }
 
   async readlink(path: string): Promise<string> {
-    const norm = this.normalisePath(path);
-    const { stdout, exitCode, stderr } = await this.execShell(
-      `readlink "${norm}"`
-    );
-    if (exitCode !== 0)
-      throw new SandboxNotSupportedError(`readlink: ${stderr}`);
-    return stdout.trim();
+    const r = await this.execShell(sh.readlink(this.normalisePath(path)));
+    if (r.exitCode !== 0) {
+      throw new SandboxNotSupportedError(`readlink: ${r.stderr}`);
+    }
+    return r.stdout.trim();
   }
 
   resolvePath(base: string, path: string): string {

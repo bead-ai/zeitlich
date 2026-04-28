@@ -26,6 +26,10 @@ export default defineConfig({
     "adapters/sandbox/bedrock/index": "src/adapters/sandbox/bedrock/index.ts",
     "adapters/sandbox/bedrock/workflow":
       "src/adapters/sandbox/bedrock/proxy.ts",
+    "adapters/sandbox/bedrock-runtime/index":
+      "src/adapters/sandbox/bedrock-runtime/index.ts",
+    "adapters/sandbox/bedrock-runtime/workflow":
+      "src/adapters/sandbox/bedrock-runtime/proxy.ts",
   },
   format: ["esm", "cjs"],
   dts: true,
