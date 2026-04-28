@@ -36,6 +36,22 @@ export interface BedrockRuntimeSandboxConfig {
    * upper bound on its wall-clock time. Server-side default if omitted.
    */
   commandTimeoutSeconds?: number;
+  /**
+   * Reject `provider.get(id)` calls for sessions this adapter never
+   * created. Defaults to `true`.
+   *
+   * When enabled, `get()` checks for a marker file in the runtime's
+   * filesystem; if absent, it destroys the freshly-minted session and
+   * throws {@link SandboxNotFoundError} — preventing AgentCore's
+   * implicit-create behaviour from silently handing you an empty session.
+   *
+   * The protection only spans Stop+resume cycles if the runtime has
+   * `filesystemConfigurations.sessionStorage` configured. Without
+   * persistence, `get()` after a pause/idle-timeout will throw, since the
+   * marker is gone with the previous microVM. That's accurate semantically
+   * (the session state was lost) but worth knowing.
+   */
+  strictGet?: boolean;
 }
 
 export interface BedrockRuntimeSandboxCreateOptions extends SandboxCreateOptions {
