@@ -22,7 +22,6 @@ import type {
   Sandbox,
   SandboxCapabilities,
   SandboxCreateResult,
-  SandboxOps,
   SandboxProvider,
   SandboxSnapshot,
   ExecOptions,
@@ -175,14 +174,7 @@ class BedrockRuntimeSandboxImpl implements Sandbox {
 // BedrockRuntimeSandboxProvider
 // ============================================================================
 
-/**
- * Full SandboxProvider implementation. Internal — exported (with a
- * narrowed type) below as `BedrockRuntimeSandboxProvider` so consumers
- * cannot statically reach the snapshot/restore/fork methods that
- * AgentCore Runtime can't fulfil. Those methods still exist on the impl
- * and throw `SandboxNotSupportedError` as defence-in-depth.
- */
-class BedrockRuntimeSandboxProviderImpl
+export class BedrockRuntimeSandboxProvider
   implements
     SandboxProvider<BedrockRuntimeSandboxCreateOptions, BedrockRuntimeSandbox>
 {
@@ -350,46 +342,6 @@ class BedrockRuntimeSandboxProviderImpl
     throw new SandboxNotSupportedError("fork");
   }
 }
-
-/**
- * Public type for the bedrock-runtime provider. Narrower than the full
- * {@link SandboxProvider} contract because AgentCore Runtime has no
- * native snapshot/restore/fork primitives — calling those would throw
- * `SandboxNotSupportedError` at runtime, so we omit them from the type to
- * surface the gap at compile time.
- *
- * Consumers swapping E2B → bedrock-runtime get TS errors on any
- * `provider.snapshot(...)`, `provider.restore(...)`, `provider.fork(...)`,
- * or `provider.deleteSnapshot(...)` call site rather than discovering the
- * limitation at runtime.
- */
-export type BedrockRuntimeSandboxProvider = Omit<
-  SandboxProvider<BedrockRuntimeSandboxCreateOptions, BedrockRuntimeSandbox>,
-  "snapshot" | "restore" | "deleteSnapshot" | "fork"
->;
-
-/**
- * Public constructor for the bedrock-runtime provider. Re-binds the impl
- * class's constructor to the narrowed {@link BedrockRuntimeSandboxProvider}
- * type, so calls to `provider.snapshot(...)`, `.restore(...)`, `.fork(...)`,
- * and `.deleteSnapshot(...)` are TS errors at the call site rather than
- * runtime `SandboxNotSupportedError` throws.
- */
-export const BedrockRuntimeSandboxProvider: new (
-  config: BedrockRuntimeSandboxConfig
-) => BedrockRuntimeSandboxProvider = BedrockRuntimeSandboxProviderImpl;
-
-/**
- * Workflow-side proxy type for bedrock-runtime ops. Narrowed mirror of
- * {@link BedrockRuntimeSandboxProvider}. Workflows that swap
- * `proxyE2bSandboxOps` for `proxyBedrockRuntimeSandboxOps` get TS errors
- * if they were calling `snapshotSandbox` / `restoreSandbox` /
- * `forkSandbox` / `deleteSandboxSnapshot`.
- */
-export type BedrockRuntimeSandboxOps = Omit<
-  SandboxOps<BedrockRuntimeSandboxCreateOptions>,
-  "snapshotSandbox" | "restoreSandbox" | "deleteSandboxSnapshot" | "forkSandbox"
->;
 
 // Re-exports
 export { BedrockRuntimeSandboxFileSystem } from "./filesystem";
