@@ -247,8 +247,8 @@
     "@eslint/js": "^10.0.1",
     "@google/genai": "^1.44.0",
     "@langchain/core": "^1.1.30",
-    "@temporalio/envconfig": "^1.16.1",
-    "@temporalio/worker": "^1.16.1",
+    "@temporalio/envconfig": "1.16.0",
+    "@temporalio/worker": "1.16.0",
     "@types/node": "^25.3.3",
     "eslint": "^10.0.2",
     "husky": "^9.1.7",
@@ -296,9 +296,9 @@
   },
   "homepage": "https://github.com/bead-ai/zeitlich#readme",
   "dependencies": {
-    "@temporalio/common": "^1.16.1",
-    "@temporalio/plugin": "^1.16.1",
-    "@temporalio/workflow": "^1.16.1",
+    "@temporalio/common": "1.16.0",
+    "@temporalio/plugin": "1.16.0",
+    "@temporalio/workflow": "1.16.0",
     "zod": "^4.3.6"
   }
 }
