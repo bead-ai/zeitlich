@@ -31,6 +31,7 @@ import type {
   SandboxSnapshot,
 } from "../sandbox/types";
 import { childSandboxReadySignal } from "./signals";
+import type { Duration } from "@temporalio/common";
 
 /**
  * Methods the parent's subagent handler invokes on a subagent's `proxy`.
@@ -66,7 +67,7 @@ type ParentDeleteSnapshotOps = Pick<
  * still catching hangs; agents that legitimately need longer should set an
  * explicit `workflowOptions.workflowRunTimeout`.
  */
-export const DEFAULT_SUBAGENT_WORKFLOW_RUN_TIMEOUT = "1h";
+export const DEFAULT_SUBAGENT_WORKFLOW_RUN_TIMEOUT: Duration = "1h";
 
 function resolveSandboxConfig(
   config?: SubagentSandboxConfig
