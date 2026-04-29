@@ -18,15 +18,14 @@
  * ```
  */
 import { proxyActivities, workflowInfo } from "@temporalio/workflow";
-import type { SandboxOps } from "../../../lib/sandbox/types";
-import type { BedrockRuntimeSandboxCreateOptions } from "./types";
+import type { BedrockRuntimeSandboxOps } from "./index";
 
 const ADAPTER_PREFIX = "bedrockRuntime";
 
 export function proxyBedrockRuntimeSandboxOps(
   scope?: string,
   options?: Parameters<typeof proxyActivities>[0]
-): SandboxOps<BedrockRuntimeSandboxCreateOptions> {
+): BedrockRuntimeSandboxOps {
   const resolvedScope = scope ?? workflowInfo().workflowType;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -46,14 +45,13 @@ export function proxyBedrockRuntimeSandboxOps(
   const p = (key: string): string =>
     `${prefix}${key.charAt(0).toUpperCase()}${key.slice(1)}`;
 
+  // Only the supported ops are exposed. snapshot/restore/fork/deleteSnapshot
+  // are absent from BedrockRuntimeSandboxOps, so workflows calling those
+  // get a TS error rather than a runtime SandboxNotSupportedError.
   return {
     createSandbox: acts[p("createSandbox")],
     destroySandbox: acts[p("destroySandbox")],
     pauseSandbox: acts[p("pauseSandbox")],
     resumeSandbox: acts[p("resumeSandbox")],
-    snapshotSandbox: acts[p("snapshotSandbox")],
-    restoreSandbox: acts[p("restoreSandbox")],
-    deleteSandboxSnapshot: acts[p("deleteSandboxSnapshot")],
-    forkSandbox: acts[p("forkSandbox")],
-  } as SandboxOps<BedrockRuntimeSandboxCreateOptions>;
+  } as BedrockRuntimeSandboxOps;
 }
