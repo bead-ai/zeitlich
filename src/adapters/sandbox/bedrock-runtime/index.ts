@@ -178,7 +178,7 @@ export class BedrockRuntimeSandboxProvider
   implements
     SandboxProvider<BedrockRuntimeSandboxCreateOptions, BedrockRuntimeSandbox>
 {
-  readonly id = "bedrock-runtime";
+  readonly id = "bedrockRuntime";
   readonly capabilities: SandboxCapabilities = {
     filesystem: true,
     execution: true,
