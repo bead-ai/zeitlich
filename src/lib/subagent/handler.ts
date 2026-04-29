@@ -25,6 +25,7 @@ import type {
 } from "../lifecycle";
 import type { SandboxOps, SandboxSnapshot } from "../sandbox/types";
 import { childSandboxReadySignal } from "./signals";
+import type { Duration } from "@temporalio/common";
 
 /**
  * Default `workflowRunTimeout` applied to every subagent child workflow
@@ -40,7 +41,7 @@ import { childSandboxReadySignal } from "./signals";
  * still catching hangs; agents that legitimately need longer should set an
  * explicit `workflowOptions.workflowRunTimeout`.
  */
-export const DEFAULT_SUBAGENT_WORKFLOW_RUN_TIMEOUT = "1h";
+export const DEFAULT_SUBAGENT_WORKFLOW_RUN_TIMEOUT: Duration = "1h";
 
 /** Normalized sandbox config after resolving the union. */
 interface ResolvedSandboxConfig {
