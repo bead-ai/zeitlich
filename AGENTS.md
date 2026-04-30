@@ -10,3 +10,4 @@
 - **Pre-commit hook**: Husky runs `npm run lint && npm run typecheck` on commit. Both must pass before committing.
 - **Tests**: `npx vitest run` — current tests are unit tests that don't require Redis or Temporal.
 - **Dev mode**: `npm run dev` starts tsup in watch mode for incremental rebuilds.
+- **Node.js via nvm**: Node lives at `/home/ubuntu/.nvm`. Source it with `export NVM_DIR="/home/ubuntu/.nvm" && . "$NVM_DIR/nvm.sh"` if `node` is not on PATH (the update script handles this automatically).
