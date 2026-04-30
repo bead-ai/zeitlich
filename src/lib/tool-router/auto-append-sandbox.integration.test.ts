@@ -388,7 +388,10 @@ describe("withSandbox", () => {
     );
 
     expect(result.toolResponse).toContain("Bash");
+    expect(result.toolResponse).toContain("execution environment");
     expect(result.toolResponse).toContain("no longer available");
+    expect(result.toolResponse).toContain("could not be completed");
+    expect(result.toolResponse).not.toContain("session cannot continue");
     expect(result.data).toBeNull();
     expect(innerCalled).not.toHaveBeenCalled();
   });

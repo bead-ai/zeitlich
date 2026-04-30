@@ -108,7 +108,7 @@ export function withSandbox<
     } catch (err) {
       if (translateSandboxNotFound && err instanceof SandboxNotFoundError) {
         return {
-          toolResponse: `Error: the sandbox backing the ${context.toolName} tool is no longer available. The session cannot continue.`,
+          toolResponse: `Error: the execution environment for the ${context.toolName} tool is no longer available, so this tool call could not be completed.`,
           data: null,
         };
       }
