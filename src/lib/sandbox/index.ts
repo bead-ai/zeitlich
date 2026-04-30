@@ -4,6 +4,7 @@ export { toTree } from "./tree";
 export type {
   Sandbox,
   SandboxCapabilities,
+  SandboxCapability,
   SandboxCreateOptions,
   SandboxFileSystem,
   SandboxOps,

@@ -177,6 +177,7 @@ export type {
 export type {
   Sandbox,
   SandboxCapabilities,
+  SandboxCapability,
   SandboxCreateOptions,
   SandboxCreateResult,
   SandboxFileSystem,

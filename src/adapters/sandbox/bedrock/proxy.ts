@@ -10,6 +10,11 @@
  * By default the scope is derived from `workflowInfo().workflowType`,
  * so activities are automatically namespaced per workflow.
  *
+ * The Bedrock Code Interpreter only exposes base sandbox lifecycle
+ * (`create`/`destroy`) — the returned proxy is typed with `TCaps = never`,
+ * so calling `pauseSandbox` / `snapshotSandbox` / `forkSandbox` / etc.
+ * on it is a TypeScript error rather than a runtime throw.
+ *
  * @example
  * ```typescript
  * import { proxyBedrockSandboxOps } from 'zeitlich/adapters/sandbox/bedrock/workflow';
@@ -26,7 +31,7 @@ const ADAPTER_PREFIX = "bedrock";
 export function proxyBedrockSandboxOps(
   scope?: string,
   options?: Parameters<typeof proxyActivities>[0]
-): SandboxOps<BedrockSandboxCreateOptions> {
+): SandboxOps<BedrockSandboxCreateOptions, unknown, never> {
   const resolvedScope = scope ?? workflowInfo().workflowType;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -49,11 +54,5 @@ export function proxyBedrockSandboxOps(
   return {
     createSandbox: acts[p("createSandbox")],
     destroySandbox: acts[p("destroySandbox")],
-    pauseSandbox: acts[p("pauseSandbox")],
-    resumeSandbox: acts[p("resumeSandbox")],
-    snapshotSandbox: acts[p("snapshotSandbox")],
-    restoreSandbox: acts[p("restoreSandbox")],
-    deleteSandboxSnapshot: acts[p("deleteSandboxSnapshot")],
-    forkSandbox: acts[p("forkSandbox")],
-  } as SandboxOps<BedrockSandboxCreateOptions>;
+  } as SandboxOps<BedrockSandboxCreateOptions, unknown, never>;
 }

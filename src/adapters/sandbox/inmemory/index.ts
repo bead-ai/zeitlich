@@ -8,6 +8,7 @@ import {
 import type {
   Sandbox,
   SandboxCapabilities,
+  SandboxCapability,
   SandboxCreateOptions,
   SandboxCreateResult,
   SandboxFileSystem,
@@ -133,13 +134,32 @@ class InMemorySandboxImpl implements Sandbox {
 // InMemorySandboxProvider
 // ============================================================================
 
-export class InMemorySandboxProvider implements SandboxProvider {
+/**
+ * Single source of truth for the in-memory adapter's capability set. The
+ * runtime `supportedCapabilities` set and the type-level `TCaps` are both
+ * derived from this array, so the two surfaces cannot drift.
+ */
+const IN_MEMORY_CAPS = [
+  "pause",
+  "resume",
+  "snapshot",
+  "restore",
+  "fork",
+] as const satisfies readonly SandboxCapability[];
+type InMemoryCaps = (typeof IN_MEMORY_CAPS)[number];
+
+export class InMemorySandboxProvider
+  implements SandboxProvider<SandboxCreateOptions, Sandbox, InMemoryCaps>
+{
   readonly id = "inMemory";
   readonly capabilities: SandboxCapabilities = {
     filesystem: true,
     execution: true,
     persistence: true,
   };
+  readonly supportedCapabilities: ReadonlySet<InMemoryCaps> = new Set(
+    IN_MEMORY_CAPS
+  );
 
   private sandboxes = new Map<string, InMemorySandboxImpl>();
 

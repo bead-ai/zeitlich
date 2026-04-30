@@ -84,6 +84,14 @@ export interface ExecResult {
 // Capabilities
 // ============================================================================
 
+/**
+ * Runtime capability flags carried by a {@link Sandbox} instance.
+ *
+ * These are an orthogonal mechanism to the type-level
+ * {@link SandboxCapability} union: this flag bag is for runtime
+ * introspection ("does the sandbox support a filesystem?") whereas
+ * {@link SandboxCapability} narrows the type-level provider/ops contract.
+ */
 export interface SandboxCapabilities {
   /** Sandbox supports filesystem operations */
   filesystem: boolean;
@@ -92,6 +100,24 @@ export interface SandboxCapabilities {
   /** Sandbox state can be persisted and restored */
   persistence: boolean;
 }
+
+/**
+ * Type-level capability vocabulary for {@link SandboxProvider} and
+ * {@link SandboxOps}. Adapters declare the subset they actually support; the
+ * conditional types on each contract gate the corresponding methods so
+ * unsupported calls become a compile-time error rather than a runtime
+ * {@link SandboxNotSupportedError}.
+ *
+ * `pause` and `resume` are split because some adapters might support one
+ * direction without the other. The `snapshot` cap covers both `snapshot()`
+ * and `deleteSnapshot()` since they always travel together in practice.
+ */
+export type SandboxCapability =
+  | "pause"
+  | "resume"
+  | "snapshot"
+  | "restore"
+  | "fork";
 
 // ============================================================================
 // Sandbox
@@ -145,88 +171,196 @@ export interface SandboxCreateResult {
   sandbox: Sandbox;
 }
 
-export interface SandboxProvider<
-  TOptions extends SandboxCreateOptions = SandboxCreateOptions,
-  TSandbox extends Sandbox = Sandbox,
+/**
+ * Internal helper: drop keys whose value is `never` from an object type.
+ *
+ * Used by the capability-gated contracts below so that an absent capability
+ * removes the corresponding key entirely, instead of leaving a required
+ * field with type `never` (which would make implementations impossible).
+ */
+type OmitNever<T> = {
+  [K in keyof T as [T[K]] extends [never] ? never : K]: T[K];
+};
+
+/**
+ * Capability-gated provider lifecycle methods.
+ *
+ * Each field becomes `never` when its capability is absent from `TCaps`;
+ * the wrapping `OmitNever` removes those keys entirely, so the method
+ * isn't part of the type surface for adapters that don't support it.
+ */
+type SandboxProviderCapMethods<
+  TOptions extends SandboxCreateOptions,
+  TSandbox extends Sandbox,
+  TCaps extends SandboxCapability,
+> = OmitNever<{
+  pause: "pause" extends TCaps
+    ? (sandboxId: string, ttlSeconds?: number) => Promise<void>
+    : never;
+  resume: "resume" extends TCaps ? (sandboxId: string) => Promise<void> : never;
+  snapshot: "snapshot" extends TCaps
+    ? (sandboxId: string, options?: TOptions) => Promise<SandboxSnapshot>
+    : never;
+  deleteSnapshot: "snapshot" extends TCaps
+    ? (snapshot: SandboxSnapshot) => Promise<void>
+    : never;
+  restore: "restore" extends TCaps
+    ? (snapshot: SandboxSnapshot, options?: TOptions) => Promise<TSandbox>
+    : never;
+  fork: "fork" extends TCaps
+    ? (sandboxId: string, options?: TOptions) => Promise<TSandbox>
+    : never;
+}>;
+
+/**
+ * Always-present provider lifecycle methods. These do not depend on the
+ * capability set and are required by every adapter.
+ */
+interface SandboxProviderBase<
+  TOptions extends SandboxCreateOptions,
+  TSandbox extends Sandbox,
+  TCaps extends SandboxCapability,
 > {
   readonly id: string;
   readonly capabilities: SandboxCapabilities;
+  /**
+   * Runtime-introspectable list of supported capabilities.
+   *
+   * Constrained to `ReadonlySet<TCaps & SandboxCapability>` so the runtime
+   * set cannot include capabilities not declared at the type level — a
+   * provider typed as `SandboxProvider<…, never>` cannot ship a runtime
+   * set that contains `"pause"`, etc.
+   *
+   * The other direction (type declares a cap, runtime set omits it)
+   * cannot be enforced by TypeScript alone; adapters should derive both
+   * `TCaps` and the runtime set from the same `as const` array (see
+   * `SandboxManager`'s constructor-time consistency check) so the two
+   * surfaces cannot drift.
+   */
+  readonly supportedCapabilities: ReadonlySet<TCaps & SandboxCapability>;
 
   create(options?: TOptions): Promise<SandboxCreateResult>;
   get(sandboxId: string): Promise<TSandbox>;
   destroy(sandboxId: string): Promise<void>;
-  pause(sandboxId: string, ttlSeconds?: number): Promise<void>;
-  /** Resume a paused sandbox. No-op if already running. */
-  resume(sandboxId: string): Promise<void>;
-  /**
-   * Capture a snapshot of a running sandbox. `options` is a per-call override
-   * merged on top of the provider's static defaults.
-   */
-  snapshot(sandboxId: string, options?: TOptions): Promise<SandboxSnapshot>;
-  /**
-   * Restore a sandbox from a snapshot. `options` is a per-call override
-   * merged on top of the provider's static defaults.
-   */
-  restore(snapshot: SandboxSnapshot, options?: TOptions): Promise<Sandbox>;
-  /** Delete a previously captured snapshot. No-op if already deleted. */
-  deleteSnapshot(snapshot: SandboxSnapshot): Promise<void>;
-  /**
-   * Fork a running sandbox into a new one. `options` is a per-call override
-   * merged on top of the provider's static defaults.
-   */
-  fork(sandboxId: string, options?: TOptions): Promise<Sandbox>;
 }
+
+/**
+ * Provider-side sandbox lifecycle contract.
+ *
+ * Generic over an optional capability set (`TCaps`). Each capability gates
+ * a specific method: when the cap is absent the corresponding key is
+ * **removed** from the type entirely, so calling it produces a TypeScript
+ * error at the call site instead of a runtime
+ * {@link SandboxNotSupportedError}.
+ *
+ * The default `TCaps = SandboxCapability` resolves to the full union, so
+ * existing usages that only pass `TOptions` / `TSandbox` continue to see
+ * the full method surface (backwards compatible).
+ *
+ * Adapters that don't support a method should narrow `TCaps` accordingly:
+ *
+ * - In-memory / E2B: `SandboxCapability` (default — all caps present).
+ * - Bedrock Code Interpreter / Daytona: `never` (only base ops).
+ * - Bedrock AgentCore Runtime: `"pause" | "resume"`.
+ */
+export type SandboxProvider<
+  TOptions extends SandboxCreateOptions = SandboxCreateOptions,
+  TSandbox extends Sandbox = Sandbox,
+  TCaps extends SandboxCapability = SandboxCapability,
+> = SandboxProviderBase<TOptions, TSandbox, TCaps> &
+  SandboxProviderCapMethods<TOptions, TSandbox, TCaps>;
 
 // ============================================================================
 // SandboxOps — workflow-side activity interface (like ThreadOps)
 // ============================================================================
 
-export interface SandboxOps<
-  TOptions extends SandboxCreateOptions = SandboxCreateOptions,
-  TCtx = unknown,
+/**
+ * Capability-gated workflow-side methods. Mirrors the provider's gating:
+ * keys whose capability is absent from `TCaps` are removed from the type.
+ */
+type SandboxOpsCapMethods<
+  TOptions extends SandboxCreateOptions,
+  TCaps extends SandboxCapability,
+> = OmitNever<{
+  pauseSandbox: "pause" extends TCaps
+    ? (sandboxId: string) => Promise<void>
+    : never;
+  resumeSandbox: "resume" extends TCaps
+    ? (sandboxId: string) => Promise<void>
+    : never;
+  snapshotSandbox: "snapshot" extends TCaps
+    ? (sandboxId: string, options?: TOptions) => Promise<SandboxSnapshot>
+    : never;
+  deleteSandboxSnapshot: "snapshot" extends TCaps
+    ? (snapshot: SandboxSnapshot) => Promise<void>
+    : never;
+  restoreSandbox: "restore" extends TCaps
+    ? (snapshot: SandboxSnapshot, options?: TOptions) => Promise<string>
+    : never;
+  forkSandbox: "fork" extends TCaps
+    ? (sandboxId: string, options?: TOptions) => Promise<string>
+    : never;
+}>;
+
+/**
+ * Always-present workflow-side lifecycle methods.
+ */
+interface SandboxOpsBase<
+  TOptions extends SandboxCreateOptions,
+  TCtx,
 > {
   createSandbox(
     options?: TOptions,
     ctx?: TCtx
   ): Promise<{ sandboxId: string } | null>;
   destroySandbox(sandboxId: string): Promise<void>;
-  pauseSandbox(sandboxId: string): Promise<void>;
-  /** Resume a paused sandbox. No-op if already running. */
-  resumeSandbox(sandboxId: string): Promise<void>;
-  /** Capture a snapshot. `options` is a per-call override merged on top of provider defaults. */
-  snapshotSandbox(
-    sandboxId: string,
-    options?: TOptions
-  ): Promise<SandboxSnapshot>;
-  /** Create a fresh sandbox from a snapshot. `options` is a per-call override merged on top of provider defaults. */
-  restoreSandbox(
-    snapshot: SandboxSnapshot,
-    options?: TOptions
-  ): Promise<string>;
-  /** Delete a previously captured snapshot. No-op if already deleted. */
-  deleteSandboxSnapshot(snapshot: SandboxSnapshot): Promise<void>;
-  /** Fork a running sandbox. `options` is a per-call override merged on top of provider defaults. */
-  forkSandbox(sandboxId: string, options?: TOptions): Promise<string>;
 }
+
+/**
+ * Workflow-side counterpart to {@link SandboxProvider}. Exposed as a set of
+ * Temporal activities and consumed by `createSession`'s `sandboxOps` field
+ * and by `defineSubagent`'s `sandbox.proxy`.
+ *
+ * Generic over a capability set (`TCaps`) — same semantics as the provider:
+ * keys whose capability is absent are removed from the type, so calling
+ * them is a TypeScript error rather than a runtime throw. The default
+ * `TCaps = SandboxCapability` keeps the full method surface for existing
+ * consumers.
+ */
+export type SandboxOps<
+  TOptions extends SandboxCreateOptions = SandboxCreateOptions,
+  TCtx = unknown,
+  TCaps extends SandboxCapability = SandboxCapability,
+> = SandboxOpsBase<TOptions, TCtx> & SandboxOpsCapMethods<TOptions, TCaps>;
 
 /**
  * Maps generic {@link SandboxOps} method names to adapter-prefixed names.
  *
+ * Inherits the capability gating from {@link SandboxOps}: when `TCaps` omits
+ * a capability the prefixed key carries the `never` type so call sites are
+ * type-protected.
+ *
  * @example
  * ```typescript
  * type InMemOps = PrefixedSandboxOps<"inMemory">;
- * // → { inMemoryCreateSandbox, inMemoryDestroySandbox, inMemorySnapshotSandbox }
+ * // → { inMemoryCreateSandbox, inMemoryDestroySandbox, inMemorySnapshotSandbox, … }
  * ```
  */
 export type PrefixedSandboxOps<
   TPrefix extends string,
   TOptions extends SandboxCreateOptions = SandboxCreateOptions,
   TCtx = unknown,
+  TCaps extends SandboxCapability = SandboxCapability,
 > = {
   [K in keyof SandboxOps<
     TOptions,
-    TCtx
-  > as `${TPrefix}${Capitalize<K & string>}`]: SandboxOps<TOptions, TCtx>[K];
+    TCtx,
+    TCaps
+  > as `${TPrefix}${Capitalize<K & string>}`]: SandboxOps<
+    TOptions,
+    TCtx,
+    TCaps
+  >[K];
 };
 
 // ============================================================================
@@ -235,6 +369,15 @@ export type PrefixedSandboxOps<
 
 import { ApplicationFailure } from "@temporalio/common";
 
+/**
+ * Thrown by adapters that still surface an unsupported method at runtime.
+ *
+ * After the capability-generic refactor most adapters drop their
+ * unsupported methods entirely so the type system rejects them at call
+ * sites. This symbol is still exported so consumers running against older
+ * adapter versions can keep their backwards-compatible error-handling
+ * paths until they finish migrating.
+ */
 export class SandboxNotSupportedError extends ApplicationFailure {
   constructor(operation: string) {
     super(
