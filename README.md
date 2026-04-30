@@ -90,14 +90,13 @@ All adapters follow the same pattern — `createActivities(scope)` for worker re
 
 ```bash
 npm install zeitlich ioredis \
-  @temporalio/workflow @temporalio/common @temporalio/plugin
+  @temporalio/workflow @temporalio/common
 ```
 
 **Peer dependencies:**
 
 - `@temporalio/workflow` >=1.16.0 <2.0.0 (required)
 - `@temporalio/common` >=1.16.0 <2.0.0 (required)
-- `@temporalio/plugin` >=1.16.0 <2.0.0 (required)
 - `@temporalio/worker` >=1.16.0 <2.0.0 (optional — only when running a worker)
 - `@temporalio/envconfig` >=1.16.0 <2.0.0 (optional — only when using envconfig)
 - `ioredis` >= 5.0.0
