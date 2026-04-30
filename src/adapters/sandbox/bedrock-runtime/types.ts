@@ -37,19 +37,32 @@ export interface BedrockRuntimeSandboxConfig {
    */
   commandTimeoutSeconds?: number;
   /**
-   * Reject `provider.get(id)` calls for sessions this adapter never
-   * created. Defaults to `true`.
+   * Opt-in defence against AgentCore's implicit-create-on-first-invoke
+   * behaviour. Defaults to `false` (off).
    *
-   * When enabled, `get()` checks for a marker file in the runtime's
-   * filesystem; if absent, it destroys the freshly-minted session and
-   * throws {@link SandboxNotFoundError} — preventing AgentCore's
-   * implicit-create behaviour from silently handing you an empty session.
+   * When `true`, `provider.create()` writes a marker file under
+   * `${workspaceBase}/.zeitlich-agentcore-runtime/created_at`, and
+   * `provider.get(id)` checks for it. If the marker is absent, `get()`
+   * destroys the freshly-minted session and throws
+   * {@link SandboxNotFoundError} instead of silently returning a new
+   * empty sandbox under whatever id you happened to pass.
    *
-   * The protection only spans Stop+resume cycles if the runtime has
-   * `filesystemConfigurations.sessionStorage` configured. Without
-   * persistence, `get()` after a pause/idle-timeout will throw, since the
-   * marker is gone with the previous microVM. That's accurate semantically
-   * (the session state was lost) but worth knowing.
+   * Why this is opt-in:
+   * - The marker file lives in the runtime filesystem, so it only
+   *   survives Stop+resume cycles when the runtime has
+   *   `filesystemConfigurations.sessionStorage` configured. Without
+   *   persistent FS, the marker dies on every microVM recycle and
+   *   `get()` after a pause/idle-timeout throws even on legitimate ids.
+   * - The probe costs an extra round-trip on every `create()` (write
+   *   marker) and every `get()` (read marker), ~150–300 ms each.
+   * - For codebases where the session id flows through a single,
+   *   well-typed path from `create()` to `get()`, the protection
+   *   rarely fires; relying on AgentCore's native
+   *   "implicit-create-on-unknown-id" semantics is simpler.
+   *
+   * Turn it on if your call sites shuffle session ids through Temporal
+   * payloads, external state, or multi-worker coordination where a
+   * typo or id collision could silently hand you the wrong sandbox.
    */
   strictGet?: boolean;
 }

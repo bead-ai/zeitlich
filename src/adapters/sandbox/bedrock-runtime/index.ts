@@ -198,7 +198,7 @@ export class BedrockRuntimeSandboxProvider
     this.defaultQualifier = config.qualifier;
     this.defaultWorkspaceBase = config.workspaceBase ?? "/mnt/workspace";
     this.defaultCommandTimeoutSeconds = config.commandTimeoutSeconds;
-    this.strictGet = config.strictGet ?? true;
+    this.strictGet = config.strictGet ?? false;
   }
 
   async create(
@@ -225,9 +225,11 @@ export class BedrockRuntimeSandboxProvider
       }
     }
 
-    // Mark the session so a later get() with strictGet on can recognise
-    // it as one we provisioned. One extra round-trip per create.
-    await sandbox.writeSessionMarker();
+    // Only write the marker when strictGet is on — saves a round-trip
+    // per create() when the protection isn't being used (the default).
+    if (this.strictGet) {
+      await sandbox.writeSessionMarker();
+    }
 
     return { sandbox };
   }
@@ -237,15 +239,18 @@ export class BedrockRuntimeSandboxProvider
     // bedrock-agentcore SDK — sessions are referenced purely by the
     // (agentRuntimeArn, runtimeSessionId) pair the caller already holds,
     // and AgentCore mints sessions from caller-supplied ids on first
-    // invoke with no "session not found" error path. To stop that
-    // implicit-create behaviour from silently handing back an empty
-    // session, `strictGet` (default true) checks for the marker file
-    // `create()` wrote. If it's missing, we destroy the session our
-    // probe just minted and throw SandboxNotFoundError.
+    // invoke with no "session not found" error path. By default this
+    // method just returns a thin handle bound to the supplied id; the
+    // first exec/fs call against it either reattaches to an existing
+    // session or implicitly mints a fresh one (AgentCore's choice, the
+    // adapter cannot tell the two apart from outside).
     //
-    // Set `strictGet: false` on the provider to opt out and observe the
-    // raw AgentCore behaviour (always returns a handle, sessions are
-    // born on first invoke).
+    // Pass `strictGet: true` on the provider to opt into a marker-based
+    // probe: `create()` writes a marker file, `get()` checks for it,
+    // and missing markers throw SandboxNotFoundError instead of silently
+    // returning a fresh empty sandbox. Worth turning on when session
+    // ids flow through Temporal payloads or external state where typo
+    // or id-collision bugs would otherwise corrupt unrelated sandboxes.
     //
     // See https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-sessions.html#session-lifecycle
     const sandbox = new BedrockRuntimeSandboxImpl(
@@ -300,13 +305,25 @@ export class BedrockRuntimeSandboxProvider
     //     — "transitions back to Active on the next invocation"
     //   https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-persistent-filesystems.html#session-storage-data-lifecycle
     //     — 14-day idle GC of session-storage data
-    await this.client.send(
-      new StopRuntimeSessionCommand({
-        agentRuntimeArn: this.agentRuntimeArn,
-        runtimeSessionId: sandboxId,
-        qualifier: this.defaultQualifier,
-      })
-    );
+    try {
+      await this.client.send(
+        new StopRuntimeSessionCommand({
+          agentRuntimeArn: this.agentRuntimeArn,
+          runtimeSessionId: sandboxId,
+          qualifier: this.defaultQualifier,
+        })
+      );
+    } catch (err) {
+      // Idempotent: if the session is already stopped or expired, the
+      // end state pause() promises ("compute is not running") is already
+      // satisfied. Treat as success. Without this, Temporal-style activity
+      // retries fail when the first attempt's StopRuntimeSession succeeded
+      // but the response was lost in transit.
+      if (err instanceof Error && err.name === "ResourceNotFoundException") {
+        return;
+      }
+      throw err;
+    }
   }
 
   async resume(_sandboxId: string): Promise<void> {

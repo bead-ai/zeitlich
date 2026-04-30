@@ -186,19 +186,92 @@ describe.skipIf(!arn)("bedrock-runtime integration", () => {
 });
 
 /**
- * `strictGet` (default true) protects against AgentCore's implicit-create
- * behaviour: calling `get(unknownId).exec(...)` would otherwise quietly
- * spin up a fresh session under that id with no error path. With strict
- * on, `get()` checks for the marker `create()` wrote and throws
- * SandboxNotFoundError if the session is unknown to this adapter, after
- * cleaning up the session the marker probe minted.
+ * pause() must be idempotent: AgentCore returns ResourceNotFoundException
+ * if you call StopRuntimeSession on a session that's already stopped, but
+ * the desired end state ("compute is not running") was already achieved
+ * by an earlier call. Temporal-style activity retries trigger this exact
+ * sequence when the first attempt's response is lost in transit; a
+ * non-idempotent pause() would fail the workflow even though the work was
+ * done.
  */
-describe.skipIf(!arn)("bedrock-runtime get() — strict mode (default)", () => {
+describe.skipIf(!arn)("bedrock-runtime pause() — idempotency", () => {
+  it("returns successfully when called twice on the same session", async () => {
+    if (!arn) throw new Error("BEDROCK_RUNTIME_TEST_ARN unset");
+    const provider = new BedrockRuntimeSandboxProvider({
+      agentRuntimeArn: arn,
+      clientConfig: { region },
+    });
+
+    const { sandbox } = await provider.create();
+    try {
+      // First pause: real StopRuntimeSession, succeeds.
+      await provider.pause(sandbox.id);
+      // Second pause: AWS replies "session already stopped" — must NOT
+      // throw. Idempotent.
+      await provider.pause(sandbox.id);
+    } finally {
+      try {
+        await sandbox.destroy();
+      } catch {
+        /* best-effort */
+      }
+    }
+  }, 120_000);
+});
+
+/**
+ * Default behaviour (`strictGet: false`) — `get(unknownId).exec(...)`
+ * does NOT error. AgentCore silently provisions a fresh session under
+ * whatever id the caller hands it on first invoke. The adapter cannot
+ * distinguish "reattached to existing" from "freshly minted" without
+ * the strict-mode marker probe; the default trusts AgentCore's
+ * implicit-create semantics.
+ *
+ * Pinning this behaviour as a regression test so any future AWS change
+ * is loud.
+ */
+describe.skipIf(!arn)("bedrock-runtime get() — default (non-strict)", () => {
+  it("silently provisions a fresh session on first invoke", async () => {
+    if (!arn) throw new Error("BEDROCK_RUNTIME_TEST_ARN unset");
+    const provider = new BedrockRuntimeSandboxProvider({
+      agentRuntimeArn: arn,
+      clientConfig: { region },
+    });
+
+    const freshId = `zeitlich-probe-${randomUUID().replace(/-/g, "")}`;
+    const sandbox = await provider.get(freshId);
+
+    try {
+      const result = await sandbox.exec("echo hello-from-fresh-session");
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout.trim()).toBe("hello-from-fresh-session");
+    } finally {
+      try {
+        await sandbox.destroy();
+      } catch {
+        /* best-effort */
+      }
+    }
+  }, 120_000);
+});
+
+/**
+ * `strictGet: true` opts into a marker-based check that protects against
+ * id-mismatch bugs at the call site. `create()` writes a marker file in
+ * the runtime FS; `get()` checks for it and throws SandboxNotFoundError
+ * (after cleaning up the freshly-minted probe session) when absent.
+ *
+ * Note: the marker only survives Stop+resume cycles when the runtime
+ * has `filesystemConfigurations.sessionStorage` configured. Without
+ * persistent FS, the marker dies on every microVM recycle.
+ */
+describe.skipIf(!arn)("bedrock-runtime get() — strict mode (opt-in)", () => {
   it("returns a handle for a session this adapter created", async () => {
     if (!arn) throw new Error("BEDROCK_RUNTIME_TEST_ARN unset");
     const provider = new BedrockRuntimeSandboxProvider({
       agentRuntimeArn: arn,
       clientConfig: { region },
+      strictGet: true,
     });
 
     const { sandbox } = await provider.create();
@@ -221,46 +294,12 @@ describe.skipIf(!arn)("bedrock-runtime get() — strict mode (default)", () => {
     const provider = new BedrockRuntimeSandboxProvider({
       agentRuntimeArn: arn,
       clientConfig: { region },
+      strictGet: true,
     });
 
     const freshId = `zeitlich-strict-probe-${randomUUID().replace(/-/g, "")}`;
     await expect(provider.get(freshId)).rejects.toBeInstanceOf(
       SandboxNotFoundError
     );
-  }, 120_000);
-});
-
-/**
- * Documents AgentCore Runtime's raw implicit-session-creation behaviour
- * (with `strictGet: false` to bypass the protection): `get(unknownId)`
- * followed by `.exec(...)` does NOT error — AgentCore silently provisions
- * a fresh session under whatever id the caller hands it on first invoke.
- *
- * Confirmed empirically; this test pins the behaviour so any future AWS
- * change is loud, and the get() doc comment can rely on it.
- */
-describe.skipIf(!arn)("bedrock-runtime get() — non-strict (raw AgentCore behaviour)", () => {
-  it("silently provisions a fresh session on first invoke", async () => {
-    if (!arn) throw new Error("BEDROCK_RUNTIME_TEST_ARN unset");
-    const provider = new BedrockRuntimeSandboxProvider({
-      agentRuntimeArn: arn,
-      clientConfig: { region },
-      strictGet: false,
-    });
-
-    const freshId = `zeitlich-probe-${randomUUID().replace(/-/g, "")}`;
-    const sandbox = await provider.get(freshId);
-
-    try {
-      const result = await sandbox.exec("echo hello-from-fresh-session");
-      expect(result.exitCode).toBe(0);
-      expect(result.stdout.trim()).toBe("hello-from-fresh-session");
-    } finally {
-      try {
-        await sandbox.destroy();
-      } catch {
-        /* best-effort */
-      }
-    }
   }, 120_000);
 });
