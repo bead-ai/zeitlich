@@ -11,7 +11,12 @@ import type {
   SandboxInit,
   SubagentSandboxShutdown,
 } from "../lifecycle";
-import type { SandboxOps, SandboxSnapshot } from "../sandbox/types";
+import type {
+  SandboxCapability,
+  SandboxCreateOptions,
+  SandboxOps,
+  SandboxSnapshot,
+} from "../sandbox/types";
 
 /**
  * Subset of {@link ChildWorkflowOptions} that callers may override when a
@@ -81,6 +86,76 @@ export type InferSubagentResult<T extends SubagentConfig> =
   T extends SubagentConfig<infer S> ? z.infer<S> : null;
 
 /**
+ * Sandbox capabilities the parent's subagent handler needs from the
+ * `proxy` for a given `continuation` value.
+ *
+ * The parent only ever calls `destroySandbox` (always) and
+ * `deleteSandboxSnapshot` (for snapshot-driven continuations) on the
+ * proxy itself; the *child* session is what runs `pauseSandbox` /
+ * `forkSandbox` / `restoreSandbox` against its own session-config
+ * `sandboxOps`. This mapping reflects the parent's caller-side needs
+ * only — the child enforces its own caps where it consumes the proxy.
+ *
+ * - `"continue"` / `"fork"` → no gated cap required from the parent
+ *   (the parent never calls anything beyond base ops).
+ * - `"snapshot"` → requires `"snapshot"` so the parent can call
+ *   `deleteSandboxSnapshot` during cleanup.
+ */
+export type SubagentContinuationCaps<
+  C extends SubagentContinuation = SubagentContinuation,
+> = C extends "snapshot" ? "snapshot" : never;
+
+/** Continuation values supported when `source` is `"inherit"`. */
+type InheritContinuation = "continue" | "fork";
+/** Continuation values supported when `source` is `"own"`. */
+type OwnContinuation = "continue" | "fork" | "snapshot";
+/** Union of every continuation value across both sources. */
+type SubagentContinuation = InheritContinuation | OwnContinuation;
+
+/**
+ * Distributes over the `TContinuation` union so each literal
+ * `continuation` value gets its own object shape with a precisely-typed
+ * `proxy` field — the proxy only needs to expose the caps that this
+ * specific `continuation` will actually invoke on the parent side.
+ */
+type InheritVariant<TOptions extends SandboxCreateOptions> =
+  InheritContinuation extends infer C
+    ? C extends InheritContinuation
+      ? {
+          source: "inherit";
+          continuation: C;
+          shutdown?: SubagentSandboxShutdown;
+          proxy: (
+            scope: string
+          ) => SandboxOps<
+            TOptions,
+            unknown,
+            SubagentContinuationCaps<C> & SandboxCapability
+          >;
+        }
+      : never
+    : never;
+
+type OwnVariant<TOptions extends SandboxCreateOptions> =
+  OwnContinuation extends infer C
+    ? C extends OwnContinuation
+      ? {
+          source: "own";
+          init?: "per-call" | "once";
+          continuation: C;
+          shutdown?: SubagentSandboxShutdown;
+          proxy: (
+            scope: string
+          ) => SandboxOps<
+            TOptions,
+            unknown,
+            SubagentContinuationCaps<C> & SandboxCapability
+          >;
+        }
+      : never
+    : never;
+
+/**
  * Sandbox configuration for a subagent.
  *
  * - `"none"` — no sandbox (default).
@@ -97,22 +172,22 @@ export type InferSubagentResult<T extends SubagentConfig> =
  * `scope = agentName`, so the returned proxy resolves to the same activity
  * prefix the child session uses. The parent uses it to destroy lingering
  * sandboxes and delete stored snapshots at shutdown.
+ *
+ * The `proxy` field is generic over the `continuation` value via
+ * {@link SubagentContinuationCaps}: only continuations that need a
+ * specific cap on the parent side require the proxy to expose it. So a
+ * narrowed adapter (e.g. Daytona's `SandboxOps<…, never>` proxy)
+ * type-checks fine when the user picks `continuation: "continue"` or
+ * `"fork"`, and gets a precise "missing snapshotSandbox" diagnostic
+ * only when the user picks `"snapshot"`.
+ *
+ * `TOptions` defaults to {@link SandboxCreateOptions} so the wide,
+ * un-parameterised `SubagentSandboxConfig` keeps working for callers
+ * that don't need adapter-specific options.
  */
-export type SubagentSandboxConfig =
-  | "none"
-  | {
-      source: "inherit";
-      continuation: "continue" | "fork";
-      shutdown?: SubagentSandboxShutdown;
-      proxy: (scope: string) => SandboxOps;
-    }
-  | {
-      source: "own";
-      init?: "per-call" | "once";
-      continuation: "continue" | "fork" | "snapshot";
-      shutdown?: SubagentSandboxShutdown;
-      proxy: (scope: string) => SandboxOps;
-    };
+export type SubagentSandboxConfig<
+  TOptions extends SandboxCreateOptions = SandboxCreateOptions,
+> = "none" | InheritVariant<TOptions> | OwnVariant<TOptions>;
 
 /**
  * Configuration for a subagent that can be spawned by the parent workflow.

@@ -298,6 +298,122 @@ class _ImplWithoutDeclProvider {
   async pause(_id: string): Promise<void> {}
 }
 
+// ---------------------------------------------------------------------------
+// SubagentSandboxConfig.proxy × continuation × adapter matrix
+//
+// The proxy field's required `TCaps` is derived from the surrounding
+// `continuation` value (see `SubagentContinuationCaps`): only
+// `continuation: "snapshot"` requires the proxy to expose
+// `snapshotSandbox` / `deleteSandboxSnapshot`. Other continuations
+// accept narrowed adapters with `TCaps = never`. This matrix pins
+// every (continuation × adapter) pair so a future regression that
+// over-rejects narrowed adapters trips the type check immediately.
+// ---------------------------------------------------------------------------
+
+import type { SubagentSandboxConfig } from "../subagent/types";
+import { proxyDaytonaSandboxOps } from "../../adapters/sandbox/daytona/proxy";
+import { proxyBedrockSandboxOps } from "../../adapters/sandbox/bedrock/proxy";
+import { proxyE2bSandboxOps } from "../../adapters/sandbox/e2b/proxy";
+import { proxyInMemorySandboxOps } from "../../adapters/sandbox/inmemory/proxy";
+
+// `source: "own"` × `continuation: "continue"` — needs no gated cap.
+// All adapters accepted.
+const _ownContinueDaytona: SubagentSandboxConfig = {
+  source: "own",
+  continuation: "continue",
+  proxy: proxyDaytonaSandboxOps,
+};
+const _ownContinueBedrock: SubagentSandboxConfig = {
+  source: "own",
+  continuation: "continue",
+  proxy: proxyBedrockSandboxOps,
+};
+const _ownContinueE2b: SubagentSandboxConfig = {
+  source: "own",
+  continuation: "continue",
+  proxy: proxyE2bSandboxOps,
+};
+const _ownContinueInMemory: SubagentSandboxConfig = {
+  source: "own",
+  continuation: "continue",
+  proxy: proxyInMemorySandboxOps,
+};
+
+// `source: "own"` × `continuation: "fork"` — also no parent-side cap
+// required (the *child* session's sandboxOps is what runs `forkSandbox`).
+// All adapters accepted.
+const _ownForkDaytona: SubagentSandboxConfig = {
+  source: "own",
+  continuation: "fork",
+  proxy: proxyDaytonaSandboxOps,
+};
+const _ownForkE2b: SubagentSandboxConfig = {
+  source: "own",
+  continuation: "fork",
+  proxy: proxyE2bSandboxOps,
+};
+
+// `source: "own"` × `continuation: "snapshot"` — requires `"snapshot"`
+// cap (parent calls `deleteSandboxSnapshot` during cleanup). E2B and
+// in-memory accepted; daytona / bedrock rejected at the proxy field.
+const _ownSnapshotE2b: SubagentSandboxConfig = {
+  source: "own",
+  continuation: "snapshot",
+  proxy: proxyE2bSandboxOps,
+};
+const _ownSnapshotInMemory: SubagentSandboxConfig = {
+  source: "own",
+  continuation: "snapshot",
+  proxy: proxyInMemorySandboxOps,
+};
+const _ownSnapshotDaytona: SubagentSandboxConfig = {
+  source: "own",
+  continuation: "snapshot",
+  // @ts-expect-error daytona's proxy doesn't expose snapshotSandbox / deleteSandboxSnapshot
+  proxy: proxyDaytonaSandboxOps,
+};
+const _ownSnapshotBedrock: SubagentSandboxConfig = {
+  source: "own",
+  continuation: "snapshot",
+  // @ts-expect-error bedrock's proxy doesn't expose snapshotSandbox / deleteSandboxSnapshot
+  proxy: proxyBedrockSandboxOps,
+};
+
+// `source: "inherit"` mirror — same cap requirements, smaller
+// continuation domain (no `"snapshot"` allowed for inherit).
+const _inheritContinueDaytona: SubagentSandboxConfig = {
+  source: "inherit",
+  continuation: "continue",
+  proxy: proxyDaytonaSandboxOps,
+};
+const _inheritForkDaytona: SubagentSandboxConfig = {
+  source: "inherit",
+  continuation: "fork",
+  proxy: proxyDaytonaSandboxOps,
+};
+const _inheritSnapshotInvalid: SubagentSandboxConfig = {
+  source: "inherit",
+  // @ts-expect-error inherit + snapshot is invalid by design
+  continuation: "snapshot",
+  proxy: proxyE2bSandboxOps,
+};
+
+void [
+  _ownContinueDaytona,
+  _ownContinueBedrock,
+  _ownContinueE2b,
+  _ownContinueInMemory,
+  _ownForkDaytona,
+  _ownForkE2b,
+  _ownSnapshotE2b,
+  _ownSnapshotInMemory,
+  _ownSnapshotDaytona,
+  _ownSnapshotBedrock,
+  _inheritContinueDaytona,
+  _inheritForkDaytona,
+  _inheritSnapshotInvalid,
+];
+
 describe("SandboxManager runtime cap consistency check", () => {
   it("rejects a provider that lists a capability it does not implement", () => {
     expect(() => new SandboxManager(new _DriftedProvider())).toThrow(

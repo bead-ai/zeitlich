@@ -169,6 +169,7 @@ export type {
   SubagentHooks,
   SubagentHandlerResponse,
   SubagentSandboxConfig,
+  SubagentContinuationCaps,
   SubagentWorkflow,
   SubagentWorkflowInput,
   SubagentSessionInput,
