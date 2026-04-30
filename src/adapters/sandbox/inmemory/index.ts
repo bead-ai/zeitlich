@@ -8,6 +8,7 @@ import {
 import type {
   Sandbox,
   SandboxCapabilities,
+  SandboxCapability,
   SandboxCreateOptions,
   SandboxCreateResult,
   SandboxFileSystem,
@@ -140,6 +141,13 @@ export class InMemorySandboxProvider implements SandboxProvider {
     execution: true,
     persistence: true,
   };
+  readonly supportedCapabilities: ReadonlySet<SandboxCapability> = new Set([
+    "pause",
+    "resume",
+    "snapshot",
+    "restore",
+    "fork",
+  ]);
 
   private sandboxes = new Map<string, InMemorySandboxImpl>();
 

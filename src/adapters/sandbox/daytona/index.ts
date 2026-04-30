@@ -2,16 +2,13 @@ import { Daytona, type Sandbox as DaytonaSdkSandbox } from "@daytonaio/sdk";
 import type {
   Sandbox,
   SandboxCapabilities,
+  SandboxCapability,
   SandboxCreateResult,
   SandboxProvider,
-  SandboxSnapshot,
   ExecOptions,
   ExecResult,
 } from "../../../lib/sandbox/types";
-import {
-  SandboxNotFoundError,
-  SandboxNotSupportedError,
-} from "../../../lib/sandbox/types";
+import { SandboxNotFoundError } from "../../../lib/sandbox/types";
 import { DaytonaSandboxFileSystem } from "./filesystem";
 import type {
   DaytonaSandbox,
@@ -64,16 +61,24 @@ class DaytonaSandboxImpl implements Sandbox {
 // DaytonaSandboxProvider
 // ============================================================================
 
-export class DaytonaSandboxProvider implements SandboxProvider<
-  DaytonaSandboxCreateOptions,
-  DaytonaSandbox
-> {
+/**
+ * Daytona implements only base sandbox lifecycle (`create` / `get` /
+ * `destroy`). Snapshot, restore, fork, pause, and resume are not supported
+ * — the type-level capability set is `never`, so calling any of those
+ * methods on a Daytona provider, manager, or `SandboxOps` proxy is a
+ * compile-time TypeScript error.
+ */
+export class DaytonaSandboxProvider
+  implements
+    SandboxProvider<DaytonaSandboxCreateOptions, DaytonaSandbox, never>
+{
   readonly id = "daytona";
   readonly capabilities: SandboxCapabilities = {
     filesystem: true,
     execution: true,
     persistence: false,
   };
+  readonly supportedCapabilities: ReadonlySet<SandboxCapability> = new Set();
 
   private client: Daytona;
   private readonly defaultWorkspaceBase: string;
@@ -139,45 +144,6 @@ export class DaytonaSandboxProvider implements SandboxProvider<
     } catch {
       // Already gone
     }
-  }
-
-  async pause(_sandboxId: string, _ttlSeconds?: number): Promise<void> {
-    throw new SandboxNotSupportedError("pause");
-  }
-
-  async resume(_sandboxId: string): Promise<void> {
-    // Daytona sandboxes don't support pause, so resume is a no-op
-  }
-
-  async fork(
-    _sandboxId: string,
-    _options?: DaytonaSandboxCreateOptions
-  ): Promise<Sandbox> {
-    throw new Error("Not implemented");
-  }
-
-  async snapshot(
-    _sandboxId: string,
-    _options?: DaytonaSandboxCreateOptions
-  ): Promise<SandboxSnapshot> {
-    throw new SandboxNotSupportedError(
-      "snapshot (use Daytona's native snapshot API directly)"
-    );
-  }
-
-  async restore(
-    _snapshot: SandboxSnapshot,
-    _options?: DaytonaSandboxCreateOptions
-  ): Promise<never> {
-    throw new SandboxNotSupportedError(
-      "restore (use Daytona's native snapshot API directly)"
-    );
-  }
-
-  async deleteSnapshot(_snapshot: SandboxSnapshot): Promise<void> {
-    throw new SandboxNotSupportedError(
-      "deleteSnapshot (use Daytona's native snapshot API directly)"
-    );
   }
 }
 

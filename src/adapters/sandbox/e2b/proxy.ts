@@ -26,7 +26,7 @@ const ADAPTER_PREFIX = "e2b";
 export function proxyE2bSandboxOps(
   scope?: string,
   options?: Parameters<typeof proxyActivities>[0]
-): SandboxOps {
+): SandboxOps<E2bSandboxCreateOptions> {
   const resolvedScope = scope ?? workflowInfo().workflowType;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

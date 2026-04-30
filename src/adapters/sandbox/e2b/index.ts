@@ -2,6 +2,7 @@ import { Sandbox as E2bSdkSandbox } from "@e2b/code-interpreter";
 import type {
   Sandbox,
   SandboxCapabilities,
+  SandboxCapability,
   SandboxCreateResult,
   SandboxProvider,
   SandboxSnapshot,
@@ -72,6 +73,13 @@ export class E2bSandboxProvider implements SandboxProvider<
     execution: true,
     persistence: true,
   };
+  readonly supportedCapabilities: ReadonlySet<SandboxCapability> = new Set([
+    "pause",
+    "resume",
+    "snapshot",
+    "restore",
+    "fork",
+  ]);
 
   private readonly defaultTemplate?: string;
   private readonly defaultWorkspaceBase: string;
@@ -166,7 +174,7 @@ export class E2bSandboxProvider implements SandboxProvider<
   async restore(
     snapshot: SandboxSnapshot,
     options?: E2bSandboxCreateOptions
-  ): Promise<Sandbox> {
+  ): Promise<E2bSandbox> {
     const data = snapshot.data as { snapshotId?: string } | null;
     if (!data?.snapshotId) {
       throw new SandboxNotSupportedError(
@@ -195,7 +203,7 @@ export class E2bSandboxProvider implements SandboxProvider<
   async fork(
     sandboxId: string,
     options?: E2bSandboxCreateOptions
-  ): Promise<Sandbox> {
+  ): Promise<E2bSandbox> {
     const { snapshotId } = await E2bSdkSandbox.createSnapshot(sandboxId);
     const sdkOpts = this.buildSdkCreateOpts(options);
     const sdkSandbox = await E2bSdkSandbox.create(snapshotId, sdkOpts);

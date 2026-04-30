@@ -9,16 +9,13 @@ import type { CodeInterpreterStreamOutput } from "@aws-sdk/client-bedrock-agentc
 import type {
   Sandbox,
   SandboxCapabilities,
+  SandboxCapability,
   SandboxCreateResult,
   SandboxProvider,
-  SandboxSnapshot,
   ExecOptions,
   ExecResult,
 } from "../../../lib/sandbox/types";
-import {
-  SandboxNotFoundError,
-  SandboxNotSupportedError,
-} from "../../../lib/sandbox/types";
+import { SandboxNotFoundError } from "../../../lib/sandbox/types";
 import { BedrockSandboxFileSystem } from "./filesystem";
 import type {
   BedrockSandbox,
@@ -134,16 +131,24 @@ class BedrockSandboxImpl implements Sandbox {
 // BedrockSandboxProvider
 // ============================================================================
 
-export class BedrockSandboxProvider implements SandboxProvider<
-  BedrockSandboxCreateOptions,
-  BedrockSandbox
-> {
+/**
+ * Bedrock Code Interpreter implements only base sandbox lifecycle
+ * (`create` / `get` / `destroy`). Snapshot, restore, fork, pause, and
+ * resume are not supported — the type-level capability set is `never`, so
+ * calling any of those methods on a Bedrock provider, manager, or
+ * `SandboxOps` proxy is a compile-time TypeScript error.
+ */
+export class BedrockSandboxProvider
+  implements
+    SandboxProvider<BedrockSandboxCreateOptions, BedrockSandbox, never>
+{
   readonly id = "bedrock";
   readonly capabilities: SandboxCapabilities = {
     filesystem: true,
     execution: true,
     persistence: false,
   };
+  readonly supportedCapabilities: ReadonlySet<SandboxCapability> = new Set();
 
   private client: BedrockAgentCoreClient;
   private readonly codeInterpreterIdentifier: string;
@@ -229,39 +234,6 @@ export class BedrockSandboxProvider implements SandboxProvider<
     } catch {
       // Already stopped or not found
     }
-  }
-
-  async pause(_sandboxId: string, _ttlSeconds?: number): Promise<void> {
-    throw new SandboxNotSupportedError("pause");
-  }
-
-  async resume(_sandboxId: string): Promise<void> {
-    // Bedrock sandboxes don't support pause, so resume is a no-op
-  }
-
-  async snapshot(
-    _sandboxId: string,
-    _options?: BedrockSandboxCreateOptions
-  ): Promise<SandboxSnapshot> {
-    throw new SandboxNotSupportedError("snapshot");
-  }
-
-  async restore(
-    _snapshot: SandboxSnapshot,
-    _options?: BedrockSandboxCreateOptions
-  ): Promise<never> {
-    throw new SandboxNotSupportedError("restore");
-  }
-
-  async fork(
-    _sandboxId: string,
-    _options?: BedrockSandboxCreateOptions
-  ): Promise<Sandbox> {
-    throw new SandboxNotSupportedError("fork");
-  }
-
-  async deleteSnapshot(_snapshot: SandboxSnapshot): Promise<void> {
-    throw new SandboxNotSupportedError("deleteSnapshot");
   }
 }
 
