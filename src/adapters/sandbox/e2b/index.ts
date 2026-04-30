@@ -63,23 +63,30 @@ class E2bSandboxImpl implements Sandbox {
 // E2bSandboxProvider
 // ============================================================================
 
-export class E2bSandboxProvider implements SandboxProvider<
-  E2bSandboxCreateOptions,
-  E2bSandbox
-> {
+/**
+ * Single source of truth for the E2B adapter's capability set. Both the
+ * runtime `supportedCapabilities` set and the type-level `TCaps` flow
+ * out of this array, so the two surfaces cannot drift.
+ */
+const E2B_CAPS = [
+  "pause",
+  "resume",
+  "snapshot",
+  "restore",
+  "fork",
+] as const satisfies readonly SandboxCapability[];
+type E2bCaps = (typeof E2B_CAPS)[number];
+
+export class E2bSandboxProvider
+  implements SandboxProvider<E2bSandboxCreateOptions, E2bSandbox, E2bCaps>
+{
   readonly id = "e2b";
   readonly capabilities: SandboxCapabilities = {
     filesystem: true,
     execution: true,
     persistence: true,
   };
-  readonly supportedCapabilities: ReadonlySet<SandboxCapability> = new Set([
-    "pause",
-    "resume",
-    "snapshot",
-    "restore",
-    "fork",
-  ]);
+  readonly supportedCapabilities: ReadonlySet<E2bCaps> = new Set(E2B_CAPS);
 
   private readonly defaultTemplate?: string;
   private readonly defaultWorkspaceBase: string;

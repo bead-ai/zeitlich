@@ -7,6 +7,28 @@ import type {
   SandboxProvider,
   SandboxSnapshot,
 } from "./types";
+import { SandboxNotSupportedError } from "./types";
+
+/**
+ * Method names the manager treats as capability-gated, mirroring the
+ * conditional fields on {@link SandboxProvider}. The full list is used
+ * by the constructor-time consistency check below to assert that, for
+ * each gated method present on the provider at runtime, the matching
+ * capability is also declared in `supportedCapabilities` (and vice
+ * versa). This is the runtime half of the type↔runtime alignment guard
+ * the type-level constraint can't enforce on its own.
+ */
+const CAP_METHOD_TO_CAPABILITY: ReadonlyArray<{
+  method: string;
+  capability: SandboxCapability;
+}> = [
+  { method: "pause", capability: "pause" },
+  { method: "resume", capability: "resume" },
+  { method: "snapshot", capability: "snapshot" },
+  { method: "deleteSnapshot", capability: "snapshot" },
+  { method: "restore", capability: "restore" },
+  { method: "fork", capability: "fork" },
+];
 
 /**
  * Result returned by {@link SandboxManagerHooks.onPreCreate}.
@@ -125,6 +147,51 @@ export class SandboxManager<
     options?: { hooks?: SandboxManagerHooks<TOptions, TCtx> }
   ) {
     this.hooks = options?.hooks ?? {};
+    this.assertCapabilityRuntimeConsistency();
+  }
+
+  /**
+   * Verifies that the provider's runtime `supportedCapabilities` set is
+   * consistent with the gated methods physically present on the provider.
+   *
+   * Belt-and-suspenders complement to the type-level
+   * `ReadonlySet<TCaps & SandboxCapability>` constraint: TypeScript can
+   * prevent the runtime set from containing capabilities not declared in
+   * `TCaps`, but it cannot detect a provider that **declares** a cap in
+   * `TCaps` and forgets to include it in the runtime set (or that ships
+   * a method without listing its cap). Both shapes silently break
+   * activity registration, so we trip a loud failure at construction
+   * time instead.
+   *
+   * Adapters that derive both surfaces from a single `as const`
+   * capability array (the recommended pattern) pass this check by
+   * construction.
+   */
+  private assertCapabilityRuntimeConsistency(): void {
+    const supported = this.provider
+      .supportedCapabilities as ReadonlySet<SandboxCapability>;
+    for (const { method, capability } of CAP_METHOD_TO_CAPABILITY) {
+      const hasMethod =
+        typeof (this.provider as unknown as Record<string, unknown>)[method] ===
+        "function";
+      const declaresCap = supported.has(capability);
+      if (hasMethod && !declaresCap) {
+        throw new Error(
+          `Sandbox provider "${this.provider.id}" implements ${method}() but ` +
+            `does not list "${capability}" in supportedCapabilities. ` +
+            `Add the capability to the provider's runtime set so activities ` +
+            `for it can be registered.`
+        );
+      }
+      if (declaresCap && !hasMethod) {
+        throw new Error(
+          `Sandbox provider "${this.provider.id}" lists "${capability}" in ` +
+            `supportedCapabilities but does not implement ${method}(). ` +
+            `Either add the method to the provider or remove the capability ` +
+            `from supportedCapabilities.`
+        );
+      }
+    }
   }
 
   async create(
@@ -242,10 +309,15 @@ export class SandboxManager<
     return typeof value === "function" ? value : undefined;
   }
 
-  private unsupported(name: string): Error {
-    return new Error(
-      `Sandbox provider "${this.provider.id}" does not support: ${name}`
-    );
+  /**
+   * Constructs the structured error thrown when an unsupported lifecycle
+   * method is invoked through the manager. Uses the public
+   * {@link SandboxNotSupportedError} symbol so consumers that catch on
+   * `instanceof SandboxNotSupportedError` (the documented compatibility
+   * path) keep matching after the refactor.
+   */
+  private unsupported(name: string): SandboxNotSupportedError {
+    return new SandboxNotSupportedError(name);
   }
 
   /**
@@ -279,7 +351,13 @@ export class SandboxManager<
   ): PrefixedSandboxOps<`${TId}${Capitalize<S>}`, TOptions, TCtx, TCaps> {
     const prefix = `${this.provider.id}${scope.charAt(0).toUpperCase()}${scope.slice(1)}`;
     const cap = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1);
-    const supported = this.provider.supportedCapabilities;
+    // The set is statically typed against the (possibly narrow) `TCaps`,
+    // but we need to probe every well-known capability here. Widen for
+    // the duration of the lookup; the constructor-time consistency check
+    // already ensures these probes can't accidentally observe a method
+    // present on the provider that's missing from the declared set.
+    const supported = this.provider
+      .supportedCapabilities as ReadonlySet<SandboxCapability>;
 
     type WideOps = SandboxOps<TOptions, TCtx>;
     const ops: Partial<WideOps> = {

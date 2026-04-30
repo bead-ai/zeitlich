@@ -219,21 +219,25 @@ type SandboxProviderCapMethods<
 interface SandboxProviderBase<
   TOptions extends SandboxCreateOptions,
   TSandbox extends Sandbox,
+  TCaps extends SandboxCapability,
 > {
   readonly id: string;
   readonly capabilities: SandboxCapabilities;
   /**
    * Runtime-introspectable list of supported capabilities.
    *
-   * Driven by `createActivities` to wire only the activities the provider
-   * actually implements, so that consumers reading the type-level
-   * capability set don't get out of sync with the runtime contract. The
-   * stored value type stays at the wide `SandboxCapability` union so a
-   * wide-cap provider remains structurally assignable to a narrow-cap
-   * consumer interface (the type-level gating is enforced through the
-   * conditional method shape, not through the set value type).
+   * Constrained to `ReadonlySet<TCaps & SandboxCapability>` so the runtime
+   * set cannot include capabilities not declared at the type level — a
+   * provider typed as `SandboxProvider<…, never>` cannot ship a runtime
+   * set that contains `"pause"`, etc.
+   *
+   * The other direction (type declares a cap, runtime set omits it)
+   * cannot be enforced by TypeScript alone; adapters should derive both
+   * `TCaps` and the runtime set from the same `as const` array (see
+   * `SandboxManager`'s constructor-time consistency check) so the two
+   * surfaces cannot drift.
    */
-  readonly supportedCapabilities: ReadonlySet<SandboxCapability>;
+  readonly supportedCapabilities: ReadonlySet<TCaps & SandboxCapability>;
 
   create(options?: TOptions): Promise<SandboxCreateResult>;
   get(sandboxId: string): Promise<TSandbox>;
@@ -263,7 +267,7 @@ export type SandboxProvider<
   TOptions extends SandboxCreateOptions = SandboxCreateOptions,
   TSandbox extends Sandbox = Sandbox,
   TCaps extends SandboxCapability = SandboxCapability,
-> = SandboxProviderBase<TOptions, TSandbox> &
+> = SandboxProviderBase<TOptions, TSandbox, TCaps> &
   SandboxProviderCapMethods<TOptions, TSandbox, TCaps>;
 
 // ============================================================================

@@ -132,6 +132,16 @@ class BedrockSandboxImpl implements Sandbox {
 // ============================================================================
 
 /**
+ * Single source of truth for the Bedrock Code Interpreter adapter's
+ * capability set. The Code Interpreter only exposes base lifecycle
+ * (`create` / `get` / `destroy`); both the type-level `TCaps` (`never`)
+ * and the runtime `supportedCapabilities` set fall out of this empty
+ * array, so the two surfaces cannot drift.
+ */
+const BEDROCK_CAPS = [] as const satisfies readonly SandboxCapability[];
+type BedrockCaps = (typeof BEDROCK_CAPS)[number]; // → never
+
+/**
  * Bedrock Code Interpreter implements only base sandbox lifecycle
  * (`create` / `get` / `destroy`). Snapshot, restore, fork, pause, and
  * resume are not supported — the type-level capability set is `never`, so
@@ -140,7 +150,7 @@ class BedrockSandboxImpl implements Sandbox {
  */
 export class BedrockSandboxProvider
   implements
-    SandboxProvider<BedrockSandboxCreateOptions, BedrockSandbox, never>
+    SandboxProvider<BedrockSandboxCreateOptions, BedrockSandbox, BedrockCaps>
 {
   readonly id = "bedrock";
   readonly capabilities: SandboxCapabilities = {
@@ -148,7 +158,9 @@ export class BedrockSandboxProvider
     execution: true,
     persistence: false,
   };
-  readonly supportedCapabilities: ReadonlySet<SandboxCapability> = new Set();
+  readonly supportedCapabilities: ReadonlySet<BedrockCaps> = new Set(
+    BEDROCK_CAPS
+  );
 
   private client: BedrockAgentCoreClient;
   private readonly codeInterpreterIdentifier: string;

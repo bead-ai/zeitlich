@@ -62,6 +62,15 @@ class DaytonaSandboxImpl implements Sandbox {
 // ============================================================================
 
 /**
+ * Single source of truth for the Daytona adapter's capability set. Daytona
+ * implements only base lifecycle (`create` / `get` / `destroy`); both the
+ * type-level `TCaps` (`never`) and the runtime `supportedCapabilities`
+ * set fall out of this empty array, so the two surfaces cannot drift.
+ */
+const DAYTONA_CAPS = [] as const satisfies readonly SandboxCapability[];
+type DaytonaCaps = (typeof DAYTONA_CAPS)[number]; // → never
+
+/**
  * Daytona implements only base sandbox lifecycle (`create` / `get` /
  * `destroy`). Snapshot, restore, fork, pause, and resume are not supported
  * — the type-level capability set is `never`, so calling any of those
@@ -70,7 +79,7 @@ class DaytonaSandboxImpl implements Sandbox {
  */
 export class DaytonaSandboxProvider
   implements
-    SandboxProvider<DaytonaSandboxCreateOptions, DaytonaSandbox, never>
+    SandboxProvider<DaytonaSandboxCreateOptions, DaytonaSandbox, DaytonaCaps>
 {
   readonly id = "daytona";
   readonly capabilities: SandboxCapabilities = {
@@ -78,7 +87,9 @@ export class DaytonaSandboxProvider
     execution: true,
     persistence: false,
   };
-  readonly supportedCapabilities: ReadonlySet<SandboxCapability> = new Set();
+  readonly supportedCapabilities: ReadonlySet<DaytonaCaps> = new Set(
+    DAYTONA_CAPS
+  );
 
   private client: Daytona;
   private readonly defaultWorkspaceBase: string;
