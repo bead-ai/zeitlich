@@ -1,4 +1,8 @@
-import { Sandbox as E2bSdkSandbox } from "@e2b/code-interpreter";
+import {
+  NotFoundError as E2bNotFoundError,
+  Sandbox as E2bSdkSandbox,
+  SandboxNotFoundError as E2bSandboxNotFoundError,
+} from "@e2b/code-interpreter";
 import type {
   Sandbox,
   SandboxCapabilities,
@@ -18,6 +22,20 @@ import type {
   E2bSandboxConfig,
   E2bSandboxCreateOptions,
 } from "./types";
+
+/**
+ * True iff `err` is the E2B SDK's "this sandbox doesn't exist (anymore)"
+ * signal. We narrow to `SandboxNotFoundError` (the canonical class) and to
+ * its deprecated parent `NotFoundError` as a defensive fallback — older
+ * SDK paths still throw the parent for sandbox-not-found cases. Any other
+ * error (auth failure, network blip, 5xx, validation) is propagated
+ * unchanged so callers can react to it specifically.
+ */
+function isE2bSandboxNotFound(err: unknown): boolean {
+  return (
+    err instanceof E2bSandboxNotFoundError || err instanceof E2bNotFoundError
+  );
+}
 
 // ============================================================================
 // E2bSandbox
@@ -133,8 +151,11 @@ export class E2bSandboxProvider implements SandboxProvider<
         sdkSandbox,
         this.defaultWorkspaceBase
       );
-    } catch {
-      throw new SandboxNotFoundError(sandboxId);
+    } catch (err) {
+      if (isE2bSandboxNotFound(err)) {
+        throw new SandboxNotFoundError(sandboxId);
+      }
+      throw err;
     }
   }
 

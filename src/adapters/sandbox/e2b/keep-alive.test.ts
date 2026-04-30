@@ -1,5 +1,8 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { Sandbox as E2bSdkSandbox } from "@e2b/code-interpreter";
+import {
+  Sandbox as E2bSdkSandbox,
+  SandboxNotFoundError as E2bSandboxNotFoundError,
+} from "@e2b/code-interpreter";
 import { E2bSandboxProvider } from "./index";
 import { SandboxNotFoundError } from "../../../lib/sandbox/types";
 
@@ -18,7 +21,17 @@ vi.mock("@e2b/code-interpreter", () => {
     async kill() {}
     async pause() {}
   }
-  return { Sandbox: FakeSdkSandbox };
+  // Mirror the real SDK error class hierarchy: SandboxNotFoundError extends
+  // (deprecated) NotFoundError extends SandboxError extends Error.
+  class FakeSandboxError extends Error {}
+  class FakeNotFoundError extends FakeSandboxError {}
+  class FakeSandboxNotFoundError extends FakeNotFoundError {}
+  return {
+    Sandbox: FakeSdkSandbox,
+    SandboxError: FakeSandboxError,
+    NotFoundError: FakeNotFoundError,
+    SandboxNotFoundError: FakeSandboxNotFoundError,
+  };
 });
 
 const sdk = E2bSdkSandbox as unknown as {
@@ -81,13 +94,22 @@ describe("E2bSandboxProvider keep-alive", () => {
     });
   });
 
-  it("throws SandboxNotFoundError when connect rejects", async () => {
-    sdk.connect.mockRejectedValue(new Error("boom"));
+  it("translates the SDK's SandboxNotFoundError into our SandboxNotFoundError", async () => {
+    sdk.connect.mockRejectedValue(
+      new E2bSandboxNotFoundError("sandbox missing-sbx not found")
+    );
 
     const provider = new E2bSandboxProvider({ keepAliveMs: 60_000 });
-    await expect(provider.get("missing")).rejects.toBeInstanceOf(
+    await expect(provider.get("missing-sbx")).rejects.toBeInstanceOf(
       SandboxNotFoundError
     );
   });
 
+  it("propagates non-not-found connect() errors unchanged (auth, network, 5xx)", async () => {
+    const transient = new Error("ECONNRESET: socket hang up");
+    sdk.connect.mockRejectedValue(transient);
+
+    const provider = new E2bSandboxProvider({ keepAliveMs: 60_000 });
+    await expect(provider.get("sbx-1")).rejects.toBe(transient);
+  });
 });
