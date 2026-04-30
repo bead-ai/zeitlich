@@ -89,15 +89,27 @@ All adapters follow the same pattern — `createActivities(scope)` for worker re
 ## Installation
 
 ```bash
-npm install zeitlich ioredis
+npm install zeitlich ioredis \
+  @temporalio/workflow @temporalio/common @temporalio/plugin
 ```
 
 **Peer dependencies:**
 
+- `@temporalio/workflow` >=1.16.0 <2.0.0 (required)
+- `@temporalio/common` >=1.16.0 <2.0.0 (required)
+- `@temporalio/plugin` >=1.16.0 <2.0.0 (required)
+- `@temporalio/worker` >=1.16.0 <2.0.0 (optional — only when running a worker)
+- `@temporalio/envconfig` >=1.16.0 <2.0.0 (optional — only when using envconfig)
 - `ioredis` >= 5.0.0
 - `@langchain/core` >= 1.0.0 (optional — only when using the LangChain adapter)
 - `@google/genai` >= 1.0.0 (optional — only when using the Google GenAI adapter)
 - `@aws-sdk/client-bedrock-agentcore` >= 3.900.0 (optional — only when using the Bedrock adapter)
+
+> **Why peer deps?** Zeitlich's public API surfaces `@temporalio/*` types
+> (`UpdateDefinition`, `ChildWorkflowOptions`, `Duration`, etc.) directly. Peer
+> deps guarantee a single resolved copy of each `@temporalio/*` package in the
+> consumer's tree, eliminating brand-symbol skew between zeitlich's types and
+> the consumer's own.
 
 **Required infrastructure:**
 
