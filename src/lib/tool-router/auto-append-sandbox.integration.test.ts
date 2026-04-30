@@ -396,6 +396,71 @@ describe("withSandbox", () => {
     expect(innerCalled).not.toHaveBeenCalled();
   });
 
+  it("uses sandboxNotFoundToolResponse as the tool response when set", async () => {
+    const manager = {
+      getSandbox: async (): Promise<Sandbox> => {
+        throw new SandboxNotFoundError("sb-gone");
+      },
+    };
+
+    const handler = async (): Promise<ToolHandlerResponse<null>> => ({
+      toolResponse: "ok",
+      data: null,
+    });
+
+    const wrapped = withSandbox(manager, handler, {
+      translateSandboxNotFound: true,
+      sandboxNotFoundToolResponse:
+        "El entorno de ejecución ya no está disponible. Reinicia el agente.",
+    });
+
+    const result = await wrapped(
+      {},
+      {
+        threadId: "t",
+        toolCallId: "tc",
+        toolName: "Bash",
+        sandboxId: "sb-gone",
+      }
+    );
+
+    expect(result.toolResponse).toBe(
+      "El entorno de ejecución ya no está disponible. Reinicia el agente."
+    );
+    expect(result.toolResponse).not.toContain("execution environment");
+    expect(result.toolResponse).not.toContain("Bash");
+    expect(result.data).toBeNull();
+  });
+
+  it("ignores sandboxNotFoundToolResponse when translateSandboxNotFound is not enabled", async () => {
+    const manager = {
+      getSandbox: async (): Promise<Sandbox> => {
+        throw new SandboxNotFoundError("sb-gone");
+      },
+    };
+
+    const handler = async (): Promise<ToolHandlerResponse<null>> => ({
+      toolResponse: "ok",
+      data: null,
+    });
+
+    const wrapped = withSandbox(manager, handler, {
+      sandboxNotFoundToolResponse: "should not be used",
+    });
+
+    await expect(
+      wrapped(
+        {},
+        {
+          threadId: "t",
+          toolCallId: "tc",
+          toolName: "Bash",
+          sandboxId: "sb-gone",
+        }
+      )
+    ).rejects.toBeInstanceOf(SandboxNotFoundError);
+  });
+
   it("does not translate non-SandboxNotFoundError errors when translate option is set", async () => {
     const manager = {
       getSandbox: async (): Promise<Sandbox> => {

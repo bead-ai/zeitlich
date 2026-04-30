@@ -25,6 +25,13 @@ export interface WithSandboxOptions {
    * @default false
    */
   translateSandboxNotFound?: boolean;
+  /**
+   * Custom tool response returned to the agent when the backing sandbox
+   * is not found and `translateSandboxNotFound` is `true`. Defaults to a
+   * generic English message. Use this to localize, match agent persona,
+   * or give the model more specific recovery instructions.
+   */
+  sandboxNotFoundToolResponse?: string;
 }
 
 /**
@@ -108,7 +115,9 @@ export function withSandbox<
     } catch (err) {
       if (translateSandboxNotFound && err instanceof SandboxNotFoundError) {
         return {
-          toolResponse: `Error: the execution environment for the ${context.toolName} tool is no longer available, so this tool call could not be completed.`,
+          toolResponse:
+            options?.sandboxNotFoundToolResponse ??
+            `Error: the execution environment for the ${context.toolName} tool is no longer available, so this tool call could not be completed.`,
           data: null,
         };
       }
