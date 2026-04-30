@@ -29,15 +29,23 @@ export interface E2bSandboxConfig {
    */
   timeoutMs?: number;
   /**
-   * If set, every call to `provider.get(sandboxId)` extends the sandbox
-   * lifetime to at least this many milliseconds, refreshing the timeout
-   * on each tool invocation. The default `timeoutMs` then acts as a
-   * kill-on-abandon safety net rather than a hard cap on run length.
+   * If set, every call to `provider.get(sandboxId)` passes
+   * `{ timeoutMs: keepAliveMs }` to `Sandbox.connect()`, refreshing the
+   * sandbox lifetime on each tool invocation. The provider-level
+   * `timeoutMs` then acts as a kill-on-abandon safety net rather than a
+   * hard cap on run length.
    *
-   * E2B's `Sandbox.connect(sandboxId, { timeoutMs })` only extends the
-   * lifetime when the new value is longer than the time remaining, so
-   * setting this is safe when sessions are still active and idempotent
-   * when they aren't.
+   * E2B's `Sandbox.connect()` is monotonic for running sandboxes: per the
+   * SDK's `SandboxConnectOpts.timeoutMs` doc, "the timeout will update
+   * only if the new timeout is longer than the existing one". Pick
+   * `keepAliveMs` as the full per-call refresh window you want; passing a
+   * value smaller than the time remaining is a no-op rather than a
+   * shrink. (If you ever need to shrink, use `Sandbox.setTimeout` /
+   * `SandboxApi.setTimeout`, which can extend or reduce.)
+   *
+   * Per-sandbox overrides are intentionally not exposed — this is a
+   * provider-level config only. Every sandbox managed by the provider
+   * refreshes by the same amount on each `get()`.
    */
   keepAliveMs?: number;
   /** Default outbound internet access policy */
@@ -56,13 +64,8 @@ export interface E2bSandboxCreateOptions extends SandboxCreateOptions {
   /**
    * Sandbox lifetime in milliseconds — overrides the provider default. See
    * {@link E2bSandboxConfig.timeoutMs} for the full semantics; pair with
-   * `keepAliveMs` to refresh on every `provider.get()` call.
+   * the provider-level `keepAliveMs` to refresh on every `provider.get()`
+   * call.
    */
   timeoutMs?: number;
-  /**
-   * Per-create override for the keep-alive refresh window applied on every
-   * `provider.get(sandboxId)` call. See {@link E2bSandboxConfig.keepAliveMs}
-   * for the full pattern.
-   */
-  keepAliveMs?: number;
 }

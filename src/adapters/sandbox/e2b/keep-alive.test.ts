@@ -69,24 +69,9 @@ describe("E2bSandboxProvider keep-alive", () => {
     expect(sdk.connect).toHaveBeenCalledWith("sbx-1");
   });
 
-  it("uses per-create keepAliveMs override over the provider default", async () => {
-    const fakeCreated = makeFakeSdkSandbox("sbx-override");
-    sdk.create.mockResolvedValue(fakeCreated);
-    const fakeGet = makeFakeSdkSandbox("sbx-override");
-    sdk.connect.mockResolvedValue(fakeGet);
-
-    const provider = new E2bSandboxProvider({ keepAliveMs: 60_000 });
-    await provider.create({ keepAliveMs: 5_000 });
-    await provider.get("sbx-override");
-
-    expect(sdk.connect).toHaveBeenCalledWith("sbx-override", {
-      timeoutMs: 5_000,
-    });
-  });
-
-  it("falls back to provider-level keepAliveMs for sandboxes without an override", async () => {
-    const fakeGet = makeFakeSdkSandbox("sbx-default");
-    sdk.connect.mockResolvedValue(fakeGet);
+  it("uses provider-level keepAliveMs for every sandbox managed by the provider", async () => {
+    const fake = makeFakeSdkSandbox("sbx-default");
+    sdk.connect.mockResolvedValue(fake);
 
     const provider = new E2bSandboxProvider({ keepAliveMs: 60_000 });
     await provider.get("sbx-default");
@@ -105,59 +90,4 @@ describe("E2bSandboxProvider keep-alive", () => {
     );
   });
 
-  it("honours per-call keepAliveMs passed to restore()", async () => {
-    const fakeRestored = makeFakeSdkSandbox("sbx-restored");
-    sdk.create.mockResolvedValue(fakeRestored);
-    sdk.connect.mockResolvedValue(fakeRestored);
-
-    const provider = new E2bSandboxProvider({ keepAliveMs: 60_000 });
-    await provider.restore(
-      {
-        sandboxId: "ignored",
-        providerId: "e2b",
-        data: { snapshotId: "snap-1" },
-        createdAt: new Date().toISOString(),
-      },
-      { keepAliveMs: 7_000 }
-    );
-
-    await provider.get("sbx-restored");
-    expect(sdk.connect).toHaveBeenCalledWith("sbx-restored", {
-      timeoutMs: 7_000,
-    });
-  });
-
-  it("honours per-call keepAliveMs passed to fork()", async () => {
-    sdk.createSnapshot.mockResolvedValue({ snapshotId: "snap-fork" });
-    const fakeForked = makeFakeSdkSandbox("sbx-forked");
-    sdk.create.mockResolvedValue(fakeForked);
-    sdk.connect.mockResolvedValue(fakeForked);
-
-    const provider = new E2bSandboxProvider({ keepAliveMs: 60_000 });
-    await provider.fork("sbx-source", { keepAliveMs: 3_000 });
-
-    await provider.get("sbx-forked");
-    expect(sdk.connect).toHaveBeenCalledWith("sbx-forked", {
-      timeoutMs: 3_000,
-    });
-  });
-
-  it("clears per-sandbox keepAlive override on destroy", async () => {
-    const fakeCreated = makeFakeSdkSandbox("sbx-destroy");
-    sdk.create.mockResolvedValue(fakeCreated);
-    const fakeConnected = makeFakeSdkSandbox("sbx-destroy");
-    sdk.connect.mockResolvedValue(fakeConnected);
-
-    const provider = new E2bSandboxProvider({ keepAliveMs: 60_000 });
-    await provider.create({ keepAliveMs: 5_000 });
-    await provider.destroy("sbx-destroy");
-
-    sdk.connect.mockClear();
-    sdk.connect.mockResolvedValue(fakeConnected);
-    await provider.get("sbx-destroy");
-
-    expect(sdk.connect).toHaveBeenCalledWith("sbx-destroy", {
-      timeoutMs: 60_000,
-    });
-  });
 });
