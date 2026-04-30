@@ -11,11 +11,13 @@ import type { ToolHandlerResponse, RouterContext } from "../tool-router";
 import type { JsonValue } from "../state/types";
 import type {
   InferSubagentResult,
+  ResolvedSubagentSandboxConfig,
   SubagentConfig,
   SubagentFnResult,
   SubagentSandboxConfig,
   SubagentWorkflowInput,
 } from "./types";
+import { resolveSubagentLifecycle } from "./types";
 import type { SubagentArgs } from "./tool";
 import type { z } from "zod";
 import type {
@@ -66,17 +68,9 @@ type ParentDeleteSnapshotOps = Pick<
  */
 export const DEFAULT_SUBAGENT_WORKFLOW_RUN_TIMEOUT = "1h";
 
-/** Normalized sandbox config after resolving the union. */
-interface ResolvedSandboxConfig {
-  source: "none" | "inherit" | "own";
-  init: "per-call" | "once";
-  continuation: "continue" | "fork" | "snapshot";
-  shutdown?: SubagentSandboxShutdown;
-}
-
 function resolveSandboxConfig(
   config?: SubagentSandboxConfig
-): ResolvedSandboxConfig {
+): ResolvedSubagentSandboxConfig {
   if (!config || config === "none") {
     return { source: "none", init: "per-call", continuation: "fork" };
   }
@@ -316,7 +310,6 @@ export function createSubagentHandler<
       if (baseSnap) {
         sandbox = { mode: "from-snapshot", snapshot: baseSnap };
       }
-      sandboxShutdownOverride = "snapshot";
     } else if (sandboxCfg.source === "own") {
       const isLazy = sandboxCfg.init === "once";
 
@@ -362,31 +355,16 @@ export function createSubagentHandler<
           sandboxId: baseSandboxId,
         };
       }
+    }
 
-      // Ensure the sandbox survives for future continuation/fork:
-      // - first lazy call (creator): pause-until-parent-close so parent can clean up
-      // - continuation=continue: sandbox must survive for next call
-      // - lazy+fork (non-creator): template must survive for future forks
-      //
-      // Skip the override when the user already configured a *-until-parent-close
-      // shutdown — that already guarantees survival.
-      const userShutdown = sandboxCfg.shutdown;
-      const alreadySurvives =
-        userShutdown === "pause-until-parent-close" ||
-        userShutdown === "keep-until-parent-close" ||
-        userShutdown === "pause" ||
-        userShutdown === "keep";
-
-      const mustSurvive =
-        isLazyCreator ||
-        sandboxCfg.continuation === "continue" ||
-        (isLazy && sandboxCfg.continuation === "fork");
-
-      if (mustSurvive && !alreadySurvives) {
-        sandboxShutdownOverride = isLazyCreator
-          ? "pause-until-parent-close"
-          : "pause";
-      }
+    // Resolve the lifecycle decision (auto-inject pause/snapshot, etc.)
+    // through the SSOT — same table the type-level `SubagentRequiredCaps`
+    // reads. Adding a new branch here means changing both. The matrix
+    // in `src/lib/sandbox/capability-types.test.ts` enforces the
+    // type-level / runtime agreement.
+    {
+      const lifecycle = resolveSubagentLifecycle(sandboxCfg, isLazyCreator);
+      sandboxShutdownOverride = lifecycle.shutdownOverride;
     }
 
     const workflowInput: SubagentWorkflowInput = {

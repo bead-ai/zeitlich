@@ -85,36 +85,338 @@ export type SubagentContext =
 export type InferSubagentResult<T extends SubagentConfig> =
   T extends SubagentConfig<infer S> ? z.infer<S> : null;
 
+// ============================================================================
+// Subagent sandbox-lifecycle decision table (SSOT)
+//
+// `createSubagentHandler` (`src/lib/subagent/handler.ts`) auto-injects
+// `sandboxShutdown` for some `(source, continuation, init, shutdown)`
+// combinations (`mustSurvive` + `alreadySurvives` rules). The child
+// session then dispatches gated sandbox methods based on the resolved
+// `(sandbox.mode, sandboxShutdown)` pair (`src/lib/session/session.ts`).
+//
+// Two surfaces have to agree on what gated methods may fire for a given
+// config:
+//
+//   1. The runtime — what the parent injects + what the child session
+//      dispatches.
+//   2. The type level — what caps the proxy field has to advertise.
+//
+// `SubagentRequiredCaps<C>` is the SSOT for the type level.
+// `resolveSubagentLifecycle(cfg)` (in `handler.ts`) is the SSOT for the
+// runtime; it returns the specific `(mode, shutdown)` to inject and is
+// the only place the auto-injection rules live. Adding a new runtime
+// branch in `handler.ts` requires extending **both** — the matrix in
+// `src/lib/sandbox/capability-types.test.ts` then locks the agreement.
+//
+// `Continuation`-only / `Shutdown`-only sub-types live below as helpers
+// `_ChildModeCaps` / `_ChildShutdownCaps` so each branch reads cleanly.
+// ============================================================================
+
+/** Shutdown classes that the runtime treats equivalently for cap purposes. */
+type _ShutdownPauseLike = "pause" | "pause-until-parent-close";
+type _ShutdownKeepLike = "keep" | "keep-until-parent-close";
+
 /**
- * Sandbox capabilities a given `continuation` strategy requires of the
- * adapter as a whole — the union of methods called across the parent's
- * shutdown handler **and** the child session's lifecycle. Pinning this
- * on the proxy field works because the proxy is documented as "a factory
- * that returns workflow-safe sandbox ops matching the subagent's own
- * activities", so its adapter type is structurally identical to the
- * child's adapter type. Requiring the strategy's caps on the proxy is
- * therefore the only type-level handle we have on the child, and is
- * what makes "any `(continuation, adapter)` combination that can't
- * execute at runtime fails to typecheck" actually true.
- *
- * Strategy → caps the strategy invokes anywhere in the codebase:
- *
- * - `"continue"` → `never`. No gated method is needed; the strategy
- *   reuses the existing sandbox via base ops.
- * - `"fork"` → `"fork"`. The child session's `sandbox.mode === "fork"`
- *   path calls `forkSandbox()` (`src/lib/session/session.ts`).
- * - `"snapshot"` → `"snapshot" | "restore"`. The child session captures
- *   via `snapshotSandbox()` and rehydrates via `restoreSandbox()`; the
- *   parent's cleanup calls `deleteSandboxSnapshot()` (gated by
- *   `"snapshot"`). All three must be present somewhere on the adapter.
+ * Caps the child session's sandbox-init dispatch invokes for a given
+ * `(mode, shutdown)`. Mirror of `src/lib/session/session.ts:230-314`.
  */
-export type SubagentContinuationCaps<
-  C extends SubagentContinuation = SubagentContinuation,
-> = C extends "snapshot"
-  ? "snapshot" | "restore"
-  : C extends "fork"
-    ? "fork"
-    : never;
+type _ChildModeCaps<Mode, Shutdown> =
+  // mode "fork" → forkSandbox
+  | (Mode extends "fork" ? "fork" : never)
+  // mode "from-snapshot" → restoreSandbox
+  | (Mode extends "from-snapshot" ? "restore" : never)
+  // mode "continue" + shutdown "pause-until-parent-close" → resumeSandbox
+  | (Mode extends "continue"
+      ? Shutdown extends "pause-until-parent-close"
+        ? "resume"
+        : never
+      : never);
+
+/**
+ * Caps the child session's exit dispatch invokes for a given `shutdown`.
+ * Only fires when `sandboxOwned` is true (mode != "inherit"). Mirror of
+ * `src/lib/session/session.ts:598-615`.
+ */
+type _ChildShutdownCaps<Mode, Shutdown> =
+  // mode="inherit" → sandboxOwned=false → no exit-shutdown caps fire
+  Mode extends "inherit"
+    ? never
+    :
+        | (Shutdown extends _ShutdownPauseLike ? "pause" : never)
+        | (Shutdown extends "snapshot" ? "snapshot" : never);
+
+/**
+ * Caps captured on entry for `mode: "new"` + `shutdown: "snapshot"`
+ * (the seeding-base-snapshot path). Mirror of
+ * `src/lib/session/session.ts:316-317`.
+ */
+type _ChildSeedCaps<Mode, Shutdown> = Mode extends "new"
+  ? Shutdown extends "snapshot"
+    ? "snapshot"
+    : never
+  : never;
+
+/**
+ * Total caps a single child-session invocation calls for the specific
+ * `(mode, shutdown)` pair the parent passes. The proxy field's required
+ * cap union is the union of this across every `(mode, shutdown)` the
+ * runtime might inject for the given config.
+ */
+type _ChildSessionCaps<Mode, Shutdown> =
+  | _ChildModeCaps<Mode, Shutdown>
+  | _ChildShutdownCaps<Mode, Shutdown>
+  | _ChildSeedCaps<Mode, Shutdown>;
+
+/**
+ * Resolves the user's `shutdown` value through the auto-injection rules
+ * for `(source: "own", continuation: "continue")`. Mirror of
+ * `src/lib/subagent/handler.ts:373-389`:
+ *
+ *   - `pause` / `pause-until-parent-close` / `keep` / `keep-until-parent-close`
+ *     → propagate (`alreadySurvives = true`).
+ *   - everything else (undefined, "destroy", "snapshot") → injected
+ *     `"pause"` (subsequent calls) or `"pause-until-parent-close"`
+ *     (creator first call). Type-level: union both.
+ */
+type _ContinueShutdown<S> = S extends _ShutdownPauseLike | _ShutdownKeepLike
+  ? S
+  : "pause" | "pause-until-parent-close";
+
+/**
+ * Resolves the user's `shutdown` value through the auto-injection rules
+ * for `(source: "own", continuation: "fork", init: "once")`. Same shape
+ * as `_ContinueShutdown` because both are `mustSurvive` paths.
+ */
+type _ForkOnceShutdown<S> = _ContinueShutdown<S>;
+
+/**
+ * Modes the child session may be invoked under for `(source: "own",
+ * continuation: "continue")`. First call has no `baseSandboxId` (mode
+ * "new"); subsequent calls reuse it (mode "continue"). The type takes
+ * the union — the matrix can't tell first vs. subsequent statically.
+ */
+type _OwnContinueModes = "new" | "continue";
+
+/**
+ * Modes the child session may be invoked under for `(source: "own",
+ * continuation: "fork")`. Same first-vs-subsequent shape as continue.
+ */
+type _OwnForkModes = "new" | "fork";
+
+/**
+ * Modes the child session may be invoked under for `(source: "own",
+ * continuation: "snapshot")`. First call (no base snapshot yet) uses
+ * "new"; subsequent calls (or `init: "once"` after the first creator
+ * publishes a base) use "from-snapshot".
+ */
+type _OwnSnapshotModes = "new" | "from-snapshot";
+
+/**
+ * Caps required on a subagent's `proxy` for the parent's own gated
+ * calls. The parent only ever calls `destroySandbox` (base) and
+ * `deleteSandboxSnapshot` (`continuation: "snapshot"` cleanup).
+ */
+type _ParentLocalCaps<C> = C extends { continuation: "snapshot" }
+  ? "snapshot"
+  : never;
+
+/**
+ * **SSOT type.** The full cap union a subagent's `proxy` must expose,
+ * derived from `(source, continuation, init, shutdown)`.
+ *
+ * The shape mirrors the rows of the runtime decision table in
+ * `resolveSubagentLifecycle` (`src/lib/subagent/handler.ts`): each
+ * branch here corresponds to exactly one runtime branch, and adding a
+ * new runtime branch requires adding a matching branch here. The
+ * `(adapter × continuation × shutdown × init × source)` matrix in
+ * `src/lib/sandbox/capability-types.test.ts` enforces agreement.
+ */
+export type SubagentRequiredCaps<C> = C extends "none"
+  ? never
+  : C extends { source: "inherit"; continuation: "continue" }
+    ? // mode="inherit", sandboxOwned=false → no gated calls regardless
+      // of shutdown value.
+      never
+    : C extends { source: "inherit"; continuation: "fork" }
+      ? // mode="fork" + user shutdown propagates verbatim (no
+        // auto-injection on the inherit path).
+        | "fork"
+            | _ChildSessionCaps<
+                "fork",
+                C extends { shutdown: infer S } ? S : "destroy"
+              >
+            | _ParentLocalCaps<C>
+      : C extends { source: "own"; continuation: "snapshot" }
+        ? // override = "snapshot" always; modes vary across calls.
+          | _ChildSessionCaps<_OwnSnapshotModes, "snapshot">
+              | _ParentLocalCaps<C>
+        : C extends { source: "own"; continuation: "continue" }
+          ? // mustSurvive=true; injection rules apply.
+            | _ChildSessionCaps<
+                  _OwnContinueModes,
+                  _ContinueShutdown<
+                    C extends { shutdown: infer S } ? S : undefined
+                  >
+                >
+              | _ParentLocalCaps<C>
+          : C extends {
+                source: "own";
+                continuation: "fork";
+                init?: infer I;
+              }
+            ? // mustSurvive iff init=once.
+              | "fork"
+                  | _ChildSessionCaps<
+                      _OwnForkModes,
+                      I extends "once"
+                        ? _ForkOnceShutdown<
+                            C extends { shutdown: infer S } ? S : undefined
+                          >
+                        : C extends { shutdown: infer S }
+                          ? S extends undefined
+                            ? "destroy"
+                            : S
+                          : "destroy"
+                    >
+                  | _ParentLocalCaps<C>
+            : never;
+
+/**
+ * Backwards-compatible alias retained for external callers that imported
+ * the old name. Resolves through the SSOT against a synthetic
+ * `{ source: "own", continuation: C }` config.
+ *
+ * @deprecated Use `SubagentRequiredCaps<C>` against the full subagent
+ * sandbox config — `continuation` alone misses `shutdown` and `init`,
+ * which is why the previous mapping under-rejected `fork`+`pause` and
+ * `continue`+auto-injected pause.
+ */
+export type SubagentContinuationCaps<C extends SubagentContinuation> =
+  C extends "snapshot"
+    ? "snapshot" | "restore"
+    : C extends "fork"
+      ? "fork"
+      : never;
+
+// ============================================================================
+// Subagent lifecycle SSOT — runtime mirror of `SubagentRequiredCaps`
+//
+// `resolveSubagentLifecycle` is the runtime side of the same table
+// `SubagentRequiredCaps` reads at the type level. Whenever
+// `createSubagentHandler` (`src/lib/subagent/handler.ts`) needs to
+// decide which `(sandbox.mode, sandboxShutdown)` to inject for the
+// child, it calls this function — so the auto-injection rules
+// (`mustSurvive`, `alreadySurvives`, snapshot override) live in
+// **one** place. Adding a new branch to the runtime means changing
+// this function AND the matching branch in `SubagentRequiredCaps`;
+// the `(adapter × continuation × shutdown × init × source)` matrix
+// in `src/lib/sandbox/capability-types.test.ts` enforces the agree.
+// ============================================================================
+
+/**
+ * Resolved sandbox config after normalising defaults. The handler
+ * passes one of these into `resolveSubagentLifecycle`.
+ */
+export interface ResolvedSubagentSandboxConfig {
+  source: "none" | "inherit" | "own";
+  init: "per-call" | "once";
+  continuation: "continue" | "fork" | "snapshot";
+  shutdown?: SubagentSandboxShutdown;
+}
+
+/**
+ * Output of `resolveSubagentLifecycle`. The handler reads
+ * `shutdownOverride` to decide what to forward to the child workflow,
+ * and `mustSurvive` / `isLazyCreator` to drive the in-handler
+ * bookkeeping (pendingDestroys, persistentSandboxes, etc.).
+ */
+export interface ResolvedSubagentLifecycle {
+  /**
+   * Sandbox shutdown the parent forwards to the child workflow. May
+   * be auto-injected (`"pause"` / `"pause-until-parent-close"` /
+   * `"snapshot"`) when the user's literal would not survive long
+   * enough for the parent's continuation strategy.
+   */
+  shutdownOverride: SubagentSandboxShutdown | undefined;
+  /**
+   * Whether the parent must keep the sandbox alive past the child
+   * session's exit. Drives the `pendingDestroys` map population.
+   */
+  mustSurvive: boolean;
+}
+
+/**
+ * Returns true iff the user's `shutdown` already keeps the sandbox
+ * alive (so the handler doesn't need to auto-inject one).
+ *
+ * Mirror of the type-level `_ShutdownPauseLike` / `_ShutdownKeepLike`
+ * checks above.
+ */
+function isSurvivalShutdown(s: SubagentSandboxShutdown | undefined): boolean {
+  return (
+    s === "pause" ||
+    s === "pause-until-parent-close" ||
+    s === "keep" ||
+    s === "keep-until-parent-close"
+  );
+}
+
+/**
+ * The single runtime decision-table consumer. Returns the shutdown the
+ * parent should forward to the child plus survival metadata.
+ *
+ * Branches must agree, one-for-one, with `SubagentRequiredCaps<C>` in
+ * this file. The matrix in `capability-types.test.ts` covers each
+ * branch.
+ */
+export function resolveSubagentLifecycle(
+  cfg: ResolvedSubagentSandboxConfig,
+  isLazyCreator: boolean
+): ResolvedSubagentLifecycle {
+  // none / inherit: no auto-injection. Handler still calls
+  // destroySandbox on child exit when mode=inherit, but
+  // `sandboxOwned` stays false in the child session so no exit-
+  // shutdown caps fire. Parent's pendingDestroys is driven entirely
+  // by the user's shutdown propagating verbatim.
+  if (cfg.source !== "own") {
+    return {
+      shutdownOverride: cfg.shutdown,
+      mustSurvive: false,
+    };
+  }
+
+  // own + snapshot: handler always overrides shutdown to "snapshot".
+  // No survival flag (snapshots are cleaned up via deleteSandboxSnapshot,
+  // not via pendingDestroys).
+  if (cfg.continuation === "snapshot") {
+    return {
+      shutdownOverride: "snapshot",
+      mustSurvive: false,
+    };
+  }
+
+  // own + (continue | fork): mustSurvive iff isLazyCreator OR
+  // continuation === "continue" OR (init === "once" + fork).
+  const isLazy = cfg.init === "once";
+  const mustSurvive =
+    isLazyCreator ||
+    cfg.continuation === "continue" ||
+    (isLazy && cfg.continuation === "fork");
+
+  if (!mustSurvive) {
+    return { shutdownOverride: cfg.shutdown, mustSurvive: false };
+  }
+
+  // mustSurvive: auto-inject only if the user's shutdown doesn't
+  // already survive.
+  if (isSurvivalShutdown(cfg.shutdown)) {
+    return { shutdownOverride: cfg.shutdown, mustSurvive };
+  }
+  return {
+    shutdownOverride: isLazyCreator ? "pause-until-parent-close" : "pause",
+    mustSurvive,
+  };
+}
 
 /** Continuation values supported when `source` is `"inherit"`. */
 type InheritContinuation = "continue" | "fork";
@@ -124,45 +426,125 @@ type OwnContinuation = "continue" | "fork" | "snapshot";
 type SubagentContinuation = InheritContinuation | OwnContinuation;
 
 /**
- * Distributes over the `TContinuation` union so each literal
- * `continuation` value gets its own object shape with a precisely-typed
- * `proxy` field — the proxy only needs to expose the caps that this
- * specific `continuation` will actually invoke on the parent side.
+ * Caps required on a subagent's `proxy` when `source: "inherit"`,
+ * threaded through the SSOT.
+ *
+ * The `inherit` source has no `init` field, and the `shutdown` field
+ * is the user's literal (or `"destroy"` if omitted). We don't have a
+ * way to detect "omitted" in the field type itself, so this row
+ * resolves the user's `S | undefined` directly — `undefined` is treated
+ * as `"destroy"` to match the runtime default in
+ * `src/lib/subagent/handler.ts:469`.
+ */
+type _InheritCaps<C extends InheritContinuation, S> = SubagentRequiredCaps<{
+  source: "inherit";
+  continuation: C;
+  shutdown: S extends undefined ? "destroy" : S;
+}>;
+
+/**
+ * Variants for `source: "inherit"`. Continuation × shutdown-presence ×
+ * shutdown-literal all distribute, with omitted vs. specified
+ * `shutdown` encoded as separate variants — for the same reason
+ * `OwnVariant` does (forbid TS from matching a permissive cell when
+ * the user omits the field).
  */
 type InheritVariant<TOptions extends SandboxCreateOptions> =
   InheritContinuation extends infer C
     ? C extends InheritContinuation
-      ? {
-          source: "inherit";
-          continuation: C;
-          shutdown?: SubagentSandboxShutdown;
-          proxy: (
-            scope: string
-          ) => SandboxOps<
-            TOptions,
-            unknown,
-            SubagentContinuationCaps<C> & SandboxCapability
-          >;
-        }
+      ? (
+          | { _s: undefined; shutdown?: never }
+          | (SubagentSandboxShutdown extends infer SL
+              ? SL extends SubagentSandboxShutdown
+                ? { _s: SL; shutdown: SL }
+                : never
+              : never)
+        ) extends infer S
+        ? S extends {
+            _s: SubagentSandboxShutdown | undefined;
+            shutdown?: SubagentSandboxShutdown;
+          }
+          ? Omit<S, "_s"> & {
+              source: "inherit";
+              continuation: C;
+              proxy: (
+                scope: string
+              ) => SandboxOps<
+                TOptions,
+                unknown,
+                _InheritCaps<C, S["_s"]> & SandboxCapability
+              >;
+            }
+          : never
+        : never
       : never
     : never;
 
+type _OwnCaps<
+  C extends OwnContinuation,
+  I extends "per-call" | "once" | undefined,
+  S,
+> = SubagentRequiredCaps<{
+  source: "own";
+  continuation: C;
+  init: I extends undefined ? "per-call" : I;
+  shutdown: S;
+}>;
+
+/**
+ * Variants for `source: "own"`. Continuation × init-presence × shutdown-
+ * presence × shutdown-literal all distribute, so each cell gets its
+ * own variant with a precisely-typed `proxy`.
+ *
+ * Critical: omitted vs. specified `init` / `shutdown` are encoded as
+ * *separate* variants. The omitted variant uses `init?: never` /
+ * `shutdown?: never` so the field is forbidden when the user doesn't
+ * write one — without this, TS would infer `field?: undefined` and
+ * happily match an unrelated permissive variant whose caps don't
+ * cover the auto-injection.
+ */
 type OwnVariant<TOptions extends SandboxCreateOptions> =
   OwnContinuation extends infer C
     ? C extends OwnContinuation
-      ? {
-          source: "own";
-          init?: "per-call" | "once";
-          continuation: C;
-          shutdown?: SubagentSandboxShutdown;
-          proxy: (
-            scope: string
-          ) => SandboxOps<
-            TOptions,
-            unknown,
-            SubagentContinuationCaps<C> & SandboxCapability
-          >;
-        }
+      ? // Init: omitted (never present) | "per-call" required | "once" required.
+        (
+          | { _i: undefined; init?: never }
+          | { _i: "per-call"; init: "per-call" }
+          | { _i: "once"; init: "once" }
+        ) extends infer I
+        ? I extends {
+            _i: "per-call" | "once" | undefined;
+            init?: "per-call" | "once";
+          }
+          ? // Shutdown: omitted | one of the literal values required.
+            (
+              | { _s: undefined; shutdown?: never }
+              | (SubagentSandboxShutdown extends infer SL
+                  ? SL extends SubagentSandboxShutdown
+                    ? { _s: SL; shutdown: SL }
+                    : never
+                  : never)
+            ) extends infer S
+            ? S extends {
+                _s: SubagentSandboxShutdown | undefined;
+                shutdown?: SubagentSandboxShutdown;
+              }
+              ? Omit<I, "_i"> &
+                  Omit<S, "_s"> & {
+                    source: "own";
+                    continuation: C;
+                    proxy: (
+                      scope: string
+                    ) => SandboxOps<
+                      TOptions,
+                      unknown,
+                      _OwnCaps<C, I["_i"], S["_s"]> & SandboxCapability
+                    >;
+                  }
+              : never
+            : never
+          : never
+        : never
       : never
     : never;
 
@@ -184,13 +566,13 @@ type OwnVariant<TOptions extends SandboxCreateOptions> =
  * prefix the child session uses. The parent uses it to destroy lingering
  * sandboxes and delete stored snapshots at shutdown.
  *
- * The `proxy` field is generic over the `continuation` value via
- * {@link SubagentContinuationCaps}: only continuations that need a
- * specific cap on the parent side require the proxy to expose it. So a
- * narrowed adapter (e.g. Daytona's `SandboxOps<…, never>` proxy)
- * type-checks fine when the user picks `continuation: "continue"` or
- * `"fork"`, and gets a precise "missing snapshotSandbox" diagnostic
- * only when the user picks `"snapshot"`.
+ * The `proxy` field's required `TCaps` is derived from
+ * {@link SubagentRequiredCaps} — the SSOT that mirrors
+ * `resolveSubagentLifecycle` in the handler. It folds in `shutdown` and
+ * `init` (including the handler's auto-injected `"pause"` /
+ * `"pause-until-parent-close"` overrides), so any `(adapter, source,
+ * continuation, init, shutdown)` cell that can't execute at runtime
+ * fails to typecheck at the `defineSubagent` site.
  *
  * `TOptions` defaults to {@link SandboxCreateOptions} so the wide,
  * un-parameterised `SubagentSandboxConfig` keeps working for callers

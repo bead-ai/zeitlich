@@ -326,132 +326,217 @@ import { proxyBedrockSandboxOps } from "../../adapters/sandbox/bedrock/proxy";
 import { proxyE2bSandboxOps } from "../../adapters/sandbox/e2b/proxy";
 import { proxyInMemorySandboxOps } from "../../adapters/sandbox/inmemory/proxy";
 
-// --- own × continue: no caps required → every adapter passes ---------------
-const _ownContinueDaytona: SubagentSandboxConfig = {
-  source: "own",
-  continuation: "continue",
-  proxy: proxyDaytonaSandboxOps,
-};
-const _ownContinueBedrock: SubagentSandboxConfig = {
-  source: "own",
-  continuation: "continue",
-  proxy: proxyBedrockSandboxOps,
-};
-const _ownContinueE2b: SubagentSandboxConfig = {
-  source: "own",
-  continuation: "continue",
-  proxy: proxyE2bSandboxOps,
-};
-const _ownContinueInMemory: SubagentSandboxConfig = {
-  source: "own",
-  continuation: "continue",
-  proxy: proxyInMemorySandboxOps,
-};
+// Helper that pins the matrix cell type to `SubagentSandboxConfig` so
+// `@ts-expect-error` directives consistently land on the call line. The
+// helper is never invoked at runtime — the matrix is a pure
+// type-level fixture wrapped in `_subagentMatrix()` below.
+const subagentCfg = <T extends SubagentSandboxConfig>(c: T): T => c;
 
-// --- own × fork: "fork" cap required → wide-cap adapters pass,
-// never-cap adapters (daytona / bedrock) rejected. -------------------------
-const _ownForkE2b: SubagentSandboxConfig = {
-  source: "own",
-  continuation: "fork",
-  proxy: proxyE2bSandboxOps,
-};
-const _ownForkInMemory: SubagentSandboxConfig = {
-  source: "own",
-  continuation: "fork",
-  proxy: proxyInMemorySandboxOps,
-};
-const _ownForkDaytona: SubagentSandboxConfig = {
-  source: "own",
-  continuation: "fork",
-  // @ts-expect-error daytona's proxy doesn't expose forkSandbox
-  proxy: proxyDaytonaSandboxOps,
-};
-const _ownForkBedrock: SubagentSandboxConfig = {
-  source: "own",
-  continuation: "fork",
-  // @ts-expect-error bedrock's proxy doesn't expose forkSandbox
-  proxy: proxyBedrockSandboxOps,
-};
+function _subagentMatrix(): void {
+  // ===============================================================
+  // own × continue
+  // ===============================================================
+  //
+  // `mustSurvive=true` for `continuation: "continue"`. When the
+  // user's shutdown isn't a survival value (`pause` / `keep` /
+  // `pause-until-parent-close` / `keep-until-parent-close`), the
+  // handler auto-injects `"pause"` (subsequent calls) or
+  // `"pause-until-parent-close"` (creator first call). Each cell
+  // below reflects the resulting required cap union.
 
-// --- own × snapshot: "snapshot" | "restore" required → wide-cap adapters
-// pass, narrow adapters rejected with a precise diagnostic. -----------------
-const _ownSnapshotE2b: SubagentSandboxConfig = {
-  source: "own",
-  continuation: "snapshot",
-  proxy: proxyE2bSandboxOps,
-};
-const _ownSnapshotInMemory: SubagentSandboxConfig = {
-  source: "own",
-  continuation: "snapshot",
-  proxy: proxyInMemorySandboxOps,
-};
-const _ownSnapshotDaytona: SubagentSandboxConfig = {
-  source: "own",
-  continuation: "snapshot",
-  // @ts-expect-error daytona's proxy doesn't expose snapshotSandbox / restoreSandbox / deleteSandboxSnapshot
-  proxy: proxyDaytonaSandboxOps,
-};
-const _ownSnapshotBedrock: SubagentSandboxConfig = {
-  source: "own",
-  continuation: "snapshot",
-  // @ts-expect-error bedrock's proxy doesn't expose snapshotSandbox / restoreSandbox / deleteSandboxSnapshot
-  proxy: proxyBedrockSandboxOps,
-};
+  // shutdown omitted → auto-injected pause/pause-until-parent-close.
+  // @ts-expect-error pauseSandbox/resumeSandbox missing — auto-injection on continue requires "pause" (and "resume" via pause-until-parent-close)
+  subagentCfg({
+    source: "own",
+    continuation: "continue",
+    proxy: proxyDaytonaSandboxOps,
+  });
+  // @ts-expect-error pauseSandbox missing — auto-injection on continue requires "pause"
+  subagentCfg({
+    source: "own",
+    continuation: "continue",
+    proxy: proxyBedrockSandboxOps,
+  });
+  subagentCfg({
+    source: "own",
+    continuation: "continue",
+    proxy: proxyE2bSandboxOps,
+  });
+  subagentCfg({
+    source: "own",
+    continuation: "continue",
+    proxy: proxyInMemorySandboxOps,
+  });
 
-// --- inherit × continue: no caps required → every adapter passes -----------
-const _inheritContinueDaytona: SubagentSandboxConfig = {
-  source: "inherit",
-  continuation: "continue",
-  proxy: proxyDaytonaSandboxOps,
-};
-const _inheritContinueE2b: SubagentSandboxConfig = {
-  source: "inherit",
-  continuation: "continue",
-  proxy: proxyE2bSandboxOps,
-};
+  // shutdown: "keep" → alreadySurvives, no auto-inject. All compile.
+  subagentCfg({
+    source: "own",
+    continuation: "continue",
+    shutdown: "keep",
+    proxy: proxyDaytonaSandboxOps,
+  });
+  subagentCfg({
+    source: "own",
+    continuation: "continue",
+    shutdown: "keep",
+    proxy: proxyBedrockSandboxOps,
+  });
+  subagentCfg({
+    source: "own",
+    continuation: "continue",
+    shutdown: "keep",
+    proxy: proxyE2bSandboxOps,
+  });
 
-// --- inherit × fork: "fork" cap required (child gets `mode: "fork"` from
-// the parent's sandbox and calls forkSandbox) → narrow adapters rejected ---
-const _inheritForkE2b: SubagentSandboxConfig = {
-  source: "inherit",
-  continuation: "fork",
-  proxy: proxyE2bSandboxOps,
-};
-const _inheritForkDaytona: SubagentSandboxConfig = {
-  source: "inherit",
-  continuation: "fork",
-  // @ts-expect-error daytona's proxy doesn't expose forkSandbox
-  proxy: proxyDaytonaSandboxOps,
-};
+  // shutdown: "pause" → propagates → "pause" cap.
+  subagentCfg({
+    source: "own",
+    continuation: "continue",
+    shutdown: "pause",
+    // @ts-expect-error pauseSandbox missing — shutdown: "pause" requires "pause"
+    proxy: proxyDaytonaSandboxOps,
+  });
+  subagentCfg({
+    source: "own",
+    continuation: "continue",
+    shutdown: "pause",
+    proxy: proxyE2bSandboxOps,
+  });
 
-// --- inherit × snapshot is structurally invalid by design (the source
-// type's continuation domain doesn't include "snapshot") --------------------
-const _inheritSnapshotInvalid: SubagentSandboxConfig = {
-  source: "inherit",
-  // @ts-expect-error inherit + snapshot is invalid by design
-  continuation: "snapshot",
-  proxy: proxyE2bSandboxOps,
-};
+  // shutdown: "destroy" → NOT alreadySurvives, auto-injection applies.
+  subagentCfg({
+    source: "own",
+    continuation: "continue",
+    shutdown: "destroy",
+    // @ts-expect-error pauseSandbox missing — shutdown: "destroy" on continue still triggers pause auto-injection
+    proxy: proxyDaytonaSandboxOps,
+  });
 
-void [
-  _ownContinueDaytona,
-  _ownContinueBedrock,
-  _ownContinueE2b,
-  _ownContinueInMemory,
-  _ownForkE2b,
-  _ownForkInMemory,
-  _ownForkDaytona,
-  _ownForkBedrock,
-  _ownSnapshotE2b,
-  _ownSnapshotInMemory,
-  _ownSnapshotDaytona,
-  _ownSnapshotBedrock,
-  _inheritContinueDaytona,
-  _inheritContinueE2b,
-  _inheritForkE2b,
-  _inheritForkDaytona,
-  _inheritSnapshotInvalid,
-];
+  // ===============================================================
+  // own × fork × per-call (default init)
+  // ===============================================================
+
+  // not mustSurvive, no auto-inject, needs "fork" only.
+  subagentCfg({
+    source: "own",
+    continuation: "fork",
+    init: "per-call",
+    // @ts-expect-error forkSandbox missing — continuation: "fork" requires "fork"
+    proxy: proxyDaytonaSandboxOps,
+  });
+  subagentCfg({
+    source: "own",
+    continuation: "fork",
+    init: "per-call",
+    // @ts-expect-error forkSandbox missing — continuation: "fork" requires "fork"
+    proxy: proxyBedrockSandboxOps,
+  });
+  subagentCfg({
+    source: "own",
+    continuation: "fork",
+    init: "per-call",
+    proxy: proxyE2bSandboxOps,
+  });
+  subagentCfg({
+    source: "own",
+    continuation: "fork",
+    init: "per-call",
+    proxy: proxyInMemorySandboxOps,
+  });
+
+  // ===============================================================
+  // own × fork × once (mustSurvive → auto-inject pause)
+  // ===============================================================
+
+  subagentCfg({
+    source: "own",
+    continuation: "fork",
+    init: "once",
+    // @ts-expect-error forkSandbox AND pauseSandbox missing — fork+once auto-injects pause and needs "fork"
+    proxy: proxyDaytonaSandboxOps,
+  });
+  subagentCfg({
+    source: "own",
+    continuation: "fork",
+    init: "once",
+    proxy: proxyE2bSandboxOps,
+  });
+
+  // ===============================================================
+  // own × snapshot (overrides shutdown to "snapshot")
+  // ===============================================================
+
+  subagentCfg({
+    source: "own",
+    continuation: "snapshot",
+    proxy: proxyE2bSandboxOps,
+  });
+  subagentCfg({
+    source: "own",
+    continuation: "snapshot",
+    proxy: proxyInMemorySandboxOps,
+  });
+  subagentCfg({
+    source: "own",
+    continuation: "snapshot",
+    // @ts-expect-error snapshotSandbox / restoreSandbox / deleteSandboxSnapshot missing
+    proxy: proxyDaytonaSandboxOps,
+  });
+  subagentCfg({
+    source: "own",
+    continuation: "snapshot",
+    // @ts-expect-error snapshotSandbox / restoreSandbox / deleteSandboxSnapshot missing
+    proxy: proxyBedrockSandboxOps,
+  });
+
+  // ===============================================================
+  // inherit × continue (mode = "inherit" → sandboxOwned=false)
+  // ===============================================================
+  //
+  // No exit-shutdown caps fire regardless of the shutdown value.
+
+  subagentCfg({
+    source: "inherit",
+    continuation: "continue",
+    proxy: proxyDaytonaSandboxOps,
+  });
+  subagentCfg({
+    source: "inherit",
+    continuation: "continue",
+    shutdown: "pause",
+    proxy: proxyDaytonaSandboxOps,
+  });
+  subagentCfg({
+    source: "inherit",
+    continuation: "continue",
+    proxy: proxyE2bSandboxOps,
+  });
+
+  // ===============================================================
+  // inherit × fork (child runs mode: "fork" against parent's sandbox)
+  // ===============================================================
+
+  subagentCfg({
+    source: "inherit",
+    continuation: "fork",
+    proxy: proxyE2bSandboxOps,
+  });
+  subagentCfg({
+    source: "inherit",
+    continuation: "fork",
+    // @ts-expect-error forkSandbox missing — inherit+fork still requires "fork"
+    proxy: proxyDaytonaSandboxOps,
+  });
+
+  // inherit + snapshot is structurally invalid (continuation domain).
+  subagentCfg({
+    source: "inherit",
+    // @ts-expect-error inherit + snapshot is invalid by design
+    continuation: "snapshot",
+    proxy: proxyE2bSandboxOps,
+  });
+}
+void _subagentMatrix;
 
 // --- Synthetic adapter coverage of the "snapshot strategy needs both
 // `snapshot` and `restore`" half of the (B) invariant: a proxy that ships
