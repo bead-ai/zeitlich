@@ -13,8 +13,8 @@ import { E2bSandboxProvider } from "zeitlich/adapters/sandbox/e2b";
 
 const provider = new E2bSandboxProvider({
   template: "my-template",
-  timeoutMs: 15 * 60 * 1000,    // kill-on-abandon safety net
-  keepAliveMs: 15 * 60 * 1000,  // refreshed on every tool call
+  timeoutMs: 15 * 60 * 1000, // kill-on-abandon safety net
+  keepAliveMs: 15 * 60 * 1000, // refreshed on every tool call
 });
 ```
 
@@ -28,17 +28,25 @@ next tool call hits `Sandbox.connect(sandboxId)` and surfaces a
 
 `keepAliveMs` solves this without giving up the kill-on-abandon safety net.
 When set, every call to `provider.get(sandboxId)` passes
-`{ timeoutMs: keepAliveMs }` to `Sandbox.connect()`, which extends the
-sandbox lifetime to at least that many milliseconds (E2B's
-`Sandbox.connect(sandboxId, { timeoutMs })` only extends when the new value is
-longer than the time remaining, so it's idempotent and safe to call on every
-tool invocation).
+`{ timeoutMs: keepAliveMs }` to `Sandbox.connect()`. Per the E2B SDK's
+`SandboxConnectOpts.timeoutMs` JSDoc:
+
+> For running sandboxes, the timeout will update only if the new timeout is
+> longer than the existing one.
+
+So `connect()` with a `timeoutMs` is **monotonic**: it never shrinks the
+lifetime of a running sandbox. Pick `keepAliveMs` as the **full per-call
+refresh window** you want — passing a value smaller than the time remaining
+is a no-op rather than a shrink, but you should still pick the value with
+"every tool call should give me at least this much headroom" in mind, not
+"floor to add".
 
 `provider.get()` is invoked exactly once per tool call by `withSandbox`, so:
 
-- An active session's tool calls each refresh the lifetime by `keepAliveMs`.
-  The sandbox cannot be killed mid-run as long as tools are still firing —
-  conceptually this is the sandbox equivalent of a Temporal activity heartbeat.
+- An active session's tool calls each refresh the lifetime to at least
+  `keepAliveMs`. The sandbox cannot be killed mid-run as long as tools are
+  still firing — conceptually this is the sandbox equivalent of a Temporal
+  activity heartbeat.
 - An abandoned sandbox still dies `keepAliveMs` after the last tool call. The
   existing kill-on-timeout safety net is preserved.
 - Consumers can drop `timeoutMs` back down to short, safe values (e.g.
@@ -53,21 +61,21 @@ tool invocation).
   value as `timeoutMs`, or shorter if you want sandboxes to be reaped sooner
   after the last tool call.
 
-### Per-create override
+### Provider-level only
 
-Per-create `keepAliveMs` overrides the provider default for that sandbox only.
-The override is tracked internally by sandbox id and cleared on `destroy()`.
-Honoured by every code path that mints a fresh sandbox id — `create()`,
-`restore()`, and `fork()` — so a per-call override applies to the sandbox it
-was passed alongside.
+`keepAliveMs` is a provider-construction-time config. There is intentionally
+no per-create override: every sandbox managed by the provider refreshes by
+the same amount on each `get()`. If a real use case for per-sandbox refresh
+windows ever shows up we can add it without breaking changes.
 
-```ts
-const { sandbox } = await provider.create({ keepAliveMs: 5 * 60 * 1000 });
-```
+### When connect-with-options is not enough
 
-### When connect-with-options stops extending lifetime
+If you ever need to **shrink** a sandbox's remaining lifetime (e.g. force an
+early reap), `connect()` won't do it because of the monotonic-extend rule
+above. Use `Sandbox.setTimeout(timeoutMs)` or the static
+`SandboxApi.setTimeout(sandboxId, timeoutMs)` instead — those can extend or
+reduce.
 
 If E2B ever changes the semantics of `Sandbox.connect(sandboxId, { timeoutMs })`
-so it no longer extends a running sandbox's lifetime, `Sandbox.setTimeout` and
-the static `SandboxApi.setTimeout(sandboxId, timeoutMs)` are equivalent
-alternatives — swap the call site in `provider.get()` accordingly.
+so it stops extending a running sandbox's lifetime at all, `setTimeout` is
+also a drop-in replacement for the call site in `provider.get()`.
