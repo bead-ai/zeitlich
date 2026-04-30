@@ -68,14 +68,14 @@ class E2bSandboxImpl implements Sandbox {
  * runtime `supportedCapabilities` set and the type-level `TCaps` flow
  * out of this array, so the two surfaces cannot drift.
  */
-const E2B_CAPS = [
+export const E2B_CAPS = [
   "pause",
   "resume",
   "snapshot",
   "restore",
   "fork",
 ] as const satisfies readonly SandboxCapability[];
-type E2bCaps = (typeof E2B_CAPS)[number];
+export type E2bCaps = (typeof E2B_CAPS)[number];
 
 export class E2bSandboxProvider
   implements SandboxProvider<E2bSandboxCreateOptions, E2bSandbox, E2bCaps>

@@ -139,14 +139,14 @@ class InMemorySandboxImpl implements Sandbox {
  * runtime `supportedCapabilities` set and the type-level `TCaps` are both
  * derived from this array, so the two surfaces cannot drift.
  */
-const IN_MEMORY_CAPS = [
+export const IN_MEMORY_CAPS = [
   "pause",
   "resume",
   "snapshot",
   "restore",
   "fork",
 ] as const satisfies readonly SandboxCapability[];
-type InMemoryCaps = (typeof IN_MEMORY_CAPS)[number];
+export type InMemoryCaps = (typeof IN_MEMORY_CAPS)[number];
 
 export class InMemorySandboxProvider
   implements SandboxProvider<SandboxCreateOptions, Sandbox, InMemoryCaps>

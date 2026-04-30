@@ -19,6 +19,7 @@
  */
 import { proxyActivities, workflowInfo } from "@temporalio/workflow";
 import type { SandboxOps } from "../../../lib/sandbox/types";
+import type { E2bCaps } from "./index";
 import type { E2bSandboxCreateOptions } from "./types";
 
 const ADAPTER_PREFIX = "e2b";
@@ -26,7 +27,7 @@ const ADAPTER_PREFIX = "e2b";
 export function proxyE2bSandboxOps(
   scope?: string,
   options?: Parameters<typeof proxyActivities>[0]
-): SandboxOps<E2bSandboxCreateOptions> {
+): SandboxOps<E2bSandboxCreateOptions, unknown, E2bCaps> {
   const resolvedScope = scope ?? workflowInfo().workflowType;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -55,5 +56,5 @@ export function proxyE2bSandboxOps(
     restoreSandbox: acts[p("restoreSandbox")],
     deleteSandboxSnapshot: acts[p("deleteSandboxSnapshot")],
     forkSandbox: acts[p("forkSandbox")],
-  } as SandboxOps<E2bSandboxCreateOptions>;
+  } as SandboxOps<E2bSandboxCreateOptions, unknown, E2bCaps>;
 }

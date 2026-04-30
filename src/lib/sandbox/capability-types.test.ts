@@ -301,13 +301,23 @@ class _ImplWithoutDeclProvider {
 // ---------------------------------------------------------------------------
 // SubagentSandboxConfig.proxy × continuation × adapter matrix
 //
-// The proxy field's required `TCaps` is derived from the surrounding
-// `continuation` value (see `SubagentContinuationCaps`): only
-// `continuation: "snapshot"` requires the proxy to expose
-// `snapshotSandbox` / `deleteSandboxSnapshot`. Other continuations
-// accept narrowed adapters with `TCaps = never`. This matrix pins
-// every (continuation × adapter) pair so a future regression that
-// over-rejects narrowed adapters trips the type check immediately.
+// `SubagentContinuationCaps` encodes the caps the chosen continuation
+// **strategy** needs anywhere in the codebase (parent shutdown handler
+// AND child session lifecycle), pinning the contract on the proxy
+// field — which is structurally identical to the child's adapter type
+// — so any `(continuation, adapter)` combination that can't execute
+// at runtime fails to typecheck here:
+//
+//   continuation: "continue"  → no gated cap required (any adapter)
+//   continuation: "fork"      → "fork" cap required (child calls forkSandbox)
+//   continuation: "snapshot"  → "snapshot" | "restore" required
+//                               (child calls snapshotSandbox + restoreSandbox;
+//                                parent calls deleteSandboxSnapshot)
+//
+// The matrix is structured by (source × continuation × adapter), with
+// expected pass/fail labelled per cell so a future regression that
+// re-widens (over-reject) or re-narrows (under-reject) one cell trips
+// the type check immediately.
 // ---------------------------------------------------------------------------
 
 import type { SubagentSandboxConfig } from "../subagent/types";
@@ -316,8 +326,7 @@ import { proxyBedrockSandboxOps } from "../../adapters/sandbox/bedrock/proxy";
 import { proxyE2bSandboxOps } from "../../adapters/sandbox/e2b/proxy";
 import { proxyInMemorySandboxOps } from "../../adapters/sandbox/inmemory/proxy";
 
-// `source: "own"` × `continuation: "continue"` — needs no gated cap.
-// All adapters accepted.
+// --- own × continue: no caps required → every adapter passes ---------------
 const _ownContinueDaytona: SubagentSandboxConfig = {
   source: "own",
   continuation: "continue",
@@ -339,23 +348,33 @@ const _ownContinueInMemory: SubagentSandboxConfig = {
   proxy: proxyInMemorySandboxOps,
 };
 
-// `source: "own"` × `continuation: "fork"` — also no parent-side cap
-// required (the *child* session's sandboxOps is what runs `forkSandbox`).
-// All adapters accepted.
-const _ownForkDaytona: SubagentSandboxConfig = {
-  source: "own",
-  continuation: "fork",
-  proxy: proxyDaytonaSandboxOps,
-};
+// --- own × fork: "fork" cap required → wide-cap adapters pass,
+// never-cap adapters (daytona / bedrock) rejected. -------------------------
 const _ownForkE2b: SubagentSandboxConfig = {
   source: "own",
   continuation: "fork",
   proxy: proxyE2bSandboxOps,
 };
+const _ownForkInMemory: SubagentSandboxConfig = {
+  source: "own",
+  continuation: "fork",
+  proxy: proxyInMemorySandboxOps,
+};
+const _ownForkDaytona: SubagentSandboxConfig = {
+  source: "own",
+  continuation: "fork",
+  // @ts-expect-error daytona's proxy doesn't expose forkSandbox
+  proxy: proxyDaytonaSandboxOps,
+};
+const _ownForkBedrock: SubagentSandboxConfig = {
+  source: "own",
+  continuation: "fork",
+  // @ts-expect-error bedrock's proxy doesn't expose forkSandbox
+  proxy: proxyBedrockSandboxOps,
+};
 
-// `source: "own"` × `continuation: "snapshot"` — requires `"snapshot"`
-// cap (parent calls `deleteSandboxSnapshot` during cleanup). E2B and
-// in-memory accepted; daytona / bedrock rejected at the proxy field.
+// --- own × snapshot: "snapshot" | "restore" required → wide-cap adapters
+// pass, narrow adapters rejected with a precise diagnostic. -----------------
 const _ownSnapshotE2b: SubagentSandboxConfig = {
   source: "own",
   continuation: "snapshot",
@@ -369,28 +388,44 @@ const _ownSnapshotInMemory: SubagentSandboxConfig = {
 const _ownSnapshotDaytona: SubagentSandboxConfig = {
   source: "own",
   continuation: "snapshot",
-  // @ts-expect-error daytona's proxy doesn't expose snapshotSandbox / deleteSandboxSnapshot
+  // @ts-expect-error daytona's proxy doesn't expose snapshotSandbox / restoreSandbox / deleteSandboxSnapshot
   proxy: proxyDaytonaSandboxOps,
 };
 const _ownSnapshotBedrock: SubagentSandboxConfig = {
   source: "own",
   continuation: "snapshot",
-  // @ts-expect-error bedrock's proxy doesn't expose snapshotSandbox / deleteSandboxSnapshot
+  // @ts-expect-error bedrock's proxy doesn't expose snapshotSandbox / restoreSandbox / deleteSandboxSnapshot
   proxy: proxyBedrockSandboxOps,
 };
 
-// `source: "inherit"` mirror — same cap requirements, smaller
-// continuation domain (no `"snapshot"` allowed for inherit).
+// --- inherit × continue: no caps required → every adapter passes -----------
 const _inheritContinueDaytona: SubagentSandboxConfig = {
   source: "inherit",
   continuation: "continue",
   proxy: proxyDaytonaSandboxOps,
 };
+const _inheritContinueE2b: SubagentSandboxConfig = {
+  source: "inherit",
+  continuation: "continue",
+  proxy: proxyE2bSandboxOps,
+};
+
+// --- inherit × fork: "fork" cap required (child gets `mode: "fork"` from
+// the parent's sandbox and calls forkSandbox) → narrow adapters rejected ---
+const _inheritForkE2b: SubagentSandboxConfig = {
+  source: "inherit",
+  continuation: "fork",
+  proxy: proxyE2bSandboxOps,
+};
 const _inheritForkDaytona: SubagentSandboxConfig = {
   source: "inherit",
   continuation: "fork",
+  // @ts-expect-error daytona's proxy doesn't expose forkSandbox
   proxy: proxyDaytonaSandboxOps,
 };
+
+// --- inherit × snapshot is structurally invalid by design (the source
+// type's continuation domain doesn't include "snapshot") --------------------
 const _inheritSnapshotInvalid: SubagentSandboxConfig = {
   source: "inherit",
   // @ts-expect-error inherit + snapshot is invalid by design
@@ -403,16 +438,299 @@ void [
   _ownContinueBedrock,
   _ownContinueE2b,
   _ownContinueInMemory,
-  _ownForkDaytona,
   _ownForkE2b,
+  _ownForkInMemory,
+  _ownForkDaytona,
+  _ownForkBedrock,
   _ownSnapshotE2b,
   _ownSnapshotInMemory,
   _ownSnapshotDaytona,
   _ownSnapshotBedrock,
   _inheritContinueDaytona,
+  _inheritContinueE2b,
+  _inheritForkE2b,
   _inheritForkDaytona,
   _inheritSnapshotInvalid,
 ];
+
+// --- Synthetic adapter coverage of the "snapshot strategy needs both
+// `snapshot` and `restore`" half of the (B) invariant: a proxy that ships
+// only `snapshot` (no `restore`) must still be rejected for snapshot
+// continuations, otherwise the child session's restoreSandbox call would
+// throw at runtime. The synthetic proxies use `declare const` so they
+// only exist at compile time; the wrapping `_syntheticAdapterMatrix`
+// function is never called, keeping these checks pure type-level.
+
+declare const proxySnapshotOnly: (
+  scope: string
+) => SandboxOps<SandboxCreateOptions, unknown, "snapshot">;
+declare const proxyForkOnly: (
+  scope: string
+) => SandboxOps<SandboxCreateOptions, unknown, "fork">;
+
+function _syntheticAdapterMatrix(): void {
+  const _ownSnapshotSnapshotOnly: SubagentSandboxConfig = {
+    source: "own",
+    continuation: "snapshot",
+    // @ts-expect-error snapshot continuation needs `restore` too — proxy is missing restoreSandbox
+    proxy: proxySnapshotOnly,
+  };
+
+  // Symmetric positive: a fork-only proxy is enough for fork continuation
+  // (no snapshot/restore needed). Pins (B) — the strategy's required cap
+  // set is the *minimum* the adapter must expose.
+  const _ownForkForkOnly: SubagentSandboxConfig = {
+    source: "own",
+    continuation: "fork",
+    proxy: proxyForkOnly,
+  };
+
+  void [_ownSnapshotSnapshotOnly, _ownForkForkOnly];
+}
+void _syntheticAdapterMatrix;
+
+// ---------------------------------------------------------------------------
+// SessionConfig.sandboxOps × (sandbox.mode × sandboxShutdown × adapter) matrix
+//
+// Mirror of the subagent matrix for `createSession`. The session's
+// `sandboxOps` field is gated on the literal types of the surrounding
+// `sandbox` and `sandboxShutdown` fields via `SessionRequiredCaps`:
+//
+//   sandbox.mode === "fork"            → "fork" cap
+//   sandbox.mode === "from-snapshot"   → "restore" cap
+//   sandbox.mode === "continue" +
+//     sandboxShutdown ===
+//     "pause-until-parent-close"       → "resume" cap
+//   sandboxShutdown === "snapshot"     → "snapshot" cap
+//   sandboxShutdown === "pause" |
+//     "pause-until-parent-close"       → "pause" cap
+//
+// The default wide `TInit` / `TShutdown` resolve to the full union, so
+// existing call sites that don't pin the literals still require the
+// full cap set (current behaviour). The matrix here pins both
+// directions: when literals are passed explicitly, narrow adapters
+// satisfy safe combinations and are rejected on unsafe ones.
+// ---------------------------------------------------------------------------
+
+import type {
+  SessionConfig,
+  SessionRequiredCaps,
+  ThreadOps,
+} from "../session/types";
+import type { ToolMap } from "../tool-router/types";
+import type { ActivityInterfaceFor } from "@temporalio/workflow";
+
+declare const fakeThreadOps: ActivityInterfaceFor<ThreadOps<string>>;
+declare const fakeTools: ToolMap;
+
+function _sessionMatrix(): void {
+  // Common config slot — all the non-sandbox required fields.
+  type Base = Omit<
+    SessionConfig<ToolMap, unknown, string>,
+    "sandboxOps" | "sandbox" | "sandboxShutdown"
+  >;
+  const base: Base = {
+    agentName: "a",
+    runAgent: async () => ({ message: null, rawToolCalls: [] }),
+    threadOps: fakeThreadOps,
+    tools: fakeTools,
+    buildContextMessage: () => "",
+  };
+
+  // --- mode: "new" + shutdown: "destroy" requires no caps. Daytona OK. -----
+  const _newDestroyDaytona: SessionConfig<
+    ToolMap,
+    unknown,
+    string,
+    { mode: "new" },
+    "destroy"
+  > = {
+    ...base,
+    sandbox: { mode: "new" },
+    sandboxShutdown: "destroy",
+    sandboxOps: proxyDaytonaSandboxOps("scope"),
+  };
+
+  // --- mode: "fork" requires "fork" cap → daytona rejected. ----------------
+  const _forkDaytona: SessionConfig<
+    ToolMap,
+    unknown,
+    string,
+    { mode: "fork"; sandboxId: string },
+    "destroy"
+  > = {
+    ...base,
+    sandbox: { mode: "fork", sandboxId: "x" },
+    sandboxShutdown: "destroy",
+    // @ts-expect-error mode: "fork" requires "fork" cap; daytona's proxy doesn't expose forkSandbox
+    sandboxOps: proxyDaytonaSandboxOps("scope"),
+  };
+  // e2b satisfies "fork".
+  const _forkE2b: SessionConfig<
+    ToolMap,
+    unknown,
+    string,
+    { mode: "fork"; sandboxId: string },
+    "destroy"
+  > = {
+    ...base,
+    sandbox: { mode: "fork", sandboxId: "x" },
+    sandboxShutdown: "destroy",
+    sandboxOps: proxyE2bSandboxOps("scope"),
+  };
+
+  // --- mode: "from-snapshot" requires "restore". Daytona rejected. ---------
+  const _fromSnapshotDaytona: SessionConfig<
+    ToolMap,
+    unknown,
+    string,
+    { mode: "from-snapshot"; snapshot: SandboxSnapshot },
+    "destroy"
+  > = {
+    ...base,
+    sandbox: {
+      mode: "from-snapshot",
+      snapshot: {} as SandboxSnapshot,
+    },
+    sandboxShutdown: "destroy",
+    // @ts-expect-error mode: "from-snapshot" requires "restore"; daytona doesn't have restoreSandbox
+    sandboxOps: proxyDaytonaSandboxOps("scope"),
+  };
+
+  // --- shutdown: "snapshot" requires "snapshot" cap. Daytona rejected. -----
+  const _snapshotShutdownDaytona: SessionConfig<
+    ToolMap,
+    unknown,
+    string,
+    { mode: "new" },
+    "snapshot"
+  > = {
+    ...base,
+    sandbox: { mode: "new" },
+    sandboxShutdown: "snapshot",
+    // @ts-expect-error shutdown: "snapshot" requires "snapshot" cap; daytona doesn't have snapshotSandbox
+    sandboxOps: proxyDaytonaSandboxOps("scope"),
+  };
+
+  // --- shutdown: "pause" requires "pause" cap. Daytona rejected. -----------
+  const _pauseShutdownDaytona: SessionConfig<
+    ToolMap,
+    unknown,
+    string,
+    { mode: "new" },
+    "pause"
+  > = {
+    ...base,
+    sandbox: { mode: "new" },
+    sandboxShutdown: "pause",
+    // @ts-expect-error shutdown: "pause" requires "pause" cap; daytona doesn't have pauseSandbox
+    sandboxOps: proxyDaytonaSandboxOps("scope"),
+  };
+
+  // --- mode: "continue" + shutdown: "pause-until-parent-close" requires
+  // "resume" + "pause" caps. Daytona rejected. ------------------------------
+  const _continueResumeDaytona: SessionConfig<
+    ToolMap,
+    unknown,
+    string,
+    { mode: "continue"; sandboxId: string },
+    "pause-until-parent-close"
+  > = {
+    ...base,
+    sandbox: { mode: "continue", sandboxId: "x" },
+    sandboxShutdown: "pause-until-parent-close",
+    // @ts-expect-error continue + pause-until-parent-close requires "resume" + "pause"
+    sandboxOps: proxyDaytonaSandboxOps("scope"),
+  };
+
+  // --- mode: "continue" + shutdown: "destroy" needs no gated cap.
+  // Daytona accepted. -------------------------------------------------------
+  const _continueDestroyDaytona: SessionConfig<
+    ToolMap,
+    unknown,
+    string,
+    { mode: "continue"; sandboxId: string },
+    "destroy"
+  > = {
+    ...base,
+    sandbox: { mode: "continue", sandboxId: "x" },
+    sandboxShutdown: "destroy",
+    sandboxOps: proxyDaytonaSandboxOps("scope"),
+  };
+
+  // --- Default `TInit` / `TShutdown` (no `as const`) widens back to full
+  // caps — narrow adapters rejected, wide adapters accepted. ----------------
+  const _defaultDaytona: SessionConfig<ToolMap, unknown, string> = {
+    ...base,
+    // @ts-expect-error wide default `SessionRequiredCaps` requires every gated method
+    sandboxOps: proxyDaytonaSandboxOps("scope"),
+  };
+  const _defaultE2b: SessionConfig<ToolMap, unknown, string> = {
+    ...base,
+    sandboxOps: proxyE2bSandboxOps("scope"),
+  };
+
+  void [
+    _newDestroyDaytona,
+    _forkDaytona,
+    _forkE2b,
+    _fromSnapshotDaytona,
+    _snapshotShutdownDaytona,
+    _pauseShutdownDaytona,
+    _continueResumeDaytona,
+    _continueDestroyDaytona,
+    _defaultDaytona,
+    _defaultE2b,
+  ];
+}
+void _sessionMatrix;
+
+// Sanity check that `SessionRequiredCaps` resolves to the expected
+// literal cap unions for each (init, shutdown) combination — locks the
+// type-level mapping independently of the call-site matrix above.
+
+type _Eq<A, B> =
+  (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2
+    ? true
+    : false;
+
+const _capsCheck: {
+  newDestroy: _Eq<SessionRequiredCaps<{ mode: "new" }, "destroy">, never>;
+  fork: _Eq<
+    SessionRequiredCaps<{ mode: "fork"; sandboxId: string }, "destroy">,
+    "fork"
+  >;
+  fromSnapshot: _Eq<
+    SessionRequiredCaps<
+      { mode: "from-snapshot"; snapshot: SandboxSnapshot },
+      "destroy"
+    >,
+    "restore"
+  >;
+  snapshotShutdown: _Eq<
+    SessionRequiredCaps<{ mode: "new" }, "snapshot">,
+    "snapshot"
+  >;
+  pauseShutdown: _Eq<SessionRequiredCaps<{ mode: "new" }, "pause">, "pause">;
+  continueResume: _Eq<
+    SessionRequiredCaps<
+      { mode: "continue"; sandboxId: string },
+      "pause-until-parent-close"
+    >,
+    "resume" | "pause"
+  >;
+  // Wide defaults resolve to the full cap set.
+  defaultWide: _Eq<SessionRequiredCaps, SandboxCapability>;
+} = {
+  newDestroy: true,
+  fork: true,
+  fromSnapshot: true,
+  snapshotShutdown: true,
+  pauseShutdown: true,
+  continueResume: true,
+  defaultWide: true,
+};
+void _capsCheck;
 
 describe("SandboxManager runtime cap consistency check", () => {
   it("rejects a provider that lists a capability it does not implement", () => {

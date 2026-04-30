@@ -86,24 +86,35 @@ export type InferSubagentResult<T extends SubagentConfig> =
   T extends SubagentConfig<infer S> ? z.infer<S> : null;
 
 /**
- * Sandbox capabilities the parent's subagent handler needs from the
- * `proxy` for a given `continuation` value.
+ * Sandbox capabilities a given `continuation` strategy requires of the
+ * adapter as a whole — the union of methods called across the parent's
+ * shutdown handler **and** the child session's lifecycle. Pinning this
+ * on the proxy field works because the proxy is documented as "a factory
+ * that returns workflow-safe sandbox ops matching the subagent's own
+ * activities", so its adapter type is structurally identical to the
+ * child's adapter type. Requiring the strategy's caps on the proxy is
+ * therefore the only type-level handle we have on the child, and is
+ * what makes "any `(continuation, adapter)` combination that can't
+ * execute at runtime fails to typecheck" actually true.
  *
- * The parent only ever calls `destroySandbox` (always) and
- * `deleteSandboxSnapshot` (for snapshot-driven continuations) on the
- * proxy itself; the *child* session is what runs `pauseSandbox` /
- * `forkSandbox` / `restoreSandbox` against its own session-config
- * `sandboxOps`. This mapping reflects the parent's caller-side needs
- * only — the child enforces its own caps where it consumes the proxy.
+ * Strategy → caps the strategy invokes anywhere in the codebase:
  *
- * - `"continue"` / `"fork"` → no gated cap required from the parent
- *   (the parent never calls anything beyond base ops).
- * - `"snapshot"` → requires `"snapshot"` so the parent can call
- *   `deleteSandboxSnapshot` during cleanup.
+ * - `"continue"` → `never`. No gated method is needed; the strategy
+ *   reuses the existing sandbox via base ops.
+ * - `"fork"` → `"fork"`. The child session's `sandbox.mode === "fork"`
+ *   path calls `forkSandbox()` (`src/lib/session/session.ts`).
+ * - `"snapshot"` → `"snapshot" | "restore"`. The child session captures
+ *   via `snapshotSandbox()` and rehydrates via `restoreSandbox()`; the
+ *   parent's cleanup calls `deleteSandboxSnapshot()` (gated by
+ *   `"snapshot"`). All three must be present somewhere on the adapter.
  */
 export type SubagentContinuationCaps<
   C extends SubagentContinuation = SubagentContinuation,
-> = C extends "snapshot" ? "snapshot" : never;
+> = C extends "snapshot"
+  ? "snapshot" | "restore"
+  : C extends "fork"
+    ? "fork"
+    : never;
 
 /** Continuation values supported when `source` is `"inherit"`. */
 type InheritContinuation = "continue" | "fork";

@@ -9,9 +9,9 @@ import type { SessionExitReason } from "../types";
 import type { SessionConfig, ZeitlichSession } from "./types";
 import type {
   SandboxCreateOptions,
-  SandboxOps,
   SandboxSnapshot,
 } from "../sandbox/types";
+import type { SandboxInit, SubagentSandboxShutdown } from "../lifecycle";
 import type {
   AgentState,
   AgentStateManager,
@@ -80,14 +80,24 @@ export async function createSession<
   T extends ToolMap,
   M = unknown,
   TContent = string,
+  TInit extends SandboxInit | undefined = SandboxInit | undefined,
+  TShutdown extends SubagentSandboxShutdown = SubagentSandboxShutdown,
 >(
-  config: SessionConfig<T, M, TContent> & { sandboxOps: SandboxOps }
+  config: SessionConfig<T, M, TContent, TInit, TShutdown> & {
+    sandboxOps: NonNullable<
+      SessionConfig<T, M, TContent, TInit, TShutdown>["sandboxOps"]
+    >;
+  }
 ): Promise<ZeitlichSession<M, true>>;
 export async function createSession<
   T extends ToolMap,
   M = unknown,
   TContent = string,
->(config: SessionConfig<T, M, TContent>): Promise<ZeitlichSession<M, false>>;
+  TInit extends SandboxInit | undefined = SandboxInit | undefined,
+  TShutdown extends SubagentSandboxShutdown = SubagentSandboxShutdown,
+>(
+  config: SessionConfig<T, M, TContent, TInit, TShutdown>
+): Promise<ZeitlichSession<M, false>>;
 export async function createSession<
   T extends ToolMap,
   M = unknown,

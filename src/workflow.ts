@@ -22,6 +22,7 @@ export type {
   PrefixedThreadOps,
   ScopedPrefix,
   SessionConfig,
+  SessionRequiredCaps,
 } from "./lib/session";
 export { defineWorkflow } from "./lib/workflow";
 export type {

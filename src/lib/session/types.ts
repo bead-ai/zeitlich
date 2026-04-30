@@ -8,7 +8,12 @@ import type {
 import type { Hooks } from "../hooks/types";
 import type { SubagentConfig } from "../subagent/types";
 import type { Skill } from "../skills/types";
-import type { SandboxOps, SandboxSnapshot } from "../sandbox/types";
+import type {
+  SandboxCapability,
+  SandboxCreateOptions,
+  SandboxOps,
+  SandboxSnapshot,
+} from "../sandbox/types";
 import type { VirtualFsOps } from "../virtual-fs/types";
 import type { RunAgentActivity } from "../model/types";
 import type {
@@ -139,16 +144,68 @@ export type PrefixedThreadOps<TPrefix extends string, TContent = string> = {
 };
 
 /**
+ * Sandbox capabilities a session actually invokes on its
+ * `sandboxOps`, derived from the literal types of the surrounding
+ * `sandbox` (i.e. {@link SandboxInit}) and `sandboxShutdown` fields.
+ *
+ * The session's runtime call surface is conditional on those two
+ * fields:
+ *
+ * - `sandbox.mode === "fork"` → `forkSandbox()` is invoked.
+ * - `sandbox.mode === "from-snapshot"` → `restoreSandbox()` is invoked.
+ * - `sandbox.mode === "continue"` + `sandboxShutdown ===
+ *   "pause-until-parent-close"` → `resumeSandbox()` is invoked.
+ * - `sandboxShutdown === "snapshot"` → `snapshotSandbox()` is invoked
+ *   on session exit (and during seeding when fresh creation is paired
+ *   with snapshot shutdown).
+ * - `sandboxShutdown === "pause" | "pause-until-parent-close"` →
+ *   `pauseSandbox()` is invoked on session exit.
+ *
+ * Anything not listed above only uses base ops (`createSandbox` /
+ * `destroySandbox`), which all adapters always carry.
+ *
+ * The default `TInit` / `TShutdown` are the wide unions, so consumers
+ * that don't pin down their `sandbox` / `sandboxShutdown` literals see
+ * the full cap set required (current behaviour). Pinning the literals
+ * (e.g. `sandbox: { mode: "new" } as const`) narrows the requirement
+ * and lets a narrowed adapter satisfy it.
+ */
+export type SessionRequiredCaps<
+  TInit extends SandboxInit | undefined = SandboxInit | undefined,
+  TShutdown extends SubagentSandboxShutdown = SubagentSandboxShutdown,
+> =
+  | (TInit extends { mode: "fork" } ? "fork" : never)
+  | (TInit extends { mode: "from-snapshot" } ? "restore" : never)
+  | (TInit extends { mode: "continue" }
+      ? TShutdown extends "pause-until-parent-close"
+        ? "resume"
+        : never
+      : never)
+  | (TShutdown extends "snapshot" ? "snapshot" : never)
+  | (TShutdown extends "pause" | "pause-until-parent-close"
+      ? "pause"
+      : never);
+
+/**
  * Configuration for a Zeitlich agent session.
  *
  * @typeParam T - Tool map
  * @typeParam M - SDK-native message type returned by the model invoker
  * @typeParam TContent - SDK-native content type for human messages (defaults to `string`)
+ * @typeParam TInit - Literal type of `sandbox` (a {@link SandboxInit}
+ *   variant or `undefined`). Defaults to the wide union; pin it via
+ *   `as const` on the call site to narrow the cap requirement on
+ *   `sandboxOps`.
+ * @typeParam TShutdown - Literal type of `sandboxShutdown`. Defaults
+ *   to the wide union; pin it via `as const` on the call site to
+ *   narrow the cap requirement on `sandboxOps`.
  */
 export interface SessionConfig<
   T extends ToolMap,
   M = unknown,
   TContent = string,
+  TInit extends SandboxInit | undefined = SandboxInit | undefined,
+  TShutdown extends SubagentSandboxShutdown = SubagentSandboxShutdown,
 > {
   /** The name of the agent, should be unique within the workflows */
   agentName: string;
@@ -206,8 +263,25 @@ export interface SessionConfig<
   // Sandbox lifecycle
   // ---------------------------------------------------------------------------
 
-  /** Sandbox lifecycle operations (optional — omit for agents that don't need a sandbox) */
-  sandboxOps?: SandboxOps;
+  /**
+   * Sandbox lifecycle operations (optional — omit for agents that don't
+   * need a sandbox).
+   *
+   * The `TCaps` argument is derived from {@link SessionRequiredCaps}
+   * over the literal types of the surrounding `sandbox` and
+   * `sandboxShutdown` fields. With the default wide
+   * `TInit` / `TShutdown`, this resolves to the full
+   * {@link SandboxCapability} union (current behaviour). When the
+   * caller pins those literals via `as const`, the cap requirement
+   * tightens so a narrow adapter (e.g. Daytona's
+   * `SandboxOps<…, never>`) can satisfy combinations that don't need
+   * a gated method.
+   */
+  sandboxOps?: SandboxOps<
+    SandboxCreateOptions,
+    unknown,
+    SessionRequiredCaps<TInit, TShutdown> & SandboxCapability
+  >;
   /**
    * Sandbox initialization strategy.
    *
@@ -218,14 +292,14 @@ export interface SessionConfig<
    *
    * When omitted and `sandboxOps` is provided, defaults to `{ mode: "new" }`.
    */
-  sandbox?: SandboxInit;
+  sandbox?: TInit;
   /**
    * What to do with the sandbox when this session exits.
    *
    * Defaults to `"destroy"` when omitted.
    * Has no effect when the sandbox is inherited (`sandbox.mode === "inherit"`).
    */
-  sandboxShutdown?: SubagentSandboxShutdown;
+  sandboxShutdown?: TShutdown;
   /**
    * Called as soon as the sandbox is created (or resumed/forked), before the
    * agent loop starts. Useful for signalling sandbox readiness to a parent.
