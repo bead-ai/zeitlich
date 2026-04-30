@@ -743,16 +743,50 @@ function _sessionMatrix(): void {
     sandboxOps: proxyDaytonaSandboxOps("scope"),
   };
 
-  // --- Default `TInit` / `TShutdown` (no `as const`) widens back to full
-  // caps — narrow adapters rejected, wide adapters accepted. ----------------
+  // --- Default `TInit` / `TShutdown` (no `as const`) → SessionRequiredCaps
+  // resolves to `never` (the runtime defaults `{ mode: "new" }` +
+  // `"destroy"` invoke no gated methods). Narrow adapters are accepted
+  // here, matching the runtime contract. -----------------------------------
   const _defaultDaytona: SessionConfig<ToolMap, unknown, string> = {
     ...base,
-    // @ts-expect-error wide default `SessionRequiredCaps` requires every gated method
     sandboxOps: proxyDaytonaSandboxOps("scope"),
+  };
+  const _defaultBedrock: SessionConfig<ToolMap, unknown, string> = {
+    ...base,
+    sandboxOps: proxyBedrockSandboxOps("scope"),
   };
   const _defaultE2b: SessionConfig<ToolMap, unknown, string> = {
     ...base,
     sandboxOps: proxyE2bSandboxOps("scope"),
+  };
+
+  // --- Specifying `sandbox: { mode: "fork" }` only (no shutdown) tightens
+  // to "fork" and rejects narrow adapters precisely. ----------------------
+  const _forkOnlyDaytona: SessionConfig<
+    ToolMap,
+    unknown,
+    string,
+    { mode: "fork"; sandboxId: string }
+  > = {
+    ...base,
+    sandbox: { mode: "fork", sandboxId: "x" },
+    // @ts-expect-error mode: "fork" requires "fork" cap; daytona is missing forkSandbox
+    sandboxOps: proxyDaytonaSandboxOps("scope"),
+  };
+
+  // --- Specifying only `sandboxShutdown: "pause"` (no sandbox) tightens
+  // to "pause" and rejects narrow adapters. -------------------------------
+  const _pauseOnlyDaytona: SessionConfig<
+    ToolMap,
+    unknown,
+    string,
+    undefined,
+    "pause"
+  > = {
+    ...base,
+    sandboxShutdown: "pause",
+    // @ts-expect-error shutdown: "pause" requires "pause" cap; daytona is missing pauseSandbox
+    sandboxOps: proxyDaytonaSandboxOps("scope"),
   };
 
   void [
@@ -765,7 +799,10 @@ function _sessionMatrix(): void {
     _continueResumeDaytona,
     _continueDestroyDaytona,
     _defaultDaytona,
+    _defaultBedrock,
     _defaultE2b,
+    _forkOnlyDaytona,
+    _pauseOnlyDaytona,
   ];
 }
 void _sessionMatrix;
@@ -804,8 +841,11 @@ const _capsCheck: {
     >,
     "resume" | "pause"
   >;
-  // Wide defaults resolve to the full cap set.
-  defaultWide: _Eq<SessionRequiredCaps, SandboxCapability>;
+  // No literals pinned → defaults to the runtime's `{mode:"new"} +
+  // "destroy"`, which invokes no gated methods (Bug 2: previously
+  // resolved to the wide cap union, over-rejecting narrow adapters
+  // even on the runtime-safe default path).
+  defaultOmittedSafe: _Eq<SessionRequiredCaps, never>;
 } = {
   newDestroy: true,
   fork: true,
@@ -813,7 +853,7 @@ const _capsCheck: {
   snapshotShutdown: true,
   pauseShutdown: true,
   continueResume: true,
-  defaultWide: true,
+  defaultOmittedSafe: true,
 };
 void _capsCheck;
 

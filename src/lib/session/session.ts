@@ -7,8 +7,11 @@ import {
 } from "@temporalio/workflow";
 import type { SessionExitReason } from "../types";
 import type { SessionConfig, ZeitlichSession } from "./types";
+import { resolveSessionLifecycle } from "./types";
 import type {
+  SandboxCapability,
   SandboxCreateOptions,
+  SandboxOps,
   SandboxSnapshot,
 } from "../sandbox/types";
 import type { SandboxInit, SubagentSandboxShutdown } from "../lifecycle";
@@ -80,8 +83,8 @@ export async function createSession<
   T extends ToolMap,
   M = unknown,
   TContent = string,
-  TInit extends SandboxInit | undefined = SandboxInit | undefined,
-  TShutdown extends SubagentSandboxShutdown = SubagentSandboxShutdown,
+  TInit extends SandboxInit | undefined = undefined,
+  TShutdown extends SubagentSandboxShutdown | undefined = undefined,
 >(
   config: SessionConfig<T, M, TContent, TInit, TShutdown> & {
     sandboxOps: NonNullable<
@@ -93,39 +96,77 @@ export async function createSession<
   T extends ToolMap,
   M = unknown,
   TContent = string,
-  TInit extends SandboxInit | undefined = SandboxInit | undefined,
-  TShutdown extends SubagentSandboxShutdown = SubagentSandboxShutdown,
+  TInit extends SandboxInit | undefined = undefined,
+  TShutdown extends SubagentSandboxShutdown | undefined = undefined,
 >(
   config: SessionConfig<T, M, TContent, TInit, TShutdown>
 ): Promise<ZeitlichSession<M, false>>;
+// Implementation. The overloads above narrow the public contract per
+// `SessionRequiredCaps<TInit, TShutdown>`. The impl signature uses the
+// `never` cap floor — the structurally-narrowest shape that every
+// adapter (including Daytona/Bedrock) satisfies — so each overload's
+// possibly-narrow `sandboxOps` is assignable here. Gated method calls
+// inside the body go through `wideOps()` below, which casts the
+// narrow-typed binding to the wide shape. This is structurally safe:
+// the runtime gates each gated call on `sandboxMode === …` /
+// `resolvedShutdown === …`, and the type system has already ruled out
+// any (mode, shutdown, adapter) cell that would invoke a missing
+// method.
 export async function createSession<
   T extends ToolMap,
   M = unknown,
   TContent = string,
->({
-  agentName,
-  maxTurns = 50,
-  metadata = {},
-  runAgent,
-  threadOps,
-  buildContextMessage,
-  subagents,
-  skills,
-  tools = {} as T,
-  processToolsInParallel = true,
-  hooks = {},
-  appendSystemPrompt = true,
-  waitForInputTimeout = "48h",
-  threadKey,
-  sandboxOps,
-  thread: threadInit,
-  sandbox: sandboxInit,
-  sandboxShutdown = "destroy",
-  onSandboxReady,
-  onSessionExit,
-  virtualFs: virtualFsConfig,
-  virtualFsOps,
-}: SessionConfig<T, M, TContent>): Promise<ZeitlichSession<M, boolean>> {
+>(
+  config: Omit<
+    SessionConfig<T, M, TContent, SandboxInit | undefined, undefined>,
+    "sandboxOps"
+  > & {
+    sandboxOps?: SandboxOps<SandboxCreateOptions, unknown, never>;
+  }
+): Promise<ZeitlichSession<M, boolean>> {
+  const {
+    agentName,
+    maxTurns = 50,
+    metadata = {},
+    runAgent,
+    threadOps,
+    buildContextMessage,
+    subagents,
+    skills,
+    tools = {} as T,
+    processToolsInParallel = true,
+    hooks = {},
+    appendSystemPrompt = true,
+    waitForInputTimeout = "48h",
+    threadKey,
+    sandboxOps,
+    thread: threadInit,
+    sandbox: sandboxInit,
+    sandboxShutdown,
+    onSandboxReady,
+    onSessionExit,
+    virtualFs: virtualFsConfig,
+    virtualFsOps,
+  } = config;
+
+  /**
+   * The narrow-typed `sandboxOps` binding cast to its wide
+   * (`SandboxCapability`) form. The overload signatures +
+   * `SessionRequiredCaps` SSOT have already ruled out `(sandbox.mode,
+   * sandboxShutdown, adapter)` combinations where a referenced method
+   * would be missing on the proxy, and each gated call site below is
+   * guarded by an `if (sandboxOps)` / `sandboxOps &&` runtime check,
+   * so the cast is structurally safe. `wideOps` returns the wide-cap
+   * shape; callers use it after their own runtime guard establishes
+   * that `sandboxOps` is defined.
+   */
+  type WideSandboxOps = SandboxOps<
+    SandboxCreateOptions,
+    unknown,
+    SandboxCapability
+  >;
+  const wideOps = (): WideSandboxOps =>
+    sandboxOps as unknown as WideSandboxOps;
   // ---------------------------------------------------------------------------
   // Thread resolution
   // ---------------------------------------------------------------------------
@@ -231,7 +272,18 @@ export async function createSession<
       );
 
       // --- Sandbox lifecycle: create, continue, fork, from-snapshot, or inherit ---
-      const sandboxMode = sandboxInit?.mode;
+      // Resolve `sandbox` / `sandboxShutdown` defaults through the SSOT
+      // so the runtime dispatch below and the type-level
+      // `SessionRequiredCaps` cannot disagree on what the documented
+      // defaults are. Both surfaces consult `resolveSessionLifecycle`
+      // (or its type-level equivalent) before checking individual
+      // mode/shutdown values.
+      const lifecycle = resolveSessionLifecycle(
+        sandboxInit,
+        sandboxShutdown
+      );
+      const sandboxMode: SandboxInit["mode"] | undefined = lifecycle.mode;
+      const resolvedShutdown: SubagentSandboxShutdown = lifecycle.shutdown;
       let sandboxId: string | undefined;
       let sandboxOwned = false;
       let baseSnapshot: SandboxSnapshot | undefined;
@@ -260,8 +312,8 @@ export async function createSession<
         }
         sandboxId = (sandboxInit as { mode: "continue"; sandboxId: string })
           .sandboxId;
-        if (sandboxShutdown === "pause-until-parent-close") {
-          await sandboxOps.resumeSandbox(sandboxId);
+        if (resolvedShutdown === "pause-until-parent-close") {
+          await wideOps().resumeSandbox(sandboxId);
         }
         sandboxOwned = true;
       } else if (sandboxMode === "fork") {
@@ -276,7 +328,7 @@ export async function createSession<
           sandboxId: string;
           options?: SandboxCreateOptions;
         };
-        sandboxId = await sandboxOps.forkSandbox(
+        sandboxId = await wideOps().forkSandbox(
           forkInit.sandboxId,
           forkInit.options
         );
@@ -293,7 +345,7 @@ export async function createSession<
           snapshot: SandboxSnapshot;
           options?: SandboxCreateOptions;
         };
-        sandboxId = await sandboxOps.restoreSandbox(
+        sandboxId = await wideOps().restoreSandbox(
           restoreInit.snapshot,
           restoreInit.options
         );
@@ -320,10 +372,10 @@ export async function createSession<
         sandboxId &&
         sandboxOwned &&
         freshlyCreated &&
-        sandboxShutdown === "snapshot" &&
+        resolvedShutdown === "snapshot" &&
         sandboxOps
       ) {
-        baseSnapshot = await sandboxOps.snapshotSandbox(sandboxId);
+        baseSnapshot = await wideOps().snapshotSandbox(sandboxId);
       }
 
       if (sandboxId && sandboxOwned && onSandboxReady) {
@@ -596,19 +648,19 @@ export async function createSession<
         await callSessionEnd(exitReason, stateManager.getTurns());
 
         if (sandboxOwned && sandboxId && sandboxOps) {
-          switch (sandboxShutdown) {
+          switch (resolvedShutdown) {
             case "destroy":
               await sandboxOps.destroySandbox(sandboxId);
               break;
             case "pause":
             case "pause-until-parent-close":
-              await sandboxOps.pauseSandbox(sandboxId);
+              await wideOps().pauseSandbox(sandboxId);
               break;
             case "keep":
             case "keep-until-parent-close":
               break;
             case "snapshot":
-              exitSnapshot = await sandboxOps.snapshotSandbox(sandboxId);
+              exitSnapshot = await wideOps().snapshotSandbox(sandboxId);
               await sandboxOps.destroySandbox(sandboxId);
               break;
           }
