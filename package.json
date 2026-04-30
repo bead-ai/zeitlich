@@ -227,8 +227,10 @@
     "@eslint/js": "^10.0.1",
     "@google/genai": "^1.44.0",
     "@langchain/core": "^1.1.30",
-    "@temporalio/envconfig": "^1.15.0",
-    "@temporalio/worker": "^1.15.0",
+    "@temporalio/common": "1.16.0",
+    "@temporalio/envconfig": "1.16.0",
+    "@temporalio/worker": "1.16.0",
+    "@temporalio/workflow": "1.16.0",
     "@types/node": "^25.3.3",
     "eslint": "^10.0.2",
     "husky": "^9.1.7",
@@ -247,6 +249,10 @@
     "@e2b/code-interpreter": "^2.3.3",
     "@google/genai": "^1.43.0",
     "@langchain/core": ">=1.0.0",
+    "@temporalio/common": ">=1.16.0 <2.0.0",
+    "@temporalio/envconfig": ">=1.16.0 <2.0.0",
+    "@temporalio/worker": ">=1.16.0 <2.0.0",
+    "@temporalio/workflow": ">=1.16.0 <2.0.0",
     "ioredis": ">=5.0.0",
     "just-bash": ">=2.0.0"
   },
@@ -266,6 +272,12 @@
     "@langchain/core": {
       "optional": true
     },
+    "@temporalio/envconfig": {
+      "optional": true
+    },
+    "@temporalio/worker": {
+      "optional": true
+    },
     "just-bash": {
       "optional": true
     }
@@ -276,9 +288,6 @@
   },
   "homepage": "https://github.com/bead-ai/zeitlich#readme",
   "dependencies": {
-    "@temporalio/common": "^1.15.0",
-    "@temporalio/plugin": "^1.15.0",
-    "@temporalio/workflow": "^1.15.0",
     "zod": "^4.3.6"
   }
 }
