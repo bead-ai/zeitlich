@@ -743,21 +743,54 @@ function _sessionMatrix(): void {
     sandboxOps: proxyDaytonaSandboxOps("scope"),
   };
 
-  // --- Default `TInit` / `TShutdown` (no `as const`) → SessionRequiredCaps
-  // resolves to `never` (the runtime defaults `{ mode: "new" }` +
-  // `"destroy"` invoke no gated methods). Narrow adapters are accepted
-  // here, matching the runtime contract. -----------------------------------
+  // --- Annotated alias `SessionConfig<ToolMap>` (no literal pin on
+  // `TInit` / `TShutdown`) is intentionally a broad shape: callers
+  // may fill `sandbox` / `sandboxShutdown` with any variant later, so
+  // `SessionRequiredCaps` resolves to the wide cap union and a narrow
+  // adapter cannot satisfy it. To get narrow caps from an annotated
+  // alias, pin the generics (see `_aliasPinnedDaytona` below). The
+  // runtime-default-narrow path is reached at the `createSession()`
+  // call site (where `TInit` infers from the literal argument).
+  const _defaultE2b: SessionConfig<ToolMap, unknown, string> = {
+    ...base,
+    sandboxOps: proxyE2bSandboxOps("scope"),
+  };
   const _defaultDaytona: SessionConfig<ToolMap, unknown, string> = {
     ...base,
+    // @ts-expect-error broad alias requires wide caps; daytona is narrow. Pin generics to get narrow caps.
     sandboxOps: proxyDaytonaSandboxOps("scope"),
   };
   const _defaultBedrock: SessionConfig<ToolMap, unknown, string> = {
     ...base,
+    // @ts-expect-error broad alias requires wide caps; bedrock is narrow. Pin generics to get narrow caps.
     sandboxOps: proxyBedrockSandboxOps("scope"),
   };
-  const _defaultE2b: SessionConfig<ToolMap, unknown, string> = {
+
+  // --- Annotated alias with pinned generics is the documented path
+  // for narrow caps when type-annotating a reusable config. With
+  // `{ mode: "new" }` + `"destroy"` pinned, no gated cap is required
+  // and Daytona is accepted. ------------------------------------------------
+  const _aliasPinnedDaytona: SessionConfig<
+    ToolMap,
+    unknown,
+    string,
+    { mode: "new" },
+    "destroy"
+  > = {
     ...base,
-    sandboxOps: proxyE2bSandboxOps("scope"),
+    sandbox: { mode: "new" },
+    sandboxShutdown: "destroy",
+    sandboxOps: proxyDaytonaSandboxOps("scope"),
+  };
+
+  // --- Annotated alias with `sandbox: { mode: "new" }` literal must
+  // compile when `TInit` defaults to the wide union. Regression test
+  // for the Codex P1 finding: the unpinned alias must accept any
+  // valid `SandboxInit` variant for `sandbox` without forcing the
+  // caller to spell out the 4th and 5th generic arguments. ----------------
+  const _aliasWithLiteralSandbox: SessionConfig<ToolMap, unknown, string> = {
+    ...base,
+    sandbox: { mode: "new" },
   };
 
   // --- Specifying `sandbox: { mode: "fork" }` only (no shutdown) tightens

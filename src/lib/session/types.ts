@@ -304,8 +304,10 @@ export interface SessionConfig<
   T extends ToolMap,
   M = unknown,
   TContent = string,
-  TInit extends SandboxInit | undefined = undefined,
-  TShutdown extends SubagentSandboxShutdown | undefined = undefined,
+  TInit extends SandboxInit | undefined = SandboxInit | undefined,
+  TShutdown extends
+    | SubagentSandboxShutdown
+    | undefined = SubagentSandboxShutdown | undefined,
 > {
   /** The name of the agent, should be unique within the workflows */
   agentName: string;
