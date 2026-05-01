@@ -1,4 +1,8 @@
-import { Sandbox as E2bSdkSandbox } from "@e2b/code-interpreter";
+import {
+  NotFoundError as E2bNotFoundError,
+  Sandbox as E2bSdkSandbox,
+  SandboxNotFoundError as E2bSandboxNotFoundError,
+} from "@e2b/code-interpreter";
 import type {
   Sandbox,
   SandboxCapabilities,
@@ -19,6 +23,20 @@ import type {
   E2bSandboxConfig,
   E2bSandboxCreateOptions,
 } from "./types";
+
+/**
+ * True iff `err` is the E2B SDK's "this sandbox doesn't exist (anymore)"
+ * signal. We narrow to `SandboxNotFoundError` (the canonical class) and to
+ * its deprecated parent `NotFoundError` as a defensive fallback — older
+ * SDK paths still throw the parent for sandbox-not-found cases. Any other
+ * error (auth failure, network blip, 5xx, validation) is propagated
+ * unchanged so callers can react to it specifically.
+ */
+function isE2bSandboxNotFound(err: unknown): boolean {
+  return (
+    err instanceof E2bSandboxNotFoundError || err instanceof E2bNotFoundError
+  );
+}
 
 // ============================================================================
 // E2bSandbox
@@ -91,6 +109,7 @@ export class E2bSandboxProvider
   private readonly defaultTemplate?: string;
   private readonly defaultWorkspaceBase: string;
   private readonly defaultTimeoutMs?: number;
+  private readonly defaultKeepAliveMs?: number;
   private readonly defaultAllowInternetAccess?: boolean;
   private readonly defaultNetwork?: E2bSandboxConfig["network"];
   private readonly defaultMetadata?: E2bSandboxConfig["metadata"];
@@ -100,6 +119,7 @@ export class E2bSandboxProvider
     this.defaultTemplate = config?.template;
     this.defaultWorkspaceBase = config?.workspaceBase ?? "/home/user";
     this.defaultTimeoutMs = config?.timeoutMs;
+    this.defaultKeepAliveMs = config?.keepAliveMs;
     this.defaultAllowInternetAccess = config?.allowInternetAccess;
     this.defaultNetwork = config?.network;
     this.defaultMetadata = config?.metadata;
@@ -135,15 +155,22 @@ export class E2bSandboxProvider
   }
 
   async get(sandboxId: string): Promise<E2bSandbox> {
+    const keepAliveMs = this.defaultKeepAliveMs;
     try {
-      const sdkSandbox = await E2bSdkSandbox.connect(sandboxId);
+      const sdkSandbox =
+        keepAliveMs !== undefined
+          ? await E2bSdkSandbox.connect(sandboxId, { timeoutMs: keepAliveMs })
+          : await E2bSdkSandbox.connect(sandboxId);
       return new E2bSandboxImpl(
         sandboxId,
         sdkSandbox,
         this.defaultWorkspaceBase
       );
-    } catch {
-      throw new SandboxNotFoundError(sandboxId);
+    } catch (err) {
+      if (isE2bSandboxNotFound(err)) {
+        throw new SandboxNotFoundError(sandboxId);
+      }
+      throw err;
     }
   }
 
@@ -152,7 +179,7 @@ export class E2bSandboxProvider
       const sdkSandbox = await E2bSdkSandbox.connect(sandboxId);
       await sdkSandbox.kill();
     } catch {
-      // Already gone or not found
+      // Already gone or not found — destroy is idempotent.
     }
   }
 
