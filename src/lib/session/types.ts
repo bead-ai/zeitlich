@@ -245,6 +245,14 @@ export interface SessionConfig<
     threadId: string;
     sandboxId?: string;
     snapshot?: SandboxSnapshot;
+    usage: {
+      totalInputTokens: number;
+      totalOutputTokens: number;
+      totalCachedWriteTokens: number;
+      totalCachedReadTokens: number;
+      totalReasonTokens: number;
+      turns: number;
+    };
   }) => void;
 
   // ---------------------------------------------------------------------------

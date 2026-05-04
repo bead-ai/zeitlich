@@ -614,6 +614,7 @@ export async function createSession<
           ...(sandboxId && { sandboxId }),
           ...(exitSnapshot && { snapshot: exitSnapshot }),
           threadId,
+          usage: stateManager.getTotalUsage(),
         });
       }
 

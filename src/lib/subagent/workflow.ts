@@ -13,6 +13,7 @@ import type {
 } from "./types";
 import type { SubagentSandboxShutdown } from "../lifecycle";
 import type { SandboxSnapshot } from "../sandbox/types";
+import type { TokenUsage } from "../types";
 import { childSandboxReadySignal } from "./signals";
 
 /**
@@ -132,6 +133,7 @@ export function defineSubagentWorkflow(
     let capturedSnapshot: SandboxSnapshot | undefined;
     let capturedBaseSnapshot: SandboxSnapshot | undefined;
     let capturedThreadId: string | undefined;
+    let capturedUsage: TokenUsage | undefined;
     const sessionInput: SubagentSessionInput = {
       agentName: config.name,
       sandboxShutdown: effectiveShutdown,
@@ -148,10 +150,17 @@ export function defineSubagentWorkflow(
           });
         }
       },
-      onSessionExit: ({ sandboxId, snapshot, threadId }) => {
+      onSessionExit: ({ sandboxId, snapshot, threadId, usage }) => {
         capturedSandboxId = sandboxId;
         capturedSnapshot = snapshot;
         capturedThreadId = threadId;
+        capturedUsage = {
+          inputTokens: usage.totalInputTokens,
+          outputTokens: usage.totalOutputTokens,
+          cachedWriteTokens: usage.totalCachedWriteTokens,
+          cachedReadTokens: usage.totalCachedReadTokens,
+          reasonTokens: usage.totalReasonTokens,
+        };
       },
     };
 
@@ -168,6 +177,7 @@ export function defineSubagentWorkflow(
       ...(capturedBaseSnapshot !== undefined && {
         baseSnapshot: capturedBaseSnapshot,
       }),
+      ...(capturedUsage !== undefined && { usage: capturedUsage }),
     };
   };
 
