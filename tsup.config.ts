@@ -23,9 +23,6 @@ export default defineConfig({
       "src/adapters/sandbox/daytona/proxy.ts",
     "adapters/sandbox/e2b/index": "src/adapters/sandbox/e2b/index.ts",
     "adapters/sandbox/e2b/workflow": "src/adapters/sandbox/e2b/proxy.ts",
-    "adapters/sandbox/bedrock/index": "src/adapters/sandbox/bedrock/index.ts",
-    "adapters/sandbox/bedrock/workflow":
-      "src/adapters/sandbox/bedrock/proxy.ts",
   },
   format: ["esm", "cjs"],
   dts: true,
@@ -41,7 +38,6 @@ export default defineConfig({
     /^@anthropic-ai\//,
     /^@daytonaio\//,
     /^@e2b\//,
-    /^@aws-sdk\//,
     "ioredis",
     "@mongodb-js/zstd",
     "node-liblzma",
