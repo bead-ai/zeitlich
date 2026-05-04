@@ -16,14 +16,18 @@
  * ```
  */
 import { proxyActivities, workflowInfo } from "@temporalio/workflow";
-import type { SandboxOps } from "../../../lib/sandbox/types";
+import type {
+  SandboxCreateOptions,
+  SandboxOps,
+} from "../../../lib/sandbox/types";
+import type { InMemoryCaps } from "./index";
 
 const ADAPTER_PREFIX = "inMemory";
 
 export function proxyInMemorySandboxOps(
   scope?: string,
   options?: Parameters<typeof proxyActivities>[0]
-): SandboxOps {
+): SandboxOps<SandboxCreateOptions, unknown, InMemoryCaps> {
   const resolvedScope = scope ?? workflowInfo().workflowType;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -52,5 +56,5 @@ export function proxyInMemorySandboxOps(
     restoreSandbox: acts[p("restoreSandbox")],
     deleteSandboxSnapshot: acts[p("deleteSandboxSnapshot")],
     forkSandbox: acts[p("forkSandbox")],
-  } as SandboxOps;
+  } as SandboxOps<SandboxCreateOptions, unknown, InMemoryCaps>;
 }

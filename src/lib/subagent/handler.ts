@@ -12,11 +12,13 @@ import type { ToolHandlerResponse, RouterContext } from "../tool-router";
 import type { JsonValue } from "../state/types";
 import type {
   InferSubagentResult,
+  ResolvedSubagentSandboxConfig,
   SubagentConfig,
   SubagentFnResult,
   SubagentSandboxConfig,
   SubagentWorkflowInput,
 } from "./types";
+import { resolveSubagentLifecycle } from "./types";
 import type { SubagentArgs } from "./tool";
 import type { z } from "zod";
 import type {
@@ -24,8 +26,32 @@ import type {
   SandboxInit,
   SubagentSandboxShutdown,
 } from "../lifecycle";
-import type { SandboxOps, SandboxSnapshot } from "../sandbox/types";
+import type {
+  SandboxCreateOptions,
+  SandboxOps,
+  SandboxSnapshot,
+} from "../sandbox/types";
 import { childSandboxReadySignal } from "./signals";
+
+/**
+ * Methods the parent's subagent handler invokes on a subagent's `proxy`.
+ * Kept narrow so the handler's internal maps accept `SandboxOps<…, never>`
+ * (e.g. Daytona) and `SandboxOps<…, "snapshot">` (e.g. E2B for
+ * snapshot-driven continuations) alike.
+ *
+ * `destroySandbox` is base — always available.
+ * `deleteSandboxSnapshot` is only called for continuations that produce
+ * snapshots; it's stored separately and only populated when present on
+ * the cfg-specific proxy.
+ */
+type ParentDestroyOps = Pick<
+  SandboxOps<SandboxCreateOptions, unknown, never>,
+  "destroySandbox"
+>;
+type ParentDeleteSnapshotOps = Pick<
+  SandboxOps<SandboxCreateOptions, unknown, "snapshot">,
+  "deleteSandboxSnapshot"
+>;
 
 /**
  * Default `workflowRunTimeout` applied to every subagent child workflow
@@ -43,17 +69,9 @@ import { childSandboxReadySignal } from "./signals";
  */
 export const DEFAULT_SUBAGENT_WORKFLOW_RUN_TIMEOUT: Duration = "1h";
 
-/** Normalized sandbox config after resolving the union. */
-interface ResolvedSandboxConfig {
-  source: "none" | "inherit" | "own";
-  init: "per-call" | "once";
-  continuation: "continue" | "fork" | "snapshot";
-  shutdown?: SubagentSandboxShutdown;
-}
-
 function resolveSandboxConfig(
   config?: SubagentSandboxConfig
-): ResolvedSandboxConfig {
+): ResolvedSubagentSandboxConfig {
   if (!config || config === "none") {
     return { source: "none", init: "per-call", continuation: "fork" };
   }
@@ -97,11 +115,31 @@ export function createSubagentHandler<
 } {
   const { taskQueue: parentTaskQueue } = workflowInfo();
 
-  /** Sandbox ops proxy per subagent, built eagerly from `sandbox.proxy` factories. */
-  const agentSandboxOps = new Map<string, SandboxOps>();
+  /**
+   * Sandbox ops proxy per subagent, built eagerly from `sandbox.proxy`
+   * factories.
+   *
+   * Split into two maps so each accepts only the cap-narrowed slice the
+   * parent actually consumes. `destroyOps` accepts every adapter (base
+   * `destroySandbox` is always present); `deleteSnapshotOps` is only
+   * populated for `continuation: "snapshot"` configs, and the
+   * `SubagentSandboxConfig` type guarantees the proxy carries
+   * `deleteSandboxSnapshot` when that continuation is selected.
+   */
+  const agentDestroyOps = new Map<string, ParentDestroyOps>();
+  const agentDeleteSnapshotOps = new Map<string, ParentDeleteSnapshotOps>();
   for (const cfg of subagents) {
-    if (cfg.sandbox && cfg.sandbox !== "none") {
-      agentSandboxOps.set(cfg.agentName, cfg.sandbox.proxy(cfg.agentName));
+    const cfgSandbox = cfg.sandbox;
+    if (!cfgSandbox || cfgSandbox === "none") continue;
+    if (cfgSandbox.continuation === "snapshot") {
+      // Pull the proxy here so the per-branch narrowing keeps
+      // `deleteSandboxSnapshot` in the inferred return type.
+      const proxy = cfgSandbox.proxy(cfg.agentName);
+      agentDestroyOps.set(cfg.agentName, proxy);
+      agentDeleteSnapshotOps.set(cfg.agentName, proxy);
+    } else {
+      const proxy = cfgSandbox.proxy(cfg.agentName);
+      agentDestroyOps.set(cfg.agentName, proxy);
     }
   }
 
@@ -183,7 +221,7 @@ export function createSubagentHandler<
 
     if (
       sandboxCfg.source !== "none" &&
-      !agentSandboxOps.has(config.agentName)
+      !agentDestroyOps.has(config.agentName)
     ) {
       throw ApplicationFailure.create({
         message: `Subagent "${config.agentName}" uses a sandbox but no \`sandbox.proxy\` is configured on its SubagentConfig`,
@@ -273,7 +311,6 @@ export function createSubagentHandler<
       if (baseSnap) {
         sandbox = { mode: "from-snapshot", snapshot: baseSnap };
       }
-      sandboxShutdownOverride = "snapshot";
     } else if (sandboxCfg.source === "own") {
       const isLazy = sandboxCfg.init === "once";
 
@@ -319,31 +356,16 @@ export function createSubagentHandler<
           sandboxId: baseSandboxId,
         };
       }
+    }
 
-      // Ensure the sandbox survives for future continuation/fork:
-      // - first lazy call (creator): pause-until-parent-close so parent can clean up
-      // - continuation=continue: sandbox must survive for next call
-      // - lazy+fork (non-creator): template must survive for future forks
-      //
-      // Skip the override when the user already configured a *-until-parent-close
-      // shutdown — that already guarantees survival.
-      const userShutdown = sandboxCfg.shutdown;
-      const alreadySurvives =
-        userShutdown === "pause-until-parent-close" ||
-        userShutdown === "keep-until-parent-close" ||
-        userShutdown === "pause" ||
-        userShutdown === "keep";
-
-      const mustSurvive =
-        isLazyCreator ||
-        sandboxCfg.continuation === "continue" ||
-        (isLazy && sandboxCfg.continuation === "fork");
-
-      if (mustSurvive && !alreadySurvives) {
-        sandboxShutdownOverride = isLazyCreator
-          ? "pause-until-parent-close"
-          : "pause";
-      }
+    // Resolve the lifecycle decision (auto-inject pause/snapshot, etc.)
+    // through the SSOT — same table the type-level `SubagentRequiredCaps`
+    // reads. Adding a new branch here means changing both. The matrix
+    // in `src/lib/sandbox/capability-types.test.ts` enforces the
+    // type-level / runtime agreement.
+    {
+      const lifecycle = resolveSubagentLifecycle(sandboxCfg, isLazyCreator);
+      sandboxShutdownOverride = lifecycle.shutdownOverride;
     }
 
     const workflowInput: SubagentWorkflowInput = {
@@ -556,7 +578,7 @@ export function createSubagentHandler<
     pendingDestroys.clear();
     await Promise.all(
       entries.map(async ({ agentName, sandboxId }) => {
-        const ops = agentSandboxOps.get(agentName);
+        const ops = agentDestroyOps.get(agentName);
         if (!ops) {
           log.warn(
             "Skipping sandbox destroy — no sandbox.proxy registered for agent",
@@ -588,7 +610,7 @@ export function createSubagentHandler<
 
     await Promise.all(
       tagged.map(async ({ agentName, snapshot }) => {
-        const ops = agentSandboxOps.get(agentName);
+        const ops = agentDeleteSnapshotOps.get(agentName);
         if (!ops) {
           log.warn(
             "Skipping snapshot delete — no sandbox.proxy registered for agent",

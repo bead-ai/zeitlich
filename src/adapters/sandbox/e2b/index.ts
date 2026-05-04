@@ -6,6 +6,7 @@ import {
 import type {
   Sandbox,
   SandboxCapabilities,
+  SandboxCapability,
   SandboxCreateResult,
   SandboxProvider,
   SandboxSnapshot,
@@ -80,16 +81,30 @@ class E2bSandboxImpl implements Sandbox {
 // E2bSandboxProvider
 // ============================================================================
 
-export class E2bSandboxProvider implements SandboxProvider<
-  E2bSandboxCreateOptions,
-  E2bSandbox
-> {
+/**
+ * Single source of truth for the E2B adapter's capability set. Both the
+ * runtime `supportedCapabilities` set and the type-level `TCaps` flow
+ * out of this array, so the two surfaces cannot drift.
+ */
+export const E2B_CAPS = [
+  "pause",
+  "resume",
+  "snapshot",
+  "restore",
+  "fork",
+] as const satisfies readonly SandboxCapability[];
+export type E2bCaps = (typeof E2B_CAPS)[number];
+
+export class E2bSandboxProvider
+  implements SandboxProvider<E2bSandboxCreateOptions, E2bSandbox, E2bCaps>
+{
   readonly id = "e2b";
   readonly capabilities: SandboxCapabilities = {
     filesystem: true,
     execution: true,
     persistence: true,
   };
+  readonly supportedCapabilities: ReadonlySet<E2bCaps> = new Set(E2B_CAPS);
 
   private readonly defaultTemplate?: string;
   private readonly defaultWorkspaceBase: string;
@@ -193,7 +208,7 @@ export class E2bSandboxProvider implements SandboxProvider<
   async restore(
     snapshot: SandboxSnapshot,
     options?: E2bSandboxCreateOptions
-  ): Promise<Sandbox> {
+  ): Promise<E2bSandbox> {
     const data = snapshot.data as { snapshotId?: string } | null;
     if (!data?.snapshotId) {
       throw new SandboxNotSupportedError(
@@ -222,7 +237,7 @@ export class E2bSandboxProvider implements SandboxProvider<
   async fork(
     sandboxId: string,
     options?: E2bSandboxCreateOptions
-  ): Promise<Sandbox> {
+  ): Promise<E2bSandbox> {
     const { snapshotId } = await E2bSdkSandbox.createSnapshot(sandboxId);
     const sdkOpts = this.buildSdkCreateOpts(options);
     const sdkSandbox = await E2bSdkSandbox.create(snapshotId, sdkOpts);

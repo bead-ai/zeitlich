@@ -22,6 +22,7 @@ export type {
   PrefixedThreadOps,
   ScopedPrefix,
   SessionConfig,
+  SessionRequiredCaps,
 } from "./lib/session";
 export { defineWorkflow } from "./lib/workflow";
 export type {
@@ -169,6 +170,7 @@ export type {
   SubagentHooks,
   SubagentHandlerResponse,
   SubagentSandboxConfig,
+  SubagentContinuationCaps,
   SubagentWorkflow,
   SubagentWorkflowInput,
   SubagentSessionInput,
@@ -177,6 +179,7 @@ export type {
 export type {
   Sandbox,
   SandboxCapabilities,
+  SandboxCapability,
   SandboxCreateOptions,
   SandboxCreateResult,
   SandboxFileSystem,

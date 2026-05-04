@@ -5,6 +5,7 @@ export type {
   PrefixedThreadOps,
   ScopedPrefix,
   SessionConfig,
+  SessionRequiredCaps,
   SessionResult,
   ZeitlichSession,
 } from "./types";
