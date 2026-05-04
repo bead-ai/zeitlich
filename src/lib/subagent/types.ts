@@ -746,5 +746,13 @@ export interface SubagentSessionInput {
     sandboxId?: string;
     snapshot?: SandboxSnapshot;
     threadId: string;
+    usage: {
+      totalInputTokens: number;
+      totalOutputTokens: number;
+      totalCachedWriteTokens: number;
+      totalCachedReadTokens: number;
+      totalReasonTokens: number;
+      turns: number;
+    };
   }) => void;
 }

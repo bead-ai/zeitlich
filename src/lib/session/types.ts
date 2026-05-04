@@ -1,4 +1,3 @@
-import type { Duration } from "@temporalio/common";
 import type { SessionExitReason, ToolResultConfig } from "../types";
 import type {
   ToolMap,
@@ -336,8 +335,6 @@ export interface SessionConfig<
    * Returns SDK-native content for the initial human message.
    */
   buildContextMessage: () => TContent | Promise<TContent>;
-  /** How long to wait for input before cancelling the workflow */
-  waitForInputTimeout?: Duration;
 
   // ---------------------------------------------------------------------------
   // Thread lifecycle
@@ -424,6 +421,14 @@ export interface SessionConfig<
     threadId: string;
     sandboxId?: string;
     snapshot?: SandboxSnapshot;
+    usage: {
+      totalInputTokens: number;
+      totalOutputTokens: number;
+      totalCachedWriteTokens: number;
+      totalCachedReadTokens: number;
+      totalReasonTokens: number;
+      turns: number;
+    };
   }) => void;
 
   // ---------------------------------------------------------------------------

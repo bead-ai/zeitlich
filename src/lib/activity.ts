@@ -32,6 +32,11 @@ export async function queryParentWorkflowState<T>(
   client: WorkflowClient
 ): Promise<T> {
   const { workflowExecution } = Context.current().info;
+
+  if (!workflowExecution) {
+    throw new Error("No workflow execution found");
+  }
+
   const handle = client.getHandle(
     workflowExecution.workflowId,
     workflowExecution.runId

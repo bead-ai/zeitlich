@@ -1,5 +1,4 @@
 import {
-  condition,
   defineUpdate,
   setHandler,
   ApplicationFailure,
@@ -137,7 +136,6 @@ export async function createSession<
     processToolsInParallel = true,
     hooks = {},
     appendSystemPrompt = true,
-    waitForInputTimeout = "48h",
     threadKey,
     sandboxOps,
     thread: threadInit,
@@ -589,19 +587,6 @@ export async function createSession<
 
           // Turn committed: fresh id for the next turn.
           assistantId = undefined;
-
-          if (stateManager.getStatus() === "WAITING_FOR_INPUT") {
-            const conditionMet = await condition(
-              () => stateManager.getStatus() === "RUNNING",
-              waitForInputTimeout
-            );
-            if (!conditionMet) {
-              stateManager.cancel();
-              exitReason = "cancelled";
-              await condition(() => false, "2s");
-              break;
-            }
-          }
         }
 
         if (stateManager.getTurns() >= maxTurns && stateManager.isRunning()) {
@@ -691,6 +676,7 @@ export async function createSession<
           ...(sandboxId && { sandboxId }),
           ...(exitSnapshot && { snapshot: exitSnapshot }),
           threadId,
+          usage: stateManager.getTotalUsage(),
         });
       }
 

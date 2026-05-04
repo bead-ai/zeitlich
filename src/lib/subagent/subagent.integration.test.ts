@@ -2602,6 +2602,7 @@ describe("defineSubagentWorkflow", () => {
           sandboxId: "sb-1",
           snapshot,
           threadId: "t",
+          usage: { totalInputTokens: 0, totalOutputTokens: 0, totalCachedWriteTokens: 0, totalCachedReadTokens: 0, totalReasonTokens: 0, turns: 0 },
         });
         return { toolResponse: "ok", data: null, threadId: "t" };
       }
@@ -2625,6 +2626,7 @@ describe("defineSubagentWorkflow", () => {
             createdAt: new Date().toISOString(),
           },
           threadId: "t",
+          usage: { totalInputTokens: 0, totalOutputTokens: 0, totalCachedWriteTokens: 0, totalCachedReadTokens: 0, totalReasonTokens: 0, turns: 0 },
         });
         return {
           toolResponse: "ok",
