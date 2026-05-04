@@ -2,6 +2,49 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.41](https://github.com/bead-ai/zeitlich/compare/v0.2.40...v0.2.41) (2026-05-04)
+
+
+### ⚠ BREAKING CHANGES
+
+* **deps:** Consumers must now explicitly install @temporalio/workflow, @temporalio/common, and @temporalio/plugin in their own package.json. Most already do (they're Temporal apps), but this is technically a breaking change to zeitlich's install surface.
+
+### Features
+
+* **deps:** move @temporalio/* from regular deps to peer deps ([e565921](https://github.com/bead-ai/zeitlich/commit/e565921583d6bd3f6e64f7b0915c6d324fd332a3))
+* **sandbox/e2b:** add keepAliveMs to refresh sandbox lifetime on get() ([95ae072](https://github.com/bead-ai/zeitlich/commit/95ae07224609d80ee00c0e091d771e3cb81739b7))
+* **sandbox/e2b:** refresh sandbox lifetime on every provider.get() ([cda30f3](https://github.com/bead-ai/zeitlich/commit/cda30f31f209003366ebad035712064268631c01))
+* **session:** add usage tracking to session and subagent workflow ([856cfa7](https://github.com/bead-ai/zeitlich/commit/856cfa78eaffc85b140bbf71893b8e1498d129a0))
+* **tool-router:** allow custom sandboxNotFoundToolResponse ([72eefd7](https://github.com/bead-ai/zeitlich/commit/72eefd7a45c3c24305e08398995abffaa126b51f))
+* **tool-router:** opt-in translation of SandboxNotFoundError in withSandbox ([6c3c242](https://github.com/bead-ai/zeitlich/commit/6c3c2428c993fcf9349389d4d492b66290bd060c))
+
+
+### Bug Fixes
+
+* **deps:** drop unused @temporalio/plugin peer dep ([51c82af](https://github.com/bead-ai/zeitlich/commit/51c82afc2a84ddfbe41fc534ca0c3e696f3e567c))
+* **sandbox/e2b:** honour per-call keepAliveMs in restore() and fork() ([d995bde](https://github.com/bead-ai/zeitlich/commit/d995bdeae75fcf58733a1bd6dc6985aa6d76e073))
+* **sandbox/e2b:** narrow connect() catch to genuine not-found errors ([81b9023](https://github.com/bead-ai/zeitlich/commit/81b9023710da31e238a4ff72c4ff4b85d92b35a1))
+* **skills:** embed skill resourceContents on file tree entries ([34e14f8](https://github.com/bead-ai/zeitlich/commit/34e14f8af9f6e42485c671da3f7a5373a042cd1e))
+* **skills:** embed skill resourceContents on file tree entries ([8755d27](https://github.com/bead-ai/zeitlich/commit/8755d27f13d8b374cb02c97b315c823305ed9eb6))
+* stop halting workflow when waiting ([7ab652b](https://github.com/bead-ai/zeitlich/commit/7ab652b128db2646c030d1b3736a37b760e3c5f0))
+* **tool-router:** rewrite SandboxNotFound tool response message ([41fab85](https://github.com/bead-ai/zeitlich/commit/41fab85c3e3c6268c4018429d74eded898742c69))
+
+
+### Code Refactoring
+
+* **sandbox/e2b:** drop per-create keepAliveMs override ([86d3776](https://github.com/bead-ai/zeitlich/commit/86d3776859ca936e40c0b2c83398ae13a01c1aa7))
+
+
+### Documentation
+
+* **sandbox/e2b:** clarify connect() timeoutMs is monotonic-extend ([305613d](https://github.com/bead-ai/zeitlich/commit/305613dc1fa82a0f94ae7d055e965493a0b11da5))
+* **sandbox/e2b:** clarify timeoutMs is a lifetime, not an idle timeout ([57baa16](https://github.com/bead-ai/zeitlich/commit/57baa16403eccf49266fb2ebc55f26c9d77197fe))
+
+
+### Miscellaneous Chores
+
+* release 0.2.41 ([9046444](https://github.com/bead-ai/zeitlich/commit/90464448801828cab4af842439a51367ca605b25))
+
 ## [0.2.40](https://github.com/bead-ai/zeitlich/compare/v0.2.39...v0.2.40) (2026-04-23)
 
 
