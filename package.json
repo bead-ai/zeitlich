@@ -156,26 +156,6 @@
         "types": "./dist/adapters/sandbox/e2b/workflow.d.ts",
         "default": "./dist/adapters/sandbox/e2b/workflow.js"
       }
-    },
-    "./adapters/sandbox/bedrock": {
-      "import": {
-        "types": "./dist/adapters/sandbox/bedrock/index.d.ts",
-        "default": "./dist/adapters/sandbox/bedrock/index.js"
-      },
-      "require": {
-        "types": "./dist/adapters/sandbox/bedrock/index.d.ts",
-        "default": "./dist/adapters/sandbox/bedrock/index.js"
-      }
-    },
-    "./adapters/sandbox/bedrock/workflow": {
-      "import": {
-        "types": "./dist/adapters/sandbox/bedrock/workflow.d.ts",
-        "default": "./dist/adapters/sandbox/bedrock/workflow.js"
-      },
-      "require": {
-        "types": "./dist/adapters/sandbox/bedrock/workflow.d.ts",
-        "default": "./dist/adapters/sandbox/bedrock/workflow.js"
-      }
     }
   },
   "files": [
@@ -221,7 +201,6 @@
   },
   "devDependencies": {
     "@anthropic-ai/sdk": "^0.93.0",
-    "@aws-sdk/client-bedrock-agentcore": "^3.900.0",
     "@daytonaio/sdk": "^0.171.0",
     "@e2b/code-interpreter": "^2.3.3",
     "@eslint/js": "^10.0.1",
@@ -244,7 +223,6 @@
   },
   "peerDependencies": {
     "@anthropic-ai/sdk": ">=0.50.0",
-    "@aws-sdk/client-bedrock-agentcore": "^3.900.0",
     "@daytonaio/sdk": ">=0.153.0",
     "@e2b/code-interpreter": "^2.3.3",
     "@google/genai": "^1.43.0",
@@ -257,9 +235,6 @@
     "just-bash": ">=2.0.0"
   },
   "peerDependenciesMeta": {
-    "@aws-sdk/client-bedrock-agentcore": {
-      "optional": true
-    },
     "@daytonaio/sdk": {
       "optional": true
     },

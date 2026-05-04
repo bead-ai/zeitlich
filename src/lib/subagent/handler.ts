@@ -6,6 +6,7 @@ import {
   ApplicationFailure,
   executeChild,
 } from "@temporalio/workflow";
+import type { Duration } from "@temporalio/common";
 import { getShortId } from "../thread/id";
 import type { ToolHandlerResponse, RouterContext } from "../tool-router";
 import type { JsonValue } from "../state/types";
@@ -31,7 +32,6 @@ import type {
   SandboxSnapshot,
 } from "../sandbox/types";
 import { childSandboxReadySignal } from "./signals";
-import type { Duration } from "@temporalio/common";
 
 /**
  * Methods the parent's subagent handler invokes on a subagent's `proxy`.

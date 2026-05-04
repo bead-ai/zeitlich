@@ -29,7 +29,6 @@ import type {
 } from "./types";
 import { InMemorySandboxProvider } from "../../adapters/sandbox/inmemory/index";
 import { DaytonaSandboxProvider } from "../../adapters/sandbox/daytona/index";
-import { BedrockSandboxProvider } from "../../adapters/sandbox/bedrock/index";
 import type { E2bSandboxProvider } from "../../adapters/sandbox/e2b/index";
 
 // ---------------------------------------------------------------------------
@@ -82,17 +81,6 @@ function _daytonaCallsRejected(p: DaytonaSandboxProvider): void {
   void p.fork("id");
   // @ts-expect-error daytona declares `TCaps = never`, so `deleteSnapshot` is gone
   void p.deleteSnapshot({} as SandboxSnapshot);
-}
-
-function _bedrockCallsRejected(p: BedrockSandboxProvider): void {
-  void p.create();
-  void p.destroy("id");
-  // @ts-expect-error bedrock declares `TCaps = never`, so `pause` is gone
-  void p.pause("id");
-  // @ts-expect-error bedrock declares `TCaps = never`, so `snapshot` is gone
-  void p.snapshot("id");
-  // @ts-expect-error bedrock declares `TCaps = never`, so `fork` is gone
-  void p.fork("id");
 }
 
 function _narrowOpsRejected(
@@ -225,14 +213,6 @@ describe("SandboxCapability fixture — type ↔ runtime alignment", () => {
     expect([...daytona.supportedCapabilities]).toEqual([]);
   });
 
-  it("BedrockSandboxProvider's runtime supportedCapabilities is empty", () => {
-    const bedrock = new BedrockSandboxProvider({
-      codeInterpreterIdentifier: "noop",
-    });
-    expect(bedrock.supportedCapabilities.size).toBe(0);
-    expect([...bedrock.supportedCapabilities]).toEqual([]);
-  });
-
   it("partial-cap provider's runtime set matches its declared TCaps", () => {
     const partial = new FakePausableProvider();
     expect([...partial.supportedCapabilities].sort()).toEqual(
@@ -322,7 +302,6 @@ class _ImplWithoutDeclProvider {
 
 import type { SubagentSandboxConfig } from "../subagent/types";
 import { proxyDaytonaSandboxOps } from "../../adapters/sandbox/daytona/proxy";
-import { proxyBedrockSandboxOps } from "../../adapters/sandbox/bedrock/proxy";
 import { proxyE2bSandboxOps } from "../../adapters/sandbox/e2b/proxy";
 import { proxyInMemorySandboxOps } from "../../adapters/sandbox/inmemory/proxy";
 
@@ -351,12 +330,6 @@ function _subagentMatrix(): void {
     continuation: "continue",
     proxy: proxyDaytonaSandboxOps,
   });
-  // @ts-expect-error pauseSandbox missing — auto-injection on continue requires "pause"
-  subagentCfg({
-    source: "own",
-    continuation: "continue",
-    proxy: proxyBedrockSandboxOps,
-  });
   subagentCfg({
     source: "own",
     continuation: "continue",
@@ -374,12 +347,6 @@ function _subagentMatrix(): void {
     continuation: "continue",
     shutdown: "keep",
     proxy: proxyDaytonaSandboxOps,
-  });
-  subagentCfg({
-    source: "own",
-    continuation: "continue",
-    shutdown: "keep",
-    proxy: proxyBedrockSandboxOps,
   });
   subagentCfg({
     source: "own",
@@ -423,13 +390,6 @@ function _subagentMatrix(): void {
     init: "per-call",
     // @ts-expect-error forkSandbox missing — continuation: "fork" requires "fork"
     proxy: proxyDaytonaSandboxOps,
-  });
-  subagentCfg({
-    source: "own",
-    continuation: "fork",
-    init: "per-call",
-    // @ts-expect-error forkSandbox missing — continuation: "fork" requires "fork"
-    proxy: proxyBedrockSandboxOps,
   });
   subagentCfg({
     source: "own",
@@ -481,12 +441,6 @@ function _subagentMatrix(): void {
     continuation: "snapshot",
     // @ts-expect-error snapshotSandbox / restoreSandbox / deleteSandboxSnapshot missing
     proxy: proxyDaytonaSandboxOps,
-  });
-  subagentCfg({
-    source: "own",
-    continuation: "snapshot",
-    // @ts-expect-error snapshotSandbox / restoreSandbox / deleteSandboxSnapshot missing
-    proxy: proxyBedrockSandboxOps,
   });
 
   // ===============================================================
@@ -760,12 +714,6 @@ function _sessionMatrix(): void {
     // @ts-expect-error broad alias requires wide caps; daytona is narrow. Pin generics to get narrow caps.
     sandboxOps: proxyDaytonaSandboxOps("scope"),
   };
-  const _defaultBedrock: SessionConfig<ToolMap, unknown, string> = {
-    ...base,
-    // @ts-expect-error broad alias requires wide caps; bedrock is narrow. Pin generics to get narrow caps.
-    sandboxOps: proxyBedrockSandboxOps("scope"),
-  };
-
   // --- Annotated alias with pinned generics is the documented path
   // for narrow caps when type-annotating a reusable config. With
   // `{ mode: "new" }` + `"destroy"` pinned, no gated cap is required
@@ -832,7 +780,6 @@ function _sessionMatrix(): void {
     _continueResumeDaytona,
     _continueDestroyDaytona,
     _defaultDaytona,
-    _defaultBedrock,
     _defaultE2b,
     _forkOnlyDaytona,
     _pauseOnlyDaytona,
