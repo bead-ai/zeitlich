@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.42](https://github.com/bead-ai/zeitlich/compare/v0.2.41...v0.2.42) (2026-05-05)
+
+
+### Bug Fixes
+
+* **subagent:** type DEFAULT_SUBAGENT_WORKFLOW_RUN_TIMEOUT as Duration ([3b78feb](https://github.com/bead-ai/zeitlich/commit/3b78feb2faa0a9646d41ef420417192ea2123914))
+
 ## [0.2.41](https://github.com/bead-ai/zeitlich/compare/v0.2.40...v0.2.41) (2026-05-04)
 
 
