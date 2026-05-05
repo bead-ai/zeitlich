@@ -5,9 +5,25 @@ All notable changes to this project will be documented in this file.
 ## [0.2.42](https://github.com/bead-ai/zeitlich/compare/v0.2.41...v0.2.42) (2026-05-05)
 
 
+### ⚠ BREAKING CHANGES
+
+* **sandbox:** `SandboxProvider` / `SandboxOps` are now generic over a `TCaps` capability set. Cells that can't execute at runtime (e.g. `daytona` paired with a `fork` continuation) now fail to typecheck at the `defineSubagent` / `createSession` site instead of throwing at runtime. Adapters and proxy factories are typed accordingly; see [#109](https://github.com/bead-ai/zeitlich/pull/109).
+* **sandbox:** drop the bedrock (Code Interpreter) adapter. Removes the `./adapters/sandbox/bedrock` and `./adapters/sandbox/bedrock/workflow` subpath exports and the `@aws-sdk/client-bedrock-agentcore` peer dependency; see [#108](https://github.com/bead-ai/zeitlich/pull/108).
+
+
+### Features
+
+* **sandbox:** capability-generic `SandboxProvider` / `SandboxOps` contracts ([#109](https://github.com/bead-ai/zeitlich/pull/109))
+
+
 ### Bug Fixes
 
 * **subagent:** type DEFAULT_SUBAGENT_WORKFLOW_RUN_TIMEOUT as Duration ([3b78feb](https://github.com/bead-ai/zeitlich/commit/3b78feb2faa0a9646d41ef420417192ea2123914))
+
+
+### Miscellaneous Chores
+
+* **sandbox:** remove bedrock adapter + restore main typecheck ([#108](https://github.com/bead-ai/zeitlich/pull/108))
 
 ## [0.2.41](https://github.com/bead-ai/zeitlich/compare/v0.2.40...v0.2.41) (2026-05-04)
 
