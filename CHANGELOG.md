@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.43](https://github.com/bead-ai/zeitlich/compare/v0.2.42...v0.2.43) (2026-05-19)
+
+
+### Features
+
+* **state:** add functionality to strip runtime fields from persisted slice ([015ac91](https://github.com/bead-ai/zeitlich/commit/015ac91f22aee9728d709184831ef055fe76bf8c))
+
+
+### Bug Fixes
+
+* **session:** update session exit reason for WAITING_FOR_INPUT state ([521c770](https://github.com/bead-ai/zeitlich/commit/521c770ec092167fac1c75f6c469583661702b1a))
+
+
+### Miscellaneous Chores
+
+* release 0.2.43 ([10588b3](https://github.com/bead-ai/zeitlich/commit/10588b3a9a9f45dbd5bf7abcd0067f240f9a5c2f))
+
 ## [0.2.42](https://github.com/bead-ai/zeitlich/compare/v0.2.41...v0.2.42) (2026-05-05)
 
 
