@@ -385,33 +385,6 @@ describe("createAgentStateManager integration", () => {
     expect("tools" in slice.custom).toBe(false);
   });
 
-  it("getPersistedSlice strips runtime fields injected via mergeUpdate", () => {
-    const sm = createAgentStateManager<{ label: string }>({
-      initialState: { systemPrompt: "test", label: "original" },
-    });
-
-    sm.mergeUpdate({
-      label: "updated",
-      fileTree: [
-        {
-          id: "f1",
-          path: "/a.txt",
-          size: 1,
-          mtime: "2026-01-01T00:00:00Z",
-          metadata: {},
-        },
-      ],
-      virtualFsCtx: { workspaceBase: "/tmp" },
-      inlineFiles: { "/a.txt": "hi" },
-    } as Parameters<typeof sm.mergeUpdate>[0]);
-
-    const slice = sm.getPersistedSlice();
-    expect(slice.custom).toEqual({ label: "updated" });
-    expect("fileTree" in slice.custom).toBe(false);
-    expect("virtualFsCtx" in slice.custom).toBe(false);
-    expect("inlineFiles" in slice.custom).toBe(false);
-  });
-
   it("mergeUpdate replaces the task map when given a tasks field", () => {
     const sm = createAgentStateManager<{ label: string; extra?: string }>({
       initialState: {

@@ -176,9 +176,18 @@ describe("createSession edge cases", () => {
     idCounter = 0;
   });
 
-  // --- WAITING_FOR_INPUT flow (condition returns false = timeout) ---
+  // NOTE: a previous test here ("cancels session when WAITING_FOR_INPUT
+  // times out") covered the condition-based wait + cancel-on-timeout flow
+  // that was removed in 7ab652b ("fix: stop halting workflow when
+  // waiting"). The session loop now exits cleanly the moment a tool puts
+  // the agent into WAITING_FOR_INPUT — there is no internal timeout to
+  // assert against — so the test was deleted rather than rewritten. The
+  // assertion below covers the surviving contract: the exit reason
+  // reflects the WAITING_FOR_INPUT state instead of the default
+  // "completed", so callers can distinguish a finished session from a
+  // parked one.
 
-  it("cancels session when WAITING_FOR_INPUT times out (condition returns false)", async () => {
+  it("exits with 'waiting_for_input' when a tool parks the session", async () => {
     const { ops } = createMockThreadOps();
     let endReason: string | undefined;
     const capturedRef: {
@@ -191,10 +200,7 @@ describe("createSession edge cases", () => {
       schema: z.object({}),
       handler: async (_args: Record<string, never>, _ctx: RouterContext) => {
         capturedRef.stateManager?.waitForInput();
-        return {
-          toolResponse: "Please provide input.",
-          data: null,
-        };
+        return { toolResponse: "Please provide input.", data: null };
       },
     });
 
@@ -224,9 +230,9 @@ describe("createSession edge cases", () => {
 
     const result = await session.runSession({ stateManager });
 
-    expect(result.exitReason).toBe("cancelled");
-    expect(result.finalMessage).toBeNull();
-    expect(endReason).toBe("cancelled");
+    expect(result.exitReason).toBe("waiting_for_input");
+    expect(endReason).toBe("waiting_for_input");
+    expect(stateManager.getStatus()).toBe("WAITING_FOR_INPUT");
   });
 
   // --- All tool calls are invalid ---

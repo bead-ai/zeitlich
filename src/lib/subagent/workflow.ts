@@ -168,9 +168,8 @@ export function defineSubagentWorkflow(
 
     // Auto-forward sandbox outputs captured from the session so user code
     // never has to thread them through manually. Explicit values on the fn
-    // result take precedence.
+    // result take precedence, so spread `result` LAST.
     return {
-      ...result,
       ...(capturedThreadId !== undefined && { threadId: capturedThreadId }),
       ...(capturedSandboxId !== undefined && { sandboxId: capturedSandboxId }),
       ...(capturedSnapshot !== undefined && { snapshot: capturedSnapshot }),
@@ -178,6 +177,7 @@ export function defineSubagentWorkflow(
         baseSnapshot: capturedBaseSnapshot,
       }),
       ...(capturedUsage !== undefined && { usage: capturedUsage }),
+      ...result,
     };
   };
 

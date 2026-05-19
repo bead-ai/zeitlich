@@ -596,6 +596,14 @@ export async function createSession<
             threadId,
             maxTurns,
           });
+        } else if (stateManager.getStatus() === "WAITING_FOR_INPUT") {
+          // A tool put the agent into WAITING_FOR_INPUT (e.g. an AskUser
+          // tool). The loop's `isRunning()` guard then exited cleanly; we
+          // report a dedicated exit reason rather than the misleading
+          // default `"completed"`, so callers can distinguish a finished
+          // session from one parked waiting on external input.
+          exitReason = "waiting_for_input";
+          log.info("session waiting for input", { agentName, threadId });
         }
       } catch (error) {
         exitReason = "failed";
