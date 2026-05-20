@@ -163,8 +163,7 @@ export async function createSession<
     unknown,
     SandboxCapability
   >;
-  const wideOps = (): WideSandboxOps =>
-    sandboxOps as unknown as WideSandboxOps;
+  const wideOps = (): WideSandboxOps => sandboxOps as unknown as WideSandboxOps;
   // ---------------------------------------------------------------------------
   // Thread resolution
   // ---------------------------------------------------------------------------
@@ -276,10 +275,7 @@ export async function createSession<
       // defaults are. Both surfaces consult `resolveSessionLifecycle`
       // (or its type-level equivalent) before checking individual
       // mode/shutdown values.
-      const lifecycle = resolveSessionLifecycle(
-        sandboxInit,
-        sandboxShutdown
-      );
+      const lifecycle = resolveSessionLifecycle(sandboxInit, sandboxShutdown);
       const sandboxMode: SandboxInit["mode"] | undefined = lifecycle.mode;
       const resolvedShutdown: SubagentSandboxShutdown = lifecycle.shutdown;
       let sandboxId: string | undefined;
@@ -383,22 +379,6 @@ export async function createSession<
         });
       }
 
-      if (hooks.onSessionStart) {
-        await hooks.onSessionStart({
-          threadId,
-          agentName,
-          metadata,
-        });
-      }
-
-      log.info("session started", {
-        agentName,
-        threadId,
-        threadMode,
-        maxTurns,
-        ...(sandboxId && { sandboxId }),
-      });
-
       const sessionStartMs = Date.now();
       const systemPrompt = stateManager.getSystemPrompt();
 
@@ -489,6 +469,22 @@ export async function createSession<
 
       let exitReason: SessionExitReason = "completed";
       let finalMessage: M | null = null;
+
+      if (hooks.onSessionStart) {
+        await hooks.onSessionStart({
+          threadId,
+          agentName,
+          metadata,
+        });
+      }
+
+      log.info("session started", {
+        agentName,
+        threadId,
+        threadMode,
+        maxTurns,
+        ...(sandboxId && { sandboxId }),
+      });
 
       try {
         // Per-turn assistant message id. Pre-generated in the workflow
