@@ -41,6 +41,7 @@ const RESERVED_STATE_KEYS = [
   "virtualFsCtx",
   "totalInputTokens",
   "totalOutputTokens",
+  "totalReasonTokens",
   "cachedWriteTokens",
   "cachedReadTokens",
 ] as const;
