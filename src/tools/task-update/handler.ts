@@ -64,7 +64,7 @@ export function createTaskUpdateHandler<
     stateManager.setTask(task);
 
     return {
-      toolResponse: JSON.stringify(task, null, 2),
+      toolResponse: `Task ${task.id} updated`,
       data: task,
     };
   };
