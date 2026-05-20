@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.45](https://github.com/bead-ai/zeitlich/compare/v0.2.44...v0.2.45) (2026-05-20)
+
+
+### Bug Fixes
+
+* onSessionStart after hydration ([2a15f62](https://github.com/bead-ai/zeitlich/commit/2a15f6275a91ccdf92df161af1ac72f72604d5b9))
+
+
+### Miscellaneous Chores
+
+* release 0.2.45 ([9658918](https://github.com/bead-ai/zeitlich/commit/96589182b888a80290fdf6566026a749b46a7fb6))
+
 ## [0.2.44](https://github.com/bead-ai/zeitlich/compare/v0.2.43...v0.2.44) (2026-05-20)
 
 
