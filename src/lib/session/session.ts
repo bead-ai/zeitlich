@@ -383,46 +383,6 @@ export async function createSession<
         });
       }
 
-      // --- Virtual filesystem init (independent of sandbox) ----------------
-      if (virtualFsConfig) {
-        if (!virtualFsOps) {
-          throw ApplicationFailure.create({
-            message: "No virtualFsOps provided — cannot resolve file tree",
-            nonRetryable: true,
-          });
-        }
-        const result = await virtualFsOps.resolveFileTree(virtualFsConfig.ctx);
-        const skillFiles = skills ? collectSkillFiles(skills) : undefined;
-        const fileTree = skillFiles
-          ? [
-              ...result.fileTree,
-              ...Object.entries(skillFiles).map(([path, content]) => ({
-                id: `skill:${path}`,
-                path,
-                size: content.length,
-                mtime: new Date().toISOString(),
-                metadata: {},
-                // Carry the content directly on the entry so any handler that
-                // constructs a VirtualFileSystem from `fileTree` can read it
-                // without needing to also wire up `inlineFiles` from state.
-                inlineContent: content,
-              })),
-            ]
-          : result.fileTree;
-        stateManager.mergeUpdate({
-          fileTree,
-          virtualFsCtx: virtualFsConfig.ctx,
-          // `inlineFiles` is still the source of truth at read time:
-          // VirtualFileSystem checks the inlineFiles map first and only
-          // falls through to entry.inlineContent. Embedding the content on
-          // the entry is the migration target so that handlers building a
-          // VirtualFileSystem from `fileTree` alone (without forwarding
-          // `inlineFiles` from state) can read skill resources. Until a
-          // follow-up drops `inlineFiles`, both fields are populated.
-          ...(skillFiles && { inlineFiles: skillFiles }),
-        } as Partial<AgentState<TState>>);
-      }
-
       if (hooks.onSessionStart) {
         await hooks.onSessionStart({
           threadId,
@@ -474,6 +434,52 @@ export async function createSession<
           await initializeThread(threadId, threadKey);
         }
       }
+
+      // --- Virtual filesystem init (independent of sandbox) ----------------
+      // Runs AFTER thread rehydration so the freshly resolved tree is
+      // authoritative. Otherwise a stale `fileTree` carried in a persisted
+      // slice (from a run on older code that didn't strip it) could
+      // overwrite entries that no longer exist in the backing store and
+      // cause subsequent FileWrite calls to fail with "not_found".
+      if (virtualFsConfig) {
+        if (!virtualFsOps) {
+          throw ApplicationFailure.create({
+            message: "No virtualFsOps provided — cannot resolve file tree",
+            nonRetryable: true,
+          });
+        }
+        const result = await virtualFsOps.resolveFileTree(virtualFsConfig.ctx);
+        const skillFiles = skills ? collectSkillFiles(skills) : undefined;
+        const fileTree = skillFiles
+          ? [
+              ...result.fileTree,
+              ...Object.entries(skillFiles).map(([path, content]) => ({
+                id: `skill:${path}`,
+                path,
+                size: content.length,
+                mtime: new Date().toISOString(),
+                metadata: {},
+                // Carry the content directly on the entry so any handler that
+                // constructs a VirtualFileSystem from `fileTree` can read it
+                // without needing to also wire up `inlineFiles` from state.
+                inlineContent: content,
+              })),
+            ]
+          : result.fileTree;
+        stateManager.mergeUpdate({
+          fileTree,
+          virtualFsCtx: virtualFsConfig.ctx,
+          // `inlineFiles` is still the source of truth at read time:
+          // VirtualFileSystem checks the inlineFiles map first and only
+          // falls through to entry.inlineContent. Embedding the content on
+          // the entry is the migration target so that handlers building a
+          // VirtualFileSystem from `fileTree` alone (without forwarding
+          // `inlineFiles` from state) can read skill resources. Until a
+          // follow-up drops `inlineFiles`, both fields are populated.
+          ...(skillFiles && { inlineFiles: skillFiles }),
+        } as Partial<AgentState<TState>>);
+      }
+
       await appendHumanMessage(
         threadId,
         uuid4(),
