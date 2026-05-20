@@ -21,6 +21,32 @@ import type {
 import { z } from "zod";
 
 /**
+ * Fields that live on `AgentState` at runtime but must NOT be persisted into
+ * `PersistedThreadState`. They're either managed by the state manager itself
+ * (status/version/turns/tasks/tools/usage), kept in their own slot
+ * (systemPrompt), or rebuilt on each run (the virtual-fs trio).
+ *
+ * Centralizing the list keeps the constructor's destructure-omit and
+ * `getPersistedSlice` in lockstep.
+ */
+const RESERVED_STATE_KEYS = [
+  "status",
+  "version",
+  "turns",
+  "tasks",
+  "tools",
+  "systemPrompt",
+  "fileTree",
+  "inlineFiles",
+  "virtualFsCtx",
+  "totalInputTokens",
+  "totalOutputTokens",
+  "totalReasonTokens",
+  "cachedWriteTokens",
+  "cachedReadTokens",
+] as const;
+
+/**
  * Creates an agent state manager for tracking workflow state.
  * Automatically registers Temporal query and update handlers for the agent.
  *
@@ -238,9 +264,21 @@ export function createAgentStateManager<
     },
 
     getPersistedSlice(): PersistedThreadState {
+      // `customState` can pick up reserved/runtime fields via `mergeUpdate`
+      // (e.g. `fileTree`, `virtualFsCtx`, `inlineFiles` written by the
+      // virtual-fs bootstrap on every run). Those are rebuilt per run and
+      // must never round-trip through the thread store, so strip them here
+      // rather than relying on callers to remember.
+      const source = customState as unknown as Record<string, JsonValue>;
+      const custom: Record<string, JsonValue> = {};
+      const reserved = new Set<string>(RESERVED_STATE_KEYS);
+      for (const [key, value] of Object.entries(source)) {
+        if (reserved.has(key)) continue;
+        custom[key] = value;
+      }
       return {
         tasks: Array.from(tasks.entries()),
-        custom: { ...(customState as unknown as Record<string, JsonValue>) },
+        custom,
       };
     },
 
