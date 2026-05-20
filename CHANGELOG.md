@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.44](https://github.com/bead-ai/zeitlich/compare/v0.2.43...v0.2.44) (2026-05-20)
+
+
+### ⚠ BREAKING CHANGES
+
+* **session:** rehydrate no longer clobbers freshly resolved fileTree ([#114](https://github.com/bead-ai/zeitlich/issues/114))
+
+### Bug Fixes
+
+* **session:** rehydrate no longer clobbers freshly resolved fileTree ([#114](https://github.com/bead-ai/zeitlich/issues/114)) ([9af7294](https://github.com/bead-ai/zeitlich/commit/9af72943a72302462346cd32e48df4c5d5d76687))
+
+
+### Miscellaneous Chores
+
+* release 0.2.44 ([ee0258d](https://github.com/bead-ai/zeitlich/commit/ee0258de6bcb0cd30223db724f0162058fbc42ee))
+
 ## [0.2.43](https://github.com/bead-ai/zeitlich/compare/v0.2.42...v0.2.43) (2026-05-19)
 
 
