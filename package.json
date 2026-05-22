@@ -181,7 +181,8 @@
     "release:pr:dry": "release-please release-pr --repo-url=bead-ai/zeitlich --token=$GITHUB_TOKEN --dry-run",
     "release:github": "release-please github-release --repo-url=bead-ai/zeitlich --token=$GITHUB_TOKEN",
     "release:npm": "npm publish --access public",
-    "release:publish": "npm run release:github && npm run release:npm"
+    "release:publish": "npm run release:github && npm run release:npm",
+    "eval:edit": "node scripts/run-edit-tool-evals.mjs"
   },
   "keywords": [
     "ai",

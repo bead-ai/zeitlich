@@ -237,8 +237,8 @@ export { readFileTool } from "./tools/read-file/tool";
 export type { FileReadArgs } from "./tools/read-file/tool";
 export { writeFileTool } from "./tools/write-file/tool";
 export type { FileWriteArgs } from "./tools/write-file/tool";
-export { editTool } from "./tools/edit/tool";
-export type { FileEditArgs } from "./tools/edit/tool";
+export { editTool, multiEditTool } from "./tools/edit/tool";
+export type { FileEditArgs, FileMultiEditArgs } from "./tools/edit/tool";
 
 // Workflow task tools (state-only, no activities needed)
 export { taskCreateTool } from "./tools/task-create/tool";
