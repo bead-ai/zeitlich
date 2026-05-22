@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.0](https://github.com/bead-ai/zeitlich/compare/v0.2.45...v0.3.0) (2026-05-22)
+
+
+### Features
+
+* **thread:** tiered Redis + cold thread storage ([#118](https://github.com/bead-ai/zeitlich/issues/118)) ([6c8c88d](https://github.com/bead-ai/zeitlich/commit/6c8c88d6cb2cad4697b570203a6483ccfc75ff2a))
+
 ## [0.2.45](https://github.com/bead-ai/zeitlich/compare/v0.2.44...v0.2.45) (2026-05-20)
 
 
