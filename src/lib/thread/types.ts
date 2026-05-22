@@ -14,6 +14,17 @@ export interface ThreadManagerConfig<T> {
    * When provided, `append` uses an atomic Lua script to skip duplicate writes.
    */
   idOf?: (message: T) => string;
+  /**
+   * TTL (in seconds) applied to every Redis key the manager writes
+   * (the list, the meta marker, the state slice, and dedup markers).
+   *
+   * Defaults to {@link THREAD_TTL_SECONDS} (90 days) for back-compat.
+   * When the consumer pairs the thread manager with a durable cold
+   * tier (see `createTieredThreadManager`), a much shorter TTL — e.g.
+   * a few hours — is usually more appropriate since the cold tier is
+   * the source of truth and Redis is just a hot cache.
+   */
+  ttlSeconds?: number;
 }
 
 /** Generic thread manager for any message type */
@@ -26,6 +37,11 @@ export interface BaseThreadManager<T> {
    * Append messages to the thread.
    * When `idOf` is configured, appends are idempotent — retries with the
    * same message ids are atomically skipped via a Redis Lua script.
+   *
+   * Caveat with tiered storage: multi-message batches write one composite
+   * dedup key (`"m1:m2"`); snapshots only persist per-message keys, so a
+   * batch retried after `flush` → `hydrate` will not be deduped. Adapter
+   * helpers all single-append and are unaffected.
    */
   append(messages: T[]): Promise<void>;
   /**

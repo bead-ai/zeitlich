@@ -109,6 +109,28 @@ export interface ThreadOps<TContent = string> {
     state: PersistedThreadState,
     threadKey?: string
   ): Promise<void>;
+  /**
+   * Restore the thread's contents from the durable cold tier (if any)
+   * into Redis. Called once on session entry for `mode: "continue"`
+   * and `mode: "fork"` so the rest of the loop reads the freshest data.
+   *
+   * Adapters configured without a cold-store implementation treat this
+   * as a no-op. Implementations must be **idempotent** — Temporal
+   * retries the activity on transient failures, and a thread that is
+   * already hot must not be wiped.
+   */
+  hydrateThread(threadId: string, threadKey?: string): Promise<void>;
+  /**
+   * Archive the thread's contents to the durable cold tier and
+   * (optionally) drop the hot-tier Redis keys. Called once in the
+   * session's `finally` block on every exit path, after
+   * `saveThreadState`.
+   *
+   * Adapters configured without a cold-store implementation treat this
+   * as a no-op. Implementations must be **idempotent** — the cold
+   * tier is last-writer-wins and a retried flush must converge.
+   */
+  flushThread(threadId: string, threadKey?: string): Promise<void>;
 }
 
 /**

@@ -198,6 +198,8 @@ export async function createSession<
     forkThread,
     loadThreadState,
     saveThreadState,
+    hydrateThread,
+    flushThread,
   } = threadOps;
 
   const plugins: ToolMap[string][] = [];
@@ -391,10 +393,19 @@ export async function createSession<
       };
 
       if (threadMode === "fork" && sourceThreadId) {
+        // Pull the source thread from the cold tier into Redis (if a
+        // cold store is configured for this adapter) before the
+        // in-Redis fork copy runs. Hydrate is a no-op when the source
+        // is already hot or when no cold tier is wired.
+        await hydrateThread(sourceThreadId, threadKey);
         await forkThread(sourceThreadId, threadId, threadKey);
         const forkedSlice = await loadThreadState(threadId, threadKey);
         if (forkedSlice) rehydrateFromSlice(forkedSlice);
       } else if (threadMode === "continue") {
+        // Pull the thread from the cold tier into Redis before any
+        // appends. No-op when the thread is already hot or when no
+        // cold tier is wired.
+        await hydrateThread(threadId, threadKey);
         // "continue" — thread already exists, just append the new message
         const continuedSlice = await loadThreadState(threadId, threadKey);
         if (continuedSlice) rehydrateFromSlice(continuedSlice);
@@ -637,6 +648,24 @@ export async function createSession<
               persistError instanceof Error
                 ? persistError.message
                 : String(persistError),
+          });
+        }
+
+        // Archive the thread to the durable cold tier (S3 / R2 / etc.)
+        // after the state slice has been written. No-op when no cold
+        // store is wired into the adapter. Best-effort — failures
+        // must not mask the original exit reason and the thread is
+        // still readable from Redis via its TTL window.
+        try {
+          await flushThread(threadId, threadKey);
+        } catch (flushError) {
+          log.warn("failed to flush thread to cold tier", {
+            agentName,
+            threadId,
+            error:
+              flushError instanceof Error
+                ? flushError.message
+                : String(flushError),
           });
         }
 

@@ -56,5 +56,7 @@ export function createThreadOpsProxy(
     truncateThread: acts[p("truncateThread")],
     loadThreadState: acts[p("loadThreadState")],
     saveThreadState: acts[p("saveThreadState")],
+    hydrateThread: acts[p("hydrateThread")],
+    flushThread: acts[p("flushThread")],
   } as ActivityInterfaceFor<ThreadOps>;
 }

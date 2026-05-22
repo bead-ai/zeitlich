@@ -13,10 +13,13 @@ import type {
   ScopedPrefix,
 } from "../../../lib/session/types";
 import type { ModelInvoker } from "../../../lib/model";
+import { createTieredThreadManager } from "../../../lib/thread/tiered";
+import type { ColdThreadStore } from "../../../lib/thread/cold-store";
 import type { StoredMessage } from "@langchain/core/messages";
 import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
 import {
   createLangChainThreadManager,
+  storedMessageId,
   type LangChainContent,
   type LangChainSystemContent,
   type LangChainThreadManagerHooks,
@@ -35,6 +38,19 @@ export interface LangChainAdapterConfig {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   model?: BaseChatModel<any>;
   hooks?: LangChainThreadManagerHooks;
+  /**
+   * Optional durable cold tier (e.g. S3, R2, GCS). When provided,
+   * the session hydrates the thread on entry (`continue`/`fork`) and
+   * flushes it on every exit path. When omitted, the adapter is
+   * Redis-only and `hydrateThread`/`flushThread` activities are no-ops.
+   */
+  coldStore?: ColdThreadStore;
+  /**
+   * Override the default Redis TTL (90 days). When pairing the
+   * adapter with a `coldStore`, a shorter TTL (hours) is typically
+   * more appropriate.
+   */
+  ttlSeconds?: number;
 }
 
 /**
@@ -117,16 +133,34 @@ export function createLangChainAdapter(
 ): LangChainAdapter {
   const { redis } = config;
 
+  const baseExtras = {
+    ...(config.ttlSeconds !== undefined && { ttlSeconds: config.ttlSeconds }),
+  };
+
+  const makeProviderThread = (threadId: string, threadKey?: string) =>
+    createLangChainThreadManager({
+      redis,
+      threadId,
+      key: threadKey,
+      ...baseExtras,
+    });
+
+  const makeTieredBase = (threadId: string, threadKey?: string) =>
+    createTieredThreadManager<StoredMessage>({
+      redis,
+      threadId,
+      key: threadKey,
+      idOf: storedMessageId,
+      ...baseExtras,
+      ...(config.coldStore && { coldStore: config.coldStore }),
+    });
+
   const threadOps: ThreadOps<LangChainContent> = {
     async initializeThread(
       threadId: string,
       threadKey?: string
     ): Promise<void> {
-      const thread = createLangChainThreadManager({
-        redis,
-        threadId,
-        key: threadKey,
-      });
+      const thread = makeProviderThread(threadId, threadKey);
       await thread.initialize();
     },
 
@@ -136,11 +170,7 @@ export function createLangChainAdapter(
       content: LangChainContent,
       threadKey?: string
     ): Promise<void> {
-      const thread = createLangChainThreadManager({
-        redis,
-        threadId,
-        key: threadKey,
-      });
+      const thread = makeProviderThread(threadId, threadKey);
       await thread.appendUserMessage(id, content);
     },
 
@@ -150,21 +180,13 @@ export function createLangChainAdapter(
       content: LangChainSystemContent,
       threadKey?: string
     ): Promise<void> {
-      const thread = createLangChainThreadManager({
-        redis,
-        threadId,
-        key: threadKey,
-      });
+      const thread = makeProviderThread(threadId, threadKey);
       await thread.appendSystemMessage(id, content);
     },
 
     async appendToolResult(id: string, cfg: ToolResultConfig): Promise<void> {
       const { threadId, threadKey, toolCallId, content } = cfg;
-      const thread = createLangChainThreadManager({
-        redis,
-        threadId,
-        key: threadKey,
-      });
+      const thread = makeProviderThread(threadId, threadKey);
       await thread.appendToolResult(id, toolCallId, "", content);
     },
 
@@ -174,11 +196,7 @@ export function createLangChainAdapter(
       message: StoredMessage,
       threadKey?: string
     ): Promise<void> {
-      const thread = createLangChainThreadManager({
-        redis,
-        threadId,
-        key: threadKey,
-      });
+      const thread = makeProviderThread(threadId, threadKey);
       const patched = { ...message, data: { ...message.data, id } };
       await thread.append([patched]);
     },
@@ -193,6 +211,7 @@ export function createLangChainAdapter(
         threadId: sourceThreadId,
         key: threadKey,
         hooks: config.hooks,
+        ...baseExtras,
       });
       await thread.fork(targetThreadId);
     },
@@ -202,7 +221,7 @@ export function createLangChainAdapter(
       messageId: string,
       threadKey?: string,
     ): Promise<void> {
-      const thread = createLangChainThreadManager({ redis, threadId, key: threadKey });
+      const thread = makeProviderThread(threadId, threadKey);
       await thread.truncateFromId(messageId);
     },
 
@@ -210,11 +229,7 @@ export function createLangChainAdapter(
       threadId: string,
       threadKey?: string
     ): Promise<PersistedThreadState | null> {
-      const thread = createLangChainThreadManager({
-        redis,
-        threadId,
-        key: threadKey,
-      });
+      const thread = makeProviderThread(threadId, threadKey);
       return thread.loadState();
     },
 
@@ -223,12 +238,24 @@ export function createLangChainAdapter(
       state: PersistedThreadState,
       threadKey?: string
     ): Promise<void> {
-      const thread = createLangChainThreadManager({
-        redis,
-        threadId,
-        key: threadKey,
-      });
+      const thread = makeProviderThread(threadId, threadKey);
       await thread.saveState(state);
+    },
+
+    async hydrateThread(
+      threadId: string,
+      threadKey?: string
+    ): Promise<void> {
+      if (!config.coldStore) return;
+      await makeTieredBase(threadId, threadKey).hydrate();
+    },
+
+    async flushThread(
+      threadId: string,
+      threadKey?: string
+    ): Promise<void> {
+      if (!config.coldStore) return;
+      await makeTieredBase(threadId, threadKey).flush();
     },
   };
 

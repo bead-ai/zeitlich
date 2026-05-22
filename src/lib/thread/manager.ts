@@ -5,6 +5,7 @@ import {
   getThreadListKey,
   getThreadMetaKey,
   getThreadStateKey,
+  getThreadDedupKey,
 } from "./keys";
 
 /**
@@ -28,10 +29,6 @@ redis.call('SET', KEYS[1], '1', 'EX', tonumber(ARGV[1]))
 return 1
 `;
 
-function getDedupKey(threadId: string, id: string): string {
-  return `dedup:${id}:thread:${threadId}`;
-}
-
 /**
  * Creates a generic thread manager for handling conversation state in Redis.
  * Framework-agnostic — works with any serializable message type.
@@ -46,10 +43,12 @@ export function createThreadManager<T>(
     serialize = (m: T): string => JSON.stringify(m),
     deserialize = (raw: string): T => JSON.parse(raw) as T,
     idOf,
+    ttlSeconds = THREAD_TTL_SECONDS,
   } = config;
   const redisKey = getThreadListKey(key, threadId);
   const metaKey = getThreadMetaKey(key, threadId);
   const stateKey = getThreadStateKey(key, threadId);
+  const dedupKey = (id: string): string => getThreadDedupKey(threadId, id);
 
   async function assertThreadExists(): Promise<void> {
     const exists = await redis.exists(metaKey);
@@ -61,7 +60,7 @@ export function createThreadManager<T>(
   return {
     async initialize(): Promise<void> {
       await redis.del(redisKey);
-      await redis.set(metaKey, "1", "EX", THREAD_TTL_SECONDS);
+      await redis.set(metaKey, "1", "EX", ttlSeconds);
     },
 
     async load(): Promise<T[]> {
@@ -76,18 +75,17 @@ export function createThreadManager<T>(
 
       if (idOf) {
         const dedupId = messages.map(idOf).join(":");
-        const dedupKey = getDedupKey(threadId, dedupId);
         await redis.eval(
           APPEND_IDEMPOTENT_SCRIPT,
           2,
-          dedupKey,
+          dedupKey(dedupId),
           redisKey,
-          String(THREAD_TTL_SECONDS),
+          String(ttlSeconds),
           ...messages.map(serialize)
         );
       } else {
         await redis.rpush(redisKey, ...messages.map(serialize));
-        await redis.expire(redisKey, THREAD_TTL_SECONDS);
+        await redis.expire(redisKey, ttlSeconds);
       }
     },
 
@@ -103,11 +101,11 @@ export function createThreadManager<T>(
       if (data.length > 0) {
         const newKey = getThreadListKey(key, newThreadId);
         await redis.rpush(newKey, ...data);
-        await redis.expire(newKey, THREAD_TTL_SECONDS);
+        await redis.expire(newKey, ttlSeconds);
       }
       if (stateRaw != null) {
         const newStateKey = getThreadStateKey(key, newThreadId);
-        await redis.set(newStateKey, stateRaw, "EX", THREAD_TTL_SECONDS);
+        await redis.set(newStateKey, stateRaw, "EX", ttlSeconds);
       }
       return forked;
     },
@@ -125,15 +123,13 @@ export function createThreadManager<T>(
         .filter((id): id is string => typeof id === "string");
       await redis.del(redisKey);
       if (existingIds.length > 0) {
-        await redis.del(
-          ...existingIds.map((id) => getDedupKey(threadId, id))
-        );
+        await redis.del(...existingIds.map(dedupKey));
       }
       if (messages.length > 0) {
         await redis.rpush(redisKey, ...messages.map(serialize));
-        await redis.expire(redisKey, THREAD_TTL_SECONDS);
+        await redis.expire(redisKey, ttlSeconds);
       }
-      await redis.expire(metaKey, THREAD_TTL_SECONDS);
+      await redis.expire(metaKey, ttlSeconds);
     },
 
     async delete(): Promise<void> {
@@ -148,12 +144,7 @@ export function createThreadManager<T>(
 
     async saveState(state: PersistedThreadState): Promise<void> {
       await assertThreadExists();
-      await redis.set(
-        stateKey,
-        JSON.stringify(state),
-        "EX",
-        THREAD_TTL_SECONDS
-      );
+      await redis.set(stateKey, JSON.stringify(state), "EX", ttlSeconds);
     },
 
     async deleteState(): Promise<void> {
@@ -185,19 +176,17 @@ export function createThreadManager<T>(
       if (idx === -1) return;
       if (idx === 0) {
         await redis.del(redisKey);
-        await redis.expire(metaKey, THREAD_TTL_SECONDS);
+        await redis.expire(metaKey, ttlSeconds);
       } else {
         await redis.ltrim(redisKey, 0, idx - 1);
-        await redis.expire(redisKey, THREAD_TTL_SECONDS);
+        await redis.expire(redisKey, ttlSeconds);
       }
       // Clear dedup markers for the removed messages so that a rewind
       // retry which reuses the same ids (e.g. the same assistantId) can
       // re-append without the idempotent-append Lua script treating it
       // as a duplicate.
       if (removedIds.length > 0) {
-        await redis.del(
-          ...removedIds.map((id) => getDedupKey(threadId, id))
-        );
+        await redis.del(...removedIds.map(dedupKey));
       }
     },
   };

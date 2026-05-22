@@ -33,11 +33,30 @@ export * from "./workflow";
 export { FileSystemSkillProvider } from "./lib/skills/fs-provider";
 
 // Thread manager (generic, framework-agnostic)
-export { createThreadManager } from "./lib/thread";
+export {
+  createThreadManager,
+  createTieredThreadManager,
+  createS3ColdStore,
+  encodeSnapshot,
+  applySnapshot,
+  clearHotTier,
+  getThreadStateKey,
+  getThreadDedupKey,
+} from "./lib/thread";
 export type {
   BaseThreadManager,
   ProviderThreadManager,
   ThreadManagerConfig,
+  TieredThreadManager,
+  TieredThreadManagerConfig,
+  FlushOptions,
+  ColdThreadStore,
+  ThreadSnapshot,
+  S3LikeClient,
+  S3ColdStoreConfig,
+  EncodeSnapshotConfig,
+  ApplySnapshotConfig,
+  ClearHotTierConfig,
 } from "./lib/thread";
 
 // Model invoker contract (framework-agnostic)

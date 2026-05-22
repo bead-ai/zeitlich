@@ -13,11 +13,15 @@ import type {
   ScopedPrefix,
 } from "../../../lib/session/types";
 import type { ModelInvoker } from "../../../lib/model";
+import { createTieredThreadManager } from "../../../lib/thread/tiered";
+import type { ColdThreadStore } from "../../../lib/thread/cold-store";
 import {
   createAnthropicThreadManager,
+  storedMessageId,
   type AnthropicContent,
   type AnthropicSystemContent,
   type AnthropicThreadManagerHooks,
+  type StoredMessage,
 } from "./thread-manager";
 import {
   createAnthropicModelInvoker,
@@ -38,6 +42,20 @@ export interface AnthropicAdapterConfig {
   /** Maximum tokens to generate. Defaults to 16384. */
   maxTokens?: number;
   hooks?: AnthropicThreadManagerHooks;
+  /**
+   * Optional durable cold tier (e.g. S3, R2, GCS). When provided,
+   * the session will hydrate the thread from cold storage on entry
+   * (`continue`/`fork` modes) and flush it back on every exit path.
+   * When omitted, the adapter is Redis-only and `hydrateThread`/
+   * `flushThread` activities are no-ops.
+   */
+  coldStore?: ColdThreadStore;
+  /**
+   * Override the default Redis TTL (90 days) for thread keys. When
+   * pairing the adapter with a `coldStore`, a shorter TTL (hours)
+   * is typically more appropriate.
+   */
+  ttlSeconds?: number;
 }
 
 /**
@@ -135,16 +153,41 @@ export function createAnthropicAdapter(
 ): AnthropicAdapter {
   const { redis, client } = config;
 
+  /**
+   * Common per-call config plumbed into both the provider thread
+   * manager (for message I/O) and the tiered base manager (for
+   * hot↔cold lifecycle ops). Keeping them in lockstep means a single
+   * `coldStore` / `ttlSeconds` configuration controls every Redis
+   * write the adapter does.
+   */
+  const baseExtras = {
+    ...(config.ttlSeconds !== undefined && { ttlSeconds: config.ttlSeconds }),
+  };
+
+  const makeProviderThread = (threadId: string, threadKey?: string) =>
+    createAnthropicThreadManager({
+      redis,
+      threadId,
+      key: threadKey,
+      ...baseExtras,
+    });
+
+  const makeTieredBase = (threadId: string, threadKey?: string) =>
+    createTieredThreadManager<StoredMessage>({
+      redis,
+      threadId,
+      key: threadKey,
+      idOf: storedMessageId,
+      ...baseExtras,
+      ...(config.coldStore && { coldStore: config.coldStore }),
+    });
+
   const threadOps: ThreadOps<AnthropicContent> = {
     async initializeThread(
       threadId: string,
       threadKey?: string
     ): Promise<void> {
-      const thread = createAnthropicThreadManager({
-        redis,
-        threadId,
-        key: threadKey,
-      });
+      const thread = makeProviderThread(threadId, threadKey);
       await thread.initialize();
     },
 
@@ -154,11 +197,7 @@ export function createAnthropicAdapter(
       content: AnthropicContent,
       threadKey?: string
     ): Promise<void> {
-      const thread = createAnthropicThreadManager({
-        redis,
-        threadId,
-        key: threadKey,
-      });
+      const thread = makeProviderThread(threadId, threadKey);
       await thread.appendUserMessage(id, content);
     },
 
@@ -168,21 +207,13 @@ export function createAnthropicAdapter(
       content: AnthropicSystemContent,
       threadKey?: string
     ): Promise<void> {
-      const thread = createAnthropicThreadManager({
-        redis,
-        threadId,
-        key: threadKey,
-      });
+      const thread = makeProviderThread(threadId, threadKey);
       await thread.appendSystemMessage(id, content);
     },
 
     async appendToolResult(id: string, cfg: ToolResultConfig): Promise<void> {
       const { threadId, threadKey, toolCallId, toolName, content } = cfg;
-      const thread = createAnthropicThreadManager({
-        redis,
-        threadId,
-        key: threadKey,
-      });
+      const thread = makeProviderThread(threadId, threadKey);
       await thread.appendToolResult(id, toolCallId, toolName, content);
     },
 
@@ -192,11 +223,7 @@ export function createAnthropicAdapter(
       message: Anthropic.Messages.Message,
       threadKey?: string
     ): Promise<void> {
-      const thread = createAnthropicThreadManager({
-        redis,
-        threadId,
-        key: threadKey,
-      });
+      const thread = makeProviderThread(threadId, threadKey);
       await thread.appendAssistantMessage(id, message.content);
     },
 
@@ -210,6 +237,7 @@ export function createAnthropicAdapter(
         threadId: sourceThreadId,
         key: threadKey,
         hooks: config.hooks,
+        ...baseExtras,
       });
       await thread.fork(targetThreadId);
     },
@@ -219,7 +247,7 @@ export function createAnthropicAdapter(
       messageId: string,
       threadKey?: string,
     ): Promise<void> {
-      const thread = createAnthropicThreadManager({ redis, threadId, key: threadKey });
+      const thread = makeProviderThread(threadId, threadKey);
       await thread.truncateFromId(messageId);
     },
 
@@ -227,11 +255,7 @@ export function createAnthropicAdapter(
       threadId: string,
       threadKey?: string
     ): Promise<PersistedThreadState | null> {
-      const thread = createAnthropicThreadManager({
-        redis,
-        threadId,
-        key: threadKey,
-      });
+      const thread = makeProviderThread(threadId, threadKey);
       return thread.loadState();
     },
 
@@ -240,12 +264,24 @@ export function createAnthropicAdapter(
       state: PersistedThreadState,
       threadKey?: string
     ): Promise<void> {
-      const thread = createAnthropicThreadManager({
-        redis,
-        threadId,
-        key: threadKey,
-      });
+      const thread = makeProviderThread(threadId, threadKey);
       await thread.saveState(state);
+    },
+
+    async hydrateThread(
+      threadId: string,
+      threadKey?: string
+    ): Promise<void> {
+      if (!config.coldStore) return;
+      await makeTieredBase(threadId, threadKey).hydrate();
+    },
+
+    async flushThread(
+      threadId: string,
+      threadKey?: string
+    ): Promise<void> {
+      if (!config.coldStore) return;
+      await makeTieredBase(threadId, threadKey).flush();
     },
   };
 

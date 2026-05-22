@@ -34,6 +34,12 @@ export interface LangChainThreadManagerConfig {
   /** Thread key, defaults to 'messages' */
   key?: string;
   hooks?: LangChainThreadManagerHooks;
+  /**
+   * Override the default thread TTL (90 days). When pairing the
+   * adapter with a durable cold tier, a shorter TTL (hours) is
+   * typically more appropriate.
+   */
+  ttlSeconds?: number;
 }
 
 /** Prepared payload ready to send to a LangChain chat model */
@@ -52,7 +58,8 @@ export interface LangChainThreadManager extends ProviderThreadManager<
   prepareForInvocation(): Promise<LangChainInvocationPayload>;
 }
 
-function storedMessageId(msg: StoredMessage): string {
+/** Extract the unique id from a LangChain {@link StoredMessage}. */
+export function storedMessageId(msg: StoredMessage): string {
   if (msg.type === "tool" && msg.data.tool_call_id) {
     return msg.data.tool_call_id;
   }
@@ -77,6 +84,7 @@ export function createLangChainThreadManager(
     threadId: config.threadId,
     key: config.key,
     idOf: storedMessageId,
+    ...(config.ttlSeconds !== undefined && { ttlSeconds: config.ttlSeconds }),
   };
 
   const base = createThreadManager(baseConfig);

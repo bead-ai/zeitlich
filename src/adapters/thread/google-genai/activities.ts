@@ -13,11 +13,15 @@ import type {
   ScopedPrefix,
 } from "../../../lib/session/types";
 import type { ModelInvoker } from "../../../lib/model";
+import { createTieredThreadManager } from "../../../lib/thread/tiered";
+import type { ColdThreadStore } from "../../../lib/thread/cold-store";
 import {
   createGoogleGenAIThreadManager,
+  storedContentId,
   type GoogleGenAIContent,
   type GoogleGenAISystemContent,
   type GoogleGenAIThreadManagerHooks,
+  type StoredContent,
 } from "./thread-manager";
 import { createGoogleGenAIModelInvoker } from "./model-invoker";
 import { ADAPTER_ID } from "./adapter-id";
@@ -34,6 +38,19 @@ export interface GoogleGenAIAdapterConfig {
   /** Default model name (e.g. 'gemini-2.5-flash'). If omitted, use `createModelInvoker()` */
   model?: string;
   hooks?: GoogleGenAIThreadManagerHooks;
+  /**
+   * Optional durable cold tier (e.g. S3, R2, GCS). When provided,
+   * the session hydrates the thread on entry (`continue`/`fork`) and
+   * flushes it on every exit path. When omitted, the adapter is
+   * Redis-only and `hydrateThread`/`flushThread` activities are no-ops.
+   */
+  coldStore?: ColdThreadStore;
+  /**
+   * Override the default Redis TTL (90 days). When pairing the
+   * adapter with a `coldStore`, a shorter TTL (hours) is typically
+   * more appropriate.
+   */
+  ttlSeconds?: number;
 }
 
 /**
@@ -140,16 +157,34 @@ export function createGoogleGenAIAdapter(
 ): GoogleGenAIAdapter {
   const { redis } = config;
 
+  const baseExtras = {
+    ...(config.ttlSeconds !== undefined && { ttlSeconds: config.ttlSeconds }),
+  };
+
+  const makeProviderThread = (threadId: string, threadKey?: string) =>
+    createGoogleGenAIThreadManager({
+      redis,
+      threadId,
+      key: threadKey,
+      ...baseExtras,
+    });
+
+  const makeTieredBase = (threadId: string, threadKey?: string) =>
+    createTieredThreadManager<StoredContent>({
+      redis,
+      threadId,
+      key: threadKey,
+      idOf: storedContentId,
+      ...baseExtras,
+      ...(config.coldStore && { coldStore: config.coldStore }),
+    });
+
   const threadOps: ThreadOps<GoogleGenAIContent> = {
     async initializeThread(
       threadId: string,
       threadKey?: string
     ): Promise<void> {
-      const thread = createGoogleGenAIThreadManager({
-        redis,
-        threadId,
-        key: threadKey,
-      });
+      const thread = makeProviderThread(threadId, threadKey);
       await thread.initialize();
     },
 
@@ -159,11 +194,7 @@ export function createGoogleGenAIAdapter(
       content: GoogleGenAIContent,
       threadKey?: string
     ): Promise<void> {
-      const thread = createGoogleGenAIThreadManager({
-        redis,
-        threadId,
-        key: threadKey,
-      });
+      const thread = makeProviderThread(threadId, threadKey);
       await thread.appendUserMessage(id, content);
     },
 
@@ -173,21 +204,13 @@ export function createGoogleGenAIAdapter(
       content: GoogleGenAISystemContent,
       threadKey?: string
     ): Promise<void> {
-      const thread = createGoogleGenAIThreadManager({
-        redis,
-        threadId,
-        key: threadKey,
-      });
+      const thread = makeProviderThread(threadId, threadKey);
       await thread.appendSystemMessage(id, content);
     },
 
     async appendToolResult(id: string, cfg: ToolResultConfig): Promise<void> {
       const { threadId, threadKey, toolCallId, toolName, content } = cfg;
-      const thread = createGoogleGenAIThreadManager({
-        redis,
-        threadId,
-        key: threadKey,
-      });
+      const thread = makeProviderThread(threadId, threadKey);
       await thread.appendToolResult(
         id,
         toolCallId,
@@ -202,11 +225,7 @@ export function createGoogleGenAIAdapter(
       message: Content,
       threadKey?: string
     ): Promise<void> {
-      const thread = createGoogleGenAIThreadManager({
-        redis,
-        threadId,
-        key: threadKey,
-      });
+      const thread = makeProviderThread(threadId, threadKey);
       await thread.appendModelContent(id, message.parts ?? []);
     },
 
@@ -220,6 +239,7 @@ export function createGoogleGenAIAdapter(
         threadId: sourceThreadId,
         key: threadKey,
         hooks: config.hooks,
+        ...baseExtras,
       });
       await thread.fork(targetThreadId);
     },
@@ -229,11 +249,7 @@ export function createGoogleGenAIAdapter(
       messageId: string,
       threadKey?: string,
     ): Promise<void> {
-      const thread = createGoogleGenAIThreadManager({
-        redis,
-        threadId,
-        key: threadKey,
-      });
+      const thread = makeProviderThread(threadId, threadKey);
       await thread.truncateFromId(messageId);
     },
 
@@ -241,11 +257,7 @@ export function createGoogleGenAIAdapter(
       threadId: string,
       threadKey?: string
     ): Promise<PersistedThreadState | null> {
-      const thread = createGoogleGenAIThreadManager({
-        redis,
-        threadId,
-        key: threadKey,
-      });
+      const thread = makeProviderThread(threadId, threadKey);
       return thread.loadState();
     },
 
@@ -254,12 +266,24 @@ export function createGoogleGenAIAdapter(
       state: PersistedThreadState,
       threadKey?: string
     ): Promise<void> {
-      const thread = createGoogleGenAIThreadManager({
-        redis,
-        threadId,
-        key: threadKey,
-      });
+      const thread = makeProviderThread(threadId, threadKey);
       await thread.saveState(state);
+    },
+
+    async hydrateThread(
+      threadId: string,
+      threadKey?: string
+    ): Promise<void> {
+      if (!config.coldStore) return;
+      await makeTieredBase(threadId, threadKey).hydrate();
+    },
+
+    async flushThread(
+      threadId: string,
+      threadKey?: string
+    ): Promise<void> {
+      if (!config.coldStore) return;
+      await makeTieredBase(threadId, threadKey).flush();
     },
   };
 

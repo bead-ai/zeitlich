@@ -103,6 +103,7 @@ npm install zeitlich ioredis \
 - `@langchain/core` >= 1.0.0 (optional — only when using the LangChain adapter)
 - `@google/genai` >= 1.0.0 (optional — only when using the Google GenAI adapter)
 - `@aws-sdk/client-bedrock-agentcore` >= 3.900.0 (optional — only when using the Bedrock adapter)
+- `@aws-sdk/client-s3` >= 3.700.0 (optional — only when using the built-in S3 cold thread tier)
 
 > **Why peer deps?** Zeitlich's public API surfaces `@temporalio/*` types
 > (`UpdateDefinition`, `ChildWorkflowOptions`, `Duration`, etc.) directly. Peer
@@ -666,6 +667,68 @@ const continuedSession = await createSession({
 
 `getShortId()` produces compact, workflow-deterministic IDs (~12 base-62 chars) that are more token-efficient than UUIDs.
 
+#### Tiered Thread Storage (Redis hot + S3 cold)
+
+By default every thread lives in Redis with a 90-day TTL — both messages and the persisted state slice. For long-lived agents, that ties up hot memory for inactive conversations and ties durability to your Redis retention. Zeitlich's tiered storage moves cold threads to a durable archive (S3, R2, GCS, …) while keeping Redis as the hot tier only for the duration of a workflow run.
+
+| Tier  | Backend                | Lifetime                                          |
+| ----- | ---------------------- | ------------------------------------------------- |
+| Hot   | Redis                  | Only while a workflow run is active (configurable TTL) |
+| Cold  | Pluggable `ColdThreadStore` (built-in S3) | Durable across runs                                |
+
+The session wiring is fully automatic:
+
+- On entry — `mode: "continue"` and `mode: "fork"` call `hydrateThread`, which restores the latest cold-tier snapshot into Redis if Redis is cold. Idempotent (safe for Temporal activity retries).
+- In `finally{}` — every exit path calls `flushThread` after `saveThreadState`, which writes the current Redis contents to the cold tier and (by default) deletes the Redis keys. A near-immediate `continue` re-hydrates in a single `GetObject`.
+
+##### Wiring the built-in S3 cold store
+
+```typescript
+import { S3Client } from "@aws-sdk/client-s3";
+import { createS3ColdStore } from "zeitlich";
+import { createAnthropicAdapter } from "zeitlich/adapters/thread/anthropic";
+
+const coldStore = createS3ColdStore({
+  s3: new S3Client({ region: "us-east-1" }),
+  bucket: "my-threads",
+  prefix: "prod/threads",
+  // gzip: true (default) — message lists compress well
+});
+
+const adapter = createAnthropicAdapter({
+  redis,
+  client: anthropic,
+  model: "claude-sonnet-4-20250514",
+  coldStore,
+  // Recommended: drop the Redis TTL to a small window when cold tiering
+  // is enabled. The cold tier is the source of truth.
+  ttlSeconds: 60 * 60 * 24, // 24h
+});
+```
+
+That's the only change required — `createSession`, all `ThreadInit` modes, and every adapter activity are already wired for the lifecycle. When `coldStore` is omitted, the adapter behaves identically to the Redis-only baseline.
+
+##### Custom backends
+
+`ColdThreadStore` is intentionally minimal:
+
+```typescript
+interface ColdThreadStore {
+  read(threadKey: string, threadId: string): Promise<ThreadSnapshot | null>;
+  write(threadKey: string, threadId: string, snapshot: ThreadSnapshot): Promise<void>;
+  delete(threadKey: string, threadId: string): Promise<void>;
+}
+```
+
+Any backend that can satisfy these three calls — Cloudflare R2, Google Cloud Storage, Postgres, the local filesystem — can plug into the same tiered manager. `ThreadSnapshot` is one JSON-friendly blob per thread; round-trip it however you like.
+
+##### Trade-offs
+
+- **Cold writes are session-boundary only.** No per-append S3 traffic. Long-running sessions are durable via Temporal workflow history + Redis TTL.
+- **Single-writer assumed.** Two sessions started simultaneously on the same `threadId` would race on flush. Use distinct `threadId`s or coordinate at a layer above zeitlich.
+- **`deleteHot: true` by default on flush.** Memory drops immediately; the next continue re-hydrates in one `GetObject`. Override per-call via the tiered manager if you want to keep the hot tier warm.
+- **`mode: "new"` overwrites the cold archive for that `threadId`.** A session entered with `mode: "new"` skips `hydrateThread`; on exit `flushThread` writes the fresh snapshot back, silently replacing any prior cold-tier blob at the same `(threadKey, threadId)`. To resume a thread, use `mode: "continue"` or `mode: "fork"` — passing a previously-used `threadId` with `mode: "new"` is destructive by design.
+
 #### Sandbox Initialization (`SandboxInit`)
 
 The `sandbox` field controls how a sandbox is created or reused:
@@ -983,16 +1046,21 @@ Safe for use in Temporal workflow files:
 
 Framework-agnostic utilities for activities, worker setup, and Node.js code:
 
-| Export                    | Description                                                                                                        |
-| ------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| `createRunAgentActivity`  | Wraps a handler into a scope-prefixed `RunAgentActivity` with auto-fetched parent workflow state                   |
-| `withParentWorkflowState` | Wraps a tool handler into an `ActivityToolHandler` with auto-fetched parent workflow state                         |
-| `createThreadManager`     | Generic Redis-backed thread manager factory                                                                        |
-| `toTree`                  | Generate file tree string from an `IFileSystem` instance                                                           |
-| `withSandbox`             | Wraps a handler to auto-resolve sandbox from context (pairs with `withAutoAppend`)                                 |
-| `NodeFsSandboxFileSystem` | `node:fs` adapter for `SandboxFileSystem` — read skills from the worker's local disk                               |
-| `FileSystemSkillProvider` | Load skills from a directory following the agentskills.io layout                                                   |
-| Tool handlers             | `bashHandler`, `editHandler`, `globHandler`, `readFileHandler`, `writeFileHandler`, `createAskUserQuestionHandler` |
+| Export                      | Description                                                                                                        |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `createRunAgentActivity`    | Wraps a handler into a scope-prefixed `RunAgentActivity` with auto-fetched parent workflow state                   |
+| `withParentWorkflowState`   | Wraps a tool handler into an `ActivityToolHandler` with auto-fetched parent workflow state                         |
+| `createThreadManager`       | Generic Redis-backed thread manager factory                                                                        |
+| `createTieredThreadManager` | Redis hot + pluggable cold tier; adds `hydrate()` / `flush()` to `BaseThreadManager<T>`                            |
+| `createS3ColdStore`         | Built-in `ColdThreadStore` backed by an `@aws-sdk/client-s3` `S3Client`                                            |
+| `encodeSnapshot`            | Low-level helper that builds a `ThreadSnapshot` from the hot-tier Redis state                                      |
+| `applySnapshot`             | Low-level helper that restores a `ThreadSnapshot` into Redis (idempotent)                                          |
+| `clearHotTier`              | Low-level helper that deletes every Redis key the thread manager wrote for a given `(threadKey, threadId)`         |
+| `toTree`                    | Generate file tree string from an `IFileSystem` instance                                                           |
+| `withSandbox`               | Wraps a handler to auto-resolve sandbox from context (pairs with `withAutoAppend`)                                 |
+| `NodeFsSandboxFileSystem`   | `node:fs` adapter for `SandboxFileSystem` — read skills from the worker's local disk                               |
+| `FileSystemSkillProvider`   | Load skills from a directory following the agentskills.io layout                                                   |
+| Tool handlers               | `bashHandler`, `editHandler`, `globHandler`, `readFileHandler`, `writeFileHandler`, `createAskUserQuestionHandler` |
 
 ### Thread Adapter Entry Points
 
