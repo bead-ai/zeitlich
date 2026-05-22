@@ -27,6 +27,7 @@ import {
   createAnthropicModelInvoker,
   type AnthropicModelInvokerConfig,
 } from "./model-invoker";
+import type { AnthropicPromptCacheConfig } from "./prompt-cache";
 import { ADAPTER_ID } from "./adapter-id";
 
 export type AnthropicThreadOps<TScope extends string = ""> = PrefixedThreadOps<
@@ -41,6 +42,11 @@ export interface AnthropicAdapterConfig {
   model?: string;
   /** Maximum tokens to generate. Defaults to 16384. */
   maxTokens?: number;
+  /**
+   * Controls Anthropic/Bedrock-compatible prompt caching. Defaults to enabled
+   * with an explicit 5 minute TTL. Set to `false` to disable.
+   */
+  promptCache?: AnthropicPromptCacheConfig;
   hooks?: AnthropicThreadManagerHooks;
   /**
    * Optional durable cold tier (e.g. S3, R2, GCS). When provided,
@@ -76,7 +82,8 @@ export interface AnthropicAdapter {
   /** Create an invoker for a specific model name (for multi-model setups) */
   createModelInvoker(
     model: string,
-    maxTokens?: number
+    maxTokens?: number,
+    promptCache?: AnthropicPromptCacheConfig
   ): ModelInvoker<Anthropic.Messages.Message>;
   /**
    * Create prefixed thread activities for registration on the worker.
@@ -245,7 +252,7 @@ export function createAnthropicAdapter(
     async truncateThread(
       threadId: string,
       messageId: string,
-      threadKey?: string,
+      threadKey?: string
     ): Promise<void> {
       const thread = makeProviderThread(threadId, threadKey);
       await thread.truncateFromId(messageId);
@@ -268,18 +275,12 @@ export function createAnthropicAdapter(
       await thread.saveState(state);
     },
 
-    async hydrateThread(
-      threadId: string,
-      threadKey?: string
-    ): Promise<void> {
+    async hydrateThread(threadId: string, threadKey?: string): Promise<void> {
       if (!config.coldStore) return;
       await makeTieredBase(threadId, threadKey).hydrate();
     },
 
-    async flushThread(
-      threadId: string,
-      threadKey?: string
-    ): Promise<void> {
+    async flushThread(threadId: string, threadKey?: string): Promise<void> {
       if (!config.coldStore) return;
       await makeTieredBase(threadId, threadKey).flush();
     },
@@ -299,7 +300,8 @@ export function createAnthropicAdapter(
 
   const makeInvoker = (
     model: string,
-    maxTokens?: number
+    maxTokens?: number,
+    promptCache?: AnthropicPromptCacheConfig
   ): ModelInvoker<Anthropic.Messages.Message> => {
     const invokerConfig: AnthropicModelInvokerConfig = {
       redis,
@@ -309,6 +311,11 @@ export function createAnthropicAdapter(
       ...(config.maxTokens !== undefined && maxTokens === undefined
         ? { maxTokens: config.maxTokens }
         : {}),
+      ...(promptCache !== undefined
+        ? { promptCache }
+        : config.promptCache !== undefined
+          ? { promptCache: config.promptCache }
+          : {}),
       hooks: config.hooks,
     };
     return createAnthropicModelInvoker(invokerConfig);

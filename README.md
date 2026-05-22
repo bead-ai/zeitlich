@@ -671,10 +671,10 @@ const continuedSession = await createSession({
 
 By default every thread lives in Redis with a 90-day TTL — both messages and the persisted state slice. For long-lived agents, that ties up hot memory for inactive conversations and ties durability to your Redis retention. Zeitlich's tiered storage moves cold threads to a durable archive (S3, R2, GCS, …) while keeping Redis as the hot tier only for the duration of a workflow run.
 
-| Tier  | Backend                | Lifetime                                          |
-| ----- | ---------------------- | ------------------------------------------------- |
-| Hot   | Redis                  | Only while a workflow run is active (configurable TTL) |
-| Cold  | Pluggable `ColdThreadStore` (built-in S3) | Durable across runs                                |
+| Tier | Backend                                   | Lifetime                                               |
+| ---- | ----------------------------------------- | ------------------------------------------------------ |
+| Hot  | Redis                                     | Only while a workflow run is active (configurable TTL) |
+| Cold | Pluggable `ColdThreadStore` (built-in S3) | Durable across runs                                    |
 
 The session wiring is fully automatic:
 
@@ -708,6 +708,30 @@ const adapter = createAnthropicAdapter({
 
 That's the only change required — `createSession`, all `ThreadInit` modes, and every adapter activity are already wired for the lifecycle. When `coldStore` is omitted, the adapter behaves identically to the Redis-only baseline.
 
+##### Anthropic prompt caching
+
+The Anthropic adapter enables 5-minute ephemeral prompt caching by default. Before each `messages.stream()` call, it adds an explicit block-level `cache_control: { type: "ephemeral", ttl: "5m" }` marker to the last cacheable message content block. Zeitlich intentionally uses the block-level shape instead of Anthropic's top-level automatic cache-control parameter so the same request body works with Anthropic direct API clients and Anthropic-on-Bedrock `InvokeModel` clients.
+
+```typescript
+const adapter = createAnthropicAdapter({
+  redis,
+  client: anthropic,
+  model: "claude-sonnet-4-20250514",
+  // Optional: 5m is the default; set explicitly if you prefer clarity.
+  promptCache: { ttl: "5m" },
+});
+
+// Disable if a model/provider route does not support prompt caching.
+const uncachedAdapter = createAnthropicAdapter({
+  redis,
+  client: anthropic,
+  model: "claude-sonnet-4-20250514",
+  promptCache: false,
+});
+```
+
+If you already provide your own `cache_control` markers, Zeitlich preserves them and skips its automatic marker when the request already has the provider maximum of four cache breakpoints.
+
 ##### Custom backends
 
 `ColdThreadStore` is intentionally minimal:
@@ -715,7 +739,11 @@ That's the only change required — `createSession`, all `ThreadInit` modes, and
 ```typescript
 interface ColdThreadStore {
   read(threadKey: string, threadId: string): Promise<ThreadSnapshot | null>;
-  write(threadKey: string, threadId: string, snapshot: ThreadSnapshot): Promise<void>;
+  write(
+    threadKey: string,
+    threadId: string,
+    snapshot: ThreadSnapshot
+  ): Promise<void>;
   delete(threadKey: string, threadId: string): Promise<void>;
 }
 ```

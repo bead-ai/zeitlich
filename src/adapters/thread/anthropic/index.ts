@@ -45,3 +45,11 @@ export {
   invokeAnthropicModel,
   type AnthropicModelInvokerConfig,
 } from "./model-invoker";
+
+// Prompt caching helpers
+export {
+  addPromptCacheControl,
+  resolvePromptCacheOptions,
+  type AnthropicPromptCacheConfig,
+  type AnthropicPromptCacheOptions,
+} from "./prompt-cache";

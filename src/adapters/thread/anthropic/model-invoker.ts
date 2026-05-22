@@ -6,6 +6,11 @@ import {
   createAnthropicThreadManager,
   type AnthropicThreadManagerHooks,
 } from "./thread-manager";
+import {
+  addPromptCacheControl,
+  resolvePromptCacheOptions,
+  type AnthropicPromptCacheConfig,
+} from "./prompt-cache";
 import { getActivityContext } from "../../../lib/activity";
 
 export interface AnthropicModelInvokerConfig {
@@ -14,6 +19,11 @@ export interface AnthropicModelInvokerConfig {
   model: string;
   /** Maximum tokens to generate. Defaults to 16384. */
   maxTokens?: number;
+  /**
+   * Controls Anthropic/Bedrock-compatible prompt caching. Defaults to enabled
+   * with an explicit 5 minute TTL. Set to `false` to disable.
+   */
+  promptCache?: AnthropicPromptCacheConfig;
   hooks?: AnthropicThreadManagerHooks;
 }
 
@@ -56,6 +66,7 @@ export function createAnthropicModelInvoker({
   client,
   model,
   maxTokens = 16384,
+  promptCache,
   hooks,
 }: AnthropicModelInvokerConfig) {
   return async function invokeAnthropicModel(
@@ -76,17 +87,24 @@ export function createAnthropicModelInvoker({
     // attempt's assistant + tool results so the LLM sees the same
     // pre-call state that it saw originally.
     await thread.truncateFromId(assistantMessageId);
-    const { messages, system } = await thread.prepareForInvocation();
+    const prepared = await thread.prepareForInvocation();
 
     const anthropicTools = toAnthropicTools(state.tools);
-    const tools = anthropicTools.length > 0 ? anthropicTools : undefined;
+    const preparedPayload = {
+      ...prepared,
+      ...(anthropicTools.length > 0 ? { tools: anthropicTools } : {}),
+    };
+    const cacheOptions = resolvePromptCacheOptions(promptCache);
+    const payload = cacheOptions
+      ? addPromptCacheControl(preparedPayload, cacheOptions)
+      : preparedPayload;
 
     const params: Anthropic.MessageCreateParams = {
       model,
       max_tokens: maxTokens,
-      messages,
-      ...(system ? { system } : {}),
-      ...(tools ? { tools } : {}),
+      messages: payload.messages,
+      ...(payload.system ? { system: payload.system } : {}),
+      ...(payload.tools ? { tools: payload.tools } : {}),
     };
 
     const stream = client.messages.stream(params, { signal });
@@ -130,6 +148,7 @@ export async function invokeAnthropicModel({
   client,
   model,
   maxTokens,
+  promptCache,
   hooks,
   config,
 }: {
@@ -137,6 +156,7 @@ export async function invokeAnthropicModel({
   client: Anthropic;
   model: string;
   maxTokens?: number;
+  promptCache?: AnthropicPromptCacheConfig;
   hooks?: AnthropicThreadManagerHooks;
   config: ModelInvokerConfig;
 }): Promise<AgentResponse<Anthropic.Messages.Message>> {
@@ -145,6 +165,7 @@ export async function invokeAnthropicModel({
     client,
     model,
     maxTokens,
+    promptCache,
     hooks,
   });
   return invoker(config);
