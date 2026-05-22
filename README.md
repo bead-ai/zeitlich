@@ -727,6 +727,7 @@ Any backend that can satisfy these three calls — Cloudflare R2, Google Cloud S
 - **Cold writes are session-boundary only.** No per-append S3 traffic. Long-running sessions are durable via Temporal workflow history + Redis TTL.
 - **Single-writer assumed.** Two sessions started simultaneously on the same `threadId` would race on flush. Use distinct `threadId`s or coordinate at a layer above zeitlich.
 - **`deleteHot: true` by default on flush.** Memory drops immediately; the next continue re-hydrates in one `GetObject`. Override per-call via the tiered manager if you want to keep the hot tier warm.
+- **`mode: "new"` overwrites the cold archive for that `threadId`.** A session entered with `mode: "new"` skips `hydrateThread`; on exit `flushThread` writes the fresh snapshot back, silently replacing any prior cold-tier blob at the same `(threadKey, threadId)`. To resume a thread, use `mode: "continue"` or `mode: "fork"` — passing a previously-used `threadId` with `mode: "new"` is destructive by design.
 
 #### Sandbox Initialization (`SandboxInit`)
 

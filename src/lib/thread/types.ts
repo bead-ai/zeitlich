@@ -37,6 +37,11 @@ export interface BaseThreadManager<T> {
    * Append messages to the thread.
    * When `idOf` is configured, appends are idempotent — retries with the
    * same message ids are atomically skipped via a Redis Lua script.
+   *
+   * Caveat with tiered storage: multi-message batches write one composite
+   * dedup key (`"m1:m2"`); snapshots only persist per-message keys, so a
+   * batch retried after `flush` → `hydrate` will not be deduped. Adapter
+   * helpers all single-append and are unaffected.
    */
   append(messages: T[]): Promise<void>;
   /**

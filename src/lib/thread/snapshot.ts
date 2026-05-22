@@ -94,22 +94,47 @@ export async function applySnapshot(
   const listKey = getThreadListKey(threadKey, threadId);
   const stateKey = getThreadStateKey(threadKey, threadId);
 
-  // Clear any partial residue from a previous failed restore attempt
-  // before writing fresh contents.
+  // Clear partial residue from any prior half-restored attempt.
+  // Awaited *outside* the pipeline so a DEL failure (ACL deny,
+  // CROSSSLOT, …) short-circuits before any writes hit the wire —
+  // pipelines are non-atomic, so a queued DEL wouldn't stop later
+  // commands from accumulating data behind a missing meta marker.
   await redis.del(listKey, stateKey);
 
+  // Pipeline the data writes (list/state/dedup) in one round-trip.
+  // Meta is written separately, only after every queued command
+  // succeeded, preserving the "meta-last" crash-safety invariant —
+  // a partial restore must leave meta absent so the next hydrate
+  // retries cleanly.
+  const pipeline = redis.pipeline();
   if (snapshot.messages.length > 0) {
-    await redis.rpush(listKey, ...snapshot.messages);
-    await redis.expire(listKey, ttlSeconds);
+    pipeline.rpush(listKey, ...snapshot.messages);
+    pipeline.expire(listKey, ttlSeconds);
   }
   if (snapshot.state != null) {
-    await redis.set(stateKey, JSON.stringify(snapshot.state), "EX", ttlSeconds);
+    pipeline.set(stateKey, JSON.stringify(snapshot.state), "EX", ttlSeconds);
   }
   for (const id of snapshot.dedupIds) {
-    await redis.set(getThreadDedupKey(threadId, id), "1", "EX", ttlSeconds);
+    pipeline.set(getThreadDedupKey(threadId, id), "1", "EX", ttlSeconds);
   }
-  // Write the meta marker last so partial restores don't masquerade
-  // as a healthy hot-tier thread.
+  const results = await pipeline.exec();
+  if (results) {
+    const firstErr = results.find(([err]) => err)?.[0] ?? null;
+    if (firstErr) {
+      // Compensate: pipelines are non-atomic, so writes queued after
+      // a failing command (notably dedup SETs) may have landed. Best-
+      // effort clear every key we touched so a leftover dedup marker
+      // can't silently skip a future append with the same id.
+      await redis
+        .del(
+          listKey,
+          stateKey,
+          ...snapshot.dedupIds.map((id) => getThreadDedupKey(threadId, id))
+        )
+        .catch(() => undefined);
+      throw firstErr;
+    }
+  }
   await redis.set(metaKey, "1", "EX", ttlSeconds);
 }
 

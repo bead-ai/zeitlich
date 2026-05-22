@@ -127,6 +127,51 @@ export function createFakeRedis(): Redis & {
       ttls.set(dedupKey, ttl);
       return 1;
     },
+    // Chainable pipeline stub. Defers each command to the underlying
+    // sync fake methods on `.exec()`, so TTL tracking and store
+    // semantics stay identical to the non-pipelined path. `fake` is
+    // typed as `Redis` after the cast below, so we narrow it back to
+    // the concrete impl shape here to avoid Redis's callback overloads.
+    pipeline(): FakePipeline {
+      const impl = fake as unknown as {
+        set: (key: string, value: string, ...rest: (string | number)[]) => Promise<"OK">;
+        del: (...keys: string[]) => Promise<number>;
+        rpush: (key: string, ...values: string[]) => Promise<number>;
+        expire: (key: string, ttl: number) => Promise<number>;
+      };
+      const ops: Array<() => Promise<unknown>> = [];
+      const chain: FakePipeline = {
+        set: (...args) => {
+          const [key, value, ...rest] = args as [string, string, ...(string | number)[]];
+          ops.push(() => impl.set(key, value, ...rest));
+          return chain;
+        },
+        del: (...keys) => {
+          ops.push(() => impl.del(...keys));
+          return chain;
+        },
+        rpush: (key, ...values) => {
+          ops.push(() => impl.rpush(key, ...values));
+          return chain;
+        },
+        expire: (key, ttl) => {
+          ops.push(() => impl.expire(key, ttl));
+          return chain;
+        },
+        exec: async () => {
+          const results: Array<[Error | null, unknown]> = [];
+          for (const op of ops) {
+            try {
+              results.push([null, await op()]);
+            } catch (e) {
+              results.push([e as Error, null]);
+            }
+          }
+          return results;
+        },
+      };
+      return chain;
+    },
     _store: store,
     _ttls: ttls,
   } as unknown as Redis & {
@@ -135,6 +180,15 @@ export function createFakeRedis(): Redis & {
   };
 
   return fake;
+}
+
+/** Minimal chainable surface used by the fake-redis pipeline stub. */
+interface FakePipeline {
+  set: (...args: (string | number)[]) => FakePipeline;
+  del: (...keys: string[]) => FakePipeline;
+  rpush: (key: string, ...values: string[]) => FakePipeline;
+  expire: (key: string, ttl: number) => FakePipeline;
+  exec: () => Promise<Array<[Error | null, unknown]>>;
 }
 
 /**
