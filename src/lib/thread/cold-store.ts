@@ -20,6 +20,7 @@
 
 import { gzipSync, gunzipSync } from "node:zlib";
 import type { PersistedThreadState } from "../state/types";
+import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
 
 /**
  * Serialized form of a thread that can be written to and read from a
@@ -185,7 +186,7 @@ export function createS3ColdStore(
       threadId: string
     ): Promise<ThreadSnapshot | null> {
       const Key = buildKey(prefix, threadKey, threadId, gzip);
-      const { GetObjectCommand } = await import("@aws-sdk/client-s3");
+
       try {
         const resp = (await s3.send(
           new GetObjectCommand({ Bucket: bucket, Key })
@@ -209,7 +210,7 @@ export function createS3ColdStore(
       const Key = buildKey(prefix, threadKey, threadId, gzip);
       const json = JSON.stringify(snapshot);
       const body = gzip ? gzipSync(Buffer.from(json, "utf8")) : json;
-      const { PutObjectCommand } = await import("@aws-sdk/client-s3");
+
       await s3.send(
         new PutObjectCommand({
           Bucket: bucket,
@@ -225,7 +226,7 @@ export function createS3ColdStore(
       threadId: string
     ): Promise<void> {
       const Key = buildKey(prefix, threadKey, threadId, gzip);
-      const { DeleteObjectCommand } = await import("@aws-sdk/client-s3");
+
       await s3.send(new DeleteObjectCommand({ Bucket: bucket, Key }));
     },
   };
