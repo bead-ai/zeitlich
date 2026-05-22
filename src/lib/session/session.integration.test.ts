@@ -1342,4 +1342,136 @@ describe("createSession integration", () => {
     const newThreadSlice = stateStore.get(result.threadId);
     expect(newThreadSlice?.tasks).toHaveLength(1);
   });
+
+  // --- Cold-tier lifecycle (hydrateThread + flushThread) ---
+
+  it("skips hydrateThread for mode:'new' threads but still flushes on exit", async () => {
+    const { ops, log } = createMockThreadOps();
+
+    const session = await createSession({
+      agentName: "TestAgent",
+      thread: { mode: "new", threadId: "fresh-thread" },
+      runAgent: createScriptedRunAgent([{ message: "ok", toolCalls: [] }]),
+      threadOps: ops,
+      buildContextMessage: () => "hi",
+    });
+
+    const stateManager = createAgentStateManager({
+      initialState: { systemPrompt: "system" },
+    });
+    await session.runSession({ stateManager });
+
+    expect(log.filter((l) => l.op === "hydrateThread")).toHaveLength(0);
+    const flushes = log.filter((l) => l.op === "flushThread");
+    expect(flushes).toHaveLength(1);
+    expect(at(flushes, 0).args[0]).toBe("fresh-thread");
+  });
+
+  it("hydrates the target thread before continuing it", async () => {
+    const { ops, log, stateStore } = createMockThreadOps();
+    stateStore.set("existing-thread", {
+      tasks: [],
+      custom: { previous: true },
+    });
+
+    const session = await createSession({
+      agentName: "TestAgent",
+      thread: { mode: "continue", threadId: "existing-thread" },
+      runAgent: createScriptedRunAgent([{ message: "ok", toolCalls: [] }]),
+      threadOps: ops,
+      buildContextMessage: () => "follow-up",
+    });
+
+    const stateManager = createAgentStateManager({
+      initialState: { systemPrompt: "system" },
+    });
+    await session.runSession({ stateManager });
+
+    const hydrates = log.filter((l) => l.op === "hydrateThread");
+    expect(hydrates).toHaveLength(1);
+    expect(at(hydrates, 0).args[0]).toBe("existing-thread");
+
+    // hydrate runs strictly before loadThreadState so the load sees
+    // fresh data when a cold tier is wired.
+    const hydrateIdx = log.findIndex((l) => l.op === "hydrateThread");
+    const loadIdx = log.findIndex((l) => l.op === "loadThreadState");
+    expect(hydrateIdx).toBeLessThan(loadIdx);
+  });
+
+  it("hydrates the *source* thread (not the new one) on mode:'fork'", async () => {
+    const { ops, log, stateStore } = createMockThreadOps();
+    stateStore.set("src-thread", { tasks: [], custom: {} });
+
+    const session = await createSession({
+      agentName: "TestAgent",
+      thread: { mode: "fork", threadId: "src-thread" },
+      runAgent: createScriptedRunAgent([{ message: "ok", toolCalls: [] }]),
+      threadOps: ops,
+      buildContextMessage: () => "fork me",
+    });
+
+    const stateManager = createAgentStateManager({
+      initialState: { systemPrompt: "system" },
+    });
+    const result = await session.runSession({ stateManager });
+
+    const hydrates = log.filter((l) => l.op === "hydrateThread");
+    expect(hydrates).toHaveLength(1);
+    expect(at(hydrates, 0).args[0]).toBe("src-thread");
+
+    // hydrate runs before forkThread so the source is hot before
+    // the in-Redis fork copy.
+    const hydrateIdx = log.findIndex((l) => l.op === "hydrateThread");
+    const forkIdx = log.findIndex((l) => l.op === "forkThread");
+    expect(hydrateIdx).toBeLessThan(forkIdx);
+
+    // Flush still targets the *new* thread.
+    const flushes = log.filter((l) => l.op === "flushThread");
+    expect(flushes).toHaveLength(1);
+    expect(at(flushes, 0).args[0]).toBe(result.threadId);
+    expect(at(flushes, 0).args[0]).not.toBe("src-thread");
+  });
+
+  it("flushThread runs even when the session fails", async () => {
+    const { ops, log } = createMockThreadOps();
+
+    const session = await createSession({
+      agentName: "TestAgent",
+      thread: { mode: "new", threadId: "fail-thread" },
+      runAgent: async () => {
+        throw new Error("boom");
+      },
+      threadOps: ops,
+      buildContextMessage: () => "hi",
+    });
+
+    const stateManager = createAgentStateManager({
+      initialState: { systemPrompt: "system" },
+    });
+    await expect(session.runSession({ stateManager })).rejects.toThrow(/boom/);
+
+    const flushes = log.filter((l) => l.op === "flushThread");
+    expect(flushes).toHaveLength(1);
+    expect(at(flushes, 0).args[0]).toBe("fail-thread");
+  });
+
+  it("flushThread runs after saveThreadState", async () => {
+    const { ops, log } = createMockThreadOps();
+    const session = await createSession({
+      agentName: "TestAgent",
+      thread: { mode: "new", threadId: "ordered-thread" },
+      runAgent: createScriptedRunAgent([{ message: "ok", toolCalls: [] }]),
+      threadOps: ops,
+      buildContextMessage: () => "hi",
+    });
+    const stateManager = createAgentStateManager({
+      initialState: { systemPrompt: "system" },
+    });
+    await session.runSession({ stateManager });
+
+    const saveIdx = log.findIndex((l) => l.op === "saveThreadState");
+    const flushIdx = log.findIndex((l) => l.op === "flushThread");
+    expect(saveIdx).toBeGreaterThanOrEqual(0);
+    expect(flushIdx).toBeGreaterThan(saveIdx);
+  });
 });
