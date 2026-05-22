@@ -35,6 +35,12 @@ export interface AnthropicThreadManagerConfig {
   /** Thread key, defaults to 'messages' */
   key?: string;
   hooks?: AnthropicThreadManagerHooks;
+  /**
+   * Override the default thread TTL (90 days). When pairing the
+   * adapter with a durable cold tier, a shorter TTL (hours) is
+   * typically more appropriate.
+   */
+  ttlSeconds?: number;
 }
 
 /** Prepared payload ready to send to the Anthropic API */
@@ -57,7 +63,8 @@ export interface AnthropicThreadManager extends ProviderThreadManager<
   prepareForInvocation(): Promise<AnthropicInvocationPayload>;
 }
 
-function storedMessageId(msg: StoredMessage): string {
+/** Extract the unique id from a {@link StoredMessage}. */
+export function storedMessageId(msg: StoredMessage): string {
   return msg.id;
 }
 
@@ -113,6 +120,7 @@ export function createAnthropicThreadManager(
     threadId: config.threadId,
     key: config.key,
     idOf: storedMessageId,
+    ...(config.ttlSeconds !== undefined && { ttlSeconds: config.ttlSeconds }),
   };
 
   const base = createThreadManager(baseConfig);

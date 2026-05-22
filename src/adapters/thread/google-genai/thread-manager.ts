@@ -31,6 +31,12 @@ export interface GoogleGenAIThreadManagerConfig {
   /** Thread key, defaults to 'messages' */
   key?: string;
   hooks?: GoogleGenAIThreadManagerHooks;
+  /**
+   * Override the default thread TTL (90 days). When pairing the
+   * adapter with a durable cold tier, a shorter TTL (hours) is
+   * typically more appropriate.
+   */
+  ttlSeconds?: number;
 }
 
 /** Prepared payload ready to send to the Google GenAI API */
@@ -50,7 +56,8 @@ export interface GoogleGenAIThreadManager extends ProviderThreadManager<
   prepareForInvocation(): Promise<GoogleGenAIInvocationPayload>;
 }
 
-function storedContentId(msg: StoredContent): string {
+/** Extract the unique id from a {@link StoredContent}. */
+export function storedContentId(msg: StoredContent): string {
   return msg.id;
 }
 
@@ -103,6 +110,7 @@ export function createGoogleGenAIThreadManager(
     threadId: config.threadId,
     key: config.key,
     idOf: storedContentId,
+    ...(config.ttlSeconds !== undefined && { ttlSeconds: config.ttlSeconds }),
   };
 
   const base = createThreadManager(baseConfig);

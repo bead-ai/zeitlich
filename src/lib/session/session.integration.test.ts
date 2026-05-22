@@ -132,6 +132,12 @@ function createMockThreadOps() {
       log.push({ op: "saveThreadState", args: [threadId, state] });
       stateStore.set(threadId, state);
     },
+    hydrateThread: async (threadId) => {
+      log.push({ op: "hydrateThread", args: [threadId] });
+    },
+    flushThread: async (threadId) => {
+      log.push({ op: "flushThread", args: [threadId] });
+    },
   });
 
   return { ops, log, stateStore };

@@ -92,3 +92,23 @@ export function getThreadStateKey(
 ): string {
   return `${threadKey}:state:thread:${threadId}`;
 }
+
+/**
+ * Build the Redis key that guards an idempotent append against a
+ * duplicate write of the message (or message batch) identified by
+ * `dedupId`. Zeitlich's thread manager writes one of these per
+ * single-message append (and one per batch for multi-message appends),
+ * keyed by the message id returned by the configured `idOf`.
+ *
+ * Note: the key layout intentionally does **not** include the
+ * `threadKey` prefix — the dedup namespace is shared across thread
+ * keys for a given `threadId`, mirroring the original internal
+ * implementation.
+ *
+ * @param threadId - Thread id as provided to the thread manager.
+ * @param dedupId  - Joined message ids (single message id for the
+ *                   common single-append case).
+ */
+export function getThreadDedupKey(threadId: string, dedupId: string): string {
+  return `dedup:${dedupId}:thread:${threadId}`;
+}

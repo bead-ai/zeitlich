@@ -14,6 +14,17 @@ export interface ThreadManagerConfig<T> {
    * When provided, `append` uses an atomic Lua script to skip duplicate writes.
    */
   idOf?: (message: T) => string;
+  /**
+   * TTL (in seconds) applied to every Redis key the manager writes
+   * (the list, the meta marker, the state slice, and dedup markers).
+   *
+   * Defaults to {@link THREAD_TTL_SECONDS} (90 days) for back-compat.
+   * When the consumer pairs the thread manager with a durable cold
+   * tier (see `createTieredThreadManager`), a much shorter TTL — e.g.
+   * a few hours — is usually more appropriate since the cold tier is
+   * the source of truth and Redis is just a hot cache.
+   */
+  ttlSeconds?: number;
 }
 
 /** Generic thread manager for any message type */
