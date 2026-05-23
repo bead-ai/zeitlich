@@ -26,13 +26,15 @@ const DEFAULT_OPTIONS: ActivityOptions = {
 };
 
 /**
- * `heartbeatTimeout` pairs with `withHeartbeat` in the adapter bodies
- * so stuck workers trip via heartbeat, not `startToCloseTimeout`.
- * Harmless on Redis-only deployments — the activities no-op.
+ * `heartbeatTimeout` assumes the built-in S3 cold store's progress
+ * events (multipart `Upload` + chunked stream read). Stalls trip via
+ * heartbeat rather than `startToCloseTimeout`. Custom backends without
+ * progress events should override via `perOp`. Harmless on Redis-only
+ * deployments — the activities no-op.
  */
 const BUILTIN_PER_OP: Partial<Record<OpName, ActivityOptions>> = {
-  hydrateThread: { startToCloseTimeout: "120s", heartbeatTimeout: "15s" },
-  flushThread: { startToCloseTimeout: "120s", heartbeatTimeout: "15s" },
+  hydrateThread: { startToCloseTimeout: "60s", heartbeatTimeout: "15s" },
+  flushThread: { startToCloseTimeout: "60s", heartbeatTimeout: "15s" },
 };
 
 /**

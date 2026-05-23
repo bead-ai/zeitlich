@@ -15,7 +15,6 @@ import type {
 import type { ModelInvoker } from "../../../lib/model";
 import { createTieredThreadManager } from "../../../lib/thread/tiered";
 import type { ColdThreadStore } from "../../../lib/thread/cold-store";
-import { withHeartbeat, COLD_TIER_HEARTBEAT_INTERVAL_MS } from "../../../lib/activity";
 import {
   createGoogleGenAIThreadManager,
   storedContentId,
@@ -276,9 +275,7 @@ export function createGoogleGenAIAdapter(
       threadKey?: string
     ): Promise<void> {
       if (!config.coldStore) return;
-      await withHeartbeat(COLD_TIER_HEARTBEAT_INTERVAL_MS, () =>
-        makeTieredBase(threadId, threadKey).hydrate()
-      );
+      await makeTieredBase(threadId, threadKey).hydrate();
     },
 
     async flushThread(
@@ -286,9 +283,7 @@ export function createGoogleGenAIAdapter(
       threadKey?: string
     ): Promise<void> {
       if (!config.coldStore) return;
-      await withHeartbeat(COLD_TIER_HEARTBEAT_INTERVAL_MS, () =>
-        makeTieredBase(threadId, threadKey).flush()
-      );
+      await makeTieredBase(threadId, threadKey).flush();
     },
   };
 

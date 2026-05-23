@@ -25,35 +25,6 @@ export function getActivityContext(): {
 }
 
 /**
- * Default heartbeat cadence for the cold-tier thread activities.
- * 2s sits under the SDK's 80% throttle of the 15s `heartbeatTimeout`
- * set on those activities, leaving headroom for prompt detection.
- */
-export const COLD_TIER_HEARTBEAT_INTERVAL_MS = 2_000;
-
-/**
- * Emit Temporal activity heartbeats every `intervalMs` while `fn`
- * runs. No-op outside an activity context (safe for unit tests).
- * Pair with `heartbeatTimeout` in the workflow-side ActivityOptions
- * for stuck-worker detection on long-running activities.
- */
-export async function withHeartbeat<T>(
-  intervalMs: number,
-  fn: () => Promise<T>
-): Promise<T> {
-  const { heartbeat } = getActivityContext();
-  if (!heartbeat) return fn();
-  const handle = setInterval(heartbeat, intervalMs);
-  // Don't keep the Node event loop alive solely for this interval.
-  handle.unref?.();
-  try {
-    return await fn();
-  } finally {
-    clearInterval(handle);
-  }
-}
-
-/**
  * Query the parent workflow's state from within an activity.
  * Resolves the workflow handle from the current activity context.
  */
