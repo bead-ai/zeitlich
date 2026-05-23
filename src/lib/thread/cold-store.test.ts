@@ -190,4 +190,27 @@ describe("createS3ColdStore", () => {
     });
     expect(await cold.read("messages", "t-1")).toEqual(sampleSnapshot);
   });
+
+  it("round-trips a large payload through the async gzip path", async () => {
+    // ~1 MB payload — regression guard that large payloads still
+    // encode/decode correctly through the promisified gzip path.
+    const big: ThreadSnapshot = {
+      v: 1,
+      messages: Array.from({ length: 500 }, (_, i) =>
+        JSON.stringify({
+          id: `m${i}`,
+          text: "x".repeat(2048),
+        })
+      ),
+      state: null,
+      dedupIds: Array.from({ length: 500 }, (_, i) => `m${i}`),
+    };
+
+    const cold = createS3ColdStore({
+      s3: fake.s3,
+      bucket: "test-bucket",
+    });
+    await cold.write("messages", "big", big);
+    expect(await cold.read("messages", "big")).toEqual(big);
+  });
 });

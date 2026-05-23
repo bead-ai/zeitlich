@@ -72,6 +72,7 @@ export {
   createRunAgentActivity,
   withParentWorkflowState,
   getActivityContext,
+  withHeartbeat,
 } from "./lib/activity";
 export type { AgentStateContext } from "./lib/activity";
 

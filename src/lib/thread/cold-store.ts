@@ -18,9 +18,15 @@
  * last-writer-wins; no compare-and-swap is required.
  */
 
-import { gzipSync, gunzipSync } from "node:zlib";
+import { gunzip as gunzipCb, gzip as gzipCb } from "node:zlib";
+import { promisify } from "node:util";
 import type { PersistedThreadState } from "../state/types";
 import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
+
+// Async zlib so gzip/gunzip yield to the event loop, letting activity
+// heartbeats fire on schedule during compression of large snapshots.
+const gzipAsync = promisify(gzipCb);
+const gunzipAsync = promisify(gunzipCb);
 
 /**
  * Serialized form of a thread that can be written to and read from a
@@ -193,7 +199,7 @@ export function createS3ColdStore(
         )) as { Body?: unknown };
         const buf = await streamToBuffer(resp.Body);
         const json = gzip
-          ? gunzipSync(buf).toString("utf8")
+          ? (await gunzipAsync(buf)).toString("utf8")
           : buf.toString("utf8");
         return JSON.parse(json) as ThreadSnapshot;
       } catch (err) {
@@ -209,7 +215,7 @@ export function createS3ColdStore(
     ): Promise<void> {
       const Key = buildKey(prefix, threadKey, threadId, gzip);
       const json = JSON.stringify(snapshot);
-      const body = gzip ? gzipSync(Buffer.from(json, "utf8")) : json;
+      const body = gzip ? await gzipAsync(Buffer.from(json, "utf8")) : json;
 
       await s3.send(
         new PutObjectCommand({

@@ -15,6 +15,7 @@ import type {
 import type { ModelInvoker } from "../../../lib/model";
 import { createTieredThreadManager } from "../../../lib/thread/tiered";
 import type { ColdThreadStore } from "../../../lib/thread/cold-store";
+import { withHeartbeat, COLD_TIER_HEARTBEAT_INTERVAL_MS } from "../../../lib/activity";
 import type { StoredMessage } from "@langchain/core/messages";
 import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
 import {
@@ -247,7 +248,9 @@ export function createLangChainAdapter(
       threadKey?: string
     ): Promise<void> {
       if (!config.coldStore) return;
-      await makeTieredBase(threadId, threadKey).hydrate();
+      await withHeartbeat(COLD_TIER_HEARTBEAT_INTERVAL_MS, () =>
+        makeTieredBase(threadId, threadKey).hydrate()
+      );
     },
 
     async flushThread(
@@ -255,7 +258,9 @@ export function createLangChainAdapter(
       threadKey?: string
     ): Promise<void> {
       if (!config.coldStore) return;
-      await makeTieredBase(threadId, threadKey).flush();
+      await withHeartbeat(COLD_TIER_HEARTBEAT_INTERVAL_MS, () =>
+        makeTieredBase(threadId, threadKey).flush()
+      );
     },
   };
 

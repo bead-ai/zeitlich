@@ -15,6 +15,7 @@ import type {
 import type { ModelInvoker } from "../../../lib/model";
 import { createTieredThreadManager } from "../../../lib/thread/tiered";
 import type { ColdThreadStore } from "../../../lib/thread/cold-store";
+import { withHeartbeat, COLD_TIER_HEARTBEAT_INTERVAL_MS } from "../../../lib/activity";
 import {
   createAnthropicThreadManager,
   storedMessageId,
@@ -273,7 +274,9 @@ export function createAnthropicAdapter(
       threadKey?: string
     ): Promise<void> {
       if (!config.coldStore) return;
-      await makeTieredBase(threadId, threadKey).hydrate();
+      await withHeartbeat(COLD_TIER_HEARTBEAT_INTERVAL_MS, () =>
+        makeTieredBase(threadId, threadKey).hydrate()
+      );
     },
 
     async flushThread(
@@ -281,7 +284,9 @@ export function createAnthropicAdapter(
       threadKey?: string
     ): Promise<void> {
       if (!config.coldStore) return;
-      await makeTieredBase(threadId, threadKey).flush();
+      await withHeartbeat(COLD_TIER_HEARTBEAT_INTERVAL_MS, () =>
+        makeTieredBase(threadId, threadKey).flush()
+      );
     },
   };
 
