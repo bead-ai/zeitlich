@@ -237,8 +237,17 @@ export function createSubagentHandler<
 
     const threadMode = config.thread ?? "new";
     const allowsContinuation = threadMode !== "new";
-    const continuationThreadId =
-      args.threadId && allowsContinuation ? args.threadId : undefined;
+    // The parent agent's tool call wins. When `threadId` is omitted,
+    // `newThreadSource` decides what to fall back to: `"new"` (default)
+    // starts fresh, `"from-parent"` continues/forks the parent's own
+    // thread via `context.threadId`. Both paths still require
+    // `thread: "fork" | "continue"` — `thread: "new"` always starts
+    // fresh regardless of the source.
+    const newThreadSource = config.newThreadSource ?? "new";
+    const continuationThreadId = !allowsContinuation
+      ? undefined
+      : (args.threadId ??
+        (newThreadSource === "from-parent" ? context.threadId : undefined));
 
     // --- Build thread init ---
     let thread: ThreadInit | undefined;

@@ -635,6 +635,145 @@ describe("createSubagentHandler", () => {
     expect(workflowInput.thread).toBeUndefined();
   });
 
+  // --- newThreadSource: "from-parent" ---
+
+  it("uses the parent's threadId when fork + newThreadSource 'from-parent' and args.threadId is absent", async () => {
+    const { executeChild } = await import("@temporalio/workflow");
+    const execMock = executeChild as ReturnType<typeof vi.fn>;
+
+    const subagent: SubagentConfig = {
+      agentName: "parent-fork",
+      description: "Forks parent thread by default",
+      workflow: mockWorkflow(),
+      thread: "fork",
+      newThreadSource: "from-parent",
+    };
+
+    const { handler } = createSubagentHandler([subagent]);
+
+    await handler(
+      { subagent: "parent-fork", description: "test", prompt: "test" },
+      { threadId: "parent-t", toolCallId: "tc", toolName: "Subagent" }
+    );
+
+    const lastCall = execMock.mock.calls[execMock.mock.calls.length - 1];
+    if (!lastCall) throw new Error("expected executeChild call");
+    const workflowInput = lastCall[1].args[1] as SubagentWorkflowInput;
+    expect(workflowInput.thread).toEqual({
+      mode: "fork",
+      threadId: "parent-t",
+    });
+  });
+
+  it("uses the parent's threadId when continue + newThreadSource 'from-parent' and args.threadId is absent", async () => {
+    const { executeChild } = await import("@temporalio/workflow");
+    const execMock = executeChild as ReturnType<typeof vi.fn>;
+
+    const subagent: SubagentConfig = {
+      agentName: "parent-continue",
+      description: "Continues parent thread by default",
+      workflow: mockWorkflow(),
+      thread: "continue",
+      newThreadSource: "from-parent",
+    };
+
+    const { handler } = createSubagentHandler([subagent]);
+
+    await handler(
+      { subagent: "parent-continue", description: "test", prompt: "test" },
+      { threadId: "parent-t", toolCallId: "tc", toolName: "Subagent" }
+    );
+
+    const lastCall = execMock.mock.calls[execMock.mock.calls.length - 1];
+    if (!lastCall) throw new Error("expected executeChild call");
+    const workflowInput = lastCall[1].args[1] as SubagentWorkflowInput;
+    expect(workflowInput.thread).toEqual({
+      mode: "continue",
+      threadId: "parent-t",
+    });
+  });
+
+  it("prefers args.threadId over the parent source when both are available", async () => {
+    const { executeChild } = await import("@temporalio/workflow");
+    const execMock = executeChild as ReturnType<typeof vi.fn>;
+
+    const subagent: SubagentConfig = {
+      agentName: "parent-fork-explicit",
+      description: "Forks parent thread by default",
+      workflow: mockWorkflow(),
+      thread: "fork",
+      newThreadSource: "from-parent",
+    };
+
+    const { handler } = createSubagentHandler([subagent]);
+
+    await handler(
+      {
+        subagent: "parent-fork-explicit",
+        description: "test",
+        prompt: "test",
+        threadId: "explicit-prev",
+      },
+      { threadId: "parent-t", toolCallId: "tc", toolName: "Subagent" }
+    );
+
+    const lastCall = execMock.mock.calls[execMock.mock.calls.length - 1];
+    if (!lastCall) throw new Error("expected executeChild call");
+    const workflowInput = lastCall[1].args[1] as SubagentWorkflowInput;
+    expect(workflowInput.thread).toEqual({
+      mode: "fork",
+      threadId: "explicit-prev",
+    });
+  });
+
+  it("ignores newThreadSource 'from-parent' when thread is new", async () => {
+    const { executeChild } = await import("@temporalio/workflow");
+    const execMock = executeChild as ReturnType<typeof vi.fn>;
+
+    const subagent: SubagentConfig = {
+      agentName: "new-with-source",
+      description: "Should still start fresh",
+      workflow: mockWorkflow(),
+      newThreadSource: "from-parent",
+    };
+
+    const { handler } = createSubagentHandler([subagent]);
+
+    await handler(
+      { subagent: "new-with-source", description: "test", prompt: "test" },
+      { threadId: "parent-t", toolCallId: "tc", toolName: "Subagent" }
+    );
+
+    const lastCall = execMock.mock.calls[execMock.mock.calls.length - 1];
+    if (!lastCall) throw new Error("expected executeChild call");
+    const workflowInput = lastCall[1].args[1] as SubagentWorkflowInput;
+    expect(workflowInput.thread).toBeUndefined();
+  });
+
+  it("preserves prior behavior when fork is set with default newThreadSource and args.threadId is absent", async () => {
+    const { executeChild } = await import("@temporalio/workflow");
+    const execMock = executeChild as ReturnType<typeof vi.fn>;
+
+    const subagent: SubagentConfig = {
+      agentName: "fork-default-source",
+      description: "Fork with default new-thread source",
+      workflow: mockWorkflow(),
+      thread: "fork",
+    };
+
+    const { handler } = createSubagentHandler([subagent]);
+
+    await handler(
+      { subagent: "fork-default-source", description: "test", prompt: "test" },
+      { threadId: "parent-t", toolCallId: "tc", toolName: "Subagent" }
+    );
+
+    const lastCall = execMock.mock.calls[execMock.mock.calls.length - 1];
+    if (!lastCall) throw new Error("expected executeChild call");
+    const workflowInput = lastCall[1].args[1] as SubagentWorkflowInput;
+    expect(workflowInput.thread).toBeUndefined();
+  });
+
   // --- Sandbox continuation ---
 
   it("does not pass sandbox when thread is fork (own sandbox)", async () => {
