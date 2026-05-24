@@ -93,7 +93,7 @@ export type { VirtualFsContext } from "./lib/virtual-fs/types";
 // Tool handlers (activity implementations)
 // Wrap sandbox handlers with withSandbox(manager, handler) at registration time
 export { bashHandler } from "./tools/bash/handler";
-export { editHandler } from "./tools/edit/handler";
+export { editHandler, multiEditHandler } from "./tools/edit/handler";
 export { globHandler } from "./tools/glob/handler";
 export { readFileHandler } from "./tools/read-file/handler";
 export { writeFileHandler } from "./tools/write-file/handler";
