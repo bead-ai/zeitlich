@@ -2,6 +2,27 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.47](https://github.com/bead-ai/zeitlich/compare/v0.2.46...v0.2.47) (2026-05-24)
+
+
+### Features
+
+* add atomic multi edit tool and evals ([#121](https://github.com/bead-ai/zeitlich/issues/121)) ([d48b078](https://github.com/bead-ai/zeitlich/commit/d48b0789dd42e1cb96d451cd2b1628f7cf0b56be))
+* **anthropic:** add Bedrock-compatible prompt caching ([#122](https://github.com/bead-ai/zeitlich/issues/122)) ([ff2d031](https://github.com/bead-ai/zeitlich/commit/ff2d0313b470bf66120207f72d765f2c3b489c1c))
+* cold-tier thread heartbeats + per-op activity timeouts ([#124](https://github.com/bead-ai/zeitlich/issues/124)) ([ea7f5ff](https://github.com/bead-ai/zeitlich/commit/ea7f5ff681e717fcd211a85c78638491ec43a9ce))
+* **subagent:** add newThreadSource field to control thread behavior ([9b92902](https://github.com/bead-ai/zeitlich/commit/9b929021c7f2d693645dfdcdb4ddd6c829d6b6b2))
+* **subagent:** enhance thread handling with newThreadSource logic ([4c644f2](https://github.com/bead-ai/zeitlich/commit/4c644f2d1107abc15898e9af0e5c8a47c2e40abf))
+
+
+### Bug Fixes
+
+* stop returning tool input from tasks tool handlers ([0afbb2d](https://github.com/bead-ai/zeitlich/commit/0afbb2d3ccb373a386048f1c951a57968d8ad4d8))
+
+
+### Miscellaneous Chores
+
+* release 0.2.47 ([a339e1d](https://github.com/bead-ai/zeitlich/commit/a339e1d532f763f50a77d1ce00cd61b1b97d6b5e))
+
 ## [0.2.46](https://github.com/bead-ai/zeitlich/compare/v0.2.45...v0.2.46) (2026-05-22)
 
 
