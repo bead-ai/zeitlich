@@ -44,6 +44,7 @@ export function defineSubagent<
     enabled?: boolean | (() => boolean);
     taskQueue?: string;
     thread?: "new" | "fork" | "continue";
+    newThreadSource?: "new" | "from-parent";
     sandbox?: SubagentSandboxConfig;
   }
 ): SubagentConfig<TResult> {

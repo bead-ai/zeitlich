@@ -833,6 +833,17 @@ Trade-off: cleanup is deferred to parent close (no eager GC of superseded thread
 
 The `thread` field accepts `"new"` (default), `"fork"`, or `"continue"`. When set to `"fork"` or `"continue"`, the parent agent can pass a `threadId` in a subsequent `Task` tool call to resume the conversation. The subagent returns its `threadId` in the response (surfaced as `[Thread ID: ...]`), which the parent can use for continuation.
 
+The `newThreadSource` field controls what to do when the parent's tool call omits `threadId`. It accepts `"new"` (default — start a fresh thread) or `"from-parent"` (fork/continue the parent agent's own thread). Useful when you want a subagent that inherits the parent's conversation state by default without requiring the LLM to explicitly thread the id through:
+
+```typescript
+export const researcherSubagent = defineSubagent(researcherWorkflow, {
+  thread: "fork",
+  newThreadSource: "from-parent", // no threadId → fork the parent's thread
+});
+```
+
+An explicit `threadId` from the parent's tool call always wins; `newThreadSource` only applies when none is provided. The field has no effect with `thread: "new"`.
+
 The `sandbox` field accepts `"none"` (default) or an object with `source`, `continuation`, and optional `init`/`shutdown` fields:
 
 - `source: "inherit"` — use the parent's sandbox. `continuation: "continue"` shares it directly; `"fork"` forks from it on every call.

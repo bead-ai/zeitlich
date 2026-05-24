@@ -633,6 +633,22 @@ export interface SubagentConfig<TResult extends z.ZodType = z.ZodType> {
    */
   thread?: "new" | "fork" | "continue";
   /**
+   * Where the subagent's thread comes from when the parent's tool call
+   * omits `threadId`. Only meaningful in combination with
+   * `thread: "fork"` or `"continue"`.
+   *
+   * - `"new"` (default) — start a fresh thread (the prior behavior).
+   * - `"from-parent"` — use the parent's own `threadId` (from
+   *   `RouterContext`). With `thread: "fork"` the parent's conversation
+   *   is copied into a new thread; with `thread: "continue"` the
+   *   subagent appends to the parent's thread in-place.
+   *
+   * Has no effect when `thread` is `"new"` (or omitted). A `threadId`
+   * supplied by the parent agent always wins — `newThreadSource` only
+   * applies when none is provided.
+   */
+  newThreadSource?: "new" | "from-parent";
+  /**
    * Sandbox strategy for this subagent.
    *
    * @see {@link SubagentSandboxConfig}
