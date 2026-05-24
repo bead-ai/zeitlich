@@ -104,6 +104,7 @@ npm install zeitlich ioredis \
 - `@google/genai` >= 1.0.0 (optional — only when using the Google GenAI adapter)
 - `@aws-sdk/client-bedrock-agentcore` >= 3.900.0 (optional — only when using the Bedrock adapter)
 - `@aws-sdk/client-s3` >= 3.700.0 (optional — only when using the built-in S3 cold thread tier)
+- `@aws-sdk/lib-storage` >= 3.700.0 (optional — paired with `@aws-sdk/client-s3` for multipart uploads in the S3 cold tier)
 
 > **Why peer deps?** Zeitlich's public API surfaces `@temporalio/*` types
 > (`UpdateDefinition`, `ChildWorkflowOptions`, `Duration`, etc.) directly. Peer
@@ -729,6 +730,23 @@ Any backend that can satisfy these three calls — Cloudflare R2, Google Cloud S
 - **`deleteHot: true` by default on flush.** Memory drops immediately; the next continue re-hydrates in one `GetObject`. Override per-call via the tiered manager if you want to keep the hot tier warm.
 - **`mode: "new"` overwrites the cold archive for that `threadId`.** A session entered with `mode: "new"` skips `hydrateThread`; on exit `flushThread` writes the fresh snapshot back, silently replacing any prior cold-tier blob at the same `(threadKey, threadId)`. To resume a thread, use `mode: "continue"` or `mode: "fork"` — passing a previously-used `threadId` with `mode: "new"` is destructive by design.
 
+##### Activity timeouts
+
+`hydrateThread` and `flushThread` automatically get `startToCloseTimeout: "60s"` and `heartbeatTimeout: "15s"`. The S3 cold store uses multipart `Upload` for writes and streams the `GetObject` response on reads — each part completion / stream chunk emits a heartbeat, so a stalled upload or download trips `heartbeatTimeout` (15s) rather than waiting out `startToCloseTimeout` (60s). The Redis-only ops keep the tight `10s` baseline.
+
+To override an individual op without inflating the rest:
+
+```typescript
+const threadOps = proxyGoogleGenAIThreadOps(undefined, {
+  defaults: { startToCloseTimeout: "5s" },                  // applied to every op
+  perOp: {
+    flushThread: { startToCloseTimeout: "180s" },           // overlays cold-tier defaults; heartbeatTimeout still inherited
+  },
+});
+```
+
+`perOp[op]` is layered shallow-rightmost over `defaults` and the built-in cold-tier overlays for `hydrateThread` / `flushThread` — so a partial override only replaces the fields you specify. A bare `ActivityOptions` object is also accepted and treated as `{ defaults: <that object> }`, with the cold-tier overlay still applied on top — to raise the cold-tier ceiling above `60s`, use `perOp.flushThread` / `perOp.hydrateThread`.
+
 #### Sandbox Initialization (`SandboxInit`)
 
 The `sandbox` field controls how a sandbox is created or reused:
@@ -1061,6 +1079,7 @@ Framework-agnostic utilities for activities, worker setup, and Node.js code:
 | --------------------------- | ------------------------------------------------------------------------------------------------------------------ |
 | `createRunAgentActivity`    | Wraps a handler into a scope-prefixed `RunAgentActivity` with auto-fetched parent workflow state                   |
 | `withParentWorkflowState`   | Wraps a tool handler into an `ActivityToolHandler` with auto-fetched parent workflow state                         |
+| `getActivityContext`        | Safely returns `{ heartbeat, signal }` from the current Temporal activity, or `{}` outside one                     |
 | `createThreadManager`       | Generic Redis-backed thread manager factory                                                                        |
 | `createTieredThreadManager` | Redis hot + pluggable cold tier; adds `hydrate()` / `flush()` to `BaseThreadManager<T>`                            |
 | `createS3ColdStore`         | Built-in `ColdThreadStore` backed by an `@aws-sdk/client-s3` `S3Client`                                            |

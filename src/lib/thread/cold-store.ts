@@ -18,9 +18,17 @@
  * last-writer-wins; no compare-and-swap is required.
  */
 
-import { gzipSync, gunzipSync } from "node:zlib";
+import { gunzip as gunzipCb, gzip as gzipCb } from "node:zlib";
+import { promisify } from "node:util";
 import type { PersistedThreadState } from "../state/types";
-import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
+import { DeleteObjectCommand, GetObjectCommand, type S3Client } from "@aws-sdk/client-s3";
+import { Upload } from "@aws-sdk/lib-storage";
+import { getActivityContext } from "../activity";
+
+// Async zlib so gzip/gunzip don't block the worker's event loop
+// during compression of large snapshots.
+const gzipAsync = promisify(gzipCb);
+const gunzipAsync = promisify(gunzipCb);
 
 /**
  * Serialized form of a thread that can be written to and read from a
@@ -69,20 +77,16 @@ export interface ColdThreadStore {
 }
 
 /**
- * Compact, duck-typed shape of an S3 client. Zeitlich only needs the
- * `send(...)` method; declaring this locally avoids forcing
- * `@aws-sdk/client-s3` to be installed when the consumer is using a
- * different cold-store backend.
+ * Alias for `@aws-sdk/client-s3`'s `S3Client`. The built-in store
+ * calls `send(...)` and accesses `client.config` (read by
+ * `@aws-sdk/lib-storage`'s `Upload`) — a duck-type with just `send`
+ * is not sufficient.
  */
-export interface S3LikeClient {
-  send<TInput, TOutput>(
-    command: { input: TInput } & object
-  ): Promise<TOutput>;
-}
+export type S3LikeClient = S3Client;
 
 /** Configuration for the built-in S3 cold store. */
 export interface S3ColdStoreConfig {
-  /** An `@aws-sdk/client-s3` `S3Client` (or duck-typed equivalent). */
+  /** An `@aws-sdk/client-s3` `S3Client`. */
   s3: S3LikeClient;
   /** S3 bucket that holds the archive. */
   bucket: string;
@@ -126,10 +130,26 @@ function buildKey(
 }
 
 async function streamToBuffer(
-  body: unknown
+  body: unknown,
+  onChunk?: () => void
 ): Promise<Buffer> {
   if (body == null) return Buffer.alloc(0);
   if (body instanceof Uint8Array) return Buffer.from(body);
+  // Prefer async iteration so `onChunk` fires per chunk. Node S3
+  // bodies (`SdkStream<Readable>`) iterate; bulk-read fallbacks
+  // below cover browser body shapes.
+  if (
+    typeof (body as { [Symbol.asyncIterator]?: unknown })[
+      Symbol.asyncIterator
+    ] === "function"
+  ) {
+    const chunks: Buffer[] = [];
+    for await (const chunk of body as AsyncIterable<Buffer | Uint8Array>) {
+      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+      onChunk?.();
+    }
+    return Buffer.concat(chunks);
+  }
   if (typeof (body as { transformToByteArray?: () => Promise<Uint8Array> })
     .transformToByteArray === "function") {
     const bytes = await (
@@ -144,12 +164,7 @@ async function streamToBuffer(
     ).arrayBuffer();
     return Buffer.from(ab);
   }
-  // Node.js Readable stream fallback
-  const chunks: Buffer[] = [];
-  for await (const chunk of body as AsyncIterable<Buffer | Uint8Array>) {
-    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-  }
-  return Buffer.concat(chunks);
+  return Buffer.alloc(0);
 }
 
 /**
@@ -191,9 +206,10 @@ export function createS3ColdStore(
         const resp = (await s3.send(
           new GetObjectCommand({ Bucket: bucket, Key })
         )) as { Body?: unknown };
-        const buf = await streamToBuffer(resp.Body);
+        const { heartbeat } = getActivityContext();
+        const buf = await streamToBuffer(resp.Body, heartbeat);
         const json = gzip
-          ? gunzipSync(buf).toString("utf8")
+          ? (await gunzipAsync(buf)).toString("utf8")
           : buf.toString("utf8");
         return JSON.parse(json) as ThreadSnapshot;
       } catch (err) {
@@ -209,16 +225,19 @@ export function createS3ColdStore(
     ): Promise<void> {
       const Key = buildKey(prefix, threadKey, threadId, gzip);
       const json = JSON.stringify(snapshot);
-      const body = gzip ? gzipSync(Buffer.from(json, "utf8")) : json;
+      const body = gzip ? await gzipAsync(Buffer.from(json, "utf8")) : json;
 
-      await s3.send(
-        new PutObjectCommand({
-          Bucket: bucket,
-          Key,
-          Body: body,
-          ContentType: contentType,
-        })
-      );
+      const upload = new Upload({
+        client: s3,
+        params: { Bucket: bucket, Key, Body: body, ContentType: contentType },
+      });
+
+      // Heartbeat per S3 part completion so a stalled upload trips
+      // `heartbeatTimeout` instead of `startToCloseTimeout`.
+      const { heartbeat } = getActivityContext();
+      if (heartbeat) upload.on("httpUploadProgress", heartbeat);
+
+      await upload.done();
     },
 
     async delete(

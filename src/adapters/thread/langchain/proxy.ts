@@ -25,6 +25,7 @@ import { createThreadOpsProxy } from "../../../lib/thread/proxy";
 import { ADAPTER_ID } from "./adapter-id";
 
 export { ADAPTER_ID, type AdapterId } from "./adapter-id";
+export type { ThreadOpsProxyOptions } from "../../../lib/thread/proxy";
 
 export function proxyLangChainThreadOps(
   scope?: string,

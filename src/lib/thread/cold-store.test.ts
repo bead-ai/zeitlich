@@ -16,9 +16,9 @@ interface CommandInput {
 }
 
 /**
- * Minimal in-memory S3-shaped client. The `send()` method dispatches
- * by the command's constructor name, mirroring the contract that
- * `@aws-sdk/client-s3` exposes.
+ * Minimal S3-shaped fake. `send()` dispatches by command constructor
+ * name; `config` provides the fields `@aws-sdk/lib-storage`'s
+ * single-part upload path inspects.
  */
 function createFakeS3(): {
   s3: S3LikeClient;
@@ -31,7 +31,12 @@ function createFakeS3(): {
   const compositeKey = (bucket: string, key: string): string =>
     `${bucket}/${key}`;
 
-  const s3: S3LikeClient = {
+  const s3 = {
+    config: {
+      requestHandler: undefined,
+      forcePathStyle: false,
+      endpoint: async (): Promise<URL> => new URL("https://fake.s3.local"),
+    },
     async send<TInput, TOutput>(
       command: { input: TInput } & object
     ): Promise<TOutput> {
@@ -68,7 +73,7 @@ function createFakeS3(): {
       }
       throw new Error(`unknown command: ${name}`);
     },
-  };
+  } as unknown as S3LikeClient;
 
   return { s3, store, calls };
 }
@@ -189,5 +194,28 @@ describe("createS3ColdStore", () => {
       bucket: "test-bucket",
     });
     expect(await cold.read("messages", "t-1")).toEqual(sampleSnapshot);
+  });
+
+  it("round-trips a large payload through the async gzip path", async () => {
+    // ~1 MB payload — regression guard that large payloads still
+    // encode/decode correctly through the promisified gzip path.
+    const big: ThreadSnapshot = {
+      v: 1,
+      messages: Array.from({ length: 500 }, (_, i) =>
+        JSON.stringify({
+          id: `m${i}`,
+          text: "x".repeat(2048),
+        })
+      ),
+      state: null,
+      dedupIds: Array.from({ length: 500 }, (_, i) => `m${i}`),
+    };
+
+    const cold = createS3ColdStore({
+      s3: fake.s3,
+      bucket: "test-bucket",
+    });
+    await cold.write("messages", "big", big);
+    expect(await cold.read("messages", "big")).toEqual(big);
   });
 });
