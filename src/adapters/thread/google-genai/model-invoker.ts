@@ -25,6 +25,14 @@ export interface GoogleGenAIModelInvokerConfig {
    *  `systemInstruction`, `tools`, and `abortSignal` are managed by the
    *  invoker and will override any values set here. */
   config?: GenerateContentConfig;
+  /** Caches the first `splitIndex` messages server-side (with
+   *  `systemInstruction`, `tools`, and `toolConfig`). Skipped when
+   *  `contents.length <= splitIndex`. */
+  cache?: {
+    splitIndex: number;
+    /** Default: 300. */
+    ttlSeconds?: number;
+  };
 }
 
 function toFunctionDeclarations(
@@ -62,6 +70,7 @@ export function createGoogleGenAIModelInvoker({
   model,
   hooks,
   config: generationConfig,
+  cache: cacheConfig,
 }: GoogleGenAIModelInvokerConfig) {
   return async function invokeGoogleGenAIModel(
     config: ModelInvokerConfig
@@ -90,16 +99,67 @@ export function createGoogleGenAIModelInvoker({
       systemInstruction: _si,
       tools: _t,
       abortSignal: _as,
+      cachedContent: callerCachedContent,
+      toolConfig: callerToolConfig,
       ...callerConfig
     } = generationConfig ?? {};
 
+    let liveContents = contents;
+    let cachedContentName: string | undefined;
+    let cachedWriteTokens: number | undefined;
+
+    if (
+      cacheConfig &&
+      cacheConfig.splitIndex > 0 &&
+      contents.length > cacheConfig.splitIndex
+    ) {
+      liveContents = contents.slice(cacheConfig.splitIndex);
+      const ttl = cacheConfig.ttlSeconds ?? 300;
+      const cacheRedisKey = `${threadKey ?? "messages"}:gemini-cache:${model}:${cacheConfig.splitIndex}:thread:${threadId}`;
+
+      cachedContentName = (await redis.get(cacheRedisKey)) ?? undefined;
+
+      if (!cachedContentName) {
+        const cacheInstance = await client.caches.create({
+          model,
+          config: {
+            contents: contents.slice(0, cacheConfig.splitIndex),
+            ...(systemInstruction ? { systemInstruction } : {}),
+            ...(tools ? { tools } : {}),
+            ...(callerToolConfig ? { toolConfig: callerToolConfig } : {}),
+            ttl: `${ttl}s`,
+            abortSignal: signal,
+          },
+        });
+        if (!cacheInstance?.name) {
+          throw new Error("Gemini cache creation did not return a cache name");
+        }
+        cachedContentName = cacheInstance.name;
+        cachedWriteTokens =
+          cacheInstance.usageMetadata?.totalTokenCount ?? undefined;
+        const redisTtl = ttl - 5;
+        if (redisTtl > 0) {
+          await redis.set(cacheRedisKey, cachedContentName, "EX", redisTtl);
+        }
+      }
+    }
+
     const stream = await client.models.generateContentStream({
       model,
-      contents,
+      contents: liveContents,
       config: {
         ...callerConfig,
-        ...(systemInstruction ? { systemInstruction } : {}),
-        ...(tools ? { tools } : {}),
+        ...(cachedContentName
+          ? { cachedContent: cachedContentName }
+          : {
+              ...(callerCachedContent
+                ? { cachedContent: callerCachedContent }
+                : {
+                    ...(systemInstruction ? { systemInstruction } : {}),
+                    ...(tools ? { tools } : {}),
+                  }),
+              ...(callerToolConfig ? { toolConfig: callerToolConfig } : {}),
+            }),
         abortSignal: signal,
       },
     });
@@ -141,6 +201,7 @@ export function createGoogleGenAIModelInvoker({
       usage: {
         inputTokens: lastChunk.usageMetadata?.promptTokenCount,
         outputTokens: lastChunk.usageMetadata?.candidatesTokenCount,
+        cachedWriteTokens,
         cachedReadTokens: lastChunk.usageMetadata?.cachedContentTokenCount,
         reasonTokens: lastChunk.usageMetadata?.thoughtsTokenCount,
       },
@@ -155,6 +216,7 @@ export async function invokeGoogleGenAIModel({
   hooks,
   config,
   generationConfig,
+  cache,
 }: {
   redis: Redis;
   client: GoogleGenAI;
@@ -162,6 +224,7 @@ export async function invokeGoogleGenAIModel({
   hooks?: GoogleGenAIThreadManagerHooks;
   config: ModelInvokerConfig;
   generationConfig?: GenerateContentConfig;
+  cache?: GoogleGenAIModelInvokerConfig["cache"];
 }): Promise<AgentResponse<Content>> {
   const invoker = createGoogleGenAIModelInvoker({
     redis,
@@ -169,6 +232,7 @@ export async function invokeGoogleGenAIModel({
     model,
     hooks,
     config: generationConfig,
+    cache,
   });
   return invoker(config);
 }
