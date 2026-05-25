@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.49](https://github.com/bead-ai/zeitlich/compare/v0.2.48...v0.2.49) (2026-05-25)
+
+
+### Features
+
+* add persistThreadState callback to RouterContext and ProcessToolCallsContext ([3aa40f3](https://github.com/bead-ai/zeitlich/commit/3aa40f3743878b0da146ff1c57dc191cd83d04c6))
+* add persistThreadState callback to RouterContext and ProcessToolCallsContext ([ba5962e](https://github.com/bead-ai/zeitlich/commit/ba5962e6f757e8921129e80a910b5c09ff428877))
+
+
+### Miscellaneous Chores
+
+* release 0.2.49 ([47ad2f6](https://github.com/bead-ai/zeitlich/commit/47ad2f6da81339a50e5dbe85094f98853a811b86))
+
 ## [0.2.48](https://github.com/bead-ai/zeitlich/compare/v0.2.47...v0.2.48) (2026-05-25)
 
 
