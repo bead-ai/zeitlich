@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.48](https://github.com/bead-ai/zeitlich/compare/v0.2.47...v0.2.48) (2026-05-25)
+
+
+### Features
+
+* add assistantMessageId to RouterContext and ProcessToolCallsContext ([135737d](https://github.com/bead-ai/zeitlich/commit/135737dd18688ee7d102fe249322ae68512be3f4))
+* add assistantMessageId to RouterContext and ProcessToolCallsContext ([81f602c](https://github.com/bead-ai/zeitlich/commit/81f602c20f2ba406b87f71ca394438ab140feea5))
+
+
+### Miscellaneous Chores
+
+* release 0.2.48 ([7371a00](https://github.com/bead-ai/zeitlich/commit/7371a00ac9de9eccaee58ee76c3e6294a8e5d7f2))
+
 ## [0.2.47](https://github.com/bead-ai/zeitlich/compare/v0.2.46...v0.2.47) (2026-05-24)
 
 
