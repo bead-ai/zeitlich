@@ -890,6 +890,8 @@ export const researcherSubagent = defineSubagent(researcherWorkflow, {
 
 An explicit `threadId` from the parent's tool call always wins; `newThreadSource` only applies when none is provided. The field has no effect with `thread: "new"`.
 
+When `newThreadSource: "from-parent"` triggers a fork, the parent is mid-tool-call: its assistant message containing the `Subagent` tool_use has been persisted, but the matching `tool_result` hasn't (the subagent is what will produce it). A verbatim fork would leave that orphan `tool_use` at the tail of the child thread — which most model APIs reject on the next call with "unmatched tool_use". The framework handles this automatically: the child session truncates the parent's last assistant message from the forked thread before the first model invocation, so the child sees a well-formed history. No user action is required.
+
 The `sandbox` field accepts `"none"` (default) or an object with `source`, `continuation`, and optional `init`/`shutdown` fields:
 
 - `source: "inherit"` — use the parent's sandbox. `continuation: "continue"` shares it directly; `"fork"` forks from it on every call.

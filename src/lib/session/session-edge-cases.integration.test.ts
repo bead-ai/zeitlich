@@ -660,6 +660,50 @@ describe("createSession edge cases", () => {
     const forkOp = forkOps[0];
     if (!forkOp) throw new Error("expected fork op");
     expect(forkOp.args[0]).toBe("original-thread");
+
+    // No truncateAfterFork directive ⇒ no truncate call.
+    const truncateOps = log.filter((l) => l.op === "truncateThread");
+    expect(truncateOps).toHaveLength(0);
+  });
+
+  it("fork thread mode truncates the forked thread at fromMessageId when truncateAfterFork is set", async () => {
+    const { ops, log } = createMockThreadOps();
+
+    const session = await createSession({
+      agentName: "TestAgent",
+      thread: {
+        mode: "fork",
+        threadId: "parent-thread",
+        truncateAfterFork: { fromMessageId: "parent-asst-msg-1" },
+      },
+      runAgent: createScriptedRunAgent([
+        { message: "forked & continued", toolCalls: [] },
+      ]),
+      threadOps: ops,
+      buildContextMessage: () => "continue",
+    });
+
+    const stateManager = createAgentStateManager({
+      initialState: { systemPrompt: "test" },
+    });
+
+    const result = await session.runSession({ stateManager });
+
+    expect(result.exitReason).toBe("completed");
+    const forkedThreadId = result.threadId;
+    expect(forkedThreadId).not.toBe("parent-thread");
+
+    // Order matters: fork must happen before truncate, otherwise the
+    // truncate would no-op against an empty thread.
+    const forkIdx = log.findIndex((l) => l.op === "forkThread");
+    const truncIdx = log.findIndex((l) => l.op === "truncateThread");
+    expect(forkIdx).toBeGreaterThanOrEqual(0);
+    expect(truncIdx).toBeGreaterThan(forkIdx);
+
+    const truncOp = log[truncIdx];
+    if (!truncOp) throw new Error("expected truncate op");
+    expect(truncOp.args[0]).toBe(forkedThreadId);
+    expect(truncOp.args[1]).toBe("parent-asst-msg-1");
   });
 
   // --- maxTurns of 1 ---

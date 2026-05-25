@@ -244,18 +244,44 @@ export function createSubagentHandler<
     // `thread: "fork" | "continue"` — `thread: "new"` always starts
     // fresh regardless of the source.
     const newThreadSource = config.newThreadSource ?? "new";
+    const usingParentFallback =
+      allowsContinuation &&
+      !args.threadId &&
+      newThreadSource === "from-parent";
     const continuationThreadId = !allowsContinuation
       ? undefined
-      : (args.threadId ??
-        (newThreadSource === "from-parent" ? context.threadId : undefined));
+      : (args.threadId ?? (usingParentFallback ? context.threadId : undefined));
 
     // --- Build thread init ---
     let thread: ThreadInit | undefined;
     if (continuationThreadId) {
-      thread = {
-        mode: threadMode as "fork" | "continue",
-        threadId: continuationThreadId,
-      };
+      if (threadMode === "fork") {
+        // When falling back to the parent's thread for a fork, the
+        // parent is mid-tool-call: its assistant message containing the
+        // `Subagent` tool_use has already been persisted, but its
+        // matching tool_result hasn't. Forking verbatim would leave an
+        // orphan tool_use at the tail of the child thread, which most
+        // model APIs reject on the very next call. Have the child's
+        // session truncate that assistant message (and anything after)
+        // immediately after the fork so the first model call sees a
+        // well-formed history.
+        thread = {
+          mode: "fork",
+          threadId: continuationThreadId,
+          ...(usingParentFallback && context.assistantMessageId
+            ? {
+                truncateAfterFork: {
+                  fromMessageId: context.assistantMessageId,
+                },
+              }
+            : {}),
+        };
+      } else {
+        thread = {
+          mode: "continue",
+          threadId: continuationThreadId,
+        };
+      }
     }
 
     // --- Build sandbox init ---

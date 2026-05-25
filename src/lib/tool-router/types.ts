@@ -178,6 +178,18 @@ export interface RouterContext {
   toolCallId: string;
   toolName: string;
   sandboxId?: string;
+  /**
+   * Id of the assistant message that issued this tool call (the message
+   * the session passed as `assistantMessageId` into `runAgent`). Present
+   * for any tool call processed through `processToolCalls` from a
+   * session; may be absent when the router is driven manually (e.g.
+   * tests, custom orchestrators).
+   *
+   * Subagent handlers that fork the parent's thread mid-call use this
+   * to truncate the orphan trailing assistant message from the forked
+   * thread so the child's first model call sees a well-formed history.
+   */
+  assistantMessageId?: string;
 }
 
 /**
@@ -294,6 +306,14 @@ export interface ProcessToolCallsContext {
   turn?: number;
   /** Active sandbox ID (when a sandbox is configured for this session) */
   sandboxId?: string;
+  /**
+   * Id of the assistant message that produced these tool calls. The
+   * router forwards it into every handler's {@link RouterContext} so
+   * handlers can reference the message they were issued from (e.g.
+   * subagent forks that need to truncate the orphan assistant message
+   * out of a parent-forked thread).
+   */
+  assistantMessageId?: string;
 }
 
 /**

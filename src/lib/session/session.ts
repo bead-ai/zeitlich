@@ -196,6 +196,7 @@ export async function createSession<
     appendSystemMessage,
     appendAgentMessage,
     forkThread,
+    truncateThread,
     loadThreadState,
     saveThreadState,
     hydrateThread,
@@ -399,6 +400,17 @@ export async function createSession<
         // is already hot or when no cold tier is wired.
         await hydrateThread(sourceThreadId, threadKey);
         await forkThread(sourceThreadId, threadId, threadKey);
+        // If the caller asked to drop the tail of the forked thread
+        // (e.g. subagent forking its parent mid-tool-call needs to
+        // strip the orphan assistant `tool_use`), do it now — before
+        // any rehydration / state load so the truncated thread is
+        // what subsequent reads see.
+        const truncate = (
+          threadInit as { mode: "fork"; truncateAfterFork?: { fromMessageId: string } }
+        ).truncateAfterFork;
+        if (truncate?.fromMessageId) {
+          await truncateThread(threadId, truncate.fromMessageId, threadKey);
+        }
         const forkedSlice = await loadThreadState(threadId, threadKey);
         if (forkedSlice) rehydrateFromSlice(forkedSlice);
       } else if (threadMode === "continue") {
@@ -570,6 +582,9 @@ export async function createSession<
             {
               turn: currentTurn,
               ...(sandboxId !== undefined && { sandboxId }),
+              ...(assistantId !== undefined && {
+                assistantMessageId: assistantId,
+              }),
             }
           );
 

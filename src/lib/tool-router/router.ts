@@ -220,7 +220,8 @@ export function createToolRouter<T extends ToolMap>(
     toolCall: ParsedToolCallUnion<T>,
     turn: number,
     sandboxId?: string,
-    onRewindRequested?: (signal: RewindSignal) => void
+    onRewindRequested?: (signal: RewindSignal) => void,
+    assistantMessageId?: string
   ): Promise<ProcessedToolCall> {
     const startTime = Date.now();
     const tool = toolMap.get(toolCall.name);
@@ -263,6 +264,7 @@ export function createToolRouter<T extends ToolMap>(
           toolCallId: toolCall.id,
           toolName: toolCall.name,
           ...(sandboxId !== undefined && { sandboxId }),
+          ...(assistantMessageId !== undefined && { assistantMessageId }),
         };
         const response = await tool.handler(
           effectiveArgs as Parameters<typeof tool.handler>[0],
@@ -419,6 +421,7 @@ export function createToolRouter<T extends ToolMap>(
 
       const turn = context?.turn ?? 0;
       const sandboxId = context?.sandboxId;
+      const assistantMessageId = context?.assistantMessageId;
 
       let rewindSignal: RewindSignal | undefined;
 
@@ -435,7 +438,13 @@ export function createToolRouter<T extends ToolMap>(
         const outcomes = await scope.run(async () =>
           Promise.allSettled(
             toolCalls.map((tc) =>
-              processToolCall(tc, turn, sandboxId, onRewindRequested)
+              processToolCall(
+                tc,
+                turn,
+                sandboxId,
+                onRewindRequested,
+                assistantMessageId
+              )
             )
           )
         );
@@ -457,7 +466,13 @@ export function createToolRouter<T extends ToolMap>(
 
       const results: ToolCallResultUnion<TResults>[] = [];
       for (const toolCall of toolCalls) {
-        const outcome = await processToolCall(toolCall, turn, sandboxId);
+        const outcome = await processToolCall(
+          toolCall,
+          turn,
+          sandboxId,
+          undefined,
+          assistantMessageId
+        );
         if (outcome.kind === "rewind") {
           rewindSignal = outcome.signal;
           break;
@@ -491,6 +506,9 @@ export function createToolRouter<T extends ToolMap>(
           toolName: toolCall.name as TName,
           ...(context?.sandboxId !== undefined && {
             sandboxId: context.sandboxId,
+          }),
+          ...(context?.assistantMessageId !== undefined && {
+            assistantMessageId: context.assistantMessageId,
           }),
         };
         const response = await handler(

@@ -134,6 +134,42 @@ describe("createToolRouter edge cases", () => {
     expect(appendSpy.calls).toHaveLength(0);
   });
 
+  // --- assistantMessageId propagation into RouterContext ---
+
+  it("forwards assistantMessageId from ProcessToolCallsContext into RouterContext", async () => {
+    let capturedAssistantMessageId: string | undefined;
+    const captureTool = defineTool({
+      name: "Capture" as const,
+      description: "captures router context",
+      schema: z.object({}),
+      handler: async (
+        _args: Record<string, never>,
+        ctx: { assistantMessageId?: string }
+      ): Promise<ToolHandlerResponse<null>> => {
+        capturedAssistantMessageId = ctx.assistantMessageId;
+        return { toolResponse: "ok", data: null };
+      },
+    });
+
+    const router = createToolRouter({
+      tools: { Capture: captureTool } as const,
+      threadId: "t-1",
+      appendToolResult: appendSpy.fn,
+    });
+
+    const parsed = router.parseToolCall({
+      id: "tc-1",
+      name: "Capture",
+      args: {},
+    });
+    await router.processToolCalls([parsed], {
+      turn: 1,
+      assistantMessageId: "asst-msg-42",
+    });
+
+    expect(capturedAssistantMessageId).toBe("asst-msg-42");
+  });
+
   // --- Both global and per-tool pre-hooks run in order ---
 
   it("global pre-hook runs before per-tool pre-hook", async () => {
