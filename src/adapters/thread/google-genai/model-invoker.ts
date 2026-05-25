@@ -1,8 +1,10 @@
+import { randomBytes } from "node:crypto";
 import type Redis from "ioredis";
 import type {
   GoogleGenAI,
   Content,
   FunctionDeclaration,
+  GenerateContentConfig,
   Part,
   GenerateContentResponse,
 } from "@google/genai";
@@ -19,6 +21,10 @@ export interface GoogleGenAIModelInvokerConfig {
   client: GoogleGenAI;
   model: string;
   hooks?: GoogleGenAIThreadManagerHooks;
+  /** Passed through to `generateContentStream().config`.
+   *  `systemInstruction`, `tools`, and `abortSignal` are managed by the
+   *  invoker and will override any values set here. */
+  config?: GenerateContentConfig;
 }
 
 function toFunctionDeclarations(
@@ -32,12 +38,7 @@ function toFunctionDeclarations(
 }
 
 /**
- * Creates a Google GenAI model invoker that satisfies the generic
- * `ModelInvoker<Content>` contract.
- *
- * Internally streams the response and emits Temporal heartbeats on each
- * chunk so that long-running LLM calls remain visible to the scheduler.
- * The caller is responsible for appending the response to the thread.
+ * The caller is responsible for appending the returned response to the thread.
  *
  * @example
  * ```typescript
@@ -60,6 +61,7 @@ export function createGoogleGenAIModelInvoker({
   client,
   model,
   hooks,
+  config: generationConfig,
 }: GoogleGenAIModelInvokerConfig) {
   return async function invokeGoogleGenAIModel(
     config: ModelInvokerConfig
@@ -78,17 +80,24 @@ export function createGoogleGenAIModelInvoker({
     // retry / Temporal reset it wipes the prior attempt's assistant
     // + tool results so the LLM sees the original pre-call state.
     await thread.truncateFromId(assistantMessageId);
-    const { contents, systemInstruction } =
-      await thread.prepareForInvocation();
+    const { contents, systemInstruction } = await thread.prepareForInvocation();
 
     const functionDeclarations = toFunctionDeclarations(state.tools);
     const tools =
       functionDeclarations.length > 0 ? [{ functionDeclarations }] : undefined;
 
+    const {
+      systemInstruction: _si,
+      tools: _t,
+      abortSignal: _as,
+      ...callerConfig
+    } = generationConfig ?? {};
+
     const stream = await client.models.generateContentStream({
       model,
       contents,
       config: {
+        ...callerConfig,
         ...(systemInstruction ? { systemInstruction } : {}),
         ...(tools ? { tools } : {}),
         abortSignal: signal,
@@ -107,48 +116,59 @@ export function createGoogleGenAIModelInvoker({
       throw new Error("Google GenAI stream ended without producing any chunks");
     }
 
+    for (const part of allParts) {
+      if (part.functionCall && !part.functionCall.id) {
+        part.functionCall.id = randomBytes(8).toString("hex");
+      }
+    }
+
     const modelContent: Content = { role: "model", parts: allParts };
-    const functionCalls = lastChunk.functionCalls ?? [];
 
     return {
       message: modelContent,
-      rawToolCalls: functionCalls.map((fc) => ({
-        id: fc.id,
-        name: fc.name ?? "",
-        args: fc.args ?? {},
-      })),
+      rawToolCalls: allParts
+        .filter(
+          (
+            p
+          ): p is Part & { functionCall: NonNullable<Part["functionCall"]> } =>
+            !!p.functionCall
+        )
+        .map((p) => ({
+          id: p.functionCall.id,
+          name: p.functionCall.name ?? "",
+          args: p.functionCall.args ?? {},
+        })),
       usage: {
         inputTokens: lastChunk.usageMetadata?.promptTokenCount,
         outputTokens: lastChunk.usageMetadata?.candidatesTokenCount,
         cachedReadTokens: lastChunk.usageMetadata?.cachedContentTokenCount,
+        reasonTokens: lastChunk.usageMetadata?.thoughtsTokenCount,
       },
     };
   };
 }
 
-/**
- * Standalone function for one-shot Google GenAI model invocation.
- * Convenience wrapper around createGoogleGenAIModelInvoker for cases
- * where you don't need to reuse the invoker.
- */
 export async function invokeGoogleGenAIModel({
   redis,
   client,
   model,
   hooks,
   config,
+  generationConfig,
 }: {
   redis: Redis;
   client: GoogleGenAI;
   model: string;
   hooks?: GoogleGenAIThreadManagerHooks;
   config: ModelInvokerConfig;
+  generationConfig?: GenerateContentConfig;
 }): Promise<AgentResponse<Content>> {
   const invoker = createGoogleGenAIModelInvoker({
     redis,
     client,
     model,
     hooks,
+    config: generationConfig,
   });
   return invoker(config);
 }
