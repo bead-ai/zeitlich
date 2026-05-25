@@ -577,6 +577,28 @@ export async function createSession<
             }
           }
 
+          // Hand handlers a way to persist the parent's slice mid-loop
+          // (subagents that fork or continue the parent's thread need
+          // this — otherwise the child loads a stale snapshot from the
+          // prior session, since `saveThreadState` would otherwise only
+          // run in the `finally` below).
+          //
+          // Memoized per-batch so a single assistant message that emits
+          // N parallel subagent calls only writes the slice once.
+          // Persisting again later in the same turn is a no-op anyway
+          // (the slice doesn't mutate between handler dispatch and the
+          // batch's last `executeChild`), and Redis/cold-store writes
+          // aren't free.
+          let persistInflight: Promise<void> | undefined;
+          const persistThreadStateOnce = (): Promise<void> => {
+            persistInflight ??= saveThreadState(
+              threadId,
+              stateManager.getPersistedSlice(),
+              threadKey
+            );
+            return persistInflight;
+          };
+
           const toolCallResults = await toolRouter.processToolCalls(
             parsedToolCalls,
             {
@@ -585,17 +607,7 @@ export async function createSession<
               ...(assistantId !== undefined && {
                 assistantMessageId: assistantId,
               }),
-              // Hand handlers a way to persist the parent's slice
-              // mid-loop (subagents that fork or continue the parent's
-              // thread need this — otherwise the child loads a stale
-              // snapshot from the prior session, since `saveThreadState`
-              // would otherwise only run in the `finally` below).
-              persistThreadState: () =>
-                saveThreadState(
-                  threadId,
-                  stateManager.getPersistedSlice(),
-                  threadKey
-                ),
+              persistThreadState: persistThreadStateOnce,
             }
           );
 

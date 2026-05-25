@@ -681,6 +681,98 @@ describe("createSession integration", () => {
     expect(capturedSandboxId).toBe("my-sandbox");
   });
 
+  // --- persistThreadState dedupe ---
+
+  it("memoizes persistThreadState across parallel tool calls in one turn", async () => {
+    const { ops, log } = createMockThreadOps();
+
+    const persistTool = defineTool({
+      name: "Persist" as const,
+      description: "calls persistThreadState",
+      schema: z.object({}),
+      handler: async (_args: Record<string, never>, ctx: RouterContext) => {
+        await ctx.persistThreadState?.();
+        return { toolResponse: "ok", data: null };
+      },
+    });
+
+    const session = await createSession({
+      agentName: "TestAgent",
+      thread: { mode: "new", threadId: "thread-1" },
+      runAgent: createScriptedRunAgent([
+        {
+          message: "fan out",
+          toolCalls: [
+            { id: "tc-1", name: "Persist", args: {} },
+            { id: "tc-2", name: "Persist", args: {} },
+            { id: "tc-3", name: "Persist", args: {} },
+          ],
+        },
+        { message: "done", toolCalls: [] },
+      ]),
+      threadOps: ops,
+      tools: { Persist: persistTool },
+      buildContextMessage: () => "go",
+    });
+
+    const stateManager = createAgentStateManager({
+      initialState: { systemPrompt: "test" },
+    });
+
+    await session.runSession({ stateManager });
+
+    const saves = log.filter((l) => l.op === "saveThreadState");
+    expect(saves).toHaveLength(2);
+  });
+
+  it("re-persists across separate turns even when handlers call persistThreadState", async () => {
+    const { ops, log } = createMockThreadOps();
+
+    const persistTool = defineTool({
+      name: "Persist" as const,
+      description: "calls persistThreadState",
+      schema: z.object({}),
+      handler: async (_args: Record<string, never>, ctx: RouterContext) => {
+        await ctx.persistThreadState?.();
+        return { toolResponse: "ok", data: null };
+      },
+    });
+
+    const session = await createSession({
+      agentName: "TestAgent",
+      thread: { mode: "new", threadId: "thread-1" },
+      runAgent: createScriptedRunAgent([
+        {
+          message: "turn 1",
+          toolCalls: [
+            { id: "tc-1", name: "Persist", args: {} },
+            { id: "tc-2", name: "Persist", args: {} },
+          ],
+        },
+        {
+          message: "turn 2",
+          toolCalls: [
+            { id: "tc-3", name: "Persist", args: {} },
+            { id: "tc-4", name: "Persist", args: {} },
+          ],
+        },
+        { message: "done", toolCalls: [] },
+      ]),
+      threadOps: ops,
+      tools: { Persist: persistTool },
+      buildContextMessage: () => "go",
+    });
+
+    const stateManager = createAgentStateManager({
+      initialState: { systemPrompt: "test" },
+    });
+
+    await session.runSession({ stateManager });
+
+    const saves = log.filter((l) => l.op === "saveThreadState");
+    expect(saves).toHaveLength(3);
+  });
+
   // --- Error propagation ---
 
   it("propagates runAgent errors and calls onSessionEnd with failed reason", async () => {
