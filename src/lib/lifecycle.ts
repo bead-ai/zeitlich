@@ -11,11 +11,23 @@
  *   continue there. When the adapter has `onForkPrepareThread` and/or
  *   `onForkTransform` hooks configured, they are applied once to the forked
  *   thread before the session starts.
+ *
+ *   The optional `truncateAfterFork.fromMessageId` directs the session to
+ *   call `truncateThread` on the freshly forked thread immediately after
+ *   the fork, dropping that message and everything after. Used by
+ *   subagents that fork their parent's thread mid-tool-call to strip the
+ *   orphan assistant `tool_use` block (the one whose `tool_result` will
+ *   never arrive in the child's thread) so the first model call doesn't
+ *   reject on an unmatched tool-use/tool-result pair.
  */
 export type ThreadInit =
   | { mode: "new"; threadId?: string }
   | { mode: "continue"; threadId: string }
-  | { mode: "fork"; threadId: string };
+  | {
+      mode: "fork";
+      threadId: string;
+      truncateAfterFork?: { fromMessageId: string };
+    };
 
 // ============================================================================
 // Sandbox lifecycle

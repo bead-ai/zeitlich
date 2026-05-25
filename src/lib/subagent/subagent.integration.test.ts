@@ -653,6 +653,40 @@ describe("createSubagentHandler", () => {
 
     await handler(
       { subagent: "parent-fork", description: "test", prompt: "test" },
+      {
+        threadId: "parent-t",
+        toolCallId: "tc",
+        toolName: "Subagent",
+        assistantMessageId: "parent-asst-msg-1",
+      }
+    );
+
+    const lastCall = execMock.mock.calls[execMock.mock.calls.length - 1];
+    if (!lastCall) throw new Error("expected executeChild call");
+    const workflowInput = lastCall[1].args[1] as SubagentWorkflowInput;
+    expect(workflowInput.thread).toEqual({
+      mode: "fork",
+      threadId: "parent-t",
+      truncateAfterFork: { fromMessageId: "parent-asst-msg-1" },
+    });
+  });
+
+  it("omits truncateAfterFork on parent-fallback fork when assistantMessageId is absent from context", async () => {
+    const { executeChild } = await import("@temporalio/workflow");
+    const execMock = executeChild as ReturnType<typeof vi.fn>;
+
+    const subagent: SubagentConfig = {
+      agentName: "parent-fork-no-asst",
+      description: "Forks parent thread by default",
+      workflow: mockWorkflow(),
+      thread: "fork",
+      newThreadSource: "from-parent",
+    };
+
+    const { handler } = createSubagentHandler([subagent]);
+
+    await handler(
+      { subagent: "parent-fork-no-asst", description: "test", prompt: "test" },
       { threadId: "parent-t", toolCallId: "tc", toolName: "Subagent" }
     );
 
@@ -693,7 +727,7 @@ describe("createSubagentHandler", () => {
     });
   });
 
-  it("prefers args.threadId over the parent source when both are available", async () => {
+  it("prefers args.threadId over the parent source when both are available and skips truncateAfterFork", async () => {
     const { executeChild } = await import("@temporalio/workflow");
     const execMock = executeChild as ReturnType<typeof vi.fn>;
 
@@ -714,7 +748,12 @@ describe("createSubagentHandler", () => {
         prompt: "test",
         threadId: "explicit-prev",
       },
-      { threadId: "parent-t", toolCallId: "tc", toolName: "Subagent" }
+      {
+        threadId: "parent-t",
+        toolCallId: "tc",
+        toolName: "Subagent",
+        assistantMessageId: "parent-asst-msg-1",
+      }
     );
 
     const lastCall = execMock.mock.calls[execMock.mock.calls.length - 1];
