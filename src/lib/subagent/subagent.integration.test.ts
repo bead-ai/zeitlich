@@ -813,6 +813,204 @@ describe("createSubagentHandler", () => {
     expect(workflowInput.thread).toBeUndefined();
   });
 
+  // --- persistThreadState: parent slice flush before child loads ---
+
+  it("calls persistThreadState before executeChild when forking parent's thread", async () => {
+    const { executeChild } = await import("@temporalio/workflow");
+    const execMock = executeChild as ReturnType<typeof vi.fn>;
+    const persistThreadState = vi.fn(async () => undefined);
+
+    const subagent: SubagentConfig = {
+      agentName: "parent-fork-persist",
+      description: "Forks parent thread",
+      workflow: mockWorkflow(),
+      thread: "fork",
+      newThreadSource: "from-parent",
+    };
+
+    const { handler } = createSubagentHandler([subagent]);
+
+    await handler(
+      {
+        subagent: "parent-fork-persist",
+        description: "test",
+        prompt: "test",
+      },
+      {
+        threadId: "parent-t",
+        toolCallId: "tc",
+        toolName: "Subagent",
+        persistThreadState,
+      }
+    );
+
+    expect(persistThreadState).toHaveBeenCalledTimes(1);
+    const lastExecOrder =
+      execMock.mock.invocationCallOrder[
+        execMock.mock.invocationCallOrder.length - 1
+      ] ?? Infinity;
+    expect(persistThreadState.mock.invocationCallOrder[0]).toBeLessThan(
+      lastExecOrder
+    );
+  });
+
+  it("calls persistThreadState before executeChild when continuing parent's thread", async () => {
+    const { executeChild } = await import("@temporalio/workflow");
+    const execMock = executeChild as ReturnType<typeof vi.fn>;
+    const persistThreadState = vi.fn(async () => undefined);
+
+    const subagent: SubagentConfig = {
+      agentName: "parent-continue-persist",
+      description: "Continues parent thread",
+      workflow: mockWorkflow(),
+      thread: "continue",
+      newThreadSource: "from-parent",
+    };
+
+    const { handler } = createSubagentHandler([subagent]);
+
+    await handler(
+      {
+        subagent: "parent-continue-persist",
+        description: "test",
+        prompt: "test",
+      },
+      {
+        threadId: "parent-t",
+        toolCallId: "tc",
+        toolName: "Subagent",
+        persistThreadState,
+      }
+    );
+
+    expect(persistThreadState).toHaveBeenCalledTimes(1);
+    const lastExecOrder =
+      execMock.mock.invocationCallOrder[
+        execMock.mock.invocationCallOrder.length - 1
+      ] ?? Infinity;
+    expect(persistThreadState.mock.invocationCallOrder[0]).toBeLessThan(
+      lastExecOrder
+    );
+  });
+
+  it("calls persistThreadState when args.threadId points at the parent's thread", async () => {
+    const persistThreadState = vi.fn(async () => undefined);
+
+    const subagent: SubagentConfig = {
+      agentName: "explicit-parent",
+      description: "Explicit parent threadId",
+      workflow: mockWorkflow(),
+      thread: "continue",
+    };
+
+    const { handler } = createSubagentHandler([subagent]);
+
+    await handler(
+      {
+        subagent: "explicit-parent",
+        description: "test",
+        prompt: "test",
+        threadId: "parent-t",
+      },
+      {
+        threadId: "parent-t",
+        toolCallId: "tc",
+        toolName: "Subagent",
+        persistThreadState,
+      }
+    );
+
+    expect(persistThreadState).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not call persistThreadState when child thread is independent of the parent", async () => {
+    const persistThreadState = vi.fn(async () => undefined);
+
+    const subagent: SubagentConfig = {
+      agentName: "independent-thread",
+      description: "Continues a sibling thread",
+      workflow: mockWorkflow(),
+      thread: "continue",
+    };
+
+    const { handler } = createSubagentHandler([subagent]);
+
+    await handler(
+      {
+        subagent: "independent-thread",
+        description: "test",
+        prompt: "test",
+        threadId: "sibling-thread",
+      },
+      {
+        threadId: "parent-t",
+        toolCallId: "tc",
+        toolName: "Subagent",
+        persistThreadState,
+      }
+    );
+
+    expect(persistThreadState).not.toHaveBeenCalled();
+  });
+
+  it("does not call persistThreadState when the child starts a fresh thread", async () => {
+    const persistThreadState = vi.fn(async () => undefined);
+
+    const subagent: SubagentConfig = {
+      agentName: "fresh-thread",
+      description: "Always starts fresh",
+      workflow: mockWorkflow(),
+    };
+
+    const { handler } = createSubagentHandler([subagent]);
+
+    await handler(
+      { subagent: "fresh-thread", description: "test", prompt: "test" },
+      {
+        threadId: "parent-t",
+        toolCallId: "tc",
+        toolName: "Subagent",
+        persistThreadState,
+      }
+    );
+
+    expect(persistThreadState).not.toHaveBeenCalled();
+  });
+
+  it("still spawns the child when persistThreadState throws", async () => {
+    const { executeChild } = await import("@temporalio/workflow");
+    const execMock = executeChild as ReturnType<typeof vi.fn>;
+    const persistThreadState = vi.fn(async () => {
+      throw new Error("redis down");
+    });
+    const callsBefore = execMock.mock.calls.length;
+
+    const subagent: SubagentConfig = {
+      agentName: "persist-fails",
+      description: "Persist failure should not block child",
+      workflow: mockWorkflow(),
+      thread: "fork",
+      newThreadSource: "from-parent",
+    };
+
+    const { handler } = createSubagentHandler([subagent]);
+
+    await expect(
+      handler(
+        { subagent: "persist-fails", description: "test", prompt: "test" },
+        {
+          threadId: "parent-t",
+          toolCallId: "tc",
+          toolName: "Subagent",
+          persistThreadState,
+        }
+      )
+    ).resolves.toBeDefined();
+
+    expect(persistThreadState).toHaveBeenCalledTimes(1);
+    expect(execMock.mock.calls.length).toBe(callsBefore + 1);
+  });
+
   // --- Sandbox continuation ---
 
   it("does not pass sandbox when thread is fork (own sandbox)", async () => {
