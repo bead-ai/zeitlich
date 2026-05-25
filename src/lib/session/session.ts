@@ -585,6 +585,17 @@ export async function createSession<
               ...(assistantId !== undefined && {
                 assistantMessageId: assistantId,
               }),
+              // Hand handlers a way to persist the parent's slice
+              // mid-loop (subagents that fork or continue the parent's
+              // thread need this — otherwise the child loads a stale
+              // snapshot from the prior session, since `saveThreadState`
+              // would otherwise only run in the `finally` below).
+              persistThreadState: () =>
+                saveThreadState(
+                  threadId,
+                  stateManager.getPersistedSlice(),
+                  threadKey
+                ),
             }
           );
 

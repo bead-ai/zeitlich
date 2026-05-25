@@ -221,7 +221,8 @@ export function createToolRouter<T extends ToolMap>(
     turn: number,
     sandboxId?: string,
     onRewindRequested?: (signal: RewindSignal) => void,
-    assistantMessageId?: string
+    assistantMessageId?: string,
+    persistThreadState?: () => Promise<void>
   ): Promise<ProcessedToolCall> {
     const startTime = Date.now();
     const tool = toolMap.get(toolCall.name);
@@ -265,6 +266,7 @@ export function createToolRouter<T extends ToolMap>(
           toolName: toolCall.name,
           ...(sandboxId !== undefined && { sandboxId }),
           ...(assistantMessageId !== undefined && { assistantMessageId }),
+          ...(persistThreadState !== undefined && { persistThreadState }),
         };
         const response = await tool.handler(
           effectiveArgs as Parameters<typeof tool.handler>[0],
@@ -422,6 +424,7 @@ export function createToolRouter<T extends ToolMap>(
       const turn = context?.turn ?? 0;
       const sandboxId = context?.sandboxId;
       const assistantMessageId = context?.assistantMessageId;
+      const persistThreadState = context?.persistThreadState;
 
       let rewindSignal: RewindSignal | undefined;
 
@@ -443,7 +446,8 @@ export function createToolRouter<T extends ToolMap>(
                 turn,
                 sandboxId,
                 onRewindRequested,
-                assistantMessageId
+                assistantMessageId,
+                persistThreadState
               )
             )
           )
@@ -471,7 +475,8 @@ export function createToolRouter<T extends ToolMap>(
           turn,
           sandboxId,
           undefined,
-          assistantMessageId
+          assistantMessageId,
+          persistThreadState
         );
         if (outcome.kind === "rewind") {
           rewindSignal = outcome.signal;
@@ -509,6 +514,9 @@ export function createToolRouter<T extends ToolMap>(
           }),
           ...(context?.assistantMessageId !== undefined && {
             assistantMessageId: context.assistantMessageId,
+          }),
+          ...(context?.persistThreadState !== undefined && {
+            persistThreadState: context.persistThreadState,
           }),
         };
         const response = await handler(

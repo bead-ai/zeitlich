@@ -190,6 +190,20 @@ export interface RouterContext {
    * thread so the child's first model call sees a well-formed history.
    */
   assistantMessageId?: string;
+  /**
+   * Persist the parent session's current `PersistedThreadState` slice
+   * (tasks + custom state) to the durable thread store. Wired up by
+   * the session — absent for manually-driven routers (tests, custom
+   * orchestrators).
+   *
+   * Subagent handlers invoke this before spawning a child that will
+   * read the parent's thread (`newThreadSource: "from-parent"` or an
+   * explicit parent threadId): the parent's slice otherwise only
+   * lands in storage at session-exit time, so the child would load a
+   * stale (or empty) snapshot. Best-effort — failures are logged by
+   * the session but never thrown.
+   */
+  persistThreadState?: () => Promise<void>;
 }
 
 /**
@@ -314,6 +328,15 @@ export interface ProcessToolCallsContext {
    * out of a parent-forked thread).
    */
   assistantMessageId?: string;
+  /**
+   * Optional callback that flushes the session's in-memory
+   * `PersistedThreadState` slice to the durable thread store. The
+   * router forwards it into every handler's {@link RouterContext}
+   * verbatim. The session uses this to let mid-loop tool handlers
+   * (notably subagents that fork or continue the parent's thread)
+   * persist the parent's slice before the child reads it.
+   */
+  persistThreadState?: () => Promise<void>;
 }
 
 /**

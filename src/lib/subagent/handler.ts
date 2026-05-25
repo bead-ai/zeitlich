@@ -439,6 +439,29 @@ export function createSubagentHandler<
       snapshotBaseCreatorAgent.set(childWorkflowId, config.agentName);
     }
 
+    // The parent's `PersistedThreadState` slice (`tasks` + custom
+    // state) only lands in storage in the session's `finally`. When
+    // the child reads from the parent's thread (`from-parent`
+    // fallback or an explicit args.threadId pointing at the parent),
+    // that `loadThreadState` would otherwise see the prior session's
+    // snapshot. Flush the live slice now via the session-supplied
+    // callback so the child sees the parent's current state.
+    if (
+      continuationThreadId &&
+      continuationThreadId === context.threadId &&
+      context.persistThreadState
+    ) {
+      try {
+        await context.persistThreadState();
+      } catch (err) {
+        log.warn("failed to persist parent thread state for subagent", {
+          subagent: config.agentName,
+          childWorkflowId,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+
     log.info("subagent spawned", {
       subagent: config.agentName,
       childWorkflowId,
