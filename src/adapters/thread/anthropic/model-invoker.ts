@@ -1,4 +1,4 @@
-import type Redis from "ioredis";
+import type { RedisClientType as Redis } from "redis";
 import type Anthropic from "@anthropic-ai/sdk";
 import type { SerializableToolDefinition } from "../../../lib/types";
 import type { AgentResponse, ModelInvokerConfig } from "../../../lib/model";

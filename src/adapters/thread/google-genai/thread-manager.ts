@@ -1,4 +1,4 @@
-import type Redis from "ioredis";
+import type { RedisClientType as Redis } from "redis";
 import type { Content, Part } from "@google/genai";
 import { createThreadManager } from "../../../lib/thread/manager";
 import type {

@@ -1,5 +1,5 @@
 import { describe, expect, it, beforeEach } from "vitest";
-import type Redis from "ioredis";
+import type { RedisClientType } from "redis";
 import {
   applySnapshot,
   clearHotTier,
@@ -14,7 +14,7 @@ import {
 } from "./keys";
 import type { PersistedThreadState } from "../state/types";
 import type { ThreadSnapshot } from "./cold-store";
-import { createFakeRedis } from "./test-utils";
+import { createFakeRedis, makeMultiError } from "./test-utils";
 
 const sampleState: PersistedThreadState = {
   tasks: [
@@ -36,7 +36,7 @@ const sampleState: PersistedThreadState = {
 };
 
 describe("encodeSnapshot", () => {
-  let redis: Redis & { _store: Map<string, unknown> };
+  let redis: RedisClientType & { _store: Map<string, unknown> };
 
   beforeEach(() => {
     redis = createFakeRedis();
@@ -97,7 +97,7 @@ describe("encodeSnapshot", () => {
 });
 
 describe("applySnapshot", () => {
-  let redis: Redis & { _store: Map<string, unknown> };
+  let redis: RedisClientType & { _store: Map<string, unknown> };
 
   beforeEach(() => {
     redis = createFakeRedis();
@@ -178,7 +178,7 @@ describe("applySnapshot", () => {
     const metaKey = getThreadMetaKey("messages", "t-1");
     expect(await redis.exists(metaKey)).toBe(1);
     expect(
-      await redis.lrange(getThreadListKey("messages", "t-1"), 0, -1)
+      await redis.lRange(getThreadListKey("messages", "t-1"), 0, -1)
     ).toEqual([]);
   });
 
@@ -190,7 +190,7 @@ describe("applySnapshot", () => {
     const wrapped = new Proxy(redis, {
       get(target, prop, receiver): unknown {
         if (prop === "del") {
-          return async (..._keys: string[]): Promise<number> => {
+          return async (_keys: string | string[]): Promise<number> => {
             throw new Error("NOPERM: DEL denied by ACL");
           };
         }
@@ -206,7 +206,7 @@ describe("applySnapshot", () => {
     };
     await expect(
       applySnapshot({
-        redis: wrapped as unknown as Redis,
+        redis: wrapped as unknown as RedisClientType,
         threadKey: "messages",
         threadId: "t-del-fail",
         snapshot: snap,
@@ -230,42 +230,44 @@ describe("applySnapshot", () => {
   });
 
   it("clears list/state/dedup residue when a pipelined write fails partway", async () => {
-    // Pipeline stub that *applies* non-failing commands to the
-    // underlying fake (so residue is observable) and errors on rpush
+    // `multi()` stub that *applies* non-failing commands to the
+    // underlying fake (so residue is observable) and errors on rPush
     // — mimicking a partial OOM where the list write fails but the
     // dedup SETs queued after it still land. Without compensating
     // cleanup, those stale dedup keys could silently skip a future
-    // append with the same id.
+    // append with the same id. node-redis rejects `execAsPipeline`
+    // with a `MultiErrorReply` carrying per-command errors.
     const wrapped = new Proxy(redis, {
       get(target, prop, receiver): unknown {
-        if (prop === "pipeline") {
+        if (prop === "multi") {
           return (): Record<string, unknown> => {
             type Op = { method: string; args: unknown[] };
             const ops: Op[] = [];
             const chain: Record<string, unknown> = {};
-            for (const m of ["set", "del", "rpush", "expire"]) {
+            for (const m of ["set", "del", "rPush", "expire"]) {
               chain[m] = (...args: unknown[]): Record<string, unknown> => {
                 ops.push({ method: m, args });
                 return chain;
               };
             }
-            chain.exec = async (): Promise<Array<[Error | null, unknown]>> => {
-              const out: Array<[Error | null, unknown]> = [];
+            chain.execAsPipeline = async (): Promise<unknown[]> => {
+              const replies: unknown[] = [];
+              const errorIndexes: number[] = [];
               const callable = target as unknown as Record<
                 string,
                 (...a: unknown[]) => Promise<unknown>
               >;
-              for (const op of ops) {
-                if (op.method === "rpush") {
-                  out.push([new Error("OOM"), null]);
+              for (const [i, op] of ops.entries()) {
+                if (op.method === "rPush") {
+                  replies.push(new Error("OOM"));
+                  errorIndexes.push(i);
                   continue;
                 }
                 const fn = callable[op.method];
                 if (!fn) throw new Error(`stub: unknown ${op.method}`);
-                const result = await fn(...op.args);
-                out.push([null, result]);
+                replies.push(await fn(...op.args));
               }
-              return out;
+              throw makeMultiError(replies, errorIndexes);
             };
             return chain;
           };
@@ -282,7 +284,7 @@ describe("applySnapshot", () => {
     };
     await expect(
       applySnapshot({
-        redis: wrapped as unknown as Redis,
+        redis: wrapped as unknown as RedisClientType,
         threadKey: "messages",
         threadId: "t-residue",
         snapshot: snap,
@@ -305,30 +307,36 @@ describe("applySnapshot", () => {
   });
 
   it("throws and leaves the meta key unset when a pipelined command fails", async () => {
-    // Wrap the fake's `pipeline()` so `exec()` returns a tuple list
-    // containing a per-command error — mimicking ioredis's behaviour
-    // when Redis runtime errors (OOM, ACL, WRONGTYPE) occur inside a
-    // pipeline. The top-level promise resolves; the error lives in the
-    // result tuple, and applySnapshot must surface it.
+    // Wrap the fake's `multi()` so `execAsPipeline()` rejects with a
+    // `MultiErrorReply` — mimicking node-redis's behaviour when Redis
+    // runtime errors (OOM, ACL, WRONGTYPE) occur inside a pipeline.
+    // `applySnapshot` must surface the underlying error.
     const wrapped = new Proxy(redis, {
       get(target, prop, receiver): unknown {
-        if (prop === "pipeline") {
+        if (prop === "multi") {
           return (): Record<string, unknown> => {
             type Op = { method: string; args: unknown[] };
             const ops: Op[] = [];
             const chain: Record<string, unknown> = {};
-            for (const m of ["set", "del", "rpush", "expire"]) {
+            for (const m of ["set", "del", "rPush", "expire"]) {
               chain[m] = (...args: unknown[]): Record<string, unknown> => {
                 ops.push({ method: m, args });
                 return chain;
               };
             }
-            chain.exec = async (): Promise<Array<[Error | null, unknown]>> =>
-              ops.map((op, i) =>
-                op.method === "rpush"
-                  ? [new Error("OOM command not allowed"), null]
-                  : [null, i]
-              );
+            chain.execAsPipeline = async (): Promise<unknown[]> => {
+              const replies: unknown[] = [];
+              const errorIndexes: number[] = [];
+              ops.forEach((op, i) => {
+                if (op.method === "rPush") {
+                  replies.push(new Error("OOM command not allowed"));
+                  errorIndexes.push(i);
+                } else {
+                  replies.push(i);
+                }
+              });
+              throw makeMultiError(replies, errorIndexes);
+            };
             return chain;
           };
         }
@@ -344,7 +352,7 @@ describe("applySnapshot", () => {
     };
     await expect(
       applySnapshot({
-        redis: wrapped as unknown as Redis,
+        redis: wrapped as unknown as RedisClientType,
         threadKey: "messages",
         threadId: "t-fail",
         snapshot: snap,
@@ -354,14 +362,14 @@ describe("applySnapshot", () => {
     expect(await redis.exists(getThreadMetaKey("messages", "t-fail"))).toBe(0);
   });
 
-  it("issues a single pipeline.exec() rather than per-key writes", async () => {
-    let pipelineCalls = 0;
+  it("issues a single multi().execAsPipeline() rather than per-key writes", async () => {
+    let multiCalls = 0;
     const wrapped = new Proxy(redis, {
       get(target, prop, receiver): unknown {
-        if (prop === "pipeline") {
+        if (prop === "multi") {
           return (): unknown => {
-            pipelineCalls++;
-            return (target as unknown as { pipeline: () => unknown }).pipeline();
+            multiCalls++;
+            return (target as unknown as { multi: () => unknown }).multi();
           };
         }
         return Reflect.get(target, prop, receiver) as unknown;
@@ -377,19 +385,19 @@ describe("applySnapshot", () => {
       dedupIds: Array.from({ length: 10 }, (_, i) => `m${i}`),
     };
     await applySnapshot({
-      redis: wrapped as unknown as Redis,
+      redis: wrapped as unknown as RedisClientType,
       threadKey: "messages",
       threadId: "t-1",
       snapshot: snap,
     });
 
-    expect(pipelineCalls).toBe(1);
+    expect(multiCalls).toBe(1);
   });
 
   it("clears any partial residue from a previous failed restore", async () => {
     const listKey = getThreadListKey("messages", "t-1");
     const stateKey = getThreadStateKey("messages", "t-1");
-    await redis.rpush(listKey, "stale-message");
+    await redis.rPush(listKey, "stale-message");
     await redis.set(stateKey, JSON.stringify({ stale: true }));
     // Note: meta is intentionally absent — simulates a half-written restore.
 

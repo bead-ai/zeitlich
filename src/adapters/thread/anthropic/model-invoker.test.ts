@@ -6,11 +6,11 @@ import type { StoredMessage } from "./thread-manager";
 function createMockRedis(stored: StoredMessage[]) {
   return {
     exists: vi.fn().mockResolvedValue(1),
-    lrange: vi.fn().mockResolvedValue(stored.map((m) => JSON.stringify(m))),
-    ltrim: vi.fn().mockResolvedValue("OK"),
+    lRange: vi.fn().mockResolvedValue(stored.map((m) => JSON.stringify(m))),
+    lTrim: vi.fn().mockResolvedValue("OK"),
     del: vi.fn().mockResolvedValue(1),
     set: vi.fn().mockResolvedValue("OK"),
-    rpush: vi.fn().mockResolvedValue(1),
+    rPush: vi.fn().mockResolvedValue(1),
     expire: vi.fn().mockResolvedValue(1),
     eval: vi.fn().mockResolvedValue(1),
   };

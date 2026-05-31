@@ -1,5 +1,5 @@
 import { describe, expect, it, beforeEach } from "vitest";
-import type Redis from "ioredis";
+import type { RedisClientType as Redis } from "redis";
 import { createTieredThreadManager } from "./tiered";
 import { createThreadManager } from "./manager";
 import {

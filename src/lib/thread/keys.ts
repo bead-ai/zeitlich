@@ -38,7 +38,7 @@ export const THREAD_TTL_SECONDS = 60 * 60 * 24 * 90;
  * Build the Redis list key that holds a thread's serialized messages.
  *
  * Mirrors the exact key used internally by zeitlich's thread manager,
- * so a consumer calling `redis.lrange(getThreadListKey(key, id), 0, -1)`
+ * so a consumer calling `redis.lRange(getThreadListKey(key, id), 0, -1)`
  * sees the same data the writer wrote.
  *
  * @param threadKey - Thread key (defaults to `"messages"` inside the

@@ -7,19 +7,35 @@
  * picks it up directly.
  */
 
-import type Redis from "ioredis";
+import type { RedisClientType } from "redis";
 import type { ColdThreadStore, ThreadSnapshot } from "./cold-store";
 
 type Value = string | string[];
 
+/** node-redis `SetOptions` subset the stub understands. */
+interface FakeSetOptions {
+  EX?: number;
+  NX?: boolean;
+  expiration?: { type: "EX" | "PX" | "EXAT" | "PXAT"; value: number } | "KEEPTTL";
+  condition?: "NX" | "XX";
+}
+
+/** node-redis accepts a single key or an array (`RedisVariadicArgument`). */
+type Keys = string | string[];
+const toKeys = (keys: Keys): string[] => (Array.isArray(keys) ? keys : [keys]);
+
 /**
- * Minimal in-memory Redis stub covering the commands the thread
+ * Minimal in-memory node-redis stub covering the commands the thread
  * manager + snapshot helpers use: get/set/del/exists/expire,
- * lrange/rpush/llen/ltrim, and the `eval`-based idempotent-append Lua
- * script. Behaviour matches Redis closely enough for unit tests; TTLs
- * are stored but never expire automatically.
+ * lRange/rPush/lLen/lTrim, and the `eval`-based idempotent-append Lua
+ * script. Mirrors the node-redis (`redis`) v4+ API surface — camelCase
+ * commands, an options object for `set`, variadic-or-array keys for
+ * `del`/`exists`, and a `multi().execAsPipeline()` pipeline that rejects
+ * with a `MultiErrorReply`-shaped error when a queued command fails.
+ * Behaviour matches Redis closely enough for unit tests; TTLs are stored
+ * but never expire automatically.
  */
-export function createFakeRedis(): Redis & {
+export function createFakeRedis(): RedisClientType & {
   _store: Map<string, Value>;
   _ttls: Map<string, number>;
 } {
@@ -48,56 +64,60 @@ export function createFakeRedis(): Redis & {
     async set(
       key: string,
       value: string,
-      ..._rest: (string | number)[]
-    ): Promise<"OK"> {
-      // NX guard: when the args contain "NX" and the key already exists,
+      options?: FakeSetOptions
+    ): Promise<"OK" | null> {
+      // NX guard: when the condition is NX and the key already exists,
       // Redis returns null. We follow the same contract for tests that
-      // need it; existing call sites use this for compare-and-set.
-      const rest = _rest.map((x) => (typeof x === "string" ? x.toUpperCase() : x));
-      if (rest.includes("NX") && store.has(key)) {
-        return null as unknown as "OK";
+      // need it.
+      const nx = options?.NX === true || options?.condition === "NX";
+      if (nx && store.has(key)) {
+        return null;
       }
       store.set(key, String(value));
-      const exIdx = rest.indexOf("EX");
-      if (exIdx >= 0 && typeof _rest[exIdx + 1] === "number") {
-        ttls.set(key, _rest[exIdx + 1] as number);
+      const ttl =
+        options?.EX ??
+        (options?.expiration && options.expiration !== "KEEPTTL"
+          ? options.expiration.value
+          : undefined);
+      if (typeof ttl === "number") {
+        ttls.set(key, ttl);
       }
       return "OK";
     },
-    async del(...keys: string[]): Promise<number> {
+    async del(keys: Keys): Promise<number> {
       let removed = 0;
-      for (const k of keys) {
+      for (const k of toKeys(keys)) {
         if (store.delete(k)) removed++;
         ttls.delete(k);
       }
       return removed;
     },
-    async exists(...keys: string[]): Promise<number> {
-      return keys.reduce((acc, k) => acc + (store.has(k) ? 1 : 0), 0);
+    async exists(keys: Keys): Promise<number> {
+      return toKeys(keys).reduce((acc, k) => acc + (store.has(k) ? 1 : 0), 0);
     },
     async expire(key: string, ttl: number): Promise<number> {
       if (!store.has(key)) return 0;
       ttls.set(key, ttl);
       return 1;
     },
-    async lrange(key: string, start: number, end: number): Promise<string[]> {
+    async lRange(key: string, start: number, end: number): Promise<string[]> {
       if (!store.has(key)) return [];
       if (!isList(key)) return [];
       const list = store.get(key) as string[];
       const last = end === -1 ? list.length - 1 : end;
       return list.slice(start, last + 1);
     },
-    async rpush(key: string, ...values: string[]): Promise<number> {
+    async rPush(key: string, element: Keys): Promise<number> {
       const list = ensureList(key);
-      list.push(...values);
+      list.push(...toKeys(element));
       return list.length;
     },
-    async llen(key: string): Promise<number> {
+    async lLen(key: string): Promise<number> {
       if (!store.has(key)) return 0;
       const list = store.get(key) as string[];
       return list.length;
     },
-    async ltrim(key: string, start: number, end: number): Promise<"OK"> {
+    async lTrim(key: string, start: number, end: number): Promise<"OK"> {
       if (!store.has(key)) return "OK";
       const list = store.get(key) as string[];
       const last = end === -1 ? list.length - 1 : end;
@@ -106,12 +126,11 @@ export function createFakeRedis(): Redis & {
     },
     async eval(
       _script: string,
-      numKeys: number,
-      ...args: (string | number)[]
+      options: { keys?: string[]; arguments?: string[] }
     ): Promise<number> {
       // Mirrors APPEND_IDEMPOTENT_SCRIPT in src/lib/thread/manager.ts.
-      const keys = args.slice(0, numKeys) as string[];
-      const argv = args.slice(numKeys) as string[];
+      const keys = options.keys ?? [];
+      const argv = options.arguments ?? [];
       const dedupKey = keys[0];
       const listKey = keys[1];
       const ttl = Number(argv[0]);
@@ -127,54 +146,64 @@ export function createFakeRedis(): Redis & {
       ttls.set(dedupKey, ttl);
       return 1;
     },
-    // Chainable pipeline stub. Defers each command to the underlying
-    // sync fake methods on `.exec()`, so TTL tracking and store
-    // semantics stay identical to the non-pipelined path. `fake` is
-    // typed as `Redis` after the cast below, so we narrow it back to
-    // the concrete impl shape here to avoid Redis's callback overloads.
-    pipeline(): FakePipeline {
+    // Chainable `multi()` stub. Defers each command to the underlying
+    // sync fake methods on `.execAsPipeline()`, so TTL tracking and store
+    // semantics stay identical to the non-pipelined path. Mirrors
+    // node-redis: per-command failures reject the pipeline with a
+    // `MultiErrorReply`-shaped error (`{ replies, errorIndexes }`).
+    multi(): FakeMulti {
       const impl = fake as unknown as {
-        set: (key: string, value: string, ...rest: (string | number)[]) => Promise<"OK">;
-        del: (...keys: string[]) => Promise<number>;
-        rpush: (key: string, ...values: string[]) => Promise<number>;
+        set: (
+          key: string,
+          value: string,
+          options?: FakeSetOptions
+        ) => Promise<"OK" | null>;
+        del: (keys: Keys) => Promise<number>;
+        rPush: (key: string, element: Keys) => Promise<number>;
         expire: (key: string, ttl: number) => Promise<number>;
       };
       const ops: Array<() => Promise<unknown>> = [];
-      const chain: FakePipeline = {
-        set: (...args) => {
-          const [key, value, ...rest] = args as [string, string, ...(string | number)[]];
-          ops.push(() => impl.set(key, value, ...rest));
+      const chain: FakeMulti = {
+        set: (key, value, options) => {
+          ops.push(() => impl.set(key, value, options));
           return chain;
         },
-        del: (...keys) => {
-          ops.push(() => impl.del(...keys));
+        del: (keys) => {
+          ops.push(() => impl.del(keys));
           return chain;
         },
-        rpush: (key, ...values) => {
-          ops.push(() => impl.rpush(key, ...values));
+        rPush: (key, element) => {
+          ops.push(() => impl.rPush(key, element));
           return chain;
         },
         expire: (key, ttl) => {
           ops.push(() => impl.expire(key, ttl));
           return chain;
         },
-        exec: async () => {
-          const results: Array<[Error | null, unknown]> = [];
+        execAsPipeline: async () => {
+          const replies: unknown[] = [];
+          const errorIndexes: number[] = [];
+          let i = 0;
           for (const op of ops) {
             try {
-              results.push([null, await op()]);
+              replies.push(await op());
             } catch (e) {
-              results.push([e as Error, null]);
+              replies.push(e);
+              errorIndexes.push(i);
             }
+            i++;
           }
-          return results;
+          if (errorIndexes.length > 0) {
+            throw makeMultiError(replies, errorIndexes);
+          }
+          return replies;
         },
       };
       return chain;
     },
     _store: store,
     _ttls: ttls,
-  } as unknown as Redis & {
+  } as unknown as RedisClientType & {
     _store: Map<string, Value>;
     _ttls: Map<string, number>;
   };
@@ -182,13 +211,31 @@ export function createFakeRedis(): Redis & {
   return fake;
 }
 
-/** Minimal chainable surface used by the fake-redis pipeline stub. */
-interface FakePipeline {
-  set: (...args: (string | number)[]) => FakePipeline;
-  del: (...keys: string[]) => FakePipeline;
-  rpush: (key: string, ...values: string[]) => FakePipeline;
-  expire: (key: string, ttl: number) => FakePipeline;
-  exec: () => Promise<Array<[Error | null, unknown]>>;
+/** Minimal chainable surface used by the fake-redis `multi()` stub. */
+interface FakeMulti {
+  set: (key: string, value: string, options?: FakeSetOptions) => FakeMulti;
+  del: (keys: Keys) => FakeMulti;
+  rPush: (key: string, element: Keys) => FakeMulti;
+  expire: (key: string, ttl: number) => FakeMulti;
+  execAsPipeline: () => Promise<unknown[]>;
+}
+
+/**
+ * Build a node-redis `MultiErrorReply`-shaped error: an `Error` carrying
+ * `replies` (per-command results, with failures as `Error`s) and
+ * `errorIndexes`. `applySnapshot` unwraps this to surface the first real
+ * error.
+ */
+export function makeMultiError(
+  replies: unknown[],
+  errorIndexes: number[]
+): Error & { replies: unknown[]; errorIndexes: number[] } {
+  return Object.assign(
+    new Error(
+      `${errorIndexes.length} commands failed, see .replies and .errorIndexes for more information`
+    ),
+    { replies, errorIndexes }
+  );
 }
 
 /**
