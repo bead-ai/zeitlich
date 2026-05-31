@@ -89,7 +89,7 @@ All adapters follow the same pattern — `createActivities(scope)` for worker re
 ## Installation
 
 ```bash
-npm install zeitlich ioredis \
+npm install zeitlich redis \
   @temporalio/workflow @temporalio/common
 ```
 
@@ -99,7 +99,7 @@ npm install zeitlich ioredis \
 - `@temporalio/common` >=1.16.0 <2.0.0 (required)
 - `@temporalio/worker` >=1.16.0 <2.0.0 (optional — only when running a worker)
 - `@temporalio/envconfig` >=1.16.0 <2.0.0 (optional — only when using envconfig)
-- `ioredis` >= 5.0.0
+- `redis` >= 4.6.0
 - `@langchain/core` >= 1.0.0 (optional — only when using the LangChain adapter)
 - `@google/genai` >= 1.0.0 (optional — only when using the Google GenAI adapter)
 - `@aws-sdk/client-bedrock-agentcore` >= 3.900.0 (optional — only when using the Bedrock adapter)
@@ -266,7 +266,7 @@ export const myAgentWorkflow = defineWorkflow(
 Activities are factory functions that receive infrastructure dependencies (`redis`, `client`). The thread adapter and sandbox provider are configured here — swap imports to change LLM or sandbox backend.
 
 ```typescript
-import type Redis from "ioredis";
+import type { RedisClientType as Redis } from "redis";
 import type { WorkflowClient } from "@temporalio/client";
 import { ChatAnthropic } from "@langchain/anthropic";
 import {
@@ -318,7 +318,7 @@ export type MyActivities = ReturnType<typeof createActivities>;
 
 ```typescript
 import { Worker, NativeConnection } from "@temporalio/worker";
-import Redis from "ioredis";
+import { createClient } from "redis";
 import { fileURLToPath } from "node:url";
 import { createActivities } from "./activities";
 
@@ -326,7 +326,8 @@ async function run() {
   const connection = await NativeConnection.connect({
     address: "localhost:7233",
   });
-  const redis = new Redis({ host: "localhost", port: 6379 });
+  const redis = createClient({ url: "redis://localhost:6379" });
+  await redis.connect();
 
   const worker = await Worker.create({
     connection,
