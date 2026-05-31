@@ -36,6 +36,7 @@ function createMockClient() {
       output_tokens: 1,
       server_tool_use: null,
       service_tier: null,
+      output_tokens_details: null,
     },
   };
   const stream = {
