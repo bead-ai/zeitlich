@@ -272,8 +272,5 @@
   "bugs": {
     "url": "https://github.com/bead-ai/zeitlich/issues"
   },
-  "homepage": "https://github.com/bead-ai/zeitlich#readme",
-  "dependencies": {
-    "zod": "^4.3.6"
-  }
+  "homepage": "https://github.com/bead-ai/zeitlich#readme"
 }
