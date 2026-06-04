@@ -1,4 +1,6 @@
 import type { ThreadInit, SandboxInit, SandboxShutdown } from "./lifecycle";
+import type { SandboxSnapshot } from "./sandbox/types";
+import type { TokenUsage } from "./types";
 
 /**
  * Session config fields derived from a main workflow input, ready to spread
@@ -13,6 +15,25 @@ export interface WorkflowSessionInput {
   sandbox?: SandboxInit;
   /** Sandbox shutdown policy (default: "destroy") */
   sandboxShutdown?: SandboxShutdown;
+  /**
+   * Called by the session right before `runSession` returns. Installed by
+   * `defineWorkflow` to capture sandbox / thread / usage outputs and forward
+   * them to the workflow's `onSessionExit` config hook. Spread into
+   * `createSession` via `...sessionInput`.
+   */
+  onSessionExit?: (result: {
+    sandboxId?: string;
+    snapshot?: SandboxSnapshot;
+    threadId: string;
+    usage: {
+      totalInputTokens: number;
+      totalOutputTokens: number;
+      totalCachedWriteTokens: number;
+      totalCachedReadTokens: number;
+      totalReasonTokens: number;
+      turns: number;
+    };
+  }) => void;
 }
 
 /** Raw workflow input fields that map into `WorkflowSessionInput`. */
@@ -34,6 +55,18 @@ export interface WorkflowConfig {
    * - `"keep"` — leave the sandbox running (no-op on exit).
    */
   sandboxShutdown?: SandboxShutdown;
+  /**
+   * Called right before the underlying session exits, with the sandbox /
+   * thread outputs and normalized token usage. Mirrors the capture logic in
+   * `defineSubagentWorkflow`; useful for emitting metrics or persisting
+   * sandbox / thread ids without threading them through the handler result.
+   */
+  onSessionExit?: (result: {
+    sandboxId?: string;
+    snapshot?: SandboxSnapshot;
+    threadId: string;
+    usage: TokenUsage;
+  }) => void;
 }
 
 /**
@@ -59,6 +92,22 @@ export function defineWorkflow<TInput, TResult>(
       sandboxShutdown: config.sandboxShutdown ?? "destroy",
       ...(workflowInput.thread && { thread: workflowInput.thread }),
       ...(workflowInput.sandbox && { sandbox: workflowInput.sandbox }),
+      ...(config.onSessionExit && {
+        onSessionExit: ({ sandboxId, snapshot, threadId, usage }): void => {
+          config.onSessionExit?.({
+            ...(sandboxId !== undefined && { sandboxId }),
+            ...(snapshot !== undefined && { snapshot }),
+            threadId,
+            usage: {
+              inputTokens: usage.totalInputTokens,
+              outputTokens: usage.totalOutputTokens,
+              cachedWriteTokens: usage.totalCachedWriteTokens,
+              cachedReadTokens: usage.totalCachedReadTokens,
+              reasonTokens: usage.totalReasonTokens,
+            },
+          });
+        },
+      }),
     };
     return fn(input, sessionInput);
   };
