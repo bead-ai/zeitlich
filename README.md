@@ -56,13 +56,12 @@ Vercel AI SDK and other provider-specific adapters can be built by implementing 
 
 A sandbox adapter provides filesystem access for tools like `Bash`, `Read`, `Write`, and `Edit`:
 
-| Adapter    | Import                               | Use case                                          |
-| ---------- | ------------------------------------ | ------------------------------------------------- |
-| In-memory  | `zeitlich/adapters/sandbox/inmemory` | Tests and lightweight agents                      |
-| Virtual FS | `zeitlich` / `zeitlich/workflow`     | Built-in virtual filesystem with custom resolvers |
-| Daytona    | `zeitlich/adapters/sandbox/daytona`  | Remote Daytona workspaces                         |
-| E2B        | `zeitlich/adapters/sandbox/e2b`      | E2B cloud sandboxes                               |
-| Bedrock    | `zeitlich/adapters/sandbox/bedrock`  | AWS Bedrock AgentCore Code Interpreter            |
+| Adapter    | Import                              | Use case                                          |
+| ---------- | ----------------------------------- | ------------------------------------------------- |
+| Virtual FS | `zeitlich` / `zeitlich/workflow`    | Built-in virtual filesystem with custom resolvers |
+| Daytona    | `zeitlich/adapters/sandbox/daytona` | Remote Daytona workspaces                         |
+| E2B        | `zeitlich/adapters/sandbox/e2b`     | E2B cloud sandboxes                               |
+| Bedrock    | `zeitlich/adapters/sandbox/bedrock` | AWS Bedrock AgentCore Code Interpreter            |
 
 ### Example: LangChain Adapter
 
@@ -132,7 +131,7 @@ import {
 
 // Adapter workflow proxies (auto-scoped to current workflow)
 import { proxyLangChainThreadOps } from "zeitlich/adapters/thread/langchain/workflow";
-import { proxyInMemorySandboxOps } from "zeitlich/adapters/sandbox/inmemory/workflow";
+import { proxyE2bSandboxOps } from "zeitlich/adapters/sandbox/e2b/workflow";
 
 // In activity files and worker setup — framework-agnostic core
 import {
@@ -195,7 +194,7 @@ import type { MyActivities } from "./activities";
 import type { StoredMessage } from "@langchain/core/messages";
 
 import { proxyLangChainThreadOps } from "zeitlich/adapters/thread/langchain/workflow";
-import { proxyInMemorySandboxOps } from "zeitlich/adapters/sandbox/inmemory/workflow";
+import { proxyE2bSandboxOps } from "zeitlich/adapters/sandbox/e2b/workflow";
 
 const runAgentActivity = proxyRunAgent<StoredMessage>();
 
@@ -230,7 +229,7 @@ export const myAgentWorkflow = defineWorkflow(
       maxTurns: 20,
       thread: { mode: "new", threadId: runId },
       threadOps: proxyLangChainThreadOps(),
-      sandboxOps: proxyInMemorySandboxOps(),
+      sandboxOps: proxyE2bSandboxOps(),
       runAgent: runAgentActivity,
       buildContextMessage: () => [{ type: "text", text: prompt }],
       tools: {
@@ -276,11 +275,11 @@ import {
   createAskUserQuestionHandler,
   createRunAgentActivity,
 } from "zeitlich";
-import { InMemorySandboxProvider } from "zeitlich/adapters/sandbox/inmemory";
+import { E2bSandboxProvider } from "zeitlich/adapters/sandbox/e2b";
 
 import { createLangChainAdapter } from "zeitlich/adapters/thread/langchain";
 
-const sandboxProvider = new InMemorySandboxProvider();
+const sandboxProvider = new E2bSandboxProvider();
 const sandboxManager = new SandboxManager(sandboxProvider);
 
 export const createActivities = ({
@@ -561,9 +560,9 @@ Use `FileSystemSkillProvider` to load skills from a directory. It accepts any `S
 
 ```typescript
 import { FileSystemSkillProvider } from "zeitlich";
-import { InMemorySandboxProvider } from "zeitlich/adapters/sandbox/inmemory";
+import { E2bSandboxProvider } from "zeitlich/adapters/sandbox/e2b";
 
-const provider = new InMemorySandboxProvider();
+const provider = new E2bSandboxProvider();
 const { sandbox } = await provider.create({});
 
 const skillProvider = new FileSystemSkillProvider(sandbox.fs, "/skills");
@@ -922,16 +921,19 @@ export const researcherWorkflow = defineSubagentWorkflow(
 
 ### Filesystem Utilities
 
-Built-in support for file operations with in-memory or custom filesystem providers (e.g. from [`just-bash`](https://github.com/nicholasgasior/just-bash)).
+Built-in support for file operations against any sandbox or custom filesystem provider.
 
-`toTree` generates a file tree string from an `IFileSystem` instance:
+`toTree` generates a file tree string from a `SandboxFileSystem` instance:
 
 ```typescript
 import { toTree } from "zeitlich";
 
 // In activities - generate a file tree string for agent context
 export const createActivities = ({ redis, client }) => ({
-  generateFileTreeActivity: async () => toTree(inMemoryFileSystem),
+  generateFileTreeActivity: async (sandboxId: string) => {
+    const sandbox = await sandboxManager.getSandbox(sandboxId);
+    return toTree(sandbox.fs);
+  },
   // ...
 });
 ```
@@ -965,7 +967,7 @@ import {
 const sandboxManager = new SandboxManager(provider);
 
 export const createActivities = ({ redis, client }) => ({
-  // scope auto-prepends the provider id (e.g. "inMemory", "virtual")
+  // scope auto-prepends the provider id (e.g. "e2b", "daytona", "virtual")
   ...sandboxManager.createActivities("MyAgentWorkflow"),
   globHandlerActivity: withSandbox(sandboxManager, globHandler),
   editHandlerActivity: withSandbox(sandboxManager, editHandler),

@@ -2,7 +2,7 @@ import { describe, expect, it, beforeEach } from "vitest";
 import { bashHandler } from "./handler";
 import { withSandbox } from "../../lib/tool-router/with-sandbox";
 import { SandboxManager } from "../../lib/sandbox/manager";
-import { InMemorySandboxProvider } from "../../adapters/sandbox/inmemory/index";
+import { InMemorySandboxProvider } from "../../test-utils/in-memory-sandbox";
 import type { RouterContext } from "../../lib/tool-router/types";
 import type { Sandbox, SandboxCreateOptions } from "../../lib/sandbox";
 

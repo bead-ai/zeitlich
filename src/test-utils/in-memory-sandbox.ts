@@ -1,3 +1,11 @@
+/**
+ * Test-only in-memory {@link Sandbox} provider backed by `just-bash`.
+ *
+ * This is **not** part of the shipped public surface — it lives under
+ * `src/test-utils` purely so the sandbox manager, tool handlers, and
+ * capability-type fixtures have a lightweight, fully-featured backend to
+ * exercise against. `just-bash` is a dev dependency for the same reason.
+ */
 import {
   Bash,
   InMemoryFs,
@@ -18,9 +26,9 @@ import type {
   ExecResult,
   DirentEntry,
   FileStat,
-} from "../../../lib/sandbox/types";
-import { SandboxNotFoundError } from "../../../lib/sandbox/types";
-import { getShortId } from "../../../lib/thread/id";
+} from "../lib/sandbox/types";
+import { SandboxNotFoundError } from "../lib/sandbox/types";
+import { getShortId } from "../lib/thread/id";
 
 // ============================================================================
 // Adapter: IFileSystem → SandboxFileSystem

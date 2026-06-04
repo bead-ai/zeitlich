@@ -17,8 +17,8 @@
  *   toTree,
  * } from 'zeitlich';
  *
- * // In-memory sandbox adapter
- * import { InMemorySandboxProvider } from 'zeitlich/adapters/sandbox/inmemory';
+ * // Sandbox adapter
+ * import { DaytonaSandboxProvider } from 'zeitlich/adapters/sandbox/daytona';
  *
  * // LangChain adapter
  * import { createLangChainAdapter } from 'zeitlich/adapters/thread/langchain';

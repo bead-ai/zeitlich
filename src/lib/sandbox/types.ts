@@ -342,8 +342,8 @@ export type SandboxOps<
  *
  * @example
  * ```typescript
- * type InMemOps = PrefixedSandboxOps<"inMemory">;
- * // → { inMemoryCreateSandbox, inMemoryDestroySandbox, inMemorySnapshotSandbox, … }
+ * type E2bOps = PrefixedSandboxOps<"e2b">;
+ * // → { e2bCreateSandbox, e2bDestroySandbox, e2bSnapshotSandbox, … }
  * ```
  */
 export type PrefixedSandboxOps<

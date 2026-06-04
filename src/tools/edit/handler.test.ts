@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { InMemorySandboxProvider } from "../../adapters/sandbox/inmemory/index";
+import { InMemorySandboxProvider } from "../../test-utils/in-memory-sandbox";
 import type { Sandbox, SandboxCreateOptions } from "../../lib/sandbox";
 import { SandboxManager } from "../../lib/sandbox/manager";
 import type { RouterContext } from "../../lib/tool-router/types";

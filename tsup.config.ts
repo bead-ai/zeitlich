@@ -15,9 +15,6 @@ export default defineConfig({
     "adapters/thread/anthropic/index": "src/adapters/thread/anthropic/index.ts",
     "adapters/thread/anthropic/workflow":
       "src/adapters/thread/anthropic/proxy.ts",
-    "adapters/sandbox/inmemory/index": "src/adapters/sandbox/inmemory/index.ts",
-    "adapters/sandbox/inmemory/workflow":
-      "src/adapters/sandbox/inmemory/proxy.ts",
     "adapters/sandbox/daytona/index": "src/adapters/sandbox/daytona/index.ts",
     "adapters/sandbox/daytona/workflow":
       "src/adapters/sandbox/daytona/proxy.ts",
