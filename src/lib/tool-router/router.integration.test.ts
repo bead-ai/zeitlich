@@ -271,6 +271,50 @@ describe("createToolRouter integration", () => {
     expect(order[1]).toBe("start-echo-b");
   });
 
+  it("appends parallel results in original call order", async () => {
+    const slowEcho = defineTool({
+      name: "Echo" as const,
+      description: "slow echo with variable latency",
+      schema: z.object({ text: z.string(), delay: z.number() }),
+      handler: async (args: { text: string; delay: number }) => {
+        await new Promise((r) => setTimeout(r, args.delay));
+        return { toolResponse: args.text, data: { echoed: args.text } };
+      },
+    });
+
+    const router = createToolRouter({
+      tools: { Echo: slowEcho, Add: mathTool } as const,
+      threadId: "t-1",
+      appendToolResult: appendSpy.fn,
+      parallel: true,
+    });
+
+    const calls = [
+      router.parseToolCall({
+        id: "tc-1",
+        name: "Echo",
+        args: { text: "first", delay: 30 },
+      }),
+      router.parseToolCall({
+        id: "tc-2",
+        name: "Echo",
+        args: { text: "second", delay: 0 },
+      }),
+      router.parseToolCall({
+        id: "tc-3",
+        name: "Echo",
+        args: { text: "third", delay: 15 },
+      }),
+    ];
+
+    await router.processToolCalls(calls);
+
+    expect(appendSpy.calls).toHaveLength(3);
+    expect(at(appendSpy.calls, 0).toolCallId).toBe("tc-1");
+    expect(at(appendSpy.calls, 1).toolCallId).toBe("tc-2");
+    expect(at(appendSpy.calls, 2).toolCallId).toBe("tc-3");
+  });
+
   it("processes multiple tool calls sequentially", async () => {
     const order: string[] = [];
     const slowEcho = defineTool({
