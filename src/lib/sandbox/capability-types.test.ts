@@ -27,7 +27,7 @@ import type {
   SandboxProvider,
   SandboxSnapshot,
 } from "./types";
-import { InMemorySandboxProvider } from "../../adapters/sandbox/inmemory/index";
+import { InMemorySandboxProvider } from "../../test-utils/in-memory-sandbox";
 import { DaytonaSandboxProvider } from "../../adapters/sandbox/daytona/index";
 import type { E2bSandboxProvider } from "../../adapters/sandbox/e2b/index";
 
@@ -303,7 +303,7 @@ class _ImplWithoutDeclProvider {
 import type { SubagentSandboxConfig } from "../subagent/types";
 import { proxyDaytonaSandboxOps } from "../../adapters/sandbox/daytona/proxy";
 import { proxyE2bSandboxOps } from "../../adapters/sandbox/e2b/proxy";
-import { proxyInMemorySandboxOps } from "../../adapters/sandbox/inmemory/proxy";
+import { proxyInMemorySandboxOps } from "../../test-utils/in-memory-sandbox-proxy";
 
 // Helper that pins the matrix cell type to `SubagentSandboxConfig` so
 // `@ts-expect-error` directives consistently land on the call line. The

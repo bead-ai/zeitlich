@@ -97,26 +97,6 @@
         "default": "./dist/adapters/thread/anthropic/workflow.js"
       }
     },
-    "./adapters/sandbox/inmemory": {
-      "import": {
-        "types": "./dist/adapters/sandbox/inmemory/index.d.ts",
-        "default": "./dist/adapters/sandbox/inmemory/index.js"
-      },
-      "require": {
-        "types": "./dist/adapters/sandbox/inmemory/index.d.ts",
-        "default": "./dist/adapters/sandbox/inmemory/index.js"
-      }
-    },
-    "./adapters/sandbox/inmemory/workflow": {
-      "import": {
-        "types": "./dist/adapters/sandbox/inmemory/workflow.d.ts",
-        "default": "./dist/adapters/sandbox/inmemory/workflow.js"
-      },
-      "require": {
-        "types": "./dist/adapters/sandbox/inmemory/workflow.d.ts",
-        "default": "./dist/adapters/sandbox/inmemory/workflow.js"
-      }
-    },
     "./adapters/sandbox/daytona": {
       "import": {
         "types": "./dist/adapters/sandbox/daytona/index.d.ts",
@@ -236,8 +216,7 @@
     "@temporalio/envconfig": ">=1.16.0 <2.0.0",
     "@temporalio/worker": ">=1.16.0 <2.0.0",
     "@temporalio/workflow": ">=1.16.0 <2.0.0",
-    "ioredis": ">=5.0.0",
-    "just-bash": ">=2.0.0"
+    "ioredis": ">=5.0.0"
   },
   "peerDependenciesMeta": {
     "@daytonaio/sdk": {
@@ -262,9 +241,6 @@
       "optional": true
     },
     "@temporalio/worker": {
-      "optional": true
-    },
-    "just-bash": {
       "optional": true
     }
   },
