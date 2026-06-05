@@ -1,7 +1,7 @@
-import type Redis from "ioredis";
+import type { RedisClientType } from "redis";
 import type { JsonValue, PersistedThreadState } from "../state/types";
 export interface ThreadManagerConfig<T> {
-  redis: Redis;
+  redis: RedisClientType;
   threadId: string;
   /** Thread key, defaults to 'messages' */
   key?: string;

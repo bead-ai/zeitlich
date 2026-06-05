@@ -35,29 +35,29 @@ describe("createThreadManager ↔ public key helpers round-trip", () => {
     const redis = {
       exists: vi.fn(async (k: string) => (meta.has(k) ? 1 : 0)),
       set: vi.fn(
-        async (k: string, v: string, _ex: string, ttl: number) => {
+        async (k: string, v: string, options?: { EX?: number }) => {
           meta.set(k, v);
-          writtenMetaExpires.set(k, ttl);
+          if (options?.EX !== undefined) writtenMetaExpires.set(k, options.EX);
           return "OK";
         }
       ),
-      del: vi.fn(async (...keys: string[]) => {
+      del: vi.fn(async (keys: string | string[]) => {
         let n = 0;
-        for (const k of keys) {
+        for (const k of Array.isArray(keys) ? keys : [keys]) {
           if (store.delete(k)) n++;
           if (meta.delete(k)) n++;
         }
         return n;
       }),
-      rpush: vi.fn(async (k: string, ...values: string[]) => {
+      rPush: vi.fn(async (k: string, element: string | string[]) => {
         const list = store.get(k) ?? [];
-        list.push(...values);
+        list.push(...(Array.isArray(element) ? element : [element]));
         store.set(k, list);
         return list.length;
       }),
-      lrange: vi.fn(async (k: string) => store.get(k) ?? []),
-      llen: vi.fn(async (k: string) => (store.get(k) ?? []).length),
-      ltrim: vi.fn(async () => "OK"),
+      lRange: vi.fn(async (k: string) => store.get(k) ?? []),
+      lLen: vi.fn(async (k: string) => (store.get(k) ?? []).length),
+      lTrim: vi.fn(async () => "OK"),
       expire: vi.fn(async (k: string, ttl: number) => {
         if (store.has(k)) writtenListExpires.set(k, ttl);
         if (meta.has(k)) writtenMetaExpires.set(k, ttl);

@@ -1,5 +1,5 @@
+import type { RedisClientType as Redis } from "redis";
 import { randomBytes } from "node:crypto";
-import type Redis from "ioredis";
 import type {
   GoogleGenAI,
   Content,

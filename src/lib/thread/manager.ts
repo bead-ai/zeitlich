@@ -60,12 +60,12 @@ export function createThreadManager<T>(
   return {
     async initialize(): Promise<void> {
       await redis.del(redisKey);
-      await redis.set(metaKey, "1", "EX", ttlSeconds);
+      await redis.set(metaKey, "1", { EX: ttlSeconds });
     },
 
     async load(): Promise<T[]> {
       await assertThreadExists();
-      const data = await redis.lrange(redisKey, 0, -1);
+      const data = await redis.lRange(redisKey, 0, -1);
       return data.map(deserialize);
     },
 
@@ -75,23 +75,19 @@ export function createThreadManager<T>(
 
       if (idOf) {
         const dedupId = messages.map(idOf).join(":");
-        await redis.eval(
-          APPEND_IDEMPOTENT_SCRIPT,
-          2,
-          dedupKey(dedupId),
-          redisKey,
-          String(ttlSeconds),
-          ...messages.map(serialize)
-        );
+        await redis.eval(APPEND_IDEMPOTENT_SCRIPT, {
+          keys: [dedupKey(dedupId), redisKey],
+          arguments: [String(ttlSeconds), ...messages.map(serialize)],
+        });
       } else {
-        await redis.rpush(redisKey, ...messages.map(serialize));
+        await redis.rPush(redisKey, messages.map(serialize));
         await redis.expire(redisKey, ttlSeconds);
       }
     },
 
     async fork(newThreadId: string): Promise<BaseThreadManager<T>> {
       await assertThreadExists();
-      const data = await redis.lrange(redisKey, 0, -1);
+      const data = await redis.lRange(redisKey, 0, -1);
       const stateRaw = await redis.get(stateKey);
       const forked = createThreadManager({
         ...config,
@@ -100,12 +96,12 @@ export function createThreadManager<T>(
       await forked.initialize();
       if (data.length > 0) {
         const newKey = getThreadListKey(key, newThreadId);
-        await redis.rpush(newKey, ...data);
+        await redis.rPush(newKey, data);
         await redis.expire(newKey, ttlSeconds);
       }
       if (stateRaw != null) {
         const newStateKey = getThreadStateKey(key, newThreadId);
-        await redis.set(newStateKey, stateRaw, "EX", ttlSeconds);
+        await redis.set(newStateKey, stateRaw, { EX: ttlSeconds });
       }
       return forked;
     },
@@ -117,23 +113,23 @@ export function createThreadManager<T>(
           "replaceAll requires the thread manager to be configured with `idOf`"
         );
       }
-      const existing = await redis.lrange(redisKey, 0, -1);
+      const existing = await redis.lRange(redisKey, 0, -1);
       const existingIds = existing
         .map((raw) => idOf(deserialize(raw)))
         .filter((id): id is string => typeof id === "string");
       await redis.del(redisKey);
       if (existingIds.length > 0) {
-        await redis.del(...existingIds.map(dedupKey));
+        await redis.del(existingIds.map(dedupKey));
       }
       if (messages.length > 0) {
-        await redis.rpush(redisKey, ...messages.map(serialize));
+        await redis.rPush(redisKey, messages.map(serialize));
         await redis.expire(redisKey, ttlSeconds);
       }
       await redis.expire(metaKey, ttlSeconds);
     },
 
     async delete(): Promise<void> {
-      await redis.del(redisKey, metaKey, stateKey);
+      await redis.del([redisKey, metaKey, stateKey]);
     },
 
     async loadState(): Promise<PersistedThreadState | null> {
@@ -144,7 +140,7 @@ export function createThreadManager<T>(
 
     async saveState(state: PersistedThreadState): Promise<void> {
       await assertThreadExists();
-      await redis.set(stateKey, JSON.stringify(state), "EX", ttlSeconds);
+      await redis.set(stateKey, JSON.stringify(state), { EX: ttlSeconds });
     },
 
     async deleteState(): Promise<void> {
@@ -153,7 +149,7 @@ export function createThreadManager<T>(
 
     async length(): Promise<number> {
       await assertThreadExists();
-      return redis.llen(redisKey);
+      return redis.lLen(redisKey);
     },
 
     async truncateFromId(messageId: string): Promise<void> {
@@ -163,7 +159,7 @@ export function createThreadManager<T>(
           "truncateFromId requires the thread manager to be configured with `idOf`"
         );
       }
-      const data = await redis.lrange(redisKey, 0, -1);
+      const data = await redis.lRange(redisKey, 0, -1);
       let idx = -1;
       const removedIds: string[] = [];
       for (let i = 0; i < data.length; i++) {
@@ -178,7 +174,7 @@ export function createThreadManager<T>(
         await redis.del(redisKey);
         await redis.expire(metaKey, ttlSeconds);
       } else {
-        await redis.ltrim(redisKey, 0, idx - 1);
+        await redis.lTrim(redisKey, 0, idx - 1);
         await redis.expire(redisKey, ttlSeconds);
       }
       // Clear dedup markers for the removed messages so that a rewind
@@ -186,7 +182,7 @@ export function createThreadManager<T>(
       // re-append without the idempotent-append Lua script treating it
       // as a duplicate.
       if (removedIds.length > 0) {
-        await redis.del(...removedIds.map(dedupKey));
+        await redis.del(removedIds.map(dedupKey));
       }
     },
   };

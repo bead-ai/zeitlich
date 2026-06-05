@@ -8,7 +8,7 @@
  * tiered thread manager in `tiered.ts` is the only consumer.
  */
 
-import type Redis from "ioredis";
+import type { RedisClientType } from "redis";
 import type { PersistedThreadState } from "../state/types";
 import type { ThreadSnapshot } from "./cold-store";
 import {
@@ -21,7 +21,7 @@ import {
 
 /** Inputs shared by every snapshot operation. */
 interface SnapshotCommon {
-  redis: Redis;
+  redis: RedisClientType;
   threadKey: string;
   threadId: string;
 }
@@ -53,7 +53,7 @@ export async function encodeSnapshot(
   }
   const listKey = getThreadListKey(threadKey, threadId);
   const stateKey = getThreadStateKey(threadKey, threadId);
-  const messages = await redis.lrange(listKey, 0, -1);
+  const messages = await redis.lRange(listKey, 0, -1);
   const stateRaw = await redis.get(stateKey);
   const state =
     stateRaw == null ? null : (JSON.parse(stateRaw) as PersistedThreadState);
@@ -99,43 +99,65 @@ export async function applySnapshot(
   // CROSSSLOT, …) short-circuits before any writes hit the wire —
   // pipelines are non-atomic, so a queued DEL wouldn't stop later
   // commands from accumulating data behind a missing meta marker.
-  await redis.del(listKey, stateKey);
+  await redis.del([listKey, stateKey]);
 
-  // Pipeline the data writes (list/state/dedup) in one round-trip.
-  // Meta is written separately, only after every queued command
-  // succeeded, preserving the "meta-last" crash-safety invariant —
-  // a partial restore must leave meta absent so the next hydrate
-  // retries cleanly.
-  const pipeline = redis.pipeline();
+  // Pipeline the data writes (list/state/dedup) in one round-trip via a
+  // non-transactional `MULTI` (`execAsPipeline`). Meta is written
+  // separately, only after every queued command succeeded, preserving
+  // the "meta-last" crash-safety invariant — a partial restore must
+  // leave meta absent so the next hydrate retries cleanly.
+  const pipeline = redis.multi();
   if (snapshot.messages.length > 0) {
-    pipeline.rpush(listKey, ...snapshot.messages);
+    pipeline.rPush(listKey, snapshot.messages);
     pipeline.expire(listKey, ttlSeconds);
   }
   if (snapshot.state != null) {
-    pipeline.set(stateKey, JSON.stringify(snapshot.state), "EX", ttlSeconds);
+    pipeline.set(stateKey, JSON.stringify(snapshot.state), { EX: ttlSeconds });
   }
   for (const id of snapshot.dedupIds) {
-    pipeline.set(getThreadDedupKey(threadId, id), "1", "EX", ttlSeconds);
+    pipeline.set(getThreadDedupKey(threadId, id), "1", { EX: ttlSeconds });
   }
-  const results = await pipeline.exec();
-  if (results) {
-    const firstErr = results.find(([err]) => err)?.[0] ?? null;
-    if (firstErr) {
-      // Compensate: pipelines are non-atomic, so writes queued after
-      // a failing command (notably dedup SETs) may have landed. Best-
-      // effort clear every key we touched so a leftover dedup marker
-      // can't silently skip a future append with the same id.
-      await redis
-        .del(
-          listKey,
-          stateKey,
-          ...snapshot.dedupIds.map((id) => getThreadDedupKey(threadId, id))
-        )
-        .catch(() => undefined);
-      throw firstErr;
-    }
+  try {
+    await pipeline.execAsPipeline();
+  } catch (err) {
+    // Compensate: pipelines are non-atomic, so writes queued after a
+    // failing command (notably dedup SETs) may have landed. Best-effort
+    // clear every key we touched so a leftover dedup marker can't
+    // silently skip a future append with the same id. node-redis
+    // surfaces per-command failures by rejecting `execAsPipeline` with a
+    // `MultiErrorReply`; we unwrap it to rethrow the first real error.
+    await redis
+      .del([
+        listKey,
+        stateKey,
+        ...snapshot.dedupIds.map((id) => getThreadDedupKey(threadId, id)),
+      ])
+      .catch(() => undefined);
+    throw firstPipelineError(err);
   }
-  await redis.set(metaKey, "1", "EX", ttlSeconds);
+  await redis.set(metaKey, "1", { EX: ttlSeconds });
+}
+
+/**
+ * Unwrap node-redis's `MultiErrorReply` (thrown by `execAsPipeline` when
+ * one or more queued commands fail) to the first underlying error so
+ * callers see the actual Redis error (OOM, WRONGTYPE, …) rather than the
+ * generic aggregate wrapper. The structural check avoids a hard runtime
+ * dependency on the `redis` error class.
+ */
+function firstPipelineError(err: unknown): unknown {
+  if (
+    err != null &&
+    typeof err === "object" &&
+    "replies" in err &&
+    Array.isArray((err as { replies: unknown }).replies)
+  ) {
+    const firstErr = (err as { replies: unknown[] }).replies.find(
+      (r): r is Error => r instanceof Error
+    );
+    if (firstErr) return firstErr;
+  }
+  return err;
 }
 
 /** Configuration for {@link clearHotTier}. */
@@ -159,5 +181,5 @@ export async function clearHotTier(
     getThreadStateKey(threadKey, threadId),
     ...dedupIds.map((id) => getThreadDedupKey(threadId, id)),
   ];
-  await redis.del(...keys);
+  await redis.del(keys);
 }

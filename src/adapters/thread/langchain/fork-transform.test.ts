@@ -11,27 +11,27 @@ function createStatefulRedis() {
   const strings = new Map<string, string>();
 
   return {
-    exists: vi.fn(async (...keys: string[]) =>
-      keys.reduce(
+    exists: vi.fn(async (keys: string | string[]) =>
+      (Array.isArray(keys) ? keys : [keys]).reduce(
         (acc, k) => acc + (lists.has(k) || strings.has(k) ? 1 : 0),
         0
       )
     ),
-    lrange: vi.fn(async (key: string, start: number, stop: number) => {
+    lRange: vi.fn(async (key: string, start: number, stop: number) => {
       const list = lists.get(key) ?? [];
       const end = stop === -1 ? list.length : stop + 1;
       return list.slice(start, end);
     }),
-    rpush: vi.fn(async (key: string, ...values: string[]) => {
+    rPush: vi.fn(async (key: string, element: string | string[]) => {
       const list = lists.get(key) ?? [];
-      list.push(...values);
+      list.push(...(Array.isArray(element) ? element : [element]));
       lists.set(key, list);
       return list.length;
     }),
-    ltrim: vi.fn(async () => "OK"),
-    del: vi.fn(async (...keys: string[]) => {
+    lTrim: vi.fn(async () => "OK"),
+    del: vi.fn(async (keys: string | string[]) => {
       let removed = 0;
-      for (const k of keys) {
+      for (const k of Array.isArray(keys) ? keys : [keys]) {
         if (lists.delete(k)) removed++;
         if (strings.delete(k)) removed++;
       }
@@ -43,10 +43,16 @@ function createStatefulRedis() {
     }),
     get: vi.fn(async (key: string) => strings.get(key) ?? null),
     expire: vi.fn(async () => 1),
-    llen: vi.fn(async (key: string) => (lists.get(key) ?? []).length),
+    lLen: vi.fn(async (key: string) => (lists.get(key) ?? []).length),
     eval: vi.fn(
-      async (_script: string, _numKeys: number, ...args: string[]) => {
-        const [dedupKey, listKey, , ...serialised] = args;
+      async (
+        _script: string,
+        options: { keys?: string[]; arguments?: string[] }
+      ) => {
+        const keys = options.keys ?? [];
+        const argv = options.arguments ?? [];
+        const [dedupKey, listKey] = keys;
+        const serialised = argv.slice(1);
         if (!dedupKey || !listKey) return 0;
         if (strings.has(dedupKey)) return 0;
         const list = lists.get(listKey) ?? [];

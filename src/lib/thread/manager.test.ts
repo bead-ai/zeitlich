@@ -1,45 +1,53 @@
 import { describe, expect, it, beforeEach } from "vitest";
-import type Redis from "ioredis";
+import type { RedisClientType } from "redis";
 import { createThreadManager } from "./manager";
 import type { PersistedThreadState } from "../state/types";
 
+type Keys = string | string[];
+const toKeys = (keys: Keys): string[] => (Array.isArray(keys) ? keys : [keys]);
+
 /**
- * Minimal in-memory Redis stub exposing just the commands used by
+ * Minimal in-memory node-redis stub exposing just the commands used by
  * `createThreadManager`'s state methods (get/set/del/exists/expire) plus
- * the list helpers needed for `initialize`.
+ * the list helpers needed for `initialize`/`fork`. Uses the node-redis
+ * (`redis`) camelCase API and array-or-variadic keys.
  */
-function createFakeRedis(): Redis {
+function createFakeRedis(): RedisClientType {
   const store = new Map<string, string>();
 
   const redis = {
     async get(key: string): Promise<string | null> {
       return store.has(key) ? (store.get(key) as string) : null;
     },
-    async set(key: string, value: string): Promise<"OK"> {
+    async set(
+      key: string,
+      value: string,
+      _options?: { EX?: number }
+    ): Promise<"OK"> {
       store.set(key, String(value));
       return "OK";
     },
-    async del(...keys: string[]): Promise<number> {
+    async del(keys: Keys): Promise<number> {
       let removed = 0;
-      for (const k of keys) {
+      for (const k of toKeys(keys)) {
         if (store.delete(k)) removed++;
       }
       return removed;
     },
-    async exists(...keys: string[]): Promise<number> {
-      return keys.reduce((acc, k) => acc + (store.has(k) ? 1 : 0), 0);
+    async exists(keys: Keys): Promise<number> {
+      return toKeys(keys).reduce((acc, k) => acc + (store.has(k) ? 1 : 0), 0);
     },
     async expire(_key: string, _ttl: number): Promise<number> {
       return 1;
     },
-    async lrange(): Promise<string[]> {
+    async lRange(): Promise<string[]> {
       return [];
     },
-    async rpush(): Promise<number> {
+    async rPush(): Promise<number> {
       return 0;
     },
     _store: store,
-  } as unknown as Redis & { _store: Map<string, string> };
+  } as unknown as RedisClientType & { _store: Map<string, string> };
 
   return redis;
 }
@@ -64,10 +72,12 @@ const baseSlice: PersistedThreadState = {
 };
 
 describe("createThreadManager state persistence", () => {
-  let redis: Redis & { _store: Map<string, string> };
+  let redis: RedisClientType & { _store: Map<string, string> };
 
   beforeEach(() => {
-    redis = createFakeRedis() as Redis & { _store: Map<string, string> };
+    redis = createFakeRedis() as RedisClientType & {
+      _store: Map<string, string>;
+    };
   });
 
   async function initThread(threadId: string): Promise<void> {

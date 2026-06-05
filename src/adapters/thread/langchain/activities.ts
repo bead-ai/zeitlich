@@ -1,4 +1,4 @@
-import type Redis from "ioredis";
+import type { RedisClientType as Redis } from "redis";
 import type { ToolResultConfig } from "../../../lib/types";
 import type { PersistedThreadState } from "../../../lib/state/types";
 import type { MessageContent } from "@langchain/core/messages";

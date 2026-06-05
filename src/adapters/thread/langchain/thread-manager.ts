@@ -1,4 +1,4 @@
-import type Redis from "ioredis";
+import type { RedisClientType as Redis } from "redis";
 import type { JsonValue } from "../../../lib/state/types";
 import {
   AIMessage,

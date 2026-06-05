@@ -1,4 +1,4 @@
-import type Redis from "ioredis";
+import type { RedisClientType as Redis } from "redis";
 import type { GoogleGenAI, Content, Part } from "@google/genai";
 import type { ToolResultConfig } from "../../../lib/types";
 import type { PersistedThreadState } from "../../../lib/state/types";

@@ -216,7 +216,7 @@
     "@temporalio/envconfig": ">=1.16.0 <2.0.0",
     "@temporalio/worker": ">=1.16.0 <2.0.0",
     "@temporalio/workflow": ">=1.16.0 <2.0.0",
-    "ioredis": ">=5.0.0"
+    "redis": ">=4.6.0"
   },
   "peerDependenciesMeta": {
     "@daytonaio/sdk": {
