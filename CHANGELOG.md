@@ -2,6 +2,36 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.50](https://github.com/bead-ai/zeitlich/compare/v0.2.49...v0.2.50) (2026-06-05)
+
+
+### ⚠ BREAKING CHANGES
+
+* consumers must pass a node-redis (`redis`) client instead of an ioredis instance; the `ioredis` peer dependency is replaced by `redis`.
+* the zeitlich/adapters/sandbox/inmemory and zeitlich/adapters/sandbox/inmemory/workflow entrypoints are removed.
+
+### Features
+
+* add onSessionExit callback to WorkflowSessionInput and WorkflowConfig ([#132](https://github.com/bead-ai/zeitlich/issues/132)) ([d5828dc](https://github.com/bead-ai/zeitlich/commit/d5828dcb284632cdc23c4597479a4219fe6f32dc))
+* enhance persistThreadState functionality for improved state management ([7913096](https://github.com/bead-ai/zeitlich/commit/7913096b2abea734231200d28377a5fbcc1d0a9f))
+* Gemini parallel tool fixes, generation config passthrough, and Redis-backed context caching ([#129](https://github.com/bead-ai/zeitlich/issues/129)) ([1866947](https://github.com/bead-ai/zeitlich/commit/1866947ba4a93721106c202d5186940d48d9768c))
+* migrate from ioredis to node-redis ([#131](https://github.com/bead-ai/zeitlich/issues/131)) ([838ba23](https://github.com/bead-ai/zeitlich/commit/838ba23c0b9e1335c6f594b5fb7a61d0ffeda121))
+
+
+### Bug Fixes
+
+* redis EX ([c393cf7](https://github.com/bead-ai/zeitlich/commit/c393cf7e394ad9720f141c01a0e5a88d318b80d1))
+
+
+### Code Refactoring
+
+* remove shipped in-memory sandbox adapter ([#133](https://github.com/bead-ai/zeitlich/issues/133)) ([b83192b](https://github.com/bead-ai/zeitlich/commit/b83192bb06d5fb5df957779715c96573a9e2a52f))
+
+
+### Miscellaneous Chores
+
+* release 0.2.50 ([4e78048](https://github.com/bead-ai/zeitlich/commit/4e780481242a99a316b09e803e01b60891930017))
+
 ## [0.2.49](https://github.com/bead-ai/zeitlich/compare/v0.2.48...v0.2.49) (2026-05-25)
 
 
