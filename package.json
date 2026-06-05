@@ -184,7 +184,7 @@
     "@anthropic-ai/sdk": "^0.100.1",
     "@aws-sdk/client-s3": "^3.1000.0",
     "@aws-sdk/lib-storage": "^3.1000.0",
-    "@daytonaio/sdk": "^0.171.0",
+    "@daytonaio/sdk": "^0.184.0",
     "@e2b/code-interpreter": "^2.3.3",
     "@eslint/js": "^10.0.1",
     "@google/genai": "^2.7.0",

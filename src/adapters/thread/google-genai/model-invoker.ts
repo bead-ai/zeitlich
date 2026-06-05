@@ -139,7 +139,7 @@ export function createGoogleGenAIModelInvoker({
           cacheInstance.usageMetadata?.totalTokenCount ?? undefined;
         const redisTtl = ttl - 5;
         if (redisTtl > 0) {
-          await redis.set(cacheRedisKey, cachedContentName, "EX", redisTtl);
+          await redis.set(cacheRedisKey, cachedContentName, { EX: redisTtl });
         }
       }
     }
