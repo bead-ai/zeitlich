@@ -102,12 +102,12 @@ export interface SandboxManagerHooks<
  *
  * @example
  * ```typescript
- * const manager = new SandboxManager(new InMemorySandboxProvider());
+ * const manager = new SandboxManager(new DaytonaSandboxProvider(config));
  * const activities = {
  *   ...manager.createActivities("CodingAgent"),
  *   bashHandler: withSandbox(manager, bashHandler),
  * };
- * // registers: inMemoryCodingAgentCreateSandbox, …
+ * // registers: daytonaCodingAgentCreateSandbox, …
  * ```
  *
  * @example
@@ -336,10 +336,6 @@ export class SandboxManager<
    *
    * @example
    * ```typescript
-   * const manager = new SandboxManager(new InMemorySandboxProvider());
-   * manager.createActivities("CodingAgent");
-   * // registers: inMemoryCodingAgentCreateSandbox, inMemoryCodingAgentDestroySandbox, …
-   *
    * const dmgr = new SandboxManager(new DaytonaSandboxProvider(config));
    * dmgr.createActivities("CodingAgent");
    * // registers: daytonaCodingAgentCreateSandbox, daytonaCodingAgentDestroySandbox

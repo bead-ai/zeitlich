@@ -1,26 +1,15 @@
 /**
- * Workflow-safe proxy for in-memory sandbox operations.
+ * Test-only workflow-safe proxy for the in-memory sandbox fixture.
  *
- * Import this from `zeitlich/adapters/sandbox/inmemory/workflow`
- * in your Temporal workflow files.
- *
- * By default the scope is derived from `workflowInfo().workflowType`,
- * so activities are automatically namespaced per workflow.
- *
- * @example
- * ```typescript
- * import { proxyInMemorySandboxOps } from 'zeitlich/adapters/sandbox/inmemory/workflow';
- *
- * // Auto-scoped to the current workflow name
- * const sandbox = proxyInMemorySandboxOps();
- * ```
+ * Not part of the shipped public surface — used by the capability-type
+ * fixtures to exercise the full-capability proxy shape.
  */
 import { proxyActivities, workflowInfo } from "@temporalio/workflow";
 import type {
   SandboxCreateOptions,
   SandboxOps,
-} from "../../../lib/sandbox/types";
-import type { InMemoryCaps } from "./index";
+} from "../lib/sandbox/types";
+import type { InMemoryCaps } from "./in-memory-sandbox";
 
 const ADAPTER_PREFIX = "inMemory";
 

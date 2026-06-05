@@ -211,10 +211,20 @@ export function createToolRouter<T extends ToolMap>(
    * handler requested a session-level rewind; when present, the result is
    * not appended to the thread and siblings should be cancelled.
    */
+  interface PendingAppend {
+    toolCallId: string;
+    toolName: string;
+    content: JsonValue;
+  }
+
   type ProcessedToolCall =
-    | { kind: "result"; value: ToolCallResultUnion<TResults> }
+    | {
+        kind: "result";
+        value: ToolCallResultUnion<TResults>;
+        pendingAppend?: PendingAppend;
+      }
     | { kind: "rewind"; signal: RewindSignal }
-    | { kind: "skipped" };
+    | { kind: "skipped"; pendingAppend?: PendingAppend };
 
   async function processToolCall(
     toolCall: ParsedToolCallUnion<T>,
@@ -222,7 +232,8 @@ export function createToolRouter<T extends ToolMap>(
     sandboxId?: string,
     onRewindRequested?: (signal: RewindSignal) => void,
     assistantMessageId?: string,
-    persistThreadState?: () => Promise<void>
+    persistThreadState?: () => Promise<void>,
+    deferAppend?: boolean
   ): Promise<ProcessedToolCall> {
     const startTime = Date.now();
     const tool = toolMap.get(toolCall.name);
@@ -230,15 +241,26 @@ export function createToolRouter<T extends ToolMap>(
     // --- Pre-hooks: may skip or modify args ---
     const preResult = await runPreHooks(toolCall, tool, turn);
     if (preResult.skip) {
+      const skipContent = JSON.stringify({
+        skipped: true,
+        reason: "Skipped by PreToolUse hook",
+      });
+      if (deferAppend) {
+        return {
+          kind: "skipped",
+          pendingAppend: {
+            toolCallId: toolCall.id,
+            toolName: toolCall.name,
+            content: skipContent,
+          },
+        };
+      }
       await appendToolResult(uuid4(), {
         threadId: options.threadId,
         threadKey: options.threadKey,
         toolCallId: toolCall.id,
         toolName: toolCall.name,
-        content: JSON.stringify({
-          skipped: true,
-          reason: "Skipped by PreToolUse hook",
-        }),
+        content: skipContent,
       });
       return { kind: "skipped" };
     }
@@ -314,19 +336,22 @@ export function createToolRouter<T extends ToolMap>(
     }
 
     // --- Append result to thread (unless handler already did) ---
-    if (!resultAppended) {
-      const config = {
-        threadId: options.threadId,
-        threadKey: options.threadKey,
-        toolCallId: toolCall.id,
-        toolName: toolCall.name,
-        content,
-      };
+    const needsAppend = !resultAppended;
+    if (needsAppend && !deferAppend) {
       await appendToolResult.executeWithOptions(
         {
           summary: `Append ${toolCall.name} result`,
         },
-        [uuid4(), config]
+        [
+          uuid4(),
+          {
+            threadId: options.threadId,
+            threadKey: options.threadKey,
+            toolCallId: toolCall.id,
+            toolName: toolCall.name,
+            content,
+          },
+        ]
       );
     }
 
@@ -356,7 +381,18 @@ export function createToolRouter<T extends ToolMap>(
       durationMs
     );
 
-    return { kind: "result", value: toolResult };
+    return {
+      kind: "result",
+      value: toolResult,
+      ...(needsAppend &&
+        deferAppend && {
+          pendingAppend: {
+            toolCallId: toolCall.id,
+            toolName: toolCall.name,
+            content,
+          },
+        }),
+    };
   }
 
   return {
@@ -409,7 +445,7 @@ export function createToolRouter<T extends ToolMap>(
     ): Promise<ProcessToolCallsResult<TResults>> {
       const attachRewind = (
         arr: ToolCallResultUnion<TResults>[],
-        rewind: RewindSignal | undefined,
+        rewind: RewindSignal | undefined
       ): ProcessToolCallsResult<TResults> => {
         if (rewind) {
           (arr as ProcessToolCallsResult<TResults>).rewind = rewind;
@@ -447,19 +483,55 @@ export function createToolRouter<T extends ToolMap>(
                 sandboxId,
                 onRewindRequested,
                 assistantMessageId,
-                persistThreadState
+                persistThreadState,
+                true
               )
             )
           )
         );
 
+        // Fail fast on non-cancellation rejections before appending
+        // anything, so the thread stays clean for retry/truncation.
+        for (const outcome of outcomes) {
+          if (
+            outcome.status === "rejected" &&
+            !isCancellation(outcome.reason)
+          ) {
+            throw outcome.reason;
+          }
+        }
+
+        // Append deferred results in original call order so positional
+        // correlation between function calls and responses is preserved.
+        if (!rewindSignal) {
+          for (const outcome of outcomes) {
+            if (
+              outcome.status === "fulfilled" &&
+              outcome.value.kind !== "rewind" &&
+              outcome.value.pendingAppend
+            ) {
+              const pa = outcome.value.pendingAppend;
+              await appendToolResult.executeWithOptions(
+                { summary: `Append ${pa.toolName} result` },
+                [
+                  uuid4(),
+                  {
+                    threadId: options.threadId,
+                    threadKey: options.threadKey,
+                    toolCallId: pa.toolCallId,
+                    toolName: pa.toolName,
+                    content: pa.content,
+                  },
+                ]
+              );
+            }
+          }
+        }
+
         const results: ToolCallResultUnion<TResults>[] = [];
         for (const outcome of outcomes) {
           if (outcome.status === "rejected") {
-            if (isCancellation(outcome.reason)) {
-              continue;
-            }
-            throw outcome.reason;
+            continue;
           }
           if (outcome.value.kind === "result") {
             results.push(outcome.value.value);
@@ -502,8 +574,12 @@ export function createToolRouter<T extends ToolMap>(
       }
 
       const processOne = async (
-        toolCall: ParsedToolCallUnion<T>
-      ): Promise<ToolCallResult<TName, TResult>> => {
+        toolCall: ParsedToolCallUnion<T>,
+        deferAppend?: boolean
+      ): Promise<{
+        result: ToolCallResult<TName, TResult>;
+        pendingAppend?: PendingAppend;
+      }> => {
         const routerContext: RouterContext = {
           threadId: options.threadId,
           ...(options.threadKey && { threadKey: options.threadKey }),
@@ -524,7 +600,8 @@ export function createToolRouter<T extends ToolMap>(
           routerContext as Parameters<typeof handler>[1]
         );
 
-        if (!response.resultAppended) {
+        const needsAppend = !response.resultAppended;
+        if (needsAppend && !deferAppend) {
           await appendToolResult.executeWithOptions(
             {
               summary: `Append ${toolCall.name} result`,
@@ -543,20 +620,51 @@ export function createToolRouter<T extends ToolMap>(
         }
 
         return {
-          toolCallId: toolCall.id,
-          name: toolCall.name as TName,
-          data: response.data,
-          ...(response.metadata && { metadata: response.metadata }),
+          result: {
+            toolCallId: toolCall.id,
+            name: toolCall.name as TName,
+            data: response.data,
+            ...(response.metadata && { metadata: response.metadata }),
+          },
+          ...(needsAppend &&
+            deferAppend && {
+              pendingAppend: {
+                toolCallId: toolCall.id,
+                toolName: toolCall.name,
+                content: response.toolResponse as JsonValue,
+              },
+            }),
         };
       };
 
       if (options.parallel) {
-        return Promise.all(matchingCalls.map(processOne));
+        const outcomes = await Promise.all(
+          matchingCalls.map((tc) => processOne(tc, true))
+        );
+        for (const { pendingAppend } of outcomes) {
+          if (pendingAppend) {
+            await appendToolResult.executeWithOptions(
+              { summary: `Append ${pendingAppend.toolName} result` },
+              [
+                uuid4(),
+                {
+                  threadId: options.threadId,
+                  threadKey: options.threadKey,
+                  toolCallId: pendingAppend.toolCallId,
+                  toolName: pendingAppend.toolName,
+                  content: pendingAppend.content,
+                },
+              ]
+            );
+          }
+        }
+        return outcomes.map((o) => o.result);
       }
 
       const results: ToolCallResult<TName, TResult>[] = [];
       for (const toolCall of matchingCalls) {
-        results.push(await processOne(toolCall));
+        const { result } = await processOne(toolCall);
+        results.push(result);
       }
       return results;
     },

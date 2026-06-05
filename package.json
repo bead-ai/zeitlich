@@ -97,26 +97,6 @@
         "default": "./dist/adapters/thread/anthropic/workflow.js"
       }
     },
-    "./adapters/sandbox/inmemory": {
-      "import": {
-        "types": "./dist/adapters/sandbox/inmemory/index.d.ts",
-        "default": "./dist/adapters/sandbox/inmemory/index.js"
-      },
-      "require": {
-        "types": "./dist/adapters/sandbox/inmemory/index.d.ts",
-        "default": "./dist/adapters/sandbox/inmemory/index.js"
-      }
-    },
-    "./adapters/sandbox/inmemory/workflow": {
-      "import": {
-        "types": "./dist/adapters/sandbox/inmemory/workflow.d.ts",
-        "default": "./dist/adapters/sandbox/inmemory/workflow.js"
-      },
-      "require": {
-        "types": "./dist/adapters/sandbox/inmemory/workflow.d.ts",
-        "default": "./dist/adapters/sandbox/inmemory/workflow.js"
-      }
-    },
     "./adapters/sandbox/daytona": {
       "import": {
         "types": "./dist/adapters/sandbox/daytona/index.d.ts",
@@ -236,7 +216,6 @@
     "@temporalio/envconfig": ">=1.16.0 <2.0.0",
     "@temporalio/worker": ">=1.16.0 <2.0.0",
     "@temporalio/workflow": ">=1.16.0 <2.0.0",
-    "just-bash": ">=2.0.0",
     "redis": ">=4.6.0"
   },
   "peerDependenciesMeta": {
@@ -263,17 +242,11 @@
     },
     "@temporalio/worker": {
       "optional": true
-    },
-    "just-bash": {
-      "optional": true
     }
   },
   "type": "module",
   "bugs": {
     "url": "https://github.com/bead-ai/zeitlich/issues"
   },
-  "homepage": "https://github.com/bead-ai/zeitlich#readme",
-  "dependencies": {
-    "zod": "^4.3.6"
-  }
+  "homepage": "https://github.com/bead-ai/zeitlich#readme"
 }
