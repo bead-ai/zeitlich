@@ -16,6 +16,11 @@ export interface LangChainModelInvokerConfig<
   redis: Redis;
   model: TModel;
   hooks?: LangChainThreadManagerHooks;
+  /**
+   * Redis TTL for the thread's keys; defaults to 90 days. Use a shorter
+   * value (hours) with a cold tier.
+   */
+  ttlSeconds?: number;
 }
 
 /**
@@ -43,7 +48,7 @@ export interface LangChainModelInvokerConfig<
  
 export function createLangChainModelInvoker<
   TModel extends BaseChatModel<any> = BaseChatModel<any>,
->({ redis, model, hooks }: LangChainModelInvokerConfig<TModel>) {
+>({ redis, model, hooks, ttlSeconds }: LangChainModelInvokerConfig<TModel>) {
   return async function invokeLangChainModel(
     config: ModelInvokerConfig
   ): Promise<AgentResponse<StoredMessage>> {
@@ -56,6 +61,7 @@ export function createLangChainModelInvoker<
       threadId,
       key: threadKey,
       hooks,
+      ...(ttlSeconds !== undefined && { ttlSeconds }),
     });
     const runId = uuidv4();
 
@@ -122,13 +128,20 @@ export async function invokeLangChainModel<
   redis,
   model,
   hooks,
+  ttlSeconds,
   config,
 }: {
   redis: Redis;
   config: ModelInvokerConfig;
   model: TModel;
   hooks?: LangChainThreadManagerHooks;
+  ttlSeconds?: number;
 }): Promise<AgentResponse<StoredMessage>> {
-  const invoker = createLangChainModelInvoker({ redis, model, hooks });
+  const invoker = createLangChainModelInvoker({
+    redis,
+    model,
+    hooks,
+    ...(ttlSeconds !== undefined && { ttlSeconds }),
+  });
   return invoker(config);
 }

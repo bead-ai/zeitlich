@@ -8,6 +8,7 @@ import {
 import { createGoogleGenAIModelInvoker } from "./model-invoker";
 import type { StoredContent } from "./thread-manager";
 import type { AgentResponse } from "../../../lib/model";
+import { THREAD_TTL_SECONDS } from "../../../lib/thread/keys";
 
 const textReply: Part[] = [{ text: "ok" }];
 
@@ -17,7 +18,8 @@ function createMockRedis(
 ) {
   return {
     exists: vi.fn().mockResolvedValue(1),
-    lrange: vi.fn().mockResolvedValue(stored.map((m) => JSON.stringify(m))),
+    lRange: vi.fn().mockResolvedValue(stored.map((m) => JSON.stringify(m))),
+    lTrim: vi.fn().mockResolvedValue("OK"),
     get: vi
       .fn()
       .mockImplementation((key: string) =>
@@ -25,7 +27,7 @@ function createMockRedis(
       ),
     del: vi.fn().mockResolvedValue(1),
     set: vi.fn().mockResolvedValue("OK"),
-    rpush: vi.fn().mockResolvedValue(1),
+    rPush: vi.fn().mockResolvedValue(1),
     expire: vi.fn().mockResolvedValue(1),
     eval: vi.fn().mockResolvedValue(1),
   };
@@ -311,8 +313,7 @@ describe("Google GenAI model invoker — context caching", () => {
     );
     expect(setCall).toBeDefined();
     expect(setCall?.[1]).toBe("cached-content-ref");
-    expect(setCall?.[2]).toBe("EX");
-    expect(setCall?.[3]).toBe(595);
+    expect(setCall?.[2]).toEqual({ EX: 595 });
   });
 
   it("reports cachedWriteTokens from cache creation", async () => {
@@ -333,5 +334,53 @@ describe("Google GenAI model invoker — context caching", () => {
     const result = await invoker(invokerConfig);
 
     expect(result.usage?.cachedWriteTokens).toBe(4200);
+  });
+});
+
+describe("Google GenAI model invoker — thread TTL", () => {
+  // A thread whose tail is a prior attempt's assistant message stored
+  // under `assistant-1`, so the invoker's `truncateFromId(assistant-1)`
+  // trims it and re-stamps the surviving list key's TTL.
+  const retriedThread: StoredContent[] = [
+    { id: "msg-1", content: { role: "user", parts: [{ text: "hi" }] } },
+    {
+      id: "assistant-1",
+      content: { role: "model", parts: [{ text: "prior attempt" }] },
+    },
+  ];
+  const listKey = "messages:thread:thread-1";
+
+  it("re-stamps trimmed hot keys at the configured ttlSeconds", async () => {
+    const redis = createMockRedis(retriedThread);
+    const client = createMockClient();
+
+    const invoker = createGoogleGenAIModelInvoker({
+      redis: redis as never,
+      client: client as never,
+      model: "gemini-2.5-flash",
+      ttlSeconds: 3600,
+    });
+
+    await invoker(invokerConfig);
+
+    expect(redis.lTrim).toHaveBeenCalledWith(listKey, 0, 0);
+    expect(redis.expire).toHaveBeenCalledWith(listKey, 3600);
+    expect(redis.expire).not.toHaveBeenCalledWith(listKey, THREAD_TTL_SECONDS);
+  });
+
+  it("defaults to THREAD_TTL_SECONDS when ttlSeconds is omitted", async () => {
+    const redis = createMockRedis(retriedThread);
+    const client = createMockClient();
+
+    const invoker = createGoogleGenAIModelInvoker({
+      redis: redis as never,
+      client: client as never,
+      model: "gemini-2.5-flash",
+    });
+
+    await invoker(invokerConfig);
+
+    expect(redis.lTrim).toHaveBeenCalledWith(listKey, 0, 0);
+    expect(redis.expire).toHaveBeenCalledWith(listKey, THREAD_TTL_SECONDS);
   });
 });

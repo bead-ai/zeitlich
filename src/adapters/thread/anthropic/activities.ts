@@ -57,9 +57,8 @@ export interface AnthropicAdapterConfig {
    */
   coldStore?: ColdThreadStore;
   /**
-   * Override the default Redis TTL (90 days) for thread keys. When
-   * pairing the adapter with a `coldStore`, a shorter TTL (hours)
-   * is typically more appropriate.
+   * Redis TTL for the thread's keys; defaults to 90 days. Use a shorter
+   * value (hours) with a cold tier.
    */
   ttlSeconds?: number;
 }
@@ -160,32 +159,26 @@ export function createAnthropicAdapter(
 ): AnthropicAdapter {
   const { redis, client } = config;
 
-  /**
-   * Common per-call config plumbed into both the provider thread
-   * manager (for message I/O) and the tiered base manager (for
-   * hot↔cold lifecycle ops). Keeping them in lockstep means a single
-   * `coldStore` / `ttlSeconds` configuration controls every Redis
-   * write the adapter does.
-   */
-  const baseExtras = {
+  // Single source for the adapter's `redis` handle and configured TTL, spread
+  // into every internal thread manager so all of them share one configuration.
+  const base = {
+    redis,
     ...(config.ttlSeconds !== undefined && { ttlSeconds: config.ttlSeconds }),
   };
 
   const makeProviderThread = (threadId: string, threadKey?: string) =>
     createAnthropicThreadManager({
-      redis,
+      ...base,
       threadId,
       key: threadKey,
-      ...baseExtras,
     });
 
   const makeTieredBase = (threadId: string, threadKey?: string) =>
     createTieredThreadManager<StoredMessage>({
-      redis,
+      ...base,
       threadId,
       key: threadKey,
       idOf: storedMessageId,
-      ...baseExtras,
       ...(config.coldStore && { coldStore: config.coldStore }),
     });
 
@@ -240,11 +233,10 @@ export function createAnthropicAdapter(
       threadKey?: string
     ): Promise<void> {
       const thread = createAnthropicThreadManager({
-        redis,
+        ...base,
         threadId: sourceThreadId,
         key: threadKey,
         hooks: config.hooks,
-        ...baseExtras,
       });
       await thread.fork(targetThreadId);
     },
@@ -304,7 +296,7 @@ export function createAnthropicAdapter(
     promptCache?: AnthropicPromptCacheConfig
   ): ModelInvoker<Anthropic.Messages.Message> => {
     const invokerConfig: AnthropicModelInvokerConfig = {
-      redis,
+      ...base,
       client,
       model,
       ...(maxTokens !== undefined ? { maxTokens } : {}),

@@ -32,9 +32,8 @@ export interface GoogleGenAIThreadManagerConfig {
   key?: string;
   hooks?: GoogleGenAIThreadManagerHooks;
   /**
-   * Override the default thread TTL (90 days). When pairing the
-   * adapter with a durable cold tier, a shorter TTL (hours) is
-   * typically more appropriate.
+   * Redis TTL for the thread's keys; defaults to 90 days. Use a shorter
+   * value (hours) with a cold tier.
    */
   ttlSeconds?: number;
 }

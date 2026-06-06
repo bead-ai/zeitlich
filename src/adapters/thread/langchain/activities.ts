@@ -46,9 +46,8 @@ export interface LangChainAdapterConfig {
    */
   coldStore?: ColdThreadStore;
   /**
-   * Override the default Redis TTL (90 days). When pairing the
-   * adapter with a `coldStore`, a shorter TTL (hours) is typically
-   * more appropriate.
+   * Redis TTL for the thread's keys; defaults to 90 days. Use a shorter
+   * value (hours) with a cold tier.
    */
   ttlSeconds?: number;
 }
@@ -133,25 +132,26 @@ export function createLangChainAdapter(
 ): LangChainAdapter {
   const { redis } = config;
 
-  const baseExtras = {
+  // Single source for the adapter's `redis` handle and configured TTL, spread
+  // into every internal thread manager so all of them share one configuration.
+  const base = {
+    redis,
     ...(config.ttlSeconds !== undefined && { ttlSeconds: config.ttlSeconds }),
   };
 
   const makeProviderThread = (threadId: string, threadKey?: string) =>
     createLangChainThreadManager({
-      redis,
+      ...base,
       threadId,
       key: threadKey,
-      ...baseExtras,
     });
 
   const makeTieredBase = (threadId: string, threadKey?: string) =>
     createTieredThreadManager<StoredMessage>({
-      redis,
+      ...base,
       threadId,
       key: threadKey,
       idOf: storedMessageId,
-      ...baseExtras,
       ...(config.coldStore && { coldStore: config.coldStore }),
     });
 
@@ -207,11 +207,10 @@ export function createLangChainAdapter(
       threadKey?: string
     ): Promise<void> {
       const thread = createLangChainThreadManager({
-        redis,
+        ...base,
         threadId: sourceThreadId,
         key: threadKey,
         hooks: config.hooks,
-        ...baseExtras,
       });
       await thread.fork(targetThreadId);
     },
@@ -275,7 +274,11 @@ export function createLangChainAdapter(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     model: BaseChatModel<any>
   ): ModelInvoker<StoredMessage> =>
-    createLangChainModelInvoker({ redis, model, hooks: config.hooks });
+    createLangChainModelInvoker({
+      ...base,
+      model,
+      hooks: config.hooks,
+    });
 
   const invoker: ModelInvoker<StoredMessage> = config.model
     ? makeInvoker(config.model)
