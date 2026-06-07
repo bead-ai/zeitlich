@@ -1,5 +1,10 @@
 import type { RedisClientType as Redis } from "redis";
-import type { GoogleGenAI, Content, Part } from "@google/genai";
+import type {
+  GoogleGenAI,
+  Content,
+  Part,
+  GenerateContentConfig,
+} from "@google/genai";
 import type { ToolResultConfig } from "../../../lib/types";
 import type { PersistedThreadState } from "../../../lib/state/types";
 import type {
@@ -23,7 +28,10 @@ import {
   type GoogleGenAIThreadManagerHooks,
   type StoredContent,
 } from "./thread-manager";
-import { createGoogleGenAIModelInvoker } from "./model-invoker";
+import {
+  createGoogleGenAIModelInvoker,
+  type GoogleGenAIModelInvokerConfig,
+} from "./model-invoker";
 import { ADAPTER_ID } from "./adapter-id";
 
 export type GoogleGenAIThreadOps<TScope extends string = ""> =
@@ -46,11 +54,22 @@ export interface GoogleGenAIAdapterConfig {
    */
   coldStore?: ColdThreadStore;
   /**
-   * Override the default Redis TTL (90 days). When pairing the
-   * adapter with a `coldStore`, a shorter TTL (hours) is typically
-   * more appropriate.
+   * Redis TTL for the thread's keys; defaults to 90 days. Use a shorter
+   * value (hours) with a cold tier.
    */
   ttlSeconds?: number;
+  /**
+   * Default generation config forwarded to every invoker the adapter
+   * builds (`invoker` and `createModelInvoker`). `systemInstruction`,
+   * `tools`, and `abortSignal` are managed by the invoker and override
+   * any values set here.
+   */
+  generationConfig?: GenerateContentConfig;
+  /**
+   * Default server-side context caching config forwarded to every
+   * invoker the adapter builds. See {@link createGoogleGenAIModelInvoker}.
+   */
+  cache?: GoogleGenAIModelInvokerConfig["cache"];
 }
 
 /**
@@ -145,7 +164,7 @@ export interface GoogleGenAIAdapter {
  *     ...createRunAgentActivity(temporalClient, adapter.invoker, "codingAgent"),
  *     ...createRunAgentActivity(
  *       temporalClient,
- *       adapter.createModelInvoker('gemini-2.5-pro'),
+ *       adapter.createModelInvoker('gemini-2.5-pro', client),
  *       "researchAgent",
  *     ),
  *   };
@@ -157,25 +176,26 @@ export function createGoogleGenAIAdapter(
 ): GoogleGenAIAdapter {
   const { redis } = config;
 
-  const baseExtras = {
+  // Single source for the adapter's `redis` handle and configured TTL, spread
+  // into every internal thread manager so all of them share one configuration.
+  const base = {
+    redis,
     ...(config.ttlSeconds !== undefined && { ttlSeconds: config.ttlSeconds }),
   };
 
   const makeProviderThread = (threadId: string, threadKey?: string) =>
     createGoogleGenAIThreadManager({
-      redis,
+      ...base,
       threadId,
       key: threadKey,
-      ...baseExtras,
     });
 
   const makeTieredBase = (threadId: string, threadKey?: string) =>
     createTieredThreadManager<StoredContent>({
-      redis,
+      ...base,
       threadId,
       key: threadKey,
       idOf: storedContentId,
-      ...baseExtras,
       ...(config.coldStore && { coldStore: config.coldStore }),
     });
 
@@ -235,11 +255,10 @@ export function createGoogleGenAIAdapter(
       threadKey?: string
     ): Promise<void> {
       const thread = createGoogleGenAIThreadManager({
-        redis,
+        ...base,
         threadId: sourceThreadId,
         key: threadKey,
         hooks: config.hooks,
-        ...baseExtras,
       });
       await thread.fork(targetThreadId);
     },
@@ -304,10 +323,14 @@ export function createGoogleGenAIAdapter(
     client: GoogleGenAI
   ): ModelInvoker<Content> =>
     createGoogleGenAIModelInvoker({
-      redis,
+      ...base,
       client,
       model,
       hooks: config.hooks,
+      ...(config.generationConfig !== undefined && {
+        config: config.generationConfig,
+      }),
+      ...(config.cache !== undefined && { cache: config.cache }),
     });
 
   const invoker: ModelInvoker<Content> =

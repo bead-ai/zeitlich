@@ -21,6 +21,12 @@ export interface GoogleGenAIModelInvokerConfig {
   client: GoogleGenAI;
   model: string;
   hooks?: GoogleGenAIThreadManagerHooks;
+  /**
+   * Redis TTL for the thread's keys; defaults to 90 days. Use a shorter
+   * value (hours) with a cold tier. Distinct from `cache.ttlSeconds`
+   * (server-side context caching).
+   */
+  ttlSeconds?: number;
   /** Passed through to `generateContentStream().config`.
    *  `systemInstruction`, `tools`, and `abortSignal` are managed by the
    *  invoker and will override any values set here. */
@@ -69,6 +75,7 @@ export function createGoogleGenAIModelInvoker({
   client,
   model,
   hooks,
+  ttlSeconds,
   config: generationConfig,
   cache: cacheConfig,
 }: GoogleGenAIModelInvokerConfig) {
@@ -83,6 +90,7 @@ export function createGoogleGenAIModelInvoker({
       threadId,
       key: threadKey,
       hooks,
+      ...(ttlSeconds !== undefined && { ttlSeconds }),
     });
     // Truncate the thread starting at the id the assistant message
     // will be stored under. No-op on the first attempt; on rewind
@@ -214,6 +222,7 @@ export async function invokeGoogleGenAIModel({
   client,
   model,
   hooks,
+  ttlSeconds,
   config,
   generationConfig,
   cache,
@@ -222,6 +231,7 @@ export async function invokeGoogleGenAIModel({
   client: GoogleGenAI;
   model: string;
   hooks?: GoogleGenAIThreadManagerHooks;
+  ttlSeconds?: number;
   config: ModelInvokerConfig;
   generationConfig?: GenerateContentConfig;
   cache?: GoogleGenAIModelInvokerConfig["cache"];
@@ -231,6 +241,7 @@ export async function invokeGoogleGenAIModel({
     client,
     model,
     hooks,
+    ...(ttlSeconds !== undefined && { ttlSeconds }),
     config: generationConfig,
     cache,
   });

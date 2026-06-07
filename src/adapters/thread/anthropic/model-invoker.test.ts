@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import type Anthropic from "@anthropic-ai/sdk";
 import { createAnthropicModelInvoker } from "./model-invoker";
 import type { StoredMessage } from "./thread-manager";
+import { THREAD_TTL_SECONDS } from "../../../lib/thread/keys";
 
 function createMockRedis(stored: StoredMessage[]) {
   return {
@@ -107,5 +108,54 @@ describe("createAnthropicModelInvoker prompt caching", () => {
       | Anthropic.MessageCreateParams
       | undefined;
     expect(params?.messages[0]?.content).toBe("hello");
+  });
+});
+
+describe("createAnthropicModelInvoker thread TTL", () => {
+  // The tail message is stored under `assistant-1`, so the invoker's
+  // `truncateFromId(assistant-1)` trims it and re-stamps the surviving
+  // list key's TTL.
+  const retriedThread: StoredMessage[] = [
+    { id: "msg-1", message: { role: "user", content: "hi" } },
+    { id: "assistant-1", message: { role: "assistant", content: "prior" } },
+  ];
+  const listKey = "messages:thread:thread-1";
+  const invokerConfig = {
+    threadId: "thread-1",
+    assistantMessageId: "assistant-1",
+    state: { tools: [] } as never,
+    agentName: "Agent",
+  };
+
+  it("re-stamps trimmed hot keys at the configured ttlSeconds", async () => {
+    const redis = createMockRedis(retriedThread);
+    const { client } = createMockClient();
+    const invoker = createAnthropicModelInvoker({
+      redis: redis as never,
+      client: client as never,
+      model: "claude-test",
+      ttlSeconds: 3600,
+    });
+
+    await invoker(invokerConfig);
+
+    expect(redis.lTrim).toHaveBeenCalledWith(listKey, 0, 0);
+    expect(redis.expire).toHaveBeenCalledWith(listKey, 3600);
+    expect(redis.expire).not.toHaveBeenCalledWith(listKey, THREAD_TTL_SECONDS);
+  });
+
+  it("defaults to THREAD_TTL_SECONDS when ttlSeconds is omitted", async () => {
+    const redis = createMockRedis(retriedThread);
+    const { client } = createMockClient();
+    const invoker = createAnthropicModelInvoker({
+      redis: redis as never,
+      client: client as never,
+      model: "claude-test",
+    });
+
+    await invoker(invokerConfig);
+
+    expect(redis.lTrim).toHaveBeenCalledWith(listKey, 0, 0);
+    expect(redis.expire).toHaveBeenCalledWith(listKey, THREAD_TTL_SECONDS);
   });
 });

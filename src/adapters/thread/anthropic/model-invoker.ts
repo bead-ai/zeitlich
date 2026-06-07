@@ -25,6 +25,11 @@ export interface AnthropicModelInvokerConfig {
    */
   promptCache?: AnthropicPromptCacheConfig;
   hooks?: AnthropicThreadManagerHooks;
+  /**
+   * Redis TTL for the thread's keys; defaults to 90 days. Use a shorter
+   * value (hours) with a cold tier.
+   */
+  ttlSeconds?: number;
 }
 
 function toAnthropicTools(
@@ -68,6 +73,7 @@ export function createAnthropicModelInvoker({
   maxTokens = 16384,
   promptCache,
   hooks,
+  ttlSeconds,
 }: AnthropicModelInvokerConfig) {
   return async function invokeAnthropicModel(
     config: ModelInvokerConfig
@@ -80,6 +86,7 @@ export function createAnthropicModelInvoker({
       threadId,
       key: threadKey,
       hooks,
+      ...(ttlSeconds !== undefined && { ttlSeconds }),
     });
     // Truncate the thread starting at the id the assistant message
     // will be stored under. On the happy path this is a no-op; on a
@@ -150,6 +157,7 @@ export async function invokeAnthropicModel({
   maxTokens,
   promptCache,
   hooks,
+  ttlSeconds,
   config,
 }: {
   redis: Redis;
@@ -158,6 +166,7 @@ export async function invokeAnthropicModel({
   maxTokens?: number;
   promptCache?: AnthropicPromptCacheConfig;
   hooks?: AnthropicThreadManagerHooks;
+  ttlSeconds?: number;
   config: ModelInvokerConfig;
 }): Promise<AgentResponse<Anthropic.Messages.Message>> {
   const invoker = createAnthropicModelInvoker({
@@ -167,6 +176,7 @@ export async function invokeAnthropicModel({
     maxTokens,
     promptCache,
     hooks,
+    ...(ttlSeconds !== undefined && { ttlSeconds }),
   });
   return invoker(config);
 }
