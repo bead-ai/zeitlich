@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.51](https://github.com/bead-ai/zeitlich/compare/v0.2.50...v0.2.51) (2026-06-07)
+
+
+### Features
+
+* **thread:** add ttlSeconds override to model invokers and adapters ([#135](https://github.com/bead-ai/zeitlich/issues/135)) ([f70e2ea](https://github.com/bead-ai/zeitlich/commit/f70e2eac8250ab854d5b7a3262ce919c9199b1c1))
+
+
+### Miscellaneous Chores
+
+* release 0.2.51 ([aeb4275](https://github.com/bead-ai/zeitlich/commit/aeb42750883fab0e8e5d9f0770ff29bb3ef81331))
+
 ## [0.2.50](https://github.com/bead-ai/zeitlich/compare/v0.2.49...v0.2.50) (2026-06-05)
 
 
