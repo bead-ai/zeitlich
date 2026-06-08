@@ -58,7 +58,7 @@ export function createObservabilityHooks(
         threadId: ctx.threadId,
         exitReason: ctx.exitReason,
         turns: ctx.turns,
-        usage: {},
+        usage: ctx.usage,
         durationMs: Date.now() - sessionStartMs,
       });
     },

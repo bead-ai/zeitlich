@@ -1,4 +1,4 @@
-import type { SessionExitReason } from "../types";
+import type { SessionExitReason, TokenUsage } from "../types";
 import type { ToolMap, ToolRouterHooks } from "../tool-router/types";
 
 // ============================================================================
@@ -29,6 +29,7 @@ export interface SessionEndHookContext {
   agentName: string;
   exitReason: SessionExitReason;
   turns: number;
+  usage: TokenUsage;
   metadata: Record<string, unknown>;
 }
 

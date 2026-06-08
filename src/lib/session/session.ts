@@ -4,7 +4,7 @@ import {
   ApplicationFailure,
   log,
 } from "@temporalio/workflow";
-import type { SessionExitReason } from "../types";
+import type { SessionExitReason, TokenUsage } from "../types";
 import type { SessionConfig, ZeitlichSession } from "./types";
 import { resolveSessionLifecycle } from "./types";
 import type {
@@ -232,7 +232,8 @@ export async function createSession<
 
   const callSessionEnd = async (
     exitReason: SessionExitReason,
-    turns: number
+    turns: number,
+    usage: TokenUsage
   ): Promise<void> => {
     if (hooks.onSessionEnd) {
       await hooks.onSessionEnd({
@@ -240,6 +241,7 @@ export async function createSession<
         agentName,
         exitReason,
         turns,
+        usage,
         metadata,
       });
     }
@@ -707,7 +709,14 @@ export async function createSession<
           });
         }
 
-        await callSessionEnd(exitReason, stateManager.getTurns());
+        const totals = stateManager.getTotalUsage();
+        await callSessionEnd(exitReason, totals.turns, {
+          inputTokens: totals.totalInputTokens,
+          outputTokens: totals.totalOutputTokens,
+          cachedWriteTokens: totals.totalCachedWriteTokens,
+          cachedReadTokens: totals.totalCachedReadTokens,
+          reasonTokens: totals.totalReasonTokens,
+        });
 
         if (sandboxOwned && sandboxId && sandboxOps) {
           switch (resolvedShutdown) {
