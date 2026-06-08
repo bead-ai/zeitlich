@@ -556,6 +556,15 @@ export async function createSession<
           });
 
           if (!toolRouter.hasTools() || rawToolCalls.length === 0) {
+            if (hooks.onTurnComplete) {
+              await hooks.onTurnComplete({
+                threadId,
+                agentName,
+                turn: currentTurn,
+                toolCallCount: rawToolCalls.length,
+                ...(usage && { usage }),
+              });
+            }
             stateManager.complete();
             exitReason = "completed";
             finalMessage = message;
@@ -640,6 +649,16 @@ export async function createSession<
 
           // Turn committed: fresh id for the next turn.
           assistantId = undefined;
+
+          if (hooks.onTurnComplete) {
+            await hooks.onTurnComplete({
+              threadId,
+              agentName,
+              turn: currentTurn,
+              toolCallCount: rawToolCalls.length,
+              ...(usage && { usage }),
+            });
+          }
         }
 
         if (stateManager.getTurns() >= maxTurns && stateManager.isRunning()) {

@@ -40,6 +40,28 @@ export type SessionEndHook = (
   ctx: SessionEndHookContext
 ) => void | Promise<void>;
 
+/**
+ * Context for TurnComplete hook - called after each agent turn commits
+ * (i.e. once per model invocation, excluding rewound turns)
+ */
+export interface TurnCompleteHookContext {
+  threadId: string;
+  agentName: string;
+  /** 1-based turn number that just completed */
+  turn: number;
+  /** Number of tool calls the model requested this turn */
+  toolCallCount: number;
+  /** Token usage reported by the model for this turn, if available */
+  usage?: TokenUsage;
+}
+
+/**
+ * TurnComplete hook - called after each agent turn commits
+ */
+export type TurnCompleteHook = (
+  ctx: TurnCompleteHookContext
+) => void | Promise<void>;
+
 // ============================================================================
 // Message Lifecycle Hooks
 // ============================================================================
@@ -96,4 +118,6 @@ export interface Hooks<
   onSessionStart?: SessionStartHook;
   /** Called when session ends */
   onSessionEnd?: SessionEndHook;
+  /** Called after each agent turn commits (excludes rewound turns) */
+  onTurnComplete?: TurnCompleteHook;
 }

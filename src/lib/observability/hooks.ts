@@ -1,6 +1,10 @@
 import { proxySinks } from "@temporalio/workflow";
 import type { ZeitlichObservabilitySinks } from "./sinks";
-import type { SessionStartHook, SessionEndHook } from "../hooks/types";
+import type {
+  SessionStartHook,
+  SessionEndHook,
+  TurnCompleteHook,
+} from "../hooks/types";
 import type {
   PostToolUseHook,
   PostToolUseFailureHook,
@@ -9,6 +13,7 @@ import type {
 export interface ObservabilityHooks {
   onSessionStart: SessionStartHook;
   onSessionEnd: SessionEndHook;
+  onTurnComplete: TurnCompleteHook;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   onPostToolUse: PostToolUseHook<any, any>;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -60,6 +65,16 @@ export function createObservabilityHooks(
         turns: ctx.turns,
         usage: ctx.usage,
         durationMs: Date.now() - sessionStartMs,
+      });
+    },
+
+    onTurnComplete: (ctx) => {
+      zeitlichMetrics.turnCompleted({
+        agentName,
+        threadId: ctx.threadId,
+        turn: ctx.turn,
+        toolCallCount: ctx.toolCallCount,
+        ...(ctx.usage && { usage: ctx.usage }),
       });
     },
 

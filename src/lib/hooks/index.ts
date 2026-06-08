@@ -3,6 +3,8 @@ export type {
   SessionStartHook,
   SessionEndHookContext,
   SessionEndHook,
+  TurnCompleteHookContext,
+  TurnCompleteHook,
   PreHumanMessageAppendHookContext,
   PreHumanMessageAppendHook,
   PostHumanMessageAppendHookContext,
