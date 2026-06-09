@@ -29,18 +29,16 @@ export type JsonValue =
  * Rejects: functions, symbols, undefined, class instances with methods
  */
 export type JsonSerializable<T> = {
-  [K in keyof T]: T[K] extends JsonValue
-    ? T[K]
-    : T[K] extends JsonPrimitive
-      ? T[K]
-      : T[K] extends (infer U)[]
-        ? U extends JsonValue
-          ? T[K]
-          : JsonSerializable<U>[]
-        : T[K] extends object
-          ? JsonSerializable<T[K]>
-          : never;
+  [K in keyof T]: JsonSerializableValue<T[K]>;
 };
+
+type JsonSerializableValue<V> = V extends JsonValue
+  ? V
+  : V extends (infer U)[]
+    ? JsonSerializableValue<U>[]
+    : V extends object
+      ? JsonSerializable<V>
+      : never;
 
 /**
  * Full state type combining base state with custom state
