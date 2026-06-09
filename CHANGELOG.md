@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.53](https://github.com/bead-ai/zeitlich/compare/v0.2.51...v0.2.53) (2026-06-09)
+
+
+### Features
+
+* **hooks:** add TurnComplete hook for tracking agent turn completions ([b81c610](https://github.com/bead-ai/zeitlich/commit/b81c6109a66ee291e174103b261c8a1ca224f9ec))
+* **session:** enhance session end hook to include token usage metrics ([9c8052d](https://github.com/bead-ai/zeitlich/commit/9c8052d1b740ddf4c8f35a743bc2aa22c8cfc792))
+
+
+### Bug Fixes
+
+* JsonSerializable value type supporting null ([71c485b](https://github.com/bead-ai/zeitlich/commit/71c485bfd28f01e091b614771c498120882fc617))
+
+
+### Miscellaneous Chores
+
+* release 0.2.52 ([6299aab](https://github.com/bead-ai/zeitlich/commit/6299aab77c0e266ba5c48855fe8414019cc53cb2))
+* release 0.2.53 ([b1b612e](https://github.com/bead-ai/zeitlich/commit/b1b612e38369aa1ab0eddeb7d72969db9eeb9fae))
+
 ## [0.2.51](https://github.com/bead-ai/zeitlich/compare/v0.2.50...v0.2.51) (2026-06-07)
 
 
