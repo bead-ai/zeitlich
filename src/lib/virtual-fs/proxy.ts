@@ -14,12 +14,12 @@
  * ```
  */
 import { proxyActivities, workflowInfo } from "@temporalio/workflow";
-import type { VirtualFsOps } from "./types";
+import type { FileEntryMetadata, VirtualFsOps } from "./types";
 
-export function proxyVirtualFsOps<TCtx = unknown>(
+export function proxyVirtualFsOps<TCtx = unknown, TMeta = FileEntryMetadata>(
   scope?: string,
   options?: Parameters<typeof proxyActivities>[0]
-): VirtualFsOps<TCtx> {
+): VirtualFsOps<TCtx, TMeta> {
   const resolvedScope = scope ?? workflowInfo().workflowType;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -41,5 +41,5 @@ export function proxyVirtualFsOps<TCtx = unknown>(
 
   return {
     resolveFileTree: acts[p("resolveFileTree")],
-  } as VirtualFsOps<TCtx>;
+  } as VirtualFsOps<TCtx, TMeta>;
 }
