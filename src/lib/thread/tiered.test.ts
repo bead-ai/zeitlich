@@ -194,6 +194,8 @@ describe("createTieredThreadManager — with cold store", () => {
     await tm.hydrate();
 
     expect(await tm.load()).toEqual([{ id: "existing", text: "in redis" }]);
+    // Hot thread: the cold store is never read.
+    expect(cold._calls.read).toBe(0);
   });
 
   it("hydrate is a no-op when nothing is archived in the cold store", async () => {

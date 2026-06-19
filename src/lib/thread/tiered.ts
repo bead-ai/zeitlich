@@ -19,7 +19,7 @@
  */
 
 import { createThreadManager } from "./manager";
-import { THREAD_TTL_SECONDS } from "./keys";
+import { THREAD_TTL_SECONDS, getThreadMetaKey } from "./keys";
 import type { BaseThreadManager, ThreadManagerConfig } from "./types";
 import type { ColdThreadStore } from "./cold-store";
 import {
@@ -100,6 +100,11 @@ export function createTieredThreadManager<T>(
   return Object.assign(base, {
     async hydrate(): Promise<void> {
       if (!coldStore) return;
+      // Skip the cold-tier round-trip when the thread is already hot.
+      // `applySnapshot` would no-op anyway, but probing the meta key
+      // first avoids an unnecessary (and potentially expensive or
+      // failing) `coldStore.read()` for warm threads.
+      if ((await redis.exists(getThreadMetaKey(key, threadId))) === 1) return;
       const snapshot = await coldStore.read(key, threadId);
       if (!snapshot) return;
       await applySnapshot({
