@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.54](https://github.com/bead-ai/zeitlich/compare/v0.2.53...v0.2.54) (2026-06-23)
+
+
+### Features
+
+* **subagent:** add support for search attributes in child workflows ([d76d979](https://github.com/bead-ai/zeitlich/commit/d76d9792f95a6e366f80e4550e99334652669d68))
+
+
+### Miscellaneous Chores
+
+* release 0.2.54 ([de71966](https://github.com/bead-ai/zeitlich/commit/de7196675067cc6355103c3815662b5905dc5bf8))
+
 ## [0.2.53](https://github.com/bead-ai/zeitlich/compare/v0.2.51...v0.2.53) (2026-06-09)
 
 
