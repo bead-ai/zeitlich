@@ -13,7 +13,7 @@ import type {
   SandboxOps,
   SandboxSnapshot,
 } from "../sandbox/types";
-import type { VirtualFsOps } from "../virtual-fs/types";
+import type { FileEntryMetadata, VirtualFsOps } from "../virtual-fs/types";
 import type { RunAgentActivity } from "../model/types";
 import type {
   AgentStateManager,
@@ -329,6 +329,8 @@ export interface SessionConfig<
   TShutdown extends
     | SubagentSandboxShutdown
     | undefined = SubagentSandboxShutdown | undefined,
+  TCtx = unknown,
+  TMeta = FileEntryMetadata,
 > {
   /** The name of the agent, should be unique within the workflows */
   agentName: string;
@@ -457,7 +459,7 @@ export interface SessionConfig<
   // Virtual filesystem
   // ---------------------------------------------------------------------------
 
-  virtualFsOps?: VirtualFsOps;
+  virtualFsOps?: VirtualFsOps<TCtx, TMeta>;
 
   /**
    * Virtual filesystem configuration (optional — independent of sandbox).
@@ -470,7 +472,7 @@ export interface SessionConfig<
    * sandbox (e.g. for execution) and a virtual filesystem.
    */
   virtualFs?: {
-    ctx: unknown;
+    ctx: TCtx;
   };
 }
 

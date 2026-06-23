@@ -14,6 +14,7 @@ import type {
   SandboxSnapshot,
 } from "../sandbox/types";
 import type { SandboxInit, SubagentSandboxShutdown } from "../lifecycle";
+import type { FileEntryMetadata } from "../virtual-fs/types";
 import type {
   AgentState,
   AgentStateManager,
@@ -84,10 +85,20 @@ export async function createSession<
   TContent = string,
   TInit extends SandboxInit | undefined = undefined,
   TShutdown extends SubagentSandboxShutdown | undefined = undefined,
+  TCtx = unknown,
+  TMeta = FileEntryMetadata,
 >(
-  config: SessionConfig<T, M, TContent, TInit, TShutdown> & {
+  config: SessionConfig<T, M, TContent, TInit, TShutdown, TCtx, TMeta> & {
     sandboxOps: NonNullable<
-      SessionConfig<T, M, TContent, TInit, TShutdown>["sandboxOps"]
+      SessionConfig<
+        T,
+        M,
+        TContent,
+        TInit,
+        TShutdown,
+        TCtx,
+        TMeta
+      >["sandboxOps"]
     >;
   }
 ): Promise<ZeitlichSession<M, true>>;
@@ -97,8 +108,10 @@ export async function createSession<
   TContent = string,
   TInit extends SandboxInit | undefined = undefined,
   TShutdown extends SubagentSandboxShutdown | undefined = undefined,
+  TCtx = unknown,
+  TMeta = FileEntryMetadata,
 >(
-  config: SessionConfig<T, M, TContent, TInit, TShutdown>
+  config: SessionConfig<T, M, TContent, TInit, TShutdown, TCtx, TMeta>
 ): Promise<ZeitlichSession<M, false>>;
 // Implementation. The overloads above narrow the public contract per
 // `SessionRequiredCaps<TInit, TShutdown>`. The impl signature uses the
