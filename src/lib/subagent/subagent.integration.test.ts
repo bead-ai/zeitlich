@@ -30,6 +30,7 @@ vi.mock("@temporalio/workflow", () => {
       taskQueue: "default-queue",
       workflowId: "child-wf-1",
       parent: { workflowId: "parent-wf-1" },
+      searchAttributes: { Team: ["parent-team"], Env: ["prod"] },
     }),
     defineSignal: vi.fn((name: string) => ({ __signal: true, name })),
     setHandler: vi.fn(),
@@ -2527,6 +2528,133 @@ describe("createSubagentHandler", () => {
     expect(lastCall[1].workflowId).toMatch(/^researcher-/);
     expect(lastCall[1].taskQueue).toBe("my-queue");
     expect(lastCall[1].args[0]).toBe("hello");
+  });
+
+  it("inherits the parent's search attributes by default", async () => {
+    const { executeChild } = await import("@temporalio/workflow");
+    const execMock = executeChild as ReturnType<typeof vi.fn>;
+
+    const { handler } = createSubagentHandler([
+      {
+        agentName: "researcher",
+        description: "Researches topics",
+        workflow: mockWorkflow("researcherWorkflow"),
+      },
+    ]);
+
+    await handler(
+      { subagent: "researcher", description: "test", prompt: "hi" },
+      { threadId: "t", toolCallId: "tc", toolName: "Subagent" }
+    );
+
+    const lastCall = execMock.mock.calls[execMock.mock.calls.length - 1];
+    if (!lastCall) throw new Error("expected executeChild call");
+    expect(lastCall[1].searchAttributes).toEqual({
+      Team: ["parent-team"],
+      Env: ["prod"],
+    });
+  });
+
+  it("merges config.searchAttributes on top of inherited attributes", async () => {
+    const { executeChild } = await import("@temporalio/workflow");
+    const execMock = executeChild as ReturnType<typeof vi.fn>;
+
+    const { handler } = createSubagentHandler([
+      {
+        agentName: "researcher",
+        description: "Researches topics",
+        workflow: mockWorkflow("researcherWorkflow"),
+        searchAttributes: { Team: ["research"], Tier: ["premium"] },
+      },
+    ]);
+
+    await handler(
+      { subagent: "researcher", description: "test", prompt: "hi" },
+      { threadId: "t", toolCallId: "tc", toolName: "Subagent" }
+    );
+
+    const lastCall = execMock.mock.calls[execMock.mock.calls.length - 1];
+    if (!lastCall) throw new Error("expected executeChild call");
+    expect(lastCall[1].searchAttributes).toEqual({
+      Team: ["research"],
+      Env: ["prod"],
+      Tier: ["premium"],
+    });
+  });
+
+  it("lets config.searchAttributes win over workflowOptions.searchAttributes", async () => {
+    const { executeChild } = await import("@temporalio/workflow");
+    const execMock = executeChild as ReturnType<typeof vi.fn>;
+
+    const { handler } = createSubagentHandler([
+      {
+        agentName: "researcher",
+        description: "Researches topics",
+        workflow: mockWorkflow("researcherWorkflow"),
+        workflowOptions: { searchAttributes: { Tier: ["basic"] } },
+        searchAttributes: { Tier: ["premium"] },
+      },
+    ]);
+
+    await handler(
+      { subagent: "researcher", description: "test", prompt: "hi" },
+      { threadId: "t", toolCallId: "tc", toolName: "Subagent" }
+    );
+
+    const lastCall = execMock.mock.calls[execMock.mock.calls.length - 1];
+    if (!lastCall) throw new Error("expected executeChild call");
+    expect(lastCall[1].searchAttributes).toEqual({
+      Team: ["parent-team"],
+      Env: ["prod"],
+      Tier: ["premium"],
+    });
+  });
+
+  it("does not inherit parent attributes when inheritSearchAttributes is false", async () => {
+    const { executeChild } = await import("@temporalio/workflow");
+    const execMock = executeChild as ReturnType<typeof vi.fn>;
+
+    const { handler } = createSubagentHandler([
+      {
+        agentName: "researcher",
+        description: "Researches topics",
+        workflow: mockWorkflow("researcherWorkflow"),
+        inheritSearchAttributes: false,
+        searchAttributes: { Team: ["research"] },
+      },
+    ]);
+
+    await handler(
+      { subagent: "researcher", description: "test", prompt: "hi" },
+      { threadId: "t", toolCallId: "tc", toolName: "Subagent" }
+    );
+
+    const lastCall = execMock.mock.calls[execMock.mock.calls.length - 1];
+    if (!lastCall) throw new Error("expected executeChild call");
+    expect(lastCall[1].searchAttributes).toEqual({ Team: ["research"] });
+  });
+
+  it("omits searchAttributes when none are inherited or configured", async () => {
+    const { executeChild } = await import("@temporalio/workflow");
+    const execMock = executeChild as ReturnType<typeof vi.fn>;
+
+    const { handler } = createSubagentHandler([
+      {
+        agentName: "researcher",
+        description: "Researches topics",
+        workflow: mockWorkflow("researcherWorkflow"),
+        inheritSearchAttributes: false,
+      },
+    ]);
+
+    await handler(
+      { subagent: "researcher", description: "test", prompt: "hi" },
+      { threadId: "t", toolCallId: "tc", toolName: "Subagent" }
+    );
+
+    const lastCall = execMock.mock.calls[execMock.mock.calls.length - 1];
+    if (!lastCall) throw new Error("expected executeChild call");
+    expect(lastCall[1]).not.toHaveProperty("searchAttributes");
   });
 
   it("clears lazy-creator bookkeeping on failure so the next call can re-try", async () => {

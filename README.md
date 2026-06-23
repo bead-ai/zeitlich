@@ -513,6 +513,21 @@ export const researcherSubagent = defineSubagent(researcherWorkflow, {
 
 `workflowId`, `taskQueue`, and `args` are managed by the subagent handler itself and cannot be overridden via `workflowOptions` — use the top-level `taskQueue` field on `SubagentConfig` to route a subagent to a different task queue.
 
+#### Search attributes
+
+By default every subagent child workflow inherits the parent's search attributes (`workflowInfo().searchAttributes`), so dashboards and queries can trace a child back to its parent. Define extra attributes (or override inherited keys) with `searchAttributes`, and opt out of inheritance with `inheritSearchAttributes: false`:
+
+```typescript
+export const researcherSubagent = defineSubagent(researcherWorkflow, {
+  // Merged on top of the parent's attributes (these keys win).
+  searchAttributes: { Team: ["research"], Tier: ["premium"] },
+  // Set to false to attach only the explicitly-configured attributes.
+  inheritSearchAttributes: true,
+});
+```
+
+Precedence (lowest to highest): inherited parent attributes → `workflowOptions.searchAttributes` → `searchAttributes`.
+
 ### Skills
 
 Zeitlich has first-class support for the [agentskills.io](https://agentskills.io) specification. Skills are reusable instruction sets that an agent can load on-demand via the built-in `ReadSkill` tool — progressive disclosure keeps token usage low while giving agents access to rich, domain-specific guidance.

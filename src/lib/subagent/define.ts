@@ -1,5 +1,7 @@
 import type { z } from "zod";
+import type { SearchAttributes } from "@temporalio/workflow";
 import type {
+  SubagentChildWorkflowOptions,
   SubagentConfig,
   SubagentDefinition,
   SubagentHooks,
@@ -43,6 +45,9 @@ export function defineSubagent<
     hooks?: SubagentHooks<SubagentArgs, z.infer<TResult>>;
     enabled?: boolean | (() => boolean);
     taskQueue?: string;
+    workflowOptions?: SubagentChildWorkflowOptions;
+    searchAttributes?: SearchAttributes;
+    inheritSearchAttributes?: boolean;
     thread?: "new" | "fork" | "continue";
     newThreadSource?: "new" | "from-parent";
     sandbox?: SubagentSandboxConfig;

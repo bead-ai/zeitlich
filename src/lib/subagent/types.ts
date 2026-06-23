@@ -1,5 +1,8 @@
 import type { z } from "zod";
-import type { ChildWorkflowOptions } from "@temporalio/workflow";
+import type {
+  ChildWorkflowOptions,
+  SearchAttributes,
+} from "@temporalio/workflow";
 import type { JsonValue } from "../state/types";
 import type {
   ToolHandlerResponse,
@@ -614,8 +617,38 @@ export interface SubagentConfig<TResult extends z.ZodType = z.ZodType> {
    *
    * `workflowId`, `taskQueue`, and `args` are managed by the subagent handler
    * and cannot be overridden here.
+   *
+   * Search attributes are handled separately — see {@link searchAttributes} and
+   * {@link inheritSearchAttributes}. Any `searchAttributes` set here are merged
+   * on top of the inherited/defined attributes (and lose to `searchAttributes`).
    */
   workflowOptions?: SubagentChildWorkflowOptions;
+  /**
+   * Search attributes to attach to the child workflow execution.
+   *
+   * These are merged on top of the parent's search attributes (see
+   * {@link inheritSearchAttributes}), so keys defined here override inherited
+   * keys of the same name. They also take precedence over any
+   * `workflowOptions.searchAttributes`.
+   *
+   * @example
+   * ```ts
+   * defineSubagent(researcherWorkflow, {
+   *   searchAttributes: { Team: ["research"], Tier: ["premium"] },
+   * });
+   * ```
+   */
+  searchAttributes?: SearchAttributes;
+  /**
+   * Whether the child workflow inherits the parent's search attributes
+   * (`workflowInfo().searchAttributes`). Defaults to `true`.
+   *
+   * When `true`, the parent's search attributes are used as the base and then
+   * merged with `workflowOptions.searchAttributes` and {@link searchAttributes}
+   * (in increasing order of precedence). Set to `false` to start from an empty
+   * set and attach only explicitly-configured attributes.
+   */
+  inheritSearchAttributes?: boolean;
   /** Optional Zod schema to validate the child workflow's result. If omitted, result is passed through as-is. */
   resultSchema?: TResult;
   /** Optional context passed to the subagent — a static object or a function evaluated at invocation time */

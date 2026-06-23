@@ -7,6 +7,7 @@ import {
   executeChild,
 } from "@temporalio/workflow";
 import type { Duration } from "@temporalio/common";
+import type { SearchAttributes } from "@temporalio/workflow";
 import { getShortId } from "../thread/id";
 import type { ToolHandlerResponse, RouterContext } from "../tool-router";
 import type { JsonValue } from "../state/types";
@@ -417,6 +418,18 @@ export function createSubagentHandler<
           ? config.context()
           : config.context;
 
+    // Resolve search attributes for the child. By default the parent's
+    // attributes (read fresh, since they can change over the parent's
+    // lifetime) form the base, then `workflowOptions.searchAttributes` and
+    // finally `config.searchAttributes` are merged on top (increasing
+    // precedence). Inheritance can be disabled via `inheritSearchAttributes`.
+    const inheritSearchAttributes = config.inheritSearchAttributes ?? true;
+    const mergedSearchAttributes: SearchAttributes = {
+      ...(inheritSearchAttributes ? workflowInfo().searchAttributes : {}),
+      ...(config.workflowOptions?.searchAttributes ?? {}),
+      ...(config.searchAttributes ?? {}),
+    };
+
     const childOpts = {
       // Apply a bounded run timeout by default so a child workflow that
       // fails to initialize or otherwise never reaches a terminal state
@@ -424,6 +437,9 @@ export function createSubagentHandler<
       // raise, lower, or disable it via `workflowOptions.workflowRunTimeout`.
       workflowRunTimeout: DEFAULT_SUBAGENT_WORKFLOW_RUN_TIMEOUT,
       ...(config.workflowOptions ?? {}),
+      ...(Object.keys(mergedSearchAttributes).length > 0
+        ? { searchAttributes: mergedSearchAttributes }
+        : {}),
       workflowId: childWorkflowId,
       args:
         resolvedContext === undefined
