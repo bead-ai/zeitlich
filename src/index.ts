@@ -97,5 +97,8 @@ export { editHandler, multiEditHandler } from "./tools/edit/handler";
 export { globHandler } from "./tools/glob/handler";
 export { readFileHandler } from "./tools/read-file/handler";
 export { writeFileHandler } from "./tools/write-file/handler";
+export type { ReadFileResult } from "./tools/read-file/handler";
+export type { GlobResult } from "./tools/glob/handler";
+export type { WriteFileResult } from "./tools/write-file/handler";
 
 export { toTree } from "./lib/sandbox";

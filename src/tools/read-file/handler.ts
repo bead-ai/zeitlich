@@ -2,7 +2,7 @@ import type { ActivityToolHandler } from "../../lib/tool-router";
 import type { SandboxContext } from "../../lib/tool-router/with-sandbox";
 import type { FileReadArgs } from "./tool";
 
-interface ReadFileResult {
+export interface ReadFileResult {
   path: string;
   content: string;
   totalLines?: number;

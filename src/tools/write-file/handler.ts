@@ -2,7 +2,7 @@ import type { ActivityToolHandler } from "../../lib/tool-router";
 import type { SandboxContext } from "../../lib/tool-router/with-sandbox";
 import type { FileWriteArgs } from "./tool";
 
-interface WriteFileResult {
+export interface WriteFileResult {
   path: string;
   success: boolean;
 }

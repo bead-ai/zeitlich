@@ -3,7 +3,7 @@ import type { SandboxContext } from "../../lib/tool-router/with-sandbox";
 import type { GlobArgs } from "./tool";
 import type { Sandbox } from "../../lib/sandbox/types";
 
-interface GlobResult {
+export interface GlobResult {
   files: string[];
 }
 
