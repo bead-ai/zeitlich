@@ -1,4 +1,4 @@
-import type { SessionExitReason, ToolResultConfig } from "../types";
+import type { AgentStatus, SessionExitReason, ToolResultConfig } from "../types";
 import type {
   ToolMap,
   ToolCallResultUnion,
@@ -18,6 +18,7 @@ import type { RunAgentActivity } from "../model/types";
 import type {
   AgentStateManager,
   JsonSerializable,
+  LoadedThreadState,
   PersistedThreadState,
 } from "../state/types";
 import type { ActivityInterfaceFor } from "@temporalio/workflow";
@@ -92,13 +93,17 @@ export interface ThreadOps<TContent = string> {
   ): Promise<void>;
   /**
    * Load the persisted state slice (tasks + custom state) associated with
-   * the thread, or `null` if none has been saved yet. Called on session
-   * start for `continue`/`fork` threads to rehydrate {@link AgentStateManager}.
+   * the thread, alongside the adapter's id. Called on session start: for
+   * `continue`/`fork` threads to rehydrate {@link AgentStateManager}, and for
+   * `new` threads solely to learn the adapter id (`state` is `null`).
+   *
+   * Returns a {@link LoadedThreadState} whose `state` is `null` when no slice
+   * has been saved yet; `adapter` is always the adapter's `ADAPTER_ID`.
    */
   loadThreadState(
     threadId: string,
     threadKey?: string
-  ): Promise<PersistedThreadState | null>;
+  ): Promise<LoadedThreadState>;
   /**
    * Overwrite the persisted state slice for the thread. Called once from
    * the session's `finally` block on every exit path so that "finish,
@@ -443,6 +448,10 @@ export interface SessionConfig<
    */
   onSessionExit?: (result: {
     threadId: string;
+    /** Final agent status from the state manager. */
+    status: AgentStatus;
+    /** Thread adapter id reported by `loadThreadState`. */
+    threadAdapter?: string;
     sandboxId?: string;
     snapshot?: SandboxSnapshot;
     usage: {
@@ -484,6 +493,10 @@ export type SessionResult<
   threadId: string;
   finalMessage: M | null;
   exitReason: SessionExitReason;
+  /** Final agent status from the state manager. */
+  status: AgentStatus;
+  /** Thread adapter id reported by `loadThreadState`. */
+  threadAdapter?: string;
   usage: ReturnType<AgentStateManager<TState>["getTotalUsage"]>;
   /**
    * Snapshot captured on exit when `sandboxShutdown === "snapshot"`.

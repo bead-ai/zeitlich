@@ -1,6 +1,9 @@
 import type { RedisClientType as Redis } from "redis";
 import type { ToolResultConfig } from "../../../lib/types";
-import type { PersistedThreadState } from "../../../lib/state/types";
+import type {
+  LoadedThreadState,
+  PersistedThreadState,
+} from "../../../lib/state/types";
 import type { MessageContent } from "@langchain/core/messages";
 import type {
   ActivityToolHandler,
@@ -227,9 +230,9 @@ export function createLangChainAdapter(
     async loadThreadState(
       threadId: string,
       threadKey?: string
-    ): Promise<PersistedThreadState | null> {
+    ): Promise<LoadedThreadState> {
       const thread = makeProviderThread(threadId, threadKey);
-      return thread.loadState();
+      return { adapter: ADAPTER_ID, state: await thread.loadState() };
     },
 
     async saveThreadState(

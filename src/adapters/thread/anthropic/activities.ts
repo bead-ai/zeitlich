@@ -1,7 +1,10 @@
 import type { RedisClientType as Redis } from "redis";
 import type Anthropic from "@anthropic-ai/sdk";
 import type { ToolResultConfig } from "../../../lib/types";
-import type { PersistedThreadState } from "../../../lib/state/types";
+import type {
+  LoadedThreadState,
+  PersistedThreadState,
+} from "../../../lib/state/types";
 import type {
   ActivityToolHandler,
   RouterContext,
@@ -253,9 +256,9 @@ export function createAnthropicAdapter(
     async loadThreadState(
       threadId: string,
       threadKey?: string
-    ): Promise<PersistedThreadState | null> {
+    ): Promise<LoadedThreadState> {
       const thread = makeProviderThread(threadId, threadKey);
-      return thread.loadState();
+      return { adapter: ADAPTER_ID, state: await thread.loadState() };
     },
 
     async saveThreadState(

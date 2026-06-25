@@ -7,4 +7,5 @@ export type {
   AgentState,
   AgentStateManager,
   PersistedThreadState,
+  LoadedThreadState,
 } from "./types";

@@ -4,6 +4,7 @@ import type {
   SearchAttributes,
 } from "@temporalio/workflow";
 import type { JsonValue } from "../state/types";
+import type { AgentStatus } from "../types";
 import type {
   ToolHandlerResponse,
   PreToolUseHookResult,
@@ -41,7 +42,12 @@ export type SubagentChildWorkflowOptions = Omit<
 export type SubagentHandlerResponse<
   TResult = null,
   TToolResponse = JsonValue,
-> = ToolHandlerResponse<TResult, TToolResponse>;
+> = ToolHandlerResponse<TResult, TToolResponse> & {
+  /** Final agent status from the child session's state manager. */
+  status?: AgentStatus;
+  /** Thread adapter id backing the child session, when configured. */
+  threadAdapter?: string;
+};
 
 /**
  * Raw workflow input fields passed from parent to child workflow.
@@ -795,6 +801,10 @@ export interface SubagentSessionInput {
     sandboxId?: string;
     snapshot?: SandboxSnapshot;
     threadId: string;
+    /** Final agent status from the state manager. */
+    status: AgentStatus;
+    /** Thread adapter id, when the session was configured with one. */
+    threadAdapter?: string;
     usage: {
       totalInputTokens: number;
       totalOutputTokens: number;

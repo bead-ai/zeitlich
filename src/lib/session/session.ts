@@ -401,6 +401,9 @@ export async function createSession<
       const systemPrompt = stateManager.getSystemPrompt();
 
       // --- Thread lifecycle: new, continue, or fork ----------------------
+      // Adapter id reported by `loadThreadState`, set on every thread mode
+      // (`new` calls it purely to learn the adapter id; its `state` is null).
+      let threadAdapter: string | undefined;
       const rehydrateFromSlice = (slice: PersistedThreadState): void => {
         stateManager.mergeUpdate({
           tasks: new Map(slice.tasks),
@@ -426,16 +429,18 @@ export async function createSession<
         if (truncate?.fromMessageId) {
           await truncateThread(threadId, truncate.fromMessageId, threadKey);
         }
-        const forkedSlice = await loadThreadState(threadId, threadKey);
-        if (forkedSlice) rehydrateFromSlice(forkedSlice);
+        const forked = await loadThreadState(threadId, threadKey);
+        threadAdapter = forked.adapter;
+        if (forked.state) rehydrateFromSlice(forked.state);
       } else if (threadMode === "continue") {
         // Pull the thread from the cold tier into Redis before any
         // appends. No-op when the thread is already hot or when no
         // cold tier is wired.
         await hydrateThread(threadId, threadKey);
         // "continue" — thread already exists, just append the new message
-        const continuedSlice = await loadThreadState(threadId, threadKey);
-        if (continuedSlice) rehydrateFromSlice(continuedSlice);
+        const continued = await loadThreadState(threadId, threadKey);
+        threadAdapter = continued.adapter;
+        if (continued.state) rehydrateFromSlice(continued.state);
       } else {
         if (appendSystemPrompt) {
           if (
@@ -451,6 +456,10 @@ export async function createSession<
         } else {
           await initializeThread(threadId, threadKey);
         }
+        // New threads have no persisted state to rehydrate, but we still
+        // call `loadThreadState` to learn the adapter id (`state` is null).
+        const loaded = await loadThreadState(threadId, threadKey);
+        threadAdapter = loaded.adapter;
       }
 
       // --- Virtual filesystem init (independent of sandbox) ----------------
@@ -794,6 +803,8 @@ export async function createSession<
           ...(sandboxId && { sandboxId }),
           ...(exitSnapshot && { snapshot: exitSnapshot }),
           threadId,
+          status: stateManager.getStatus(),
+          ...(threadAdapter && { threadAdapter }),
           usage: stateManager.getTotalUsage(),
         });
       }
@@ -802,6 +813,8 @@ export async function createSession<
         threadId,
         finalMessage,
         exitReason,
+        status: stateManager.getStatus(),
+        ...(threadAdapter && { threadAdapter }),
         usage: stateManager.getTotalUsage(),
         sandboxId,
         ...(baseSnapshot && { baseSnapshot }),

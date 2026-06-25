@@ -126,7 +126,7 @@ function createMockThreadOps() {
     },
     loadThreadState: async (threadId) => {
       log.push({ op: "loadThreadState", args: [threadId] });
-      return stateStore.get(threadId) ?? null;
+      return { adapter: "test", state: stateStore.get(threadId) ?? null };
     },
     saveThreadState: async (threadId, state) => {
       log.push({ op: "saveThreadState", args: [threadId, state] });

@@ -56,6 +56,7 @@ export type {
   JsonValue,
   JsonPrimitive,
   PersistedThreadState,
+  LoadedThreadState,
 } from "./lib/state";
 
 // Tool router (includes registry functionality)

@@ -13,7 +13,7 @@ import type {
 } from "./types";
 import type { SubagentSandboxShutdown } from "../lifecycle";
 import type { SandboxSnapshot } from "../sandbox/types";
-import type { TokenUsage } from "../types";
+import type { AgentStatus, TokenUsage } from "../types";
 import { childSandboxReadySignal } from "./signals";
 
 /**
@@ -133,6 +133,8 @@ export function defineSubagentWorkflow(
     let capturedSnapshot: SandboxSnapshot | undefined;
     let capturedBaseSnapshot: SandboxSnapshot | undefined;
     let capturedThreadId: string | undefined;
+    let capturedStatus: AgentStatus | undefined;
+    let capturedThreadAdapter: string | undefined;
     let capturedUsage: TokenUsage | undefined;
     const sessionInput: SubagentSessionInput = {
       agentName: config.name,
@@ -150,10 +152,19 @@ export function defineSubagentWorkflow(
           });
         }
       },
-      onSessionExit: ({ sandboxId, snapshot, threadId, usage }) => {
+      onSessionExit: ({
+        sandboxId,
+        snapshot,
+        threadId,
+        status,
+        threadAdapter,
+        usage,
+      }) => {
         capturedSandboxId = sandboxId;
         capturedSnapshot = snapshot;
         capturedThreadId = threadId;
+        capturedStatus = status;
+        capturedThreadAdapter = threadAdapter;
         capturedUsage = {
           inputTokens: usage.totalInputTokens,
           outputTokens: usage.totalOutputTokens,
@@ -171,6 +182,10 @@ export function defineSubagentWorkflow(
     // result take precedence, so spread `result` LAST.
     return {
       ...(capturedThreadId !== undefined && { threadId: capturedThreadId }),
+      ...(capturedStatus !== undefined && { status: capturedStatus }),
+      ...(capturedThreadAdapter !== undefined && {
+        threadAdapter: capturedThreadAdapter,
+      }),
       ...(capturedSandboxId !== undefined && { sandboxId: capturedSandboxId }),
       ...(capturedSnapshot !== undefined && { snapshot: capturedSnapshot }),
       ...(capturedBaseSnapshot !== undefined && {

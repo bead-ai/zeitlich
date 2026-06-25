@@ -64,6 +64,20 @@ export interface PersistedThreadState {
 }
 
 /**
+ * Result of {@link ThreadOps.loadThreadState}. Bundles the persisted slice
+ * (or `null` when none has been saved yet) with the id of the thread adapter
+ * that produced it — the adapter's `ADAPTER_ID` const. The adapter id is not
+ * persisted; each adapter stamps its own at load time, so callers can surface
+ * which adapter backs a thread without hardcoding it.
+ */
+export interface LoadedThreadState {
+  /** Adapter id of the thread adapter (its `ADAPTER_ID` const). */
+  adapter: string;
+  /** The persisted state slice, or `null` if none has been saved yet. */
+  state: PersistedThreadState | null;
+}
+
+/**
  * Agent state manager interface
  * Note: Temporal handlers must be set up in the workflow file due to
  * Temporal's workflow isolation requirements. This manager provides
