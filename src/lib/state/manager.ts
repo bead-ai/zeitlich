@@ -119,7 +119,7 @@ export function createAgentStateManager<
       turns,
       tools,
       ...customState,
-    } as AgentState<TCustom>;
+    } as unknown as AgentState<TCustom>;
   }
 
   const stateQuery = defineQuery<AgentState<TCustom>>("getAgentState");

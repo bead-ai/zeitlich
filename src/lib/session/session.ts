@@ -408,7 +408,7 @@ export async function createSession<
         stateManager.mergeUpdate({
           tasks: new Map(slice.tasks),
           ...slice.custom,
-        } as Partial<AgentState<TState>>);
+        } as unknown as Partial<AgentState<TState>>);
       };
 
       if (threadMode === "fork" && sourceThreadId) {
@@ -504,7 +504,7 @@ export async function createSession<
           // `inlineFiles` from state) can read skill resources. Until a
           // follow-up drops `inlineFiles`, both fields are populated.
           ...(skillFiles && { inlineFiles: skillFiles }),
-        } as Partial<AgentState<TState>>);
+        } as unknown as Partial<AgentState<TState>>);
       }
 
       await appendHumanMessage(
