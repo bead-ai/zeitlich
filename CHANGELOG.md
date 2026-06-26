@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.55](https://github.com/bead-ai/zeitlich/compare/v0.2.54...v0.2.55) (2026-06-26)
+
+
+### Features
+
+* **session:** enhance thread state management with adapter ID ([46fe4ac](https://github.com/bead-ai/zeitlich/commit/46fe4ac0873b218dec57cb446840dc04258e4fdf))
+
+
+### Bug Fixes
+
+* share missing types ([e2172a9](https://github.com/bead-ai/zeitlich/commit/e2172a97d4a614f8f3c70eb019237d5d741c6245))
+
+
+### Miscellaneous Chores
+
+* release 0.2.55 ([8624999](https://github.com/bead-ai/zeitlich/commit/862499963f8ea54204bd8725b51e3e8ab0ccd4e0))
+
 ## [0.2.54](https://github.com/bead-ai/zeitlich/compare/v0.2.53...v0.2.54) (2026-06-23)
 
 
