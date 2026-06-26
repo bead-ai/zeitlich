@@ -1,6 +1,6 @@
 import type { ThreadInit, SandboxInit, SandboxShutdown } from "./lifecycle";
 import type { SandboxSnapshot } from "./sandbox/types";
-import type { TokenUsage } from "./types";
+import type { AgentStatus, TokenUsage } from "./types";
 
 /**
  * Session config fields derived from a main workflow input, ready to spread
@@ -25,6 +25,10 @@ export interface WorkflowSessionInput {
     sandboxId?: string;
     snapshot?: SandboxSnapshot;
     threadId: string;
+    /** Final agent status from the state manager. */
+    status: AgentStatus;
+    /** Thread adapter id reported by `loadThreadState`. */
+    threadAdapter?: string;
     usage: {
       totalInputTokens: number;
       totalOutputTokens: number;
@@ -65,6 +69,10 @@ export interface WorkflowConfig {
     sandboxId?: string;
     snapshot?: SandboxSnapshot;
     threadId: string;
+    /** Final agent status from the state manager. */
+    status: AgentStatus;
+    /** Thread adapter id reported by `loadThreadState`. */
+    threadAdapter?: string;
     usage: TokenUsage;
   }) => void;
 }
@@ -93,11 +101,20 @@ export function defineWorkflow<TInput, TResult>(
       ...(workflowInput.thread && { thread: workflowInput.thread }),
       ...(workflowInput.sandbox && { sandbox: workflowInput.sandbox }),
       ...(config.onSessionExit && {
-        onSessionExit: ({ sandboxId, snapshot, threadId, usage }): void => {
+        onSessionExit: ({
+          sandboxId,
+          snapshot,
+          threadId,
+          status,
+          threadAdapter,
+          usage,
+        }): void => {
           config.onSessionExit?.({
             ...(sandboxId !== undefined && { sandboxId }),
             ...(snapshot !== undefined && { snapshot }),
             threadId,
+            status,
+            ...(threadAdapter !== undefined && { threadAdapter }),
             usage: {
               inputTokens: usage.totalInputTokens,
               outputTokens: usage.totalOutputTokens,
