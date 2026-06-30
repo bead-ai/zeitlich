@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.56](https://github.com/bead-ai/zeitlich/compare/v0.2.55...v0.2.56) (2026-06-30)
+
+
+### Miscellaneous Chores
+
+* release 0.2.56 ([aabcc76](https://github.com/bead-ai/zeitlich/commit/aabcc769865e22ec084552343de575e7567af952))
+
 ## [0.2.55](https://github.com/bead-ai/zeitlich/compare/v0.2.54...v0.2.55) (2026-06-26)
 
 
