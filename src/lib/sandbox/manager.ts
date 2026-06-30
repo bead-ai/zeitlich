@@ -8,27 +8,11 @@ import type {
   SandboxSnapshot,
 } from "./types";
 import { SandboxNotSupportedError } from "./types";
-
-/**
- * Method names the manager treats as capability-gated, mirroring the
- * conditional fields on {@link SandboxProvider}. The full list is used
- * by the constructor-time consistency check below to assert that, for
- * each gated method present on the provider at runtime, the matching
- * capability is also declared in `supportedCapabilities` (and vice
- * versa). This is the runtime half of the type↔runtime alignment guard
- * the type-level constraint can't enforce on its own.
- */
-const CAP_METHOD_TO_CAPABILITY: ReadonlyArray<{
-  method: string;
-  capability: SandboxCapability;
-}> = [
-  { method: "pause", capability: "pause" },
-  { method: "resume", capability: "resume" },
-  { method: "snapshot", capability: "snapshot" },
-  { method: "deleteSnapshot", capability: "snapshot" },
-  { method: "restore", capability: "restore" },
-  { method: "fork", capability: "fork" },
-];
+import { assertCapabilityRuntimeConsistency } from "../resource/manager";
+import type {
+  PreCreateHookResult as ResourcePreCreateHookResult,
+  ResourceManagerHooks,
+} from "../resource/manager";
 
 /**
  * Result returned by {@link SandboxManagerHooks.onPreCreate}.
@@ -39,47 +23,21 @@ const CAP_METHOD_TO_CAPABILITY: ReadonlyArray<{
  *   top of the original options (`initialFiles` and `env` are shallow-merged;
  *   everything else is overwritten).
  */
-export interface PreCreateHookResult<
+export type PreCreateHookResult<
   TOptions extends SandboxCreateOptions = SandboxCreateOptions,
-> {
-  skip?: boolean;
-  modifiedOptions?: Partial<TOptions>;
-}
+> = ResourcePreCreateHookResult<TOptions>;
 
 /**
  * Lifecycle hooks for {@link SandboxManager}.
  *
  * Hooks run inside the existing `createSandbox` activity — no additional
- * activity registration required.
+ * activity registration required. Sandbox specialization of the generic
+ * {@link ResourceManagerHooks}: `onPostCreate` receives a live {@link Sandbox}.
  */
-export interface SandboxManagerHooks<
+export type SandboxManagerHooks<
   TOptions extends SandboxCreateOptions = SandboxCreateOptions,
   TCtx = unknown,
-> {
-  /**
-   * Called before sandbox creation.
-   *
-   * Receives the provider options and an opaque `ctx` value set from the
-   * workflow's {@link SandboxInit}. Use `ctx` to derive additional creation
-   * options (e.g. initial files from workflow arguments).
-   *
-   * Return `{ skip: true }` to prevent creation, or `{ modifiedOptions }`
-   * to alter the options before they reach the provider.
-   */
-  onPreCreate?: (
-    options: TOptions,
-    ctx: TCtx
-  ) => Promise<PreCreateHookResult<TOptions> | undefined>;
-
-  /**
-   * Called after a sandbox has been successfully created.
-   *
-   * Receives the live {@link Sandbox} instance so the hook can run setup
-   * commands, seed files, or capture identifiers without an extra
-   * `provider.get()` round-trip.
-   */
-  onPostCreate?: (sandbox: Sandbox, ctx: TCtx) => Promise<void>;
-}
+> = ResourceManagerHooks<TOptions, TCtx, Sandbox>;
 
 /**
  * Stateless facade over a {@link SandboxProvider}.
@@ -168,30 +126,12 @@ export class SandboxManager<
    * construction.
    */
   private assertCapabilityRuntimeConsistency(): void {
-    const supported = this.provider
-      .supportedCapabilities as ReadonlySet<SandboxCapability>;
-    for (const { method, capability } of CAP_METHOD_TO_CAPABILITY) {
-      const hasMethod =
-        typeof (this.provider as unknown as Record<string, unknown>)[method] ===
-        "function";
-      const declaresCap = supported.has(capability);
-      if (hasMethod && !declaresCap) {
-        throw new Error(
-          `Sandbox provider "${this.provider.id}" implements ${method}() but ` +
-            `does not list "${capability}" in supportedCapabilities. ` +
-            `Add the capability to the provider's runtime set so activities ` +
-            `for it can be registered.`
-        );
+    assertCapabilityRuntimeConsistency(
+      this.provider as unknown as {
+        readonly id: string;
+        readonly supportedCapabilities: ReadonlySet<SandboxCapability>;
       }
-      if (declaresCap && !hasMethod) {
-        throw new Error(
-          `Sandbox provider "${this.provider.id}" lists "${capability}" in ` +
-            `supportedCapabilities but does not implement ${method}(). ` +
-            `Either add the method to the provider or remove the capability ` +
-            `from supportedCapabilities.`
-        );
-      }
-    }
+    );
   }
 
   async create(

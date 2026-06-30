@@ -6,6 +6,7 @@ import type { PersistedThreadState } from "../state/types";
 import type { RunAgentActivity } from "../model/types";
 import type { RawToolCall } from "../tool-router/types";
 import type { SandboxOps } from "../sandbox/types";
+import type { BrowserSessionOps } from "../browser/types";
 import type { ActivityInterfaceFor } from "@temporalio/workflow";
 
 // ---------------------------------------------------------------------------
@@ -621,6 +622,213 @@ describe("createSession integration", () => {
     await session.runSession({ stateManager });
 
     expect(sandboxLog).toHaveLength(0);
+  });
+
+  // --- Browser session lifecycle ---
+
+  it("creates and destroys a browser session when browserOps are provided", async () => {
+    const { ops } = createMockThreadOps();
+    const browserLog: string[] = [];
+
+    const browserOps: BrowserSessionOps = {
+      createBrowser: async () => {
+        browserLog.push("create");
+        return { browserSessionId: "br-1" };
+      },
+      destroyBrowser: async (browserSessionId: string) => {
+        browserLog.push(`destroy:${browserSessionId}`);
+      },
+    };
+
+    const session = await createSession({
+      agentName: "TestAgent",
+      thread: { mode: "new", threadId: "thread-1" },
+      runAgent: createScriptedRunAgent([{ message: "done", toolCalls: [] }]),
+      threadOps: ops,
+      buildContextMessage: () => "go",
+      browserOps,
+    });
+
+    const stateManager = createAgentStateManager({
+      initialState: { systemPrompt: "test" },
+    });
+
+    const result = await session.runSession({ stateManager });
+
+    expect(browserLog).toEqual(["create", "destroy:br-1"]);
+    expect(result.browserSessionId).toBe("br-1");
+  });
+
+  it("keeps the browser session alive when browserShutdown is 'keep'", async () => {
+    const { ops } = createMockThreadOps();
+    const browserLog: string[] = [];
+
+    const browserOps: BrowserSessionOps = {
+      createBrowser: async () => {
+        browserLog.push("create");
+        return { browserSessionId: "br-2" };
+      },
+      destroyBrowser: async () => {
+        browserLog.push("destroy");
+      },
+    };
+
+    const session = await createSession({
+      agentName: "TestAgent",
+      thread: { mode: "new", threadId: "thread-1" },
+      runAgent: createScriptedRunAgent([{ message: "done", toolCalls: [] }]),
+      threadOps: ops,
+      buildContextMessage: () => "go",
+      browserOps,
+      browserShutdown: "keep",
+    });
+
+    const stateManager = createAgentStateManager({
+      initialState: { systemPrompt: "test" },
+    });
+
+    await session.runSession({ stateManager });
+
+    expect(browserLog).toEqual(["create"]);
+  });
+
+  it("does not create or destroy the browser session when inherited", async () => {
+    const { ops } = createMockThreadOps();
+    const browserLog: string[] = [];
+
+    const browserOps: BrowserSessionOps = {
+      createBrowser: async () => {
+        browserLog.push("create");
+        return { browserSessionId: "br-new" };
+      },
+      destroyBrowser: async () => {
+        browserLog.push("destroy");
+      },
+    };
+
+    const session = await createSession({
+      agentName: "TestAgent",
+      thread: { mode: "new", threadId: "thread-1" },
+      runAgent: createScriptedRunAgent([{ message: "done", toolCalls: [] }]),
+      threadOps: ops,
+      buildContextMessage: () => "go",
+      browserOps,
+      browser: { mode: "inherit", browserSessionId: "inherited-br" },
+    });
+
+    const stateManager = createAgentStateManager({
+      initialState: { systemPrompt: "test" },
+    });
+
+    const result = await session.runSession({ stateManager });
+
+    expect(browserLog).toHaveLength(0);
+    expect(result.browserSessionId).toBe("inherited-br");
+  });
+
+  it("supports a sandbox and a browser session simultaneously", async () => {
+    const { ops } = createMockThreadOps();
+    const sandboxLog: string[] = [];
+    const browserLog: string[] = [];
+
+    const sandboxOps: SandboxOps = {
+      createSandbox: async () => {
+        sandboxLog.push("create");
+        return { sandboxId: "sb-1" };
+      },
+      destroySandbox: async (sandboxId: string) => {
+        sandboxLog.push(`destroy:${sandboxId}`);
+      },
+      snapshotSandbox: async () => ({
+        sandboxId: "sb-1",
+        providerId: "test",
+        data: null,
+        createdAt: new Date().toISOString(),
+      }),
+      forkSandbox: async () => "forked",
+      restoreSandbox: async () => "restored",
+      deleteSandboxSnapshot: async () => {},
+      pauseSandbox: async () => {},
+      resumeSandbox: async () => {},
+    };
+
+    const browserOps: BrowserSessionOps = {
+      createBrowser: async () => {
+        browserLog.push("create");
+        return { browserSessionId: "br-1" };
+      },
+      destroyBrowser: async (browserSessionId: string) => {
+        browserLog.push(`destroy:${browserSessionId}`);
+      },
+    };
+
+    const session = await createSession({
+      agentName: "TestAgent",
+      thread: { mode: "new", threadId: "thread-1" },
+      runAgent: createScriptedRunAgent([{ message: "done", toolCalls: [] }]),
+      threadOps: ops,
+      buildContextMessage: () => "go",
+      sandboxOps,
+      browserOps,
+    });
+
+    const stateManager = createAgentStateManager({
+      initialState: { systemPrompt: "test" },
+    });
+
+    const result = await session.runSession({ stateManager });
+
+    expect(sandboxLog).toEqual(["create", "destroy:sb-1"]);
+    expect(browserLog).toEqual(["create", "destroy:br-1"]);
+    expect(result.sandboxId).toBe("sb-1");
+    expect(result.browserSessionId).toBe("br-1");
+  });
+
+  it("passes the browserSessionId to tool handlers via router context", async () => {
+    const { ops } = createMockThreadOps();
+    let seenBrowserSessionId: string | undefined;
+
+    const browserOps: BrowserSessionOps = {
+      createBrowser: async () => ({ browserSessionId: "br-ctx" }),
+      destroyBrowser: async () => {},
+    };
+
+    const probeTool = defineTool({
+      name: "Probe" as const,
+      description: "captures browserSessionId from context",
+      schema: z.object({}),
+      handler: async (
+        _args: Record<string, never>,
+        ctx: RouterContext
+      ): Promise<ToolHandlerResponse<null>> => {
+        seenBrowserSessionId = ctx.browserSessionId;
+        return { toolResponse: "ok", data: null };
+      },
+    });
+
+    const session = await createSession({
+      agentName: "TestAgent",
+      thread: { mode: "new", threadId: "thread-1" },
+      runAgent: createScriptedRunAgent([
+        {
+          message: "probe",
+          toolCalls: [{ id: "tc-1", name: "Probe", args: {} }],
+        },
+        { message: "done", toolCalls: [] },
+      ]),
+      threadOps: ops,
+      buildContextMessage: () => "go",
+      tools: { Probe: probeTool },
+      browserOps,
+    });
+
+    const stateManager = createAgentStateManager({
+      initialState: { systemPrompt: "test" },
+    });
+
+    await session.runSession({ stateManager });
+
+    expect(seenBrowserSessionId).toBe("br-ctx");
   });
 
   // --- Sandbox ID passed to tool handlers ---

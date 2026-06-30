@@ -93,3 +93,33 @@ export type SubagentSandboxShutdown =
   | SandboxShutdown
   | "pause-until-parent-close"
   | "keep-until-parent-close";
+
+// ============================================================================
+// Browser session lifecycle
+// ============================================================================
+
+/**
+ * Browser-session initialization strategy.
+ *
+ * Browser providers are minimal-cap (no fork/snapshot/pause), so the supported
+ * modes are intentionally limited:
+ *
+ * - `"new"` — create a fresh browser session. Optionally pass `ctx` to have
+ *   the provider's `onPreCreate` hook derive creation options.
+ * - `"continue"` — take ownership of an existing, still-running session by id.
+ *   The shutdown policy applies on exit.
+ * - `"inherit"` — use a session owned by someone else (e.g. a parent agent).
+ *   The session will **not** be torn down on exit.
+ */
+export type BrowserInit =
+  | { mode: "new"; ctx?: unknown }
+  | { mode: "continue"; browserSessionId: string }
+  | { mode: "inherit"; browserSessionId: string };
+
+/**
+ * What to do with the browser session when the owning session exits.
+ *
+ * - `"destroy"` — stop the browser session entirely (default).
+ * - `"keep"` — leave the session running (no-op on exit).
+ */
+export type BrowserShutdown = "destroy" | "keep";

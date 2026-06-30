@@ -13,7 +13,12 @@ import type {
   SandboxOps,
   SandboxSnapshot,
 } from "../sandbox/types";
-import type { SandboxInit, SubagentSandboxShutdown } from "../lifecycle";
+import type {
+  SandboxInit,
+  SubagentSandboxShutdown,
+  BrowserInit,
+  BrowserShutdown,
+} from "../lifecycle";
 import type { FileEntryMetadata } from "../virtual-fs/types";
 import type {
   AgentState,
@@ -155,6 +160,10 @@ export async function createSession<
     sandbox: sandboxInit,
     sandboxShutdown,
     onSandboxReady,
+    browserOps,
+    browser: browserInit,
+    browserShutdown,
+    onBrowserReady,
     onSessionExit,
     virtualFs: virtualFsConfig,
     virtualFsOps,
@@ -397,6 +406,47 @@ export async function createSession<
         });
       }
 
+      // --- Browser session lifecycle: new, continue, or inherit -------------
+      // Independent of (and composable with) the sandbox above. Browser
+      // providers are minimal-cap, so there is no SSOT/capability machinery:
+      // the only gated decision is whether this session owns the session and
+      // therefore tears it down on exit.
+      const browserMode: BrowserInit["mode"] = browserInit?.mode ?? "new";
+      const resolvedBrowserShutdown: BrowserShutdown =
+        browserShutdown ?? "destroy";
+      let browserSessionId: string | undefined;
+      let browserOwned = false;
+
+      if (browserMode === "inherit") {
+        browserSessionId = (
+          browserInit as { mode: "inherit"; browserSessionId: string }
+        ).browserSessionId;
+      } else if (browserMode === "continue") {
+        if (!browserOps) {
+          throw ApplicationFailure.create({
+            message: "No browserOps provided — cannot continue browser session",
+            nonRetryable: true,
+          });
+        }
+        browserSessionId = (
+          browserInit as { mode: "continue"; browserSessionId: string }
+        ).browserSessionId;
+        browserOwned = true;
+      } else if (browserOps) {
+        const ctx = (
+          browserInit as { mode: "new"; ctx?: unknown } | undefined
+        )?.ctx;
+        const result = await browserOps.createBrowser(undefined, ctx);
+        if (result) {
+          browserSessionId = result.browserSessionId;
+          browserOwned = true;
+        }
+      }
+
+      if (browserSessionId && onBrowserReady) {
+        onBrowserReady({ browserSessionId });
+      }
+
       const sessionStartMs = Date.now();
       const systemPrompt = stateManager.getSystemPrompt();
 
@@ -408,7 +458,7 @@ export async function createSession<
         stateManager.mergeUpdate({
           tasks: new Map(slice.tasks),
           ...slice.custom,
-        } as Partial<AgentState<TState>>);
+        } as unknown as Partial<AgentState<TState>>);
       };
 
       if (threadMode === "fork" && sourceThreadId) {
@@ -504,7 +554,7 @@ export async function createSession<
           // `inlineFiles` from state) can read skill resources. Until a
           // follow-up drops `inlineFiles`, both fields are populated.
           ...(skillFiles && { inlineFiles: skillFiles }),
-        } as Partial<AgentState<TState>>);
+        } as unknown as Partial<AgentState<TState>>);
       }
 
       await appendHumanMessage(
@@ -637,6 +687,7 @@ export async function createSession<
             {
               turn: currentTurn,
               ...(sandboxId !== undefined && { sandboxId }),
+              ...(browserSessionId !== undefined && { browserSessionId }),
               ...(assistantId !== undefined && {
                 assistantMessageId: assistantId,
               }),
@@ -778,6 +829,15 @@ export async function createSession<
           }
         }
 
+        if (
+          browserOwned &&
+          browserSessionId &&
+          browserOps &&
+          resolvedBrowserShutdown === "destroy"
+        ) {
+          await browserOps.destroyBrowser(browserSessionId);
+        }
+
         if (destroySubagentSandboxes) {
           await destroySubagentSandboxes();
         }
@@ -817,6 +877,7 @@ export async function createSession<
         ...(threadAdapter && { threadAdapter }),
         usage: stateManager.getTotalUsage(),
         sandboxId,
+        ...(browserSessionId && { browserSessionId }),
         ...(baseSnapshot && { baseSnapshot }),
         ...(exitSnapshot && { snapshot: exitSnapshot }),
       } as Awaited<ReturnType<ZeitlichSession<M, boolean>["runSession"]>>;

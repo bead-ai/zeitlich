@@ -26,7 +26,13 @@ import type {
   ThreadInit,
   SandboxInit,
   SubagentSandboxShutdown,
+  BrowserInit,
+  BrowserShutdown,
 } from "../lifecycle";
+import type {
+  BrowserCreateOptions,
+  BrowserSessionOps,
+} from "../browser/types";
 
 /**
  * Thread operations required by a session.
@@ -465,6 +471,42 @@ export interface SessionConfig<
   }) => void;
 
   // ---------------------------------------------------------------------------
+  // Browser session lifecycle (independent of sandbox)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Browser-session lifecycle operations (optional — omit for agents that
+   * don't need a browser). Browser providers are minimal-cap, so the ops only
+   * expose `createBrowser` / `destroyBrowser`.
+   *
+   * Can be used alongside `sandboxOps` for agents that need both a sandbox
+   * (for execution) and a browser (for web interaction).
+   */
+  browserOps?: BrowserSessionOps<BrowserCreateOptions, unknown>;
+  /**
+   * Browser-session initialization strategy.
+   *
+   * - `{ mode: "new" }` — create a fresh browser session.
+   * - `{ mode: "continue", browserSessionId }` — take ownership of a running session.
+   * - `{ mode: "inherit", browserSessionId }` — use a parent's session without ownership.
+   *
+   * When omitted and `browserOps` is provided, defaults to `{ mode: "new" }`.
+   */
+  browser?: BrowserInit;
+  /**
+   * What to do with the browser session when this session exits.
+   *
+   * Defaults to `"destroy"` when omitted. Has no effect when the session is
+   * inherited (`browser.mode === "inherit"`).
+   */
+  browserShutdown?: BrowserShutdown;
+  /**
+   * Called as soon as the browser session is created (or continued/inherited),
+   * before the agent loop starts. Useful for signalling readiness to a parent.
+   */
+  onBrowserReady?: (args: { browserSessionId: string }) => void;
+
+  // ---------------------------------------------------------------------------
   // Virtual filesystem
   // ---------------------------------------------------------------------------
 
@@ -509,6 +551,8 @@ export type SessionResult<
    * threads that want to skip re-seeding.
    */
   baseSnapshot?: SandboxSnapshot;
+  /** Active browser session ID, when a browser session was configured. */
+  browserSessionId?: string;
 } & (HasSandbox extends true
   ? { sandboxId: string }
   : { sandboxId?: undefined });

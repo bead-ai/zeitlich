@@ -1,5 +1,18 @@
 export { SandboxManager } from "./manager";
 export type { SandboxManagerHooks, PreCreateHookResult } from "./manager";
+export type {
+  ManagedResource,
+  ResourceCapability,
+  ResourceCreateOptions,
+  ResourceNetworkConfig,
+  ResourceLifecycleConfig,
+  ResourceSnapshot,
+  ResourceManagerHooks,
+} from "../resource";
+export {
+  ResourceNotFoundError,
+  ResourceNotSupportedError,
+} from "../resource";
 export { toTree } from "./tree";
 export type {
   Sandbox,

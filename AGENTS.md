@@ -6,7 +6,7 @@
 
 ### Key caveats
 
-- **Optional peer dependencies required for build**: `@google/genai`, `@langchain/core`, `redis`, `@aws-sdk/client-s3`, and `@aws-sdk/lib-storage` are peer deps. The DTS build (`npm run build`) fails without `@google/genai` installed. Install all five with `npm install --no-save @google/genai @langchain/core redis @aws-sdk/client-s3 @aws-sdk/lib-storage` before building.
+- **Optional peer dependencies required for build**: `@google/genai`, `@langchain/core`, `redis`, `@aws-sdk/client-s3`, `@aws-sdk/lib-storage`, and the AgentCore browser trio (`@aws-sdk/client-bedrock-agentcore`, `@aws-sdk/signature-v4`, `@aws-crypto/sha256-js`) are peer deps. The DTS build (`npm run build`) fails without `@google/genai` installed. Install them with `npm install --no-save @google/genai @langchain/core redis @aws-sdk/client-s3 @aws-sdk/lib-storage @aws-sdk/client-bedrock-agentcore @aws-sdk/signature-v4 @aws-crypto/sha256-js` before building.
 - **Pre-commit hook**: Husky runs `npm run lint && npm run typecheck` on commit. Both must pass before committing.
 - **Tests**: `npx vitest run` — current tests are unit tests that don't require Redis or Temporal.
 - **Dev mode**: `npm run dev` starts tsup in watch mode for incremental rebuilds.

@@ -20,6 +20,10 @@ export default defineConfig({
       "src/adapters/sandbox/daytona/proxy.ts",
     "adapters/sandbox/e2b/index": "src/adapters/sandbox/e2b/index.ts",
     "adapters/sandbox/e2b/workflow": "src/adapters/sandbox/e2b/proxy.ts",
+    "adapters/browser/agentcore/index":
+      "src/adapters/browser/agentcore/index.ts",
+    "adapters/browser/agentcore/workflow":
+      "src/adapters/browser/agentcore/proxy.ts",
   },
   format: ["esm", "cjs"],
   dts: true,
@@ -35,6 +39,9 @@ export default defineConfig({
     /^@anthropic-ai\//,
     /^@daytonaio\//,
     /^@e2b\//,
+    /^@aws-sdk\//,
+    /^@aws-crypto\//,
+    /^@smithy\//,
     "redis",
     /^@redis\//,
     "@mongodb-js/zstd",

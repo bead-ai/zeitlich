@@ -41,10 +41,23 @@ type JsonSerializableValue<V> = V extends JsonValue
       : never;
 
 /**
- * Full state type combining base state with custom state
+ * Full state type combining base state with custom state.
+ *
+ * When custom state redeclares `fileTree`, that declaration *overrides* the
+ * base field instead of intersecting with it. This lets a caller narrow the
+ * tree's metadata (e.g. `fileTree: FileEntry<MyMeta>[]` to type the resolver
+ * output) without producing the unsatisfiable
+ * `FileEntry<FileEntryMetadata>[] & FileEntry<MyMeta>[]`.
+ *
+ * Only the `fileTree` key is stripped from the base before merging — every
+ * other base field is preserved exactly, so `keyof TCustom` staying opaque for
+ * a generic `TCustom` cannot degrade unrelated fields (e.g. `tools`).
  */
-export type AgentState<TCustom extends JsonSerializable<TCustom>> =
-  BaseAgentState & TCustom;
+export type AgentState<TCustom extends JsonSerializable<TCustom>> = Omit<
+  BaseAgentState,
+  keyof TCustom & "fileTree"
+> &
+  TCustom;
 
 /**
  * The slice of agent state that is persisted alongside the thread in the

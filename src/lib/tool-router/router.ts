@@ -233,7 +233,8 @@ export function createToolRouter<T extends ToolMap>(
     onRewindRequested?: (signal: RewindSignal) => void,
     assistantMessageId?: string,
     persistThreadState?: () => Promise<void>,
-    deferAppend?: boolean
+    deferAppend?: boolean,
+    browserSessionId?: string
   ): Promise<ProcessedToolCall> {
     const startTime = Date.now();
     const tool = toolMap.get(toolCall.name);
@@ -287,6 +288,7 @@ export function createToolRouter<T extends ToolMap>(
           toolCallId: toolCall.id,
           toolName: toolCall.name,
           ...(sandboxId !== undefined && { sandboxId }),
+          ...(browserSessionId !== undefined && { browserSessionId }),
           ...(assistantMessageId !== undefined && { assistantMessageId }),
           ...(persistThreadState !== undefined && { persistThreadState }),
         };
@@ -459,6 +461,7 @@ export function createToolRouter<T extends ToolMap>(
 
       const turn = context?.turn ?? 0;
       const sandboxId = context?.sandboxId;
+      const browserSessionId = context?.browserSessionId;
       const assistantMessageId = context?.assistantMessageId;
       const persistThreadState = context?.persistThreadState;
 
@@ -484,7 +487,8 @@ export function createToolRouter<T extends ToolMap>(
                 onRewindRequested,
                 assistantMessageId,
                 persistThreadState,
-                true
+                true,
+                browserSessionId
               )
             )
           )
@@ -548,7 +552,9 @@ export function createToolRouter<T extends ToolMap>(
           sandboxId,
           undefined,
           assistantMessageId,
-          persistThreadState
+          persistThreadState,
+          undefined,
+          browserSessionId
         );
         if (outcome.kind === "rewind") {
           rewindSignal = outcome.signal;
@@ -587,6 +593,9 @@ export function createToolRouter<T extends ToolMap>(
           toolName: toolCall.name as TName,
           ...(context?.sandboxId !== undefined && {
             sandboxId: context.sandboxId,
+          }),
+          ...(context?.browserSessionId !== undefined && {
+            browserSessionId: context.browserSessionId,
           }),
           ...(context?.assistantMessageId !== undefined && {
             assistantMessageId: context.assistantMessageId,
