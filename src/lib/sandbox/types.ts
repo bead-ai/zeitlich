@@ -1,4 +1,25 @@
 // ============================================================================
+// Sandbox types
+//
+// The sandbox is one specialization of the generic managed-resource core in
+// `src/lib/resource`. The control-plane primitives (capability vocabulary,
+// create-options base, snapshot envelope, network/lifecycle config, the
+// `OmitNever` helper) come from there; this module layers the sandbox
+// data-plane (`fs` + `exec`) and the sandbox-specific provider/ops method
+// names on top. The neutral types are re-exported under their historical
+// `Sandbox*` names so existing imports keep working unchanged.
+// ============================================================================
+
+import type {
+  ManagedResource,
+  OmitNever,
+  ResourceCapability,
+  ResourceCreateOptions,
+  ResourceLifecycleConfig,
+  ResourceNetworkConfig,
+} from "../resource/types";
+
+// ============================================================================
 // Sandbox Filesystem
 // ============================================================================
 
@@ -21,16 +42,9 @@ export interface FileStat {
 // Network & lifecycle
 // ============================================================================
 
-export interface SandboxNetworkConfig {
-  allowOut?: string[];
-  denyOut?: string[];
-  allowPublicTraffic?: boolean;
-}
+export type SandboxNetworkConfig = ResourceNetworkConfig;
 
-export interface SandboxLifecycleConfig {
-  onTimeout: "kill" | "pause";
-  autoResume?: boolean;
-}
+export type SandboxLifecycleConfig = ResourceLifecycleConfig;
 
 /**
  * Provider-agnostic filesystem interface.
@@ -112,18 +126,13 @@ export interface SandboxCapabilities {
  * direction without the other. The `snapshot` cap covers both `snapshot()`
  * and `deleteSnapshot()` since they always travel together in practice.
  */
-export type SandboxCapability =
-  | "pause"
-  | "resume"
-  | "snapshot"
-  | "restore"
-  | "fork";
+export type SandboxCapability = ResourceCapability;
 
 // ============================================================================
 // Sandbox
 // ============================================================================
 
-export interface Sandbox {
+export interface Sandbox extends ManagedResource {
   readonly id: string;
   readonly capabilities: SandboxCapabilities;
   readonly fs: SandboxFileSystem;
@@ -148,39 +157,14 @@ export interface SandboxSnapshot {
 // Provider
 // ============================================================================
 
-export interface SandboxCreateOptions {
-  /** Preferred sandbox ID (provider may ignore) */
-  id?: string;
+export interface SandboxCreateOptions extends ResourceCreateOptions {
   /** Seed the filesystem with these files */
   initialFiles?: Record<string, string | Uint8Array>;
-  /** Environment variables available inside the sandbox */
-  env?: Record<string, string>;
-  /** Key-value metadata surfaced via provider list/query APIs */
-  metadata?: Record<string, string>;
-  /** Sandbox idle timeout in milliseconds */
-  timeoutMs?: number;
-  /** Enable or disable outbound internet access */
-  allowInternetAccess?: boolean;
-  /** Outbound network allow/deny rules */
-  network?: SandboxNetworkConfig;
-  /** Sandbox timeout behaviour */
-  lifecycle?: SandboxLifecycleConfig;
 }
 
 export interface SandboxCreateResult {
   sandbox: Sandbox;
 }
-
-/**
- * Internal helper: drop keys whose value is `never` from an object type.
- *
- * Used by the capability-gated contracts below so that an absent capability
- * removes the corresponding key entirely, instead of leaving a required
- * field with type `never` (which would make implementations impossible).
- */
-type OmitNever<T> = {
-  [K in keyof T as [T[K]] extends [never] ? never : K]: T[K];
-};
 
 /**
  * Capability-gated provider lifecycle methods.
