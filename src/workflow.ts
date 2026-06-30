@@ -37,6 +37,8 @@ export type {
   SandboxInit,
   SandboxShutdown,
   SubagentSandboxShutdown,
+  BrowserInit,
+  BrowserShutdown,
 } from "./lib/lifecycle";
 
 // Thread utilities
@@ -199,6 +201,32 @@ export {
   SandboxNotFoundError,
   SandboxNotSupportedError,
 } from "./lib/sandbox/types";
+
+// Generic managed-resource core (workflow-safe)
+export type {
+  ManagedResource,
+  ResourceCapability,
+  ResourceCreateOptions,
+  ResourceNetworkConfig,
+  ResourceLifecycleConfig,
+  ResourceSnapshot,
+  ResourceManagerHooks,
+} from "./lib/resource";
+export {
+  ResourceNotFoundError,
+  ResourceNotSupportedError,
+} from "./lib/resource";
+
+// Browser session types (workflow-safe — no activity-side code)
+export type {
+  BrowserSession,
+  BrowserConnection,
+  BrowserCreateOptions,
+  BrowserSessionCreateResult,
+  BrowserSessionProvider,
+  BrowserSessionOps,
+  PrefixedBrowserSessionOps,
+} from "./lib/browser/types";
 
 // Virtual filesystem (workflow-safe — imported from leaf modules to avoid
 // pulling activity-side code like VirtualFileSystem).

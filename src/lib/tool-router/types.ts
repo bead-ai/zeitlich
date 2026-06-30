@@ -178,6 +178,8 @@ export interface RouterContext {
   toolCallId: string;
   toolName: string;
   sandboxId?: string;
+  /** Browser session ID (when a browser session is configured for this session) */
+  browserSessionId?: string;
   /**
    * Id of the assistant message that issued this tool call (the message
    * the session passed as `assistantMessageId` into `runAgent`). Present
@@ -320,6 +322,8 @@ export interface ProcessToolCallsContext {
   turn?: number;
   /** Active sandbox ID (when a sandbox is configured for this session) */
   sandboxId?: string;
+  /** Active browser session ID (when a browser session is configured for this session) */
+  browserSessionId?: string;
   /**
    * Id of the assistant message that produced these tool calls. The
    * router forwards it into every handler's {@link RouterContext} so

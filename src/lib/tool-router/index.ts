@@ -2,6 +2,8 @@ export { createToolRouter, defineTool, hasNoOtherToolCalls } from "./router";
 export { withAutoAppend } from "./auto-append";
 export { withSandbox } from "./with-sandbox";
 export type { SandboxContext, WithSandboxOptions } from "./with-sandbox";
+export { withBrowser } from "./with-browser";
+export type { BrowserContext, WithBrowserOptions } from "./with-browser";
 
 export type {
   ToolDefinition,

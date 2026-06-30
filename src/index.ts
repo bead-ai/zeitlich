@@ -63,8 +63,13 @@ export type {
 export type { ModelInvoker, ModelInvokerConfig } from "./lib/model";
 
 // Activity-side handler wrappers
-export { withAutoAppend, withSandbox } from "./lib/tool-router";
-export type { SandboxContext, WithSandboxOptions } from "./lib/tool-router";
+export { withAutoAppend, withSandbox, withBrowser } from "./lib/tool-router";
+export type {
+  SandboxContext,
+  WithSandboxOptions,
+  BrowserContext,
+  WithBrowserOptions,
+} from "./lib/tool-router";
 
 // Activity-side wrappers (requires Temporal client)
 export {
@@ -82,6 +87,10 @@ export type {
   PreCreateHookResult,
 } from "./lib/sandbox/manager";
 export { NodeFsSandboxFileSystem } from "./lib/sandbox/node-fs";
+
+// Browser session (activity-side: manager)
+export { BrowserSessionManager } from "./lib/browser/manager";
+export type { BrowserSessionManagerHooks } from "./lib/browser/manager";
 
 // Virtual filesystem (activity-side)
 export { VirtualFileSystem } from "./lib/virtual-fs/filesystem";
