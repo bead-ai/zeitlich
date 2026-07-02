@@ -8,6 +8,8 @@ import type {
 import type {
   PostToolUseHook,
   PostToolUseFailureHook,
+  PostToolUseFailureHookResult,
+  ToolMap,
 } from "../tool-router/types";
 
 export interface ObservabilityHooks {
@@ -137,11 +139,16 @@ export function composeHooks<TArgs extends unknown[], TReturn>(
  * Compose multiple `onPostToolUseFailure` hooks into one, preserving the
  * {@link PostToolUseFailureHook} type.
  *
- * Same semantics as {@link composeHooks} (sequential, last non-undefined
- * result wins), but returns the exact hook function type. The generic
- * {@link composeHooks} returns a rest-tuple function type that skews tool-map
- * inference in `createSession`, forcing consumers to cast the composed hook
- * back to `PostToolUseFailureHook` — this helper avoids that.
+ * Hooks run sequentially; the last *decisive* result wins. A result is
+ * decisive when it sets `fallbackContent` or `suppress` — empty results
+ * (`{}`, e.g. from observability hooks that only record metrics) and
+ * `undefined` never override an earlier hook's recovery, so composition
+ * order doesn't silently discard a recovery.
+ *
+ * Prefer this over {@link composeHooks} for failure hooks: the generic
+ * helper returns a rest-tuple function type that skews tool-map inference
+ * in `createSession`, forcing consumers to cast the composed hook back to
+ * `PostToolUseFailureHook` — and it lets empty results win.
  *
  * @example
  * ```typescript
@@ -154,10 +161,20 @@ export function composeHooks<TArgs extends unknown[], TReturn>(
  * };
  * ```
  */
-export function composeFailureHooks(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  ...hooks: PostToolUseFailureHook<any>[]
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-): PostToolUseFailureHook<any> {
-  return composeHooks(...hooks);
+export function composeFailureHooks<T extends ToolMap>(
+  ...hooks: PostToolUseFailureHook<T>[]
+): PostToolUseFailureHook<T> {
+  return async (ctx) => {
+    let lastResult: PostToolUseFailureHookResult = {};
+    for (const hook of hooks) {
+      const result = await hook(ctx);
+      if (
+        result !== undefined &&
+        (result.fallbackContent !== undefined || result.suppress !== undefined)
+      ) {
+        lastResult = result;
+      }
+    }
+    return lastResult;
+  };
 }

@@ -69,12 +69,34 @@ describe("composeFailureHooks", () => {
     expect(observeHook).toHaveBeenCalledWith(ctx);
   });
 
-  it("lets a later hook override an earlier result", async () => {
-    const composed = composeFailureHooks(
+  it("preserves an earlier recovery when a later observer hook returns an empty result", async () => {
+    // createObservabilityHooks().onPostToolUseFailure returns {} — an empty
+    // result must not clobber a recovery regardless of composition order.
+    const composed = composeFailureHooks<ToolMap>(
+      async () => ({ fallbackContent: "recovered gracefully" }),
+      async () => ({})
+    );
+
+    await expect(composed(ctx)).resolves.toEqual({
+      fallbackContent: "recovered gracefully",
+    });
+  });
+
+  it("lets a later decisive hook override an earlier result", async () => {
+    const composed = composeFailureHooks<ToolMap>(
       async () => ({ fallbackContent: "first" }),
       async () => ({ suppress: true })
     );
 
     await expect(composed(ctx)).resolves.toEqual({ suppress: true });
+  });
+
+  it("returns an empty result when no hook is decisive", async () => {
+    const composed = composeFailureHooks<ToolMap>(
+      async () => ({}),
+      async () => ({})
+    );
+
+    await expect(composed(ctx)).resolves.toEqual({});
   });
 });
