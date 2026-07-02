@@ -637,7 +637,7 @@ describe("createToolRouter integration", () => {
     });
   });
 
-  it("suppresses error when handler fails and no hook recovers", async () => {
+  it("surfaces the error message when handler fails and no hook recovers", async () => {
     const router = createToolRouter({
       tools: { Fail: failingTool } as const,
       threadId: "t-1",
@@ -647,15 +647,50 @@ describe("createToolRouter integration", () => {
     const parsed = router.parseToolCall({
       id: "tc-1",
       name: "Fail",
-      args: { reason: "unrecoverable" },
+      args: { reason: "boom" },
     });
 
     const results = await router.processToolCalls([parsed], { turn: 1 });
     expect(results).toHaveLength(1);
     expect(at(results, 0).data).toEqual({
-      error: "Error: unrecoverable",
+      error: "Error: boom",
       suppressed: true,
     });
+
+    const content = JSON.parse(at(appendSpy.calls, 0).content as string);
+    expect(content.error).toContain("Tool execution failed: boom");
+  });
+
+  it("surfaces the deepest cause message for wrapped failures", async () => {
+    const nestedFailTool = defineTool({
+      name: "Nested" as const,
+      description: "fails with a Temporal-style wrapped error",
+      schema: z.object({}),
+      handler: async (): Promise<ToolHandlerResponse<null>> => {
+        throw new Error("Child workflow failed", {
+          cause: new Error("Activity task failed", {
+            cause: new Error("Object not found in S3"),
+          }),
+        });
+      },
+    });
+
+    const router = createToolRouter({
+      tools: { Nested: nestedFailTool } as const,
+      threadId: "t-1",
+      appendToolResult: appendSpy.fn,
+    });
+
+    const parsed = router.parseToolCall({
+      id: "tc-1",
+      name: "Nested",
+      args: {},
+    });
+    await router.processToolCalls([parsed], { turn: 1 });
+
+    const content = JSON.parse(at(appendSpy.calls, 0).content as string);
+    expect(content.error).toContain("Object not found in S3");
+    expect(content.error).not.toContain("Activity task failed");
   });
 
   // --- Disabled tools ---

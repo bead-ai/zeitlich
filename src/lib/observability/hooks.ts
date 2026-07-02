@@ -124,8 +124,40 @@ export function composeHooks<TArgs extends unknown[], TReturn>(
   return async (...args: TArgs): Promise<TReturn> => {
     let lastResult!: TReturn;
     for (const fn of fns) {
-      lastResult = await fn(...args);
+      const result = await fn(...args);
+      if (result !== undefined) {
+        lastResult = result;
+      }
     }
     return lastResult;
   };
+}
+
+/**
+ * Compose multiple `onPostToolUseFailure` hooks into one, preserving the
+ * {@link PostToolUseFailureHook} type.
+ *
+ * Same semantics as {@link composeHooks} (sequential, last non-undefined
+ * result wins), but returns the exact hook function type. The generic
+ * {@link composeHooks} returns a rest-tuple function type that skews tool-map
+ * inference in `createSession`, forcing consumers to cast the composed hook
+ * back to `PostToolUseFailureHook` — this helper avoids that.
+ *
+ * @example
+ * ```typescript
+ * const obs = createObservabilityHooks("myAgent");
+ * const hooks = {
+ *   onPostToolUseFailure: composeFailureHooks(
+ *     obs.onPostToolUseFailure,
+ *     myRecoveryHook
+ *   ),
+ * };
+ * ```
+ */
+export function composeFailureHooks(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ...hooks: PostToolUseFailureHook<any>[]
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+): PostToolUseFailureHook<any> {
+  return composeHooks(...hooks);
 }

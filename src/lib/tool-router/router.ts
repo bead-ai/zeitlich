@@ -29,6 +29,39 @@ import {
   isCancellation,
 } from "@temporalio/workflow";
 
+const MAX_CAUSE_DEPTH = 10;
+const MAX_FAILURE_MESSAGE_LENGTH = 500;
+
+/**
+ * Extracts the most specific message from an error by walking its `cause`
+ * chain (bounded, cycle-safe). Wrappers like Temporal's ChildWorkflowFailure
+ * and ActivityFailure carry generic messages ("Activity task failed"); the
+ * root cause at the bottom holds the actionable one. Returns the deepest
+ * non-empty message, truncated to {@link MAX_FAILURE_MESSAGE_LENGTH} chars.
+ */
+function extractFailureMessage(error: unknown): string {
+  const seen = new Set<unknown>();
+  let deepest = "";
+  let current: unknown = error;
+  for (let depth = 0; depth <= MAX_CAUSE_DEPTH; depth++) {
+    if (current == null || seen.has(current)) break;
+    seen.add(current);
+    const maybeMessage = (current as { message?: unknown }).message;
+    const message =
+      current instanceof Error
+        ? current.message
+        : typeof maybeMessage === "string"
+          ? maybeMessage
+          : String(current);
+    if (message.trim() !== "") deepest = message;
+    current = (current as { cause?: unknown }).cause;
+  }
+  if (deepest === "") deepest = String(error);
+  return deepest.length > MAX_FAILURE_MESSAGE_LENGTH
+    ? `${deepest.slice(0, MAX_FAILURE_MESSAGE_LENGTH)}…`
+    : deepest;
+}
+
 /**
  * Creates a tool router for declarative tool call processing.
  * Combines tool definitions with handlers in a single API.
@@ -167,10 +200,11 @@ export function createToolRouter<T extends ToolMap>(
         };
     }
 
+    // No hook recovered: surface the underlying failure reason so the model
+    // can act on it instead of guessing blind.
     return {
       content: JSON.stringify({
-        error:
-          "The tool encountered an error. Please try again or use a different approach.",
+        error: `Tool execution failed: ${extractFailureMessage(error)}. If retrying or adjusting arguments cannot fix this, report the failure and continue with a different approach — do not ask the user to do the tool's work manually.`,
       }),
       result: { error: errorStr, suppressed: true },
     };

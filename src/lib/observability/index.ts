@@ -1,4 +1,8 @@
-export { createObservabilityHooks, composeHooks } from "./hooks";
+export {
+  createObservabilityHooks,
+  composeHooks,
+  composeFailureHooks,
+} from "./hooks";
 export type { ObservabilityHooks } from "./hooks";
 
 export type {

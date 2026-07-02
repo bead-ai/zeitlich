@@ -697,6 +697,95 @@ describe("createToolRouter edge cases", () => {
     });
   });
 
+  // --- Unrecovered failure message extraction ------------------------------
+
+  it("handles a self-referential error cause without hanging", async () => {
+    const cyclicTool = defineTool({
+      name: "Cyclic" as const,
+      description: "throws an error whose cause is itself",
+      schema: z.object({}),
+      handler: async (): Promise<ToolHandlerResponse<null>> => {
+        const err = new Error("cyclic failure");
+        err.cause = err;
+        throw err;
+      },
+    });
+
+    const router = createToolRouter({
+      tools: { Cyclic: cyclicTool } as const,
+      threadId: "t-1",
+      appendToolResult: appendSpy.fn,
+    });
+
+    const parsed = router.parseToolCall({
+      id: "tc-1",
+      name: "Cyclic",
+      args: {},
+    });
+    const results = await router.processToolCalls([parsed], { turn: 1 });
+
+    expect(results).toHaveLength(1);
+    const content = JSON.parse(at(appendSpy.calls, 0).content as string);
+    expect(content.error).toContain("Tool execution failed: cyclic failure");
+  });
+
+  it("reads message properties from non-Error cause-chain objects", async () => {
+    const objectCauseTool = defineTool({
+      name: "ObjectCause" as const,
+      description: "throws a plain object with a nested cause",
+      schema: z.object({}),
+      handler: async (): Promise<ToolHandlerResponse<null>> => {
+        throw { message: "outer", cause: { message: "inner" } };
+      },
+    });
+
+    const router = createToolRouter({
+      tools: { ObjectCause: objectCauseTool } as const,
+      threadId: "t-1",
+      appendToolResult: appendSpy.fn,
+    });
+
+    const parsed = router.parseToolCall({
+      id: "tc-1",
+      name: "ObjectCause",
+      args: {},
+    });
+    await router.processToolCalls([parsed], { turn: 1 });
+
+    const content = JSON.parse(at(appendSpy.calls, 0).content as string);
+    expect(content.error).toContain("Tool execution failed: inner");
+    expect(content.error).not.toContain("[object Object]");
+  });
+
+  it("truncates very long failure messages in the appended content", async () => {
+    const longMessage = "x".repeat(600);
+    const verboseTool = defineTool({
+      name: "Verbose" as const,
+      description: "throws a very long error message",
+      schema: z.object({}),
+      handler: async (): Promise<ToolHandlerResponse<null>> => {
+        throw new Error(longMessage);
+      },
+    });
+
+    const router = createToolRouter({
+      tools: { Verbose: verboseTool } as const,
+      threadId: "t-1",
+      appendToolResult: appendSpy.fn,
+    });
+
+    const parsed = router.parseToolCall({
+      id: "tc-1",
+      name: "Verbose",
+      args: {},
+    });
+    await router.processToolCalls([parsed], { turn: 1 });
+
+    const content = JSON.parse(at(appendSpy.calls, 0).content as string);
+    expect(content.error).toContain("x".repeat(500));
+    expect(content.error).not.toContain("x".repeat(501));
+  });
+
   // --- Rewind signal -------------------------------------------------------
 
   it("attaches a rewind signal and skips result append when handler returns rewind:true", async () => {

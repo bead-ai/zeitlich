@@ -128,7 +128,11 @@ export type {
 } from "./lib/hooks";
 
 // Observability
-export { createObservabilityHooks, composeHooks } from "./lib/observability";
+export {
+  createObservabilityHooks,
+  composeHooks,
+  composeFailureHooks,
+} from "./lib/observability";
 export type {
   ObservabilityHooks,
   ZeitlichObservabilitySinks,
