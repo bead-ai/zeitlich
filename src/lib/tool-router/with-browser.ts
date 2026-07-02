@@ -1,11 +1,7 @@
 import type { BrowserSession } from "../browser/types";
 import { ResourceNotFoundError } from "../resource/types";
 import type { JsonValue } from "../state/types";
-import type {
-  ActivityToolHandler,
-  RouterContext,
-  ToolHandlerResponse,
-} from "./types";
+import type { ActivityToolHandler, RouterContext } from "./types";
 
 /**
  * Options for {@link withBrowser}.
@@ -31,8 +27,9 @@ export interface WithBrowserOptions {
 /**
  * Extended router context with a resolved {@link BrowserSession} instance.
  */
-export interface BrowserContext extends RouterContext {
-  browserSession: BrowserSession;
+export interface BrowserContext<TSession extends BrowserSession = BrowserSession>
+  extends RouterContext {
+  browserSession: TSession;
   browserSessionId: string;
 }
 
@@ -69,13 +66,12 @@ export function withBrowser<
   TToolResponse = JsonValue,
 >(
   manager: { getBrowserSession(id: string): Promise<TSession> },
-  handler: (
-    args: TArgs,
-    context: RouterContext & {
-      browserSession: TSession;
-      browserSessionId: string;
-    }
-  ) => Promise<ToolHandlerResponse<TResult, TToolResponse>>,
+  handler: ActivityToolHandler<
+    TArgs,
+    TResult,
+    BrowserContext<TSession>,
+    TToolResponse
+  >,
   options?: WithBrowserOptions
 ): ActivityToolHandler<
   TArgs,
