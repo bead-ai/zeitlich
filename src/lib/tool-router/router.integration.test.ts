@@ -693,6 +693,235 @@ describe("createToolRouter integration", () => {
     expect(content.error).not.toContain("Activity task failed");
   });
 
+  // --- Hook arrays & chaining semantics ---
+
+  it("runs an array of pre-hooks in order, threading modifiedArgs to the next hook", async () => {
+    let secondHookSawArgs: unknown = null;
+    let handlerArgs: { text: string } | null = null;
+
+    const modTool = defineTool({
+      name: "Echo" as const,
+      description: "echo",
+      schema: z.object({ text: z.string() }),
+      handler: async (args: { text: string }) => {
+        handlerArgs = args;
+        return { toolResponse: args.text, data: null };
+      },
+    });
+
+    const router = createToolRouter({
+      tools: { Echo: modTool } as const,
+      threadId: "t-1",
+      appendToolResult: appendSpy.fn,
+      hooks: {
+        onPreToolUse: [
+          async () => ({ modifiedArgs: { text: "from-first" } }),
+          async ({ toolCall }) => {
+            secondHookSawArgs = toolCall.args;
+            return { modifiedArgs: { text: "from-second" } };
+          },
+        ],
+      },
+    });
+
+    const parsed = router.parseToolCall({
+      id: "tc-1",
+      name: "Echo",
+      args: { text: "original" },
+    });
+    await router.processToolCalls([parsed], { turn: 1 });
+
+    expect(secondHookSawArgs).toEqual({ text: "from-first" });
+    expect(handlerArgs).toEqual({ text: "from-second" });
+  });
+
+  it("first skip in a pre-hook array stops the chain and later hooks", async () => {
+    const laterPreHook = vi.fn(async () => ({}));
+    const perToolPreHook = vi.fn(async () => ({}));
+    const handlerSpy = vi.fn(async () => ({
+      toolResponse: "should not run",
+      data: null,
+    }));
+
+    const skipTool = defineTool({
+      name: "Skippable" as const,
+      description: "can be skipped",
+      schema: z.object({}),
+      handler: handlerSpy,
+      hooks: {
+        onPreToolUse: perToolPreHook,
+      },
+    });
+
+    const router = createToolRouter({
+      tools: { Skippable: skipTool } as const,
+      threadId: "t-1",
+      appendToolResult: appendSpy.fn,
+      hooks: {
+        onPreToolUse: [async () => ({ skip: true }), laterPreHook],
+      },
+    });
+
+    const parsed = router.parseToolCall({
+      id: "tc-1",
+      name: "Skippable",
+      args: {},
+    });
+    const results = await router.processToolCalls([parsed], { turn: 1 });
+
+    expect(results).toHaveLength(0);
+    expect(laterPreHook).not.toHaveBeenCalled();
+    expect(perToolPreHook).not.toHaveBeenCalled();
+    expect(handlerSpy).not.toHaveBeenCalled();
+  });
+
+  it("runs arrays of post-hooks independently in order", async () => {
+    const order: string[] = [];
+
+    const hookedTool = defineTool({
+      name: "Echo" as const,
+      description: "echo",
+      schema: z.object({ text: z.string() }),
+      handler: async (args: { text: string }) => ({
+        toolResponse: args.text,
+        data: { echoed: args.text },
+      }),
+      hooks: {
+        onPostToolUse: [
+          async () => {
+            order.push("tool-1");
+          },
+          async () => {
+            order.push("tool-2");
+          },
+        ],
+      },
+    });
+
+    const router = createToolRouter({
+      tools: { Echo: hookedTool } as const,
+      threadId: "t-1",
+      appendToolResult: appendSpy.fn,
+      hooks: {
+        onPostToolUse: [
+          async () => {
+            order.push("global-1");
+          },
+          async () => {
+            order.push("global-2");
+          },
+        ],
+      },
+    });
+
+    const parsed = router.parseToolCall({
+      id: "tc-1",
+      name: "Echo",
+      args: { text: "hi" },
+    });
+    await router.processToolCalls([parsed], { turn: 1 });
+
+    expect(order).toEqual(["tool-1", "tool-2", "global-1", "global-2"]);
+  });
+
+  it("last fallbackContent wins in a failure hook array", async () => {
+    const router = createToolRouter({
+      tools: { Fail: failingTool } as const,
+      threadId: "t-1",
+      appendToolResult: appendSpy.fn,
+      hooks: {
+        onPostToolUseFailure: [
+          async () => ({ fallbackContent: "first recovery" }),
+          async () => ({ fallbackContent: "second recovery" }),
+        ],
+      },
+    });
+
+    const parsed = router.parseToolCall({
+      id: "tc-1",
+      name: "Fail",
+      args: { reason: "boom" },
+    });
+    const results = await router.processToolCalls([parsed], { turn: 1 });
+
+    expect(at(results, 0).data).toEqual({
+      error: "Error: boom",
+      recovered: true,
+    });
+    expect(at(appendSpy.calls, 0).content).toBe("second recovery");
+  });
+
+  it("empty failure hook results never clobber a recovery", async () => {
+    // Observability-style hooks return {} — regardless of position in the
+    // array they must not discard another hook's fallbackContent.
+    const router = createToolRouter({
+      tools: { Fail: failingTool } as const,
+      threadId: "t-1",
+      appendToolResult: appendSpy.fn,
+      hooks: {
+        onPostToolUseFailure: [
+          async () => ({ fallbackContent: "recovered gracefully" }),
+          async () => ({}),
+        ],
+      },
+    });
+
+    const parsed = router.parseToolCall({
+      id: "tc-1",
+      name: "Fail",
+      args: { reason: "boom" },
+    });
+    await router.processToolCalls([parsed], { turn: 1 });
+
+    expect(at(appendSpy.calls, 0).content).toBe("recovered gracefully");
+  });
+
+  it("explicit suppress:false lets the error bubble out of processToolCalls", async () => {
+    const router = createToolRouter({
+      tools: { Fail: failingTool } as const,
+      threadId: "t-1",
+      appendToolResult: appendSpy.fn,
+      hooks: {
+        onPostToolUseFailure: async () => ({ suppress: false }),
+      },
+    });
+
+    const parsed = router.parseToolCall({
+      id: "tc-1",
+      name: "Fail",
+      args: { reason: "boom" },
+    });
+
+    await expect(
+      router.processToolCalls([parsed], { turn: 1 })
+    ).rejects.toThrow("boom");
+    expect(appendSpy.calls).toHaveLength(0);
+  });
+
+  it("suppress:false wins over fallbackContent from another hook", async () => {
+    const router = createToolRouter({
+      tools: { Fail: failingTool } as const,
+      threadId: "t-1",
+      appendToolResult: appendSpy.fn,
+      hooks: {
+        onPostToolUseFailure: [
+          async () => ({ fallbackContent: "recovered gracefully" }),
+          async () => ({ suppress: false }),
+        ],
+      },
+    });
+
+    const parsed = router.parseToolCall({
+      id: "tc-1",
+      name: "Fail",
+      args: { reason: "boom" },
+    });
+
+    await expect(
+      router.processToolCalls([parsed], { turn: 1 })
+    ).rejects.toThrow("boom");
+  });
+
   // --- Disabled tools ---
 
   it("excludes disabled tools from definitions and parsing", () => {

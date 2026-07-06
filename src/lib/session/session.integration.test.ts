@@ -375,6 +375,60 @@ describe("createSession integration", () => {
     ]);
   });
 
+  it("runs arrays of session lifecycle hooks sequentially in order", async () => {
+    const { ops } = createMockThreadOps();
+    const hookLog: string[] = [];
+
+    const session = await createSession({
+      agentName: "TestAgent",
+      thread: { mode: "new", threadId: "thread-1" },
+      runAgent: createScriptedRunAgent([{ message: "done", toolCalls: [] }]),
+      threadOps: ops,
+      buildContextMessage: () => "hi",
+      hooks: {
+        onSessionStart: [
+          async () => {
+            hookLog.push("start-1");
+          },
+          async () => {
+            hookLog.push("start-2");
+          },
+        ],
+        onTurnComplete: [
+          async ({ turn }) => {
+            hookLog.push(`turn-1:${turn}`);
+          },
+          async ({ turn }) => {
+            hookLog.push(`turn-2:${turn}`);
+          },
+        ],
+        onSessionEnd: [
+          async () => {
+            hookLog.push("end-1");
+          },
+          async () => {
+            hookLog.push("end-2");
+          },
+        ],
+      },
+    });
+
+    const stateManager = createAgentStateManager({
+      initialState: { systemPrompt: "test" },
+    });
+
+    await session.runSession({ stateManager });
+
+    expect(hookLog).toEqual([
+      "start-1",
+      "start-2",
+      "turn-1:1",
+      "turn-2:1",
+      "end-1",
+      "end-2",
+    ]);
+  });
+
   // --- System prompt ---
 
   it("throws when system prompt is missing", async () => {

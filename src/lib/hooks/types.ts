@@ -1,5 +1,6 @@
 import type { SessionExitReason, TokenUsage } from "../types";
 import type { ToolMap, ToolRouterHooks } from "../tool-router/types";
+import type { HookInput } from "./normalize";
 
 // ============================================================================
 // Session Lifecycle Hooks
@@ -104,6 +105,11 @@ export type PostHumanMessageAppendHook<TContent = unknown> = (
  * Full hooks interface for a session — combines tool execution hooks
  * (consumed by the router) with session/message lifecycle hooks
  * (consumed directly by the session).
+ *
+ * Every slot accepts a single hook or an array of hooks. Session and
+ * message lifecycle hooks run sequentially in array order, independently
+ * of each other — return values are ignored. Tool execution hooks have
+ * per-hook chaining semantics, documented on {@link ToolRouterHooks}.
  */
 export interface Hooks<
   T extends ToolMap,
@@ -111,13 +117,13 @@ export interface Hooks<
   TContent = unknown,
 > extends ToolRouterHooks<T, TResult> {
   /** Called before each human message is appended to the thread */
-  onPreHumanMessageAppend?: PreHumanMessageAppendHook<TContent>;
+  onPreHumanMessageAppend?: HookInput<PreHumanMessageAppendHook<TContent>>;
   /** Called after each human message is appended to the thread */
-  onPostHumanMessageAppend?: PostHumanMessageAppendHook<TContent>;
+  onPostHumanMessageAppend?: HookInput<PostHumanMessageAppendHook<TContent>>;
   /** Called when session starts */
-  onSessionStart?: SessionStartHook;
+  onSessionStart?: HookInput<SessionStartHook>;
   /** Called when session ends */
-  onSessionEnd?: SessionEndHook;
+  onSessionEnd?: HookInput<SessionEndHook>;
   /** Called after each agent turn commits (excludes rewound turns) */
-  onTurnComplete?: TurnCompleteHook;
+  onTurnComplete?: HookInput<TurnCompleteHook>;
 }

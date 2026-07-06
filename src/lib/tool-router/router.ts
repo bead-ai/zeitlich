@@ -18,8 +18,10 @@ import type {
   ProcessToolCallsResult,
   RewindSignal,
   ToolWithHandler,
+  PostToolUseFailureHookResult,
 } from "./types";
 
+import { normalizeHooks } from "../hooks/normalize";
 import type { JsonValue } from "../state/types";
 import type { z } from "zod";
 import {
@@ -115,7 +117,11 @@ export function createToolRouter<T extends ToolMap>(
     }
   }
 
-  /** Run global → per-tool pre-hooks. Returns null to skip, or the (possibly modified) args. */
+  /**
+   * Run global → per-tool pre-hooks in order. The first `skip: true` stops
+   * the chain; `modifiedArgs` are threaded into the next hook's args and
+   * ultimately returned as the effective handler args.
+   */
   async function runPreHooks(
     toolCall: ParsedToolCallUnion<T>,
     tool: ToolMap[string] | undefined,
@@ -123,9 +129,12 @@ export function createToolRouter<T extends ToolMap>(
   ): Promise<{ skip: true } | { skip: false; args: unknown }> {
     let effectiveArgs: unknown = toolCall.args;
 
-    if (options.hooks?.onPreToolUse) {
-      const preResult = await options.hooks.onPreToolUse({
-        toolCall,
+    for (const hook of normalizeHooks(options.hooks?.onPreToolUse)) {
+      const preResult = await hook({
+        toolCall: {
+          ...toolCall,
+          args: effectiveArgs,
+        } as ParsedToolCallUnion<T>,
         threadId: options.threadId,
         turn,
       });
@@ -134,8 +143,8 @@ export function createToolRouter<T extends ToolMap>(
         effectiveArgs = preResult.modifiedArgs;
     }
 
-    if (tool?.hooks?.onPreToolUse) {
-      const preResult = await tool.hooks.onPreToolUse({
+    for (const hook of normalizeHooks(tool?.hooks?.onPreToolUse)) {
+      const preResult = await hook({
         args: effectiveArgs,
         threadId: options.threadId,
         turn,
@@ -149,8 +158,15 @@ export function createToolRouter<T extends ToolMap>(
   }
 
   /**
-   * Run per-tool → global failure hooks. Returns recovery content/result,
-   * or a generic error response if no hook recovers.
+   * Run global → per-tool failure hooks. All hooks run (so side-effect-only
+   * hooks like observability always see the failure), then a single verdict
+   * is derived:
+   *
+   * 1. any explicit `suppress: false` → rethrow the original error
+   * 2. the last `fallbackContent` → recovered content (per-tool hooks run
+   *    last, so the more specific recovery wins)
+   * 3. any `suppress: true` → suppressed error content
+   * 4. otherwise → default error content with the underlying failure reason
    */
   async function runFailureHooks(
     toolCall: ParsedToolCallUnion<T>,
@@ -162,55 +178,57 @@ export function createToolRouter<T extends ToolMap>(
     const err = error instanceof Error ? error : new Error(String(error));
     const errorStr = String(error);
 
-    if (tool?.hooks?.onPostToolUseFailure) {
-      const r = await tool.hooks.onPostToolUseFailure({
-        args: effectiveArgs,
-        error: err,
-        threadId: options.threadId,
-        turn,
-      });
-      if (r?.fallbackContent !== undefined)
-        return {
-          content: r.fallbackContent,
-          result: { error: errorStr, recovered: true },
-        };
-      if (r?.suppress)
-        return {
-          content: JSON.stringify({ error: errorStr, suppressed: true }),
-          result: { error: errorStr, suppressed: true },
-        };
-    }
-
-    if (options.hooks?.onPostToolUseFailure) {
-      const r = await options.hooks.onPostToolUseFailure({
+    const results: PostToolUseFailureHookResult[] = [];
+    for (const hook of normalizeHooks(options.hooks?.onPostToolUseFailure)) {
+      const r = await hook({
         toolCall,
         error: err,
         threadId: options.threadId,
         turn,
       });
-      if (r?.fallbackContent !== undefined)
+      if (r !== undefined) results.push(r);
+    }
+    for (const hook of normalizeHooks(tool?.hooks?.onPostToolUseFailure)) {
+      const r = await hook({
+        args: effectiveArgs,
+        error: err,
+        threadId: options.threadId,
+        turn,
+      });
+      if (r !== undefined) results.push(r);
+    }
+
+    // An explicit `suppress: false` is the strongest signal: this error
+    // must not be converted into model-visible content — let it bubble.
+    if (results.some((r) => r.suppress === false)) throw error;
+
+    for (let i = results.length - 1; i >= 0; i--) {
+      const fallbackContent = results[i]?.fallbackContent;
+      if (fallbackContent !== undefined)
         return {
-          content: r.fallbackContent,
+          content: fallbackContent,
           result: { error: errorStr, recovered: true },
-        };
-      if (r?.suppress)
-        return {
-          content: JSON.stringify({ error: errorStr, suppressed: true }),
-          result: { error: errorStr, suppressed: true },
         };
     }
 
+    if (results.some((r) => r.suppress))
+      return {
+        content: JSON.stringify({ error: errorStr, suppressed: true }),
+        result: { error: errorStr, suppressed: true },
+      };
+
     // No hook recovered: surface the underlying failure reason so the model
-    // can act on it instead of guessing blind.
+    // can act on it instead of guessing blind. Kept deliberately free of
+    // behavioral instructions — consumers add those via onPostToolUseFailure.
     return {
       content: JSON.stringify({
-        error: `Tool execution failed: ${extractFailureMessage(error)}. If retrying or adjusting arguments cannot fix this, report the failure and continue with a different approach — do not ask the user to do the tool's work manually.`,
+        error: `Tool execution failed: ${extractFailureMessage(error)}`,
       }),
       result: { error: errorStr, suppressed: true },
     };
   }
 
-  /** Run per-tool → global post-hooks. */
+  /** Run per-tool → global post-hooks sequentially; return values are ignored. */
   async function runPostHooks(
     toolCall: ParsedToolCallUnion<T>,
     tool: ToolMap[string] | undefined,
@@ -219,8 +237,8 @@ export function createToolRouter<T extends ToolMap>(
     turn: number,
     durationMs: number
   ): Promise<void> {
-    if (tool?.hooks?.onPostToolUse) {
-      await tool.hooks.onPostToolUse({
+    for (const hook of normalizeHooks(tool?.hooks?.onPostToolUse)) {
+      await hook({
         args: effectiveArgs,
         result: toolResult.data,
         threadId: options.threadId,
@@ -229,8 +247,8 @@ export function createToolRouter<T extends ToolMap>(
         ...(toolResult.metadata && { metadata: toolResult.metadata }),
       });
     }
-    if (options.hooks?.onPostToolUse) {
-      await options.hooks.onPostToolUse({
+    for (const hook of normalizeHooks(options.hooks?.onPostToolUse)) {
+      await hook({
         toolCall,
         result: toolResult,
         threadId: options.threadId,

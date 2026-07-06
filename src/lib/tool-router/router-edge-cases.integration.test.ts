@@ -296,7 +296,7 @@ describe("createToolRouter edge cases", () => {
 
   // --- Per-tool failure hook takes precedence over global ---
 
-  it("per-tool failure hook takes precedence over global failure hook", async () => {
+  it("per-tool failure hook recovery wins over global, but both run", async () => {
     const failTool = defineTool({
       name: "Fail" as const,
       description: "fails",
@@ -327,12 +327,14 @@ describe("createToolRouter edge cases", () => {
     const parsed = router.parseToolCall({ id: "tc-1", name: "Fail", args: {} });
     const results = await router.processToolCalls([parsed], { turn: 1 });
 
+    // All failure hooks run (global → per-tool); the last fallbackContent
+    // wins, so the more specific per-tool recovery prevails.
     expect(at(appendSpy.calls, 0).content).toBe("tool-level recovery");
     expect(at(results, 0).data).toEqual({
       error: "Error: boom",
       recovered: true,
     });
-    expect(globalHookSpy).not.toHaveBeenCalled();
+    expect(globalHookSpy).toHaveBeenCalledTimes(1);
   });
 
   // --- Pre-hook modifiedArgs from both global and per-tool ---
@@ -396,7 +398,6 @@ describe("createToolRouter edge cases", () => {
       parallel: true,
     });
 
-     
     const results = await router.processToolCalls([
       { id: "tc-1", name: "Unknown1", args: {} },
       { id: "tc-2", name: "Unknown2", args: {} },

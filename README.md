@@ -394,7 +394,8 @@ const session = await createSession({
 
 ### Lifecycle Hooks
 
-Add hooks for tool execution and session lifecycle:
+Add hooks for tool execution and session lifecycle. Every hook slot accepts
+a single function or an array of functions run in order:
 
 ```typescript
 const session = await createSession({
@@ -414,9 +415,12 @@ const session = await createSession({
     onSessionStart: ({ threadId, agentName }) => {
       console.log(`Session started: ${agentName}`);
     },
-    onSessionEnd: ({ exitReason, turns }) => {
-      console.log(`Session ended: ${exitReason} after ${turns} turns`);
-    },
+    onSessionEnd: [
+      ({ exitReason, turns }) => {
+        console.log(`Session ended: ${exitReason} after ${turns} turns`);
+      },
+      // ...more hooks, run in order
+    ],
   },
 });
 ```
@@ -1313,22 +1317,38 @@ const session = await createSession({
 });
 ```
 
-Use `composeHooks()` to combine observability hooks with your own:
+Every hook slot accepts a single function or an array of functions run in
+order, so combining observability hooks with your own is just an array:
 
 ```typescript
-import { createObservabilityHooks, composeHooks } from "zeitlich/workflow";
+import { createObservabilityHooks } from "zeitlich/workflow";
 
 const obs = createObservabilityHooks("myAgent");
 
 const session = await createSession({
   hooks: {
     ...obs,
-    onSessionEnd: composeHooks(obs.onSessionEnd, (ctx) => {
-      // your custom session-end logic
-    }),
+    onSessionEnd: [
+      obs.onSessionEnd,
+      (ctx) => {
+        // your custom session-end logic
+      },
+    ],
   },
 });
 ```
+
+Most hooks run independently and their return values are ignored. Two are
+special:
+
+- `onPreToolUse` — hooks run in order; the first `skip: true` stops the
+  chain and skips the tool call, and `modifiedArgs` are passed to the next
+  hook (and ultimately the tool handler).
+- `onPostToolUseFailure` — all hooks run; if any returns an explicit
+  `suppress: false` the error is rethrown and bubbles out of tool
+  processing, otherwise the last `fallbackContent` wins, otherwise a
+  default error content (including the underlying failure reason) is
+  returned to the model.
 
 ### Tracing with OpenTelemetry
 

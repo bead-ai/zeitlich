@@ -115,6 +115,7 @@ export type {
 // Session & message lifecycle hooks
 export type {
   Hooks,
+  HookInput,
   SessionStartHook,
   SessionStartHookContext,
   SessionEndHook,
@@ -128,11 +129,7 @@ export type {
 } from "./lib/hooks";
 
 // Observability
-export {
-  createObservabilityHooks,
-  composeHooks,
-  composeFailureHooks,
-} from "./lib/observability";
+export { createObservabilityHooks } from "./lib/observability";
 export type {
   ObservabilityHooks,
   ZeitlichObservabilitySinks,

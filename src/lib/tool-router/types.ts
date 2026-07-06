@@ -1,5 +1,6 @@
 import type { TokenUsage, ToolResultConfig } from "../types";
 import type { JsonValue } from "../state/types";
+import type { HookInput } from "../hooks/normalize";
 import type { z } from "zod";
 import type { ActivityFunctionWithOptions } from "@temporalio/workflow";
 import type { SandboxSnapshot } from "../sandbox/types";
@@ -384,39 +385,59 @@ export interface PreToolUseHookResult {
  * Result from PostToolUseFailure hook - can recover from errors
  */
 export interface PostToolUseFailureHookResult {
-  /** Provide a fallback result instead of throwing */
+  /**
+   * Provide fallback content to return to the model instead of the default
+   * error content. When multiple failure hooks return `fallbackContent`,
+   * the last one wins.
+   */
   fallbackContent?: JsonValue;
-  /** Whether to suppress the error (still logs, but continues) */
+  /**
+   * Explicitly `false` — do not suppress: the error is rethrown and bubbles
+   * out of tool processing (takes precedence over any `fallbackContent`).
+   * `true` — suppress: the error is converted into an error content
+   * response for the model.
+   * Omitted — no opinion; other hooks or the default behavior decide.
+   */
   suppress?: boolean;
 }
 
 /**
  * Per-tool lifecycle hooks - defined directly on a tool definition.
- * Runs in addition to global hooks (global pre → tool pre → execute → tool post → global post).
+ * Runs in addition to global hooks (global pre → tool pre → execute → tool
+ * post → global post; on failure: global failure → tool failure).
+ *
+ * Every slot accepts a single hook or an array of hooks run in order;
+ * see {@link ToolRouterHooks} for the per-hook chaining semantics.
  */
 export interface ToolHooks<TArgs = unknown, TResult = unknown> {
   /** Called before this tool executes - can skip or modify args */
-  onPreToolUse?: (ctx: {
-    args: TArgs;
-    threadId: string;
-    turn: number;
-  }) => PreToolUseHookResult | Promise<PreToolUseHookResult>;
+  onPreToolUse?: HookInput<
+    (ctx: {
+      args: TArgs;
+      threadId: string;
+      turn: number;
+    }) => PreToolUseHookResult | Promise<PreToolUseHookResult>
+  >;
   /** Called after this tool executes successfully */
-  onPostToolUse?: (ctx: {
-    args: TArgs;
-    result: TResult;
-    threadId: string;
-    turn: number;
-    durationMs: number;
-    metadata?: Record<string, unknown>;
-  }) => void | Promise<void>;
+  onPostToolUse?: HookInput<
+    (ctx: {
+      args: TArgs;
+      result: TResult;
+      threadId: string;
+      turn: number;
+      durationMs: number;
+      metadata?: Record<string, unknown>;
+    }) => void | Promise<void>
+  >;
   /** Called when this tool execution fails */
-  onPostToolUseFailure?: (ctx: {
-    args: TArgs;
-    error: Error;
-    threadId: string;
-    turn: number;
-  }) => PostToolUseFailureHookResult | Promise<PostToolUseFailureHookResult>;
+  onPostToolUseFailure?: HookInput<
+    (ctx: {
+      args: TArgs;
+      error: Error;
+      threadId: string;
+      turn: number;
+    }) => PostToolUseFailureHookResult | Promise<PostToolUseFailureHookResult>
+  >;
 }
 
 /**
@@ -485,14 +506,29 @@ export type PostToolUseFailureHook<T extends ToolMap> = (
 /**
  * Tool execution hooks — the subset of hooks consumed by the tool router.
  * Session/message lifecycle hooks live in lib/hooks/types.ts.
+ *
+ * Every slot accepts a single hook or an array of hooks run sequentially
+ * in order. Per-tool hooks ({@link ToolHooks}) join the same chain:
+ * `onPreToolUse` and `onPostToolUseFailure` run global → per-tool (so the
+ * more specific per-tool hooks get the final say), `onPostToolUse` runs
+ * per-tool → global. Chaining semantics per hook:
+ *
+ * - `onPreToolUse`: the first `skip: true` stops the chain and skips the
+ *   tool; `modifiedArgs` are passed to the next hook as args (and
+ *   ultimately to the handler).
+ * - `onPostToolUse`: hooks run independently; return values are ignored.
+ * - `onPostToolUseFailure`: all hooks run. If any returns an explicit
+ *   `suppress: false` the error is rethrown and bubbles out of tool
+ *   processing; otherwise the last `fallbackContent` wins; otherwise the
+ *   default error content is returned to the model.
  */
 export interface ToolRouterHooks<T extends ToolMap, TResult = unknown> {
   /** Called before each tool execution - can block or modify */
-  onPreToolUse?: PreToolUseHook<T>;
+  onPreToolUse?: HookInput<PreToolUseHook<T>>;
   /** Called after each successful tool execution */
-  onPostToolUse?: PostToolUseHook<T, TResult>;
+  onPostToolUse?: HookInput<PostToolUseHook<T, TResult>>;
   /** Called when tool execution fails */
-  onPostToolUseFailure?: PostToolUseFailureHook<T>;
+  onPostToolUseFailure?: HookInput<PostToolUseFailureHook<T>>;
 }
 
 // ============================================================================

@@ -28,6 +28,7 @@ import type {
 } from "../state/types";
 import { createToolRouter } from "../tool-router/router";
 import type { ParsedToolCallUnion, ToolMap } from "../tool-router/types";
+import { normalizeHooks } from "../hooks/normalize";
 import { getShortId } from "../thread/id";
 import { buildSubagentRegistration } from "../subagent/register";
 import { buildSkillRegistration } from "../skills/register";
@@ -257,8 +258,8 @@ export async function createSession<
     turns: number,
     usage: TokenUsage
   ): Promise<void> => {
-    if (hooks.onSessionEnd) {
-      await hooks.onSessionEnd({
+    for (const hook of normalizeHooks(hooks.onSessionEnd)) {
+      await hook({
         threadId,
         agentName,
         exitReason,
@@ -278,15 +279,15 @@ export async function createSession<
       setHandler(
         defineUpdate<unknown, [TContent]>(`add${agentName}Message`),
         async (message: TContent) => {
-          if (hooks.onPreHumanMessageAppend) {
-            await hooks.onPreHumanMessageAppend({
+          for (const hook of normalizeHooks(hooks.onPreHumanMessageAppend)) {
+            await hook({
               message,
               threadId,
             });
           }
           await appendHumanMessage(threadId, uuid4(), message, threadKey);
-          if (hooks.onPostHumanMessageAppend) {
-            await hooks.onPostHumanMessageAppend({
+          for (const hook of normalizeHooks(hooks.onPostHumanMessageAppend)) {
+            await hook({
               message,
               threadId,
             });
@@ -567,8 +568,8 @@ export async function createSession<
       let exitReason: SessionExitReason = "completed";
       let finalMessage: M | null = null;
 
-      if (hooks.onSessionStart) {
-        await hooks.onSessionStart({
+      for (const hook of normalizeHooks(hooks.onSessionStart)) {
+        await hook({
           threadId,
           agentName,
           metadata,
@@ -628,8 +629,8 @@ export async function createSession<
           });
 
           if (!toolRouter.hasTools() || rawToolCalls.length === 0) {
-            if (hooks.onTurnComplete) {
-              await hooks.onTurnComplete({
+            for (const hook of normalizeHooks(hooks.onTurnComplete)) {
+              await hook({
                 threadId,
                 agentName,
                 turn: currentTurn,
@@ -723,8 +724,8 @@ export async function createSession<
           // Turn committed: fresh id for the next turn.
           assistantId = undefined;
 
-          if (hooks.onTurnComplete) {
-            await hooks.onTurnComplete({
+          for (const hook of normalizeHooks(hooks.onTurnComplete)) {
+            await hook({
               threadId,
               agentName,
               turn: currentTurn,

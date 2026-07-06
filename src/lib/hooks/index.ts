@@ -1,3 +1,5 @@
+export { normalizeHooks } from "./normalize";
+export type { HookInput } from "./normalize";
 export type {
   SessionStartHookContext,
   SessionStartHook,
