@@ -25,13 +25,15 @@ import {
 export const genaiErrorClassifier: LlmErrorClassifier = (error) => {
   if (!(error instanceof ApiError)) return undefined;
   // The SDK types `status` as a numeric HTTP code, but Vertex surfaces gRPC
-  // status-name strings at runtime (e.g. 'RESOURCE_EXHAUSTED'); the numeric
-  // code embedded in the message body is the fallback.
-  const grpc: string | number = error.status;
+  // status-name strings at runtime (e.g. 'RESOURCE_EXHAUSTED'), so handle
+  // both; the numeric code embedded in the message body is the last fallback.
+  const status: string | number = error.status;
   const code = httpCodeFromMessage(error.message);
   const kind =
-    (grpc ? GRPC_STATUS_KIND[grpc] : undefined) ??
+    (typeof status === "number"
+      ? kindFromHttpStatus(status)
+      : GRPC_STATUS_KIND[status]) ??
     (code != null ? kindFromHttpStatus(code) : undefined);
   if (!kind) return undefined;
-  return { kind, status: grpc || code };
+  return { kind, status: status || code };
 };

@@ -73,6 +73,25 @@ describe("genaiErrorClassifier — Vertex/Gemini (via genai ApiError)", () => {
     expect(e?.status).toBe(429);
   });
 
+  it("maps a numeric HTTP status (as the SDK types claim)", () => {
+    const e = classify(
+      new ApiError({ message: "quota exceeded", status: 429 })
+    );
+    expect(e).toBeInstanceOf(LlmRateLimitError);
+    expect(e?.status).toBe(429);
+    expect(
+      classify(new ApiError({ message: "server error", status: 503 }))
+    ).toBeInstanceOf(LlmUnavailableError);
+  });
+
+  it("prefers the numeric status over the code in the message", () => {
+    const e = classify(
+      new ApiError({ message: '{"error":{"code":429}}', status: 503 })
+    );
+    expect(e).toBeInstanceOf(LlmUnavailableError);
+    expect(e?.status).toBe(503);
+  });
+
   it("preserves the original ApiError as the cause", () => {
     const original = genaiApiError("RESOURCE_EXHAUSTED");
     const e = classify(original);
