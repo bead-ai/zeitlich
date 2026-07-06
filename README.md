@@ -781,9 +781,9 @@ To override an individual op without inflating the rest:
 
 ```typescript
 const threadOps = proxyGoogleGenAIThreadOps(undefined, {
-  defaults: { startToCloseTimeout: "5s" },                  // applied to every op
+  defaults: { startToCloseTimeout: "5s" }, // applied to every op
   perOp: {
-    flushThread: { startToCloseTimeout: "180s" },           // overlays cold-tier defaults; heartbeatTimeout still inherited
+    flushThread: { startToCloseTimeout: "180s" }, // overlays cold-tier defaults; heartbeatTimeout still inherited
   },
 });
 ```
@@ -1096,6 +1096,44 @@ const session = await createSession({
 });
 ```
 
+### LLM Provider Error Classification
+
+Provider SDKs throw their own error shapes, which error tracking (e.g. Datadog) lumps into a single issue and Temporal retries blindly. `classifyLlmError` (from `zeitlich`) normalises them into typed `LlmError` subclasses — `LlmRateLimitError`, `LlmTimeoutError`, `LlmUnavailableError`, `LlmPermanentError` — each carrying `kind`, `provider`, `model`, `status`, `retryAfterMs`, and the original error as `cause`.
+
+Each subclass assigns `this.name` in its constructor, so the name survives minification and becomes Temporal's `ApplicationFailure.type`. On Temporal that buys you:
+
+- distinct Error Tracking issues per failure mode instead of one lumped bucket;
+- fail-fast on permanent errors instead of burning the retry budget:
+
+```typescript
+const retry = {
+  nonRetryableErrorTypes: ["LlmPermanentError"],
+};
+```
+
+Built-in classifiers cover unambiguous transport failures (`TimeoutError`, transient Node errno codes) and Bedrock (structural, via the AWS SDK's typed `SdkError` contract — type-only, no runtime dependency). SDK-anchored classifiers live with their adapter so the main entry never imports an optional dependency at runtime — compose them via `opts.classifiers`:
+
+```typescript
+import { classifyLlmError } from "zeitlich";
+import { genaiErrorClassifier } from "zeitlich/adapters/thread/google-genai";
+
+try {
+  return await client.models.generateContent(request);
+} catch (error) {
+  throw (
+    classifyLlmError(
+      error,
+      { provider: "vertex", model },
+      { classifiers: [genaiErrorClassifier] }
+    ) ?? error // unrecognised → rethrow the original under its real class
+  );
+}
+```
+
+Classifiers run in order, first match wins: the built-in transport classifier, then `opts.classifiers` in array order, then the structural AWS classifier last.
+
+Note: a bare `AbortError` is intentionally left unclassified — an abort is ambiguous between a genuine provider timeout and a Temporal activity cancellation / worker shutdown, and classifying it as a retryable timeout would mask cancellation and retry cancelled work. `TimeoutError` is unambiguous and is classified.
+
 ## API Reference
 
 ### Workflow Entry Point (`zeitlich/workflow`)
@@ -1138,6 +1176,7 @@ Framework-agnostic utilities for activities, worker setup, and Node.js code:
 | `withSandbox`               | Wraps a handler to auto-resolve sandbox from context (pairs with `withAutoAppend`)                                 |
 | `NodeFsSandboxFileSystem`   | `node:fs` adapter for `SandboxFileSystem` — read skills from the worker's local disk                               |
 | `FileSystemSkillProvider`   | Load skills from a directory following the agentskills.io layout                                                   |
+| `classifyLlmError`          | Normalise provider errors into typed `LlmError` subclasses (see [above](#llm-provider-error-classification))       |
 | Tool handlers               | `bashHandler`, `editHandler`, `globHandler`, `readFileHandler`, `writeFileHandler`, `createAskUserQuestionHandler` |
 
 ### Thread Adapter Entry Points
@@ -1159,6 +1198,7 @@ Framework-agnostic utilities for activities, worker setup, and Node.js code:
 | `createGoogleGenAIModelInvoker`  | Factory that returns a `ModelInvoker` backed by the `@google/genai` SDK       |
 | `invokeGoogleGenAIModel`         | One-shot model invocation convenience function                                |
 | `createGoogleGenAIThreadManager` | Thread manager with Google GenAI `Content` helpers                            |
+| `genaiErrorClassifier`           | `ApiError`-anchored classifier for `classifyLlmError`'s `opts.classifiers`    |
 
 ### Types
 

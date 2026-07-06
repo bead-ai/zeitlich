@@ -212,6 +212,7 @@
     "@eslint/js": "^10.0.1",
     "@google/genai": "^2.7.0",
     "@langchain/core": "^1.1.48",
+    "@smithy/types": "^4.15.1",
     "@temporalio/common": "^1.17.2",
     "@temporalio/envconfig": "^1.17.2",
     "@temporalio/worker": "^1.17.2",

@@ -45,3 +45,6 @@ export {
   invokeGoogleGenAIModel,
   type GoogleGenAIModelInvokerConfig,
 } from "./model-invoker";
+
+// LLM error classification (compose with `classifyLlmError` from `zeitlich`)
+export { genaiErrorClassifier } from "./error-classifier";

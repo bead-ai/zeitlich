@@ -62,6 +62,27 @@ export type {
 // Model invoker contract (framework-agnostic)
 export type { ModelInvoker, ModelInvokerConfig } from "./lib/model";
 
+// LLM provider error classification (pure — no optional SDK imports here;
+// compose SDK-anchored classifiers such as `genaiErrorClassifier` from
+// `zeitlich/adapters/thread/google-genai` via `opts.classifiers`)
+export {
+  LlmError,
+  LlmRateLimitError,
+  LlmTimeoutError,
+  LlmUnavailableError,
+  LlmPermanentError,
+  classifyLlmError,
+  transportErrorClassifier,
+  awsErrorClassifier,
+} from "./lib/llm-errors";
+export type {
+  LlmProvider,
+  LlmErrorKind,
+  LlmErrorContext,
+  LlmErrorClassifier,
+  LlmErrorClassification,
+} from "./lib/llm-errors";
+
 // Activity-side handler wrappers
 export { withAutoAppend, withSandbox, withBrowser } from "./lib/tool-router";
 export type {
